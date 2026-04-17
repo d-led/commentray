@@ -1,15 +1,7 @@
 # `cli.ts` — companion
 
-Commander entry: **`init`**, **`init config`**, **`init scm`**, **`validate`**, **`doctor`**, **`migrate`**, **`paths`**, **`render`**. Version string comes from this package’s `package.json` (JSON import) so **SEA** bundles and plain `node` agree.
+Commander is the table read: **`init`**, **`init config`**, **`init scm`**, **`validate`**, **`doctor`**, **`migrate`**, **`paths`**, **`render`**. The version string is read from **this** package’s `package.json` (JSON import) so SEA bundles and plain `node` never improvise different numbers.
 
-## Operational split
+**Split** — `validate` is for machines (CI, hooks). `doctor` is for humans who want environment noise in the same pass. `paths` exists so scripts and editors can ask “where’s the companion?” without reimplementing path rules.
 
-| Command    | Typical use                                                  |
-| ---------- | ------------------------------------------------------------ |
-| `validate` | CI + hooks — schema and anchor checks                        |
-| `doctor`   | Human preflight — validate + environment                     |
-| `paths`    | Scripts / editors — resolve companion path for a source file |
-
-## Binary story
-
-[`binaries.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml) publishes OS/arch builds on **`v*`** tags; local smoke: `npm run binary:smoke`.
+**Binaries** — [`binaries.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml) on **`v*`** tags; local smoke stays **`npm run binary:smoke`**.

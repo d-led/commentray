@@ -13,21 +13,25 @@ import { visit } from "unist-util-visit";
 
 import { escapeHtml } from "./html-utils.js";
 
-export type GithubBlobLinkRewriteOptions = {
-  owner: string;
-  repo: string;
-  /** Absolute path to the HTML file being generated (used to compute relative `href`s). */
-  htmlOutputFileAbs: string;
-  /** Absolute repository root; rewritten targets must stay under this directory. */
+/**
+ * When generating static HTML (Pages, `commentray render`), rewrites `img[src]` and `a[href]`
+ * so local assets work from the output file location.
+ *
+ * **URL rules** (same companion file as in the editor):
+ * - **`/path/to/file`** — repository root (leading slash), POSIX-style.
+ * - **`./` / `../` / `figures/a.png`** — relative to the companion Markdown file’s directory
+ *   (`markdownUrlBaseDirAbs`), i.e. normal Markdown resolution.
+ */
+export type CommentrayOutputUrlOptions = {
   repoRootAbs: string;
+  htmlOutputFileAbs: string;
+  markdownUrlBaseDirAbs: string;
+  /** When set, `https://github.com/<owner>/<repo>/blob|tree/<branch>/…` becomes a `/…` repo path. */
+  githubBlobRepo?: { owner: string; repo: string };
 };
 
 export type MarkdownPipelineOptions = {
-  /**
-   * When set, `https://github.com/<owner>/<repo>/blob|tree/<branch>/path` in Markdown becomes
-   * an `href` (or `img` `src`) relative to `htmlOutputFileAbs`, pointing at `repoRootAbs/path`.
-   */
-  githubBlobLinkRewrite?: GithubBlobLinkRewriteOptions;
+  commentrayOutputUrls?: CommentrayOutputUrlOptions;
 };
 
 function escapeRegExp(s: string): string {
@@ -68,7 +72,9 @@ function remarkGithubBlobToRepoPaths(opts: { owner: string; repo: string }) {
   return (tree: MdastRoot) => {
     const rewrite = (url: string): string | null => {
       const next = tryExtractRepoFilePathFromGithubUrl(url, owner, repo);
-      return next ? next.replace(/\\/g, "/") : null;
+      if (!next) return null;
+      const posix = next.replace(/\\/g, "/").replace(/^\/+/, "");
+      return posix ? `/${posix}` : null;
     };
     visit(tree, "link", (node: Link) => {
       const next = rewrite(node.url);
@@ -89,26 +95,39 @@ function posixHref(fsPath: string): string {
   return fsPath.split(path.sep).join("/");
 }
 
-function rehypeRelativizeRepoLinks(opts: { repoRootAbs: string; htmlOutputFileAbs: string }) {
-  const repoRoot = path.resolve(opts.repoRootAbs);
-  const htmlDir = path.dirname(path.resolve(opts.htmlOutputFileAbs));
+function decodeUrlPath(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
 
-  function adjustUrl(raw: string): string | null {
-    const href = raw.trim();
-    if (!href || href.startsWith("#")) return null;
-    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/i.test(href)) return null;
-    if (href.startsWith("//")) return null;
-    if (href.startsWith(".")) return null;
+function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
+  const repoRoot = path.resolve(ctx.repoRootAbs);
+  const htmlDir = path.dirname(path.resolve(ctx.htmlOutputFileAbs));
+  const baseDir = path.resolve(ctx.markdownUrlBaseDirAbs);
 
-    const normalized = href.replace(/^\.\/+/, "").replace(/\\/g, "/");
-    if (normalized.includes("://")) return null;
+  function resolveTargetAbs(raw: string): string | null {
+    const t = raw.trim();
+    if (!t || t.startsWith("#")) return null;
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/i.test(t)) return null;
+    if (t.startsWith("//")) return null;
 
-    const segments = normalized.split("/").filter((s) => s && s !== "." && s !== "..");
-    const targetAbs = path.normalize(path.join(repoRoot, ...segments));
-    const relToRepo = path.relative(repoRoot, targetAbs);
+    let resolved: string;
+    if (t.startsWith("/")) {
+      const rest = decodeUrlPath(t.replace(/^\/+/, ""));
+      const segments = rest.split("/").filter((s) => s && s !== "." && s !== "..");
+      resolved = path.normalize(path.join(repoRoot, ...segments));
+    } else {
+      const decoded = decodeUrlPath(t);
+      resolved = path.normalize(path.resolve(baseDir, decoded));
+    }
+
+    const relToRepo = path.relative(repoRoot, resolved);
     if (relToRepo.startsWith("..") || path.isAbsolute(relToRepo)) return null;
 
-    const out = path.relative(htmlDir, targetAbs);
+    const out = path.relative(htmlDir, resolved);
     if (path.isAbsolute(out)) return null;
 
     return posixHref(out);
@@ -120,7 +139,7 @@ function rehypeRelativizeRepoLinks(opts: { repoRootAbs: string; htmlOutputFileAb
       const key = node.tagName === "a" ? "href" : "src";
       const raw = node.properties?.[key];
       if (typeof raw !== "string") return;
-      const next = adjustUrl(raw);
+      const next = resolveTargetAbs(raw);
       if (next == null) return;
       node.properties ??= {};
       node.properties[key] = next;
@@ -158,26 +177,24 @@ export async function renderMarkdownToHtml(
   markdown: string,
   options?: MarkdownPipelineOptions,
 ): Promise<string> {
-  const rewriter = options?.githubBlobLinkRewrite;
+  const outUrls = options?.commentrayOutputUrls;
   const file = await unified()
     .use(remarkParse)
     .use(remarkGfm)
     .use(function remarkGithubBlobMaybe() {
       return (tree: MdastRoot) => {
-        if (!rewriter) return;
-        remarkGithubBlobToRepoPaths({ owner: rewriter.owner, repo: rewriter.repo })(tree);
+        const gh = outUrls?.githubBlobRepo;
+        if (!gh) return;
+        remarkGithubBlobToRepoPaths({ owner: gh.owner, repo: gh.repo })(tree);
       };
     })
     .use(remarkMermaidPlaceholders)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeSanitize, sanitizeSchema)
-    .use(function rehypeRelativizeMaybe() {
+    .use(function rehypeOutputUrlsMaybe() {
       return (tree: HastRoot) => {
-        if (!rewriter) return;
-        rehypeRelativizeRepoLinks({
-          repoRootAbs: rewriter.repoRootAbs,
-          htmlOutputFileAbs: rewriter.htmlOutputFileAbs,
-        })(tree);
+        if (!outUrls) return;
+        rehypeCommentrayOutputUrls(outUrls)(tree);
       };
     })
     .use(rehypeHighlight)

@@ -24,11 +24,11 @@ describe("renderMarkdownToHtml", () => {
       "[Storage](https://github.com/acme/demo/blob/main/docs/spec/storage.md) " +
       "and [other](https://github.com/other/repo/blob/main/x.md).";
     const html = await renderMarkdownToHtml(md, {
-      githubBlobLinkRewrite: {
-        owner: "acme",
-        repo: "demo",
-        htmlOutputFileAbs: outHtml,
+      commentrayOutputUrls: {
         repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: repoRoot,
+        githubBlobRepo: { owner: "acme", repo: "demo" },
       },
     });
     expect(html).toContain('href="../docs/spec/storage.md"');
@@ -42,11 +42,11 @@ describe("renderMarkdownToHtml", () => {
     const outHtml = path.join(repoRoot, "out.html");
     const md = "[x](https://github.com/wrong/repo/blob/main/README.md)";
     const html = await renderMarkdownToHtml(md, {
-      githubBlobLinkRewrite: {
-        owner: "acme",
-        repo: "demo",
-        htmlOutputFileAbs: outHtml,
+      commentrayOutputUrls: {
         repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: repoRoot,
+        githubBlobRepo: { owner: "acme", repo: "demo" },
       },
     });
     expect(html).toContain("github.com/wrong/repo");
@@ -67,7 +67,7 @@ describe("renderSideBySideHtml", () => {
     expect(html).toContain("Notes");
   });
 
-  it("forwards githubBlobLinkRewrite into the commentray pane", async () => {
+  it("forwards commentrayOutputUrls into the commentray pane", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-sbs-"));
     const repoRoot = path.join(tmp, "repo");
     await mkdir(path.join(repoRoot, "a"), { recursive: true });
@@ -81,13 +81,55 @@ describe("renderSideBySideHtml", () => {
       language: "txt",
       commentrayMarkdown: "[b](https://github.com/o/r/blob/main/a/b.md)",
       includeMermaidRuntime: false,
-      githubBlobLinkRewrite: {
-        owner: "o",
-        repo: "r",
-        htmlOutputFileAbs: outHtml,
+      commentrayOutputUrls: {
         repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: repoRoot,
+        githubBlobRepo: { owner: "o", repo: "r" },
       },
     });
     expect(html).toContain('href="../a/b.md"');
+  });
+
+  it("resolves companion-relative and repo-root images for static HTML", async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), "cr-img-"));
+    const repoRoot = path.join(tmp, "repo");
+    const companionDir = path.join(repoRoot, ".commentray", "source");
+    await mkdir(companionDir, { recursive: true });
+    await writeFile(path.join(companionDir, "diagram.svg"), "<svg/>", "utf8");
+    await mkdir(path.join(repoRoot, "docs"), { recursive: true });
+    await writeFile(path.join(repoRoot, "docs", "logo.svg"), "<svg/>", "utf8");
+    const outHtml = path.join(repoRoot, "_site", "index.html");
+    await mkdir(path.dirname(outHtml), { recursive: true });
+
+    const md = "![local](./diagram.svg) ![root](/docs/logo.svg)";
+    const html = await renderMarkdownToHtml(md, {
+      commentrayOutputUrls: {
+        repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: companionDir,
+      },
+    });
+    expect(html).toContain('src="../.commentray/source/diagram.svg"');
+    expect(html).toContain('src="../docs/logo.svg"');
+  });
+
+  it("resolves a path relative to the companion directory (no leading ./)", async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), "cr-img2-"));
+    const repoRoot = path.join(tmp, "repo");
+    const companionDir = path.join(repoRoot, ".commentray", "source");
+    await mkdir(path.join(companionDir, "figures"), { recursive: true });
+    await writeFile(path.join(companionDir, "figures", "a.svg"), "<svg/>", "utf8");
+    const outHtml = path.join(repoRoot, "out", "index.html");
+    await mkdir(path.dirname(outHtml), { recursive: true });
+
+    const html = await renderMarkdownToHtml("![](figures/a.svg)", {
+      commentrayOutputUrls: {
+        repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: companionDir,
+      },
+    });
+    expect(html).toContain('src="../.commentray/source/figures/a.svg"');
   });
 });

@@ -1,6 +1,6 @@
 import { escapeHtml } from "./html-utils.js";
 import {
-  type GithubBlobLinkRewriteOptions,
+  type CommentrayOutputUrlOptions,
   renderFencedCode,
   renderMarkdownToHtml,
 } from "./markdown-pipeline.js";
@@ -15,8 +15,8 @@ export type SideBySideOptions = {
   commentrayMarkdown: string;
   /** When true, include Mermaid runtime from CDN in the footer. */
   includeMermaidRuntime?: boolean;
-  /** Optional GitHub blob/tree → relative file link rewriting for the commentray pane. */
-  githubBlobLinkRewrite?: GithubBlobLinkRewriteOptions;
+  /** Optional static URL rewriting for the commentray pane (images, local links, GitHub blob). */
+  commentrayOutputUrls?: CommentrayOutputUrlOptions;
 };
 
 export async function renderSideBySideHtml(opts: SideBySideOptions): Promise<string> {
@@ -24,7 +24,7 @@ export async function renderSideBySideHtml(opts: SideBySideOptions): Promise<str
   const [codeHtml, commentrayHtml] = await Promise.all([
     renderFencedCode(fence),
     renderMarkdownToHtml(opts.commentrayMarkdown, {
-      githubBlobLinkRewrite: opts.githubBlobLinkRewrite,
+      commentrayOutputUrls: opts.commentrayOutputUrls,
     }),
   ]);
 

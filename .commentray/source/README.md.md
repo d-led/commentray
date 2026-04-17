@@ -1,44 +1,34 @@
 # Commentray — quick-start
 
-_The companion Markdown for [`README.md`](https://github.com/d-led/commentray/blob/main/README.md). Read the left pane for the project summary; this pane is the shortest path from zero to productive._
+_You have the main [`README.md`](https://github.com/d-led/commentray/blob/main/README.md) in the left column: packages, scripts, release flow. This column is the other microphone—same premiere, different job._
 
-## Why
+> **Director beat:** two panes, one checkout. The left column states facts; this one adds motive, trade-offs, and “we tried that already.” Nothing here replaces the README—it annotates it.
 
-Inline comments can't always live in the code: generated files, tight formats, policy constraints, or commentary long enough to need diagrams. Commentray keeps the source untouched and stores the _why_ next to it, in plain Markdown under `.commentray/source/` — the file you're reading is the companion of `README.md` itself.
+## Why this file exists
 
-## Start in 90 seconds
+The README has to stay scannable. Here we can linger: why `.commentray/` lives beside the code, when to reach for the extension versus the CLI, and where the sharp edges are—without pasting another full quickstart.
 
-```bash
-git clone https://github.com/d-led/commentray && cd commentray
-npm run setup      # install, build, init, doctor — idempotent
-```
+## If you only do one thing
 
-Then choose how you want to author commentary:
+Clone and `npm run setup` (left pane has the exact line). After that, pick your lane: editor install script vs `cli:install`—again spelled out in the README. The interesting bit is that **both** paths land on the same storage layout and validators; we split the UX, not the model.
 
-- **In your editor** (Cursor / VS Code): [`npm run extension:install`](https://github.com/d-led/commentray/blob/main/scripts/install-extension.sh) packages and installs the `.vsix`. Open any file, run _Commentray: Open commentray beside source_, and start writing on the right.
-- **From the shell**: [`npm run cli:install`](https://github.com/d-led/commentray/blob/main/scripts/install-cli.sh) puts `commentray` on your `PATH`. Run `commentray init` in any repo to scaffold the storage tree.
+## About this HTML
 
-## You're looking at a generated page
+You may be reading a **generated** page: `code-commentray-static` plus [`build-static-pages.mjs`](https://github.com/d-led/commentray/blob/main/scripts/build-static-pages.mjs) and [`pages.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/pages.yml) are the assembly line. Point `[static_site]` at another source file and you get the same split-pane treatment—configuration is the cameo, not a fork of the product.
 
-This HTML was produced by [`code-commentray-static`](https://github.com/d-led/commentray/tree/main/packages/code-commentray-static) from [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml) via [`scripts/build-static-pages.mjs`](https://github.com/d-led/commentray/blob/main/scripts/build-static-pages.mjs), and deployed by [`pages.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/pages.yml). The same machinery will render any source + companion pair — point `[static_site].source_file` at your own file and rebuild.
+## Cookbook (tone, not a second README)
 
-## Cookbook
+- **Greenfield adopt** — `commentray init` is deliberately boring (idempotent, safe to re-run). The “aha” is that nothing in your primary tree _has_ to move.
+- **Hook paranoia** — `init scm` is for teams who want the index validated **before** a misleading companion can merge; it is opt-in because hooks are a social contract, not a library concern.
+- **“Why is my tree red?”** — `doctor` layers environment noise on top of `validate` so humans get a single front door.
+- **Binaries** — Releases and [`binaries.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml) are the distribution story; the README tables stay canonical for artifact names.
+- **Your own Pages** — Copy [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml), adjust `[static_site]`, run `npm run pages:build`. The dogfood site is proof the pipeline is boring enough to reuse.
 
-- **Adopt Commentray in your own repo** — run [`commentray init`](https://github.com/d-led/commentray/blob/main/packages/cli/src/init.ts) once; it's idempotent and lays down `.commentray/`, `.commentray.toml`, and an empty `metadata/index.json`.
-- **Install a Git guard-rail** — [`commentray init scm`](https://github.com/d-led/commentray/blob/main/packages/cli/src/scm.ts) writes a `pre-commit` hook that runs [`commentray validate`](https://github.com/d-led/commentray/blob/main/packages/cli/src/validate.ts) so stale commentary can't land quietly.
-- **Diagnose a setup** — [`commentray doctor`](https://github.com/d-led/commentray/blob/main/packages/cli/src/cli.ts) runs `validate` plus environment checks.
-- **Ship a standalone binary** — no Node install needed; grab one per OS from [Releases](https://github.com/d-led/commentray/releases) or the [`binaries.yml` workflow](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml).
-- **Publish a Pages site of your own** — copy [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml), tweak `[static_site]`, and run `npm run pages:build`.
+## Architecture (who talks to whom)
 
-## Architecture, one link each
+Treat the left README’s bullet list as the roster. In practice: **`@commentray/core`** owns truth (paths, index schema, staleness); **`@commentray/render`** owns “safe enough HTML”; **`@commentray/cli`** is the automation face; **`commentray-vscode`** is the human face; **`code-commentray-static`** is the smallest interesting consumer of the renderer. If you change the HTML contract, walk that chain backward before you tag.
 
-- [`@commentray/core`](https://github.com/d-led/commentray/tree/main/packages/core/src) — TOML parser, metadata schema, Git SCM adapter, staleness helpers, path safety.
-- [`@commentray/render`](https://github.com/d-led/commentray/tree/main/packages/render/src) — Markdown→sanitized HTML (GFM, `rehype-sanitize`), Mermaid containers, the side-by-side shell and the [`code-browser`](https://github.com/d-led/commentray/blob/main/packages/render/src/code-browser.ts) you're looking at.
-- [`@commentray/cli`](https://github.com/d-led/commentray/tree/main/packages/cli/src) — every CLI subcommand lives here as its own small module.
-- [`commentray-vscode`](https://github.com/d-led/commentray/tree/main/packages/vscode/src) — [`extension.ts`](https://github.com/d-led/commentray/blob/main/packages/vscode/src/extension.ts) opens source + companion in a split view with scroll sync.
-- [`code-commentray-static`](https://github.com/d-led/commentray/tree/main/packages/code-commentray-static/src) — the generator that produced this page.
-
-## Reference
+## Reference (jump off points)
 
 - Storage layout: [`docs/spec/storage.md`](https://github.com/d-led/commentray/blob/main/docs/spec/storage.md)
 - Anchor strategies: [`docs/spec/anchors.md`](https://github.com/d-led/commentray/blob/main/docs/spec/anchors.md)
@@ -48,8 +38,6 @@ This HTML was produced by [`code-commentray-static`](https://github.com/d-led/co
 - Trust model & parsing guarantees: [`SECURITY.md`](https://github.com/d-led/commentray/blob/main/SECURITY.md)
 - Quality gate & contribution flow: [`CONTRIBUTING.md`](https://github.com/d-led/commentray/blob/main/CONTRIBUTING.md)
 
-## What Commentray is not
+## What Commentray is not (one beat each)
 
-- Not a replacement for inline comments when those are the right fit.
-- Not a blog engine — the companion Markdown travels with the code, in the same commit.
-- Not tied to one editor — the CLI does everything the extension does, scriptably.
+Not a substitute for good inline comments where the medium allows. Not a hosted blog—the companion travels in **git**. Not editor-exclusive—the CLI is the same story without a GUI.

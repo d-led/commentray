@@ -57,7 +57,7 @@ describe("buildCommentrayStatic", () => {
     expect(html).toContain('<span class="file-path__base">sample.ts</span>');
   });
 
-  it("forwards githubBlobLinkRewrite into rendered commentray links", async () => {
+  it("forwards commentrayOutputUrls into rendered commentray links", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const repoRoot = path.join(outDir, "repo");
     await mkdir(path.join(repoRoot, "docs"), { recursive: true });
@@ -74,11 +74,11 @@ describe("buildCommentrayStatic", () => {
       sourceFile: path.join(pkgRoot, "fixtures", "sample.ts"),
       markdownFile: mdPath,
       outHtml,
-      githubBlobLinkRewrite: {
-        owner: "acme",
-        repo: "demo",
-        htmlOutputFileAbs: outHtml,
+      commentrayOutputUrls: {
         repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: path.dirname(mdPath),
+        githubBlobRepo: { owner: "acme", repo: "demo" },
       },
     });
     const html = await readFile(outHtml, "utf8");

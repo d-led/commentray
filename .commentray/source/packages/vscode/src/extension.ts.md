@@ -1,15 +1,9 @@
 # `extension.ts` — companion
 
-VS Code / Cursor surface: **open beside**, **add block from selection**, **validate workspace** output channel, **Markdown preview** passthrough.
+This is the **handheld camera** version of Commentray: open beside, start a block from selection, validate into an output channel, and lean on the built-in Markdown preview when you want stock rendering.
 
-## Scroll sync (dogfood feature)
+**Scroll sync** — When a pair is active, visible-range listeners on both editors drive the dance. The block list is rebuilt on document change (debounced) and when **`index.json`** saves—so metadata edits feel live without polling the world. Programmatic `revealRange` is wrapped so the two panes don’t argue in a feedback loop.
 
-When a pair is active: visible-range listeners on **both** editors; block list rebuilt on document change (debounced) and when **`index.json`** is saved. Programmatic `revealRange` is wrapped so source ↔ commentray does not fight itself.
+**Add block** — Appends marker + heading + placeholder, then **`addBlockToIndex`**. Release tooling (`tag-version.sh`, publish) stays deliberately separate from day-to-day commentary edits.
 
-## Authoring affordance
-
-**Add block** appends an HTML marker + heading + placeholder, then **`addBlockToIndex`** — after commit, **`tag-version.sh`** / publish flow stay separate from day-to-day commentary edits.
-
-## Packaged extension
-
-`esbuild` inlines `@commentray/core` before `vsce`; a stale `.vsix` without that step is the usual “command not found” failure — reinstall via root `npm run extension:install`.
+**Packaging** — `esbuild` inlines `@commentray/core` before `vsce`. A `.vsix` built without that step is the usual “command not found” ghost; root **`npm run extension:install`** is the fix we tell people first.

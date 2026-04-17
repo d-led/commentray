@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { escapeHtml } from "./html-utils.js";
 import {
-  type GithubBlobLinkRewriteOptions,
+  type CommentrayOutputUrlOptions,
   renderFencedCode,
   renderMarkdownToHtml,
 } from "./markdown-pipeline.js";
@@ -31,10 +31,10 @@ export type CodeBrowserPageOptions = {
    */
   toolHomeUrl?: string;
   /**
-   * When set, GitHub `blob` / `tree` links for this repository are rewritten to paths
-   * relative to the generated HTML file (offline-friendly).
+   * When set, local `img`/`a` URLs and optional GitHub blob/tree rewrites resolve to paths
+   * relative to the generated HTML file.
    */
-  githubBlobLinkRewrite?: GithubBlobLinkRewriteOptions;
+  commentrayOutputUrls?: CommentrayOutputUrlOptions;
 };
 
 function extractPreCodeInner(html: string): string {
@@ -346,7 +346,7 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const [codeHtml, commentrayHtml] = await Promise.all([
     renderCodeLineBlocks(opts.code, opts.language),
     renderMarkdownToHtml(opts.commentrayMarkdown, {
-      githubBlobLinkRewrite: opts.githubBlobLinkRewrite,
+      commentrayOutputUrls: opts.commentrayOutputUrls,
     }),
   ]);
 

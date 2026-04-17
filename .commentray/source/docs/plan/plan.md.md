@@ -1,27 +1,6 @@
 # Plan — companion
 
-Engineering intent for the whole monorepo: product metaphor, package boundaries, CI, Pages, and what is explicitly **not** in v0.
-
-## Map this file to the plan
-
-| Section (approx.) | Intent                                                                                                                                 |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Product metaphor  | DVD-style commentary without touching the primary artifact                                                                             |
-| Goals / Non-goals | v0 scope vs deferred (LSP, every SCM, …)                                                                                               |
-| Data flow diagram | Mermaid in source → same idea renders on [Pages](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md) when Mermaid is on |
-| Packages table    | `@commentray/core` → `render` → `cli` / `vscode` / static generator                                                                    |
-| Static browser    | Split panes, wrap toggle, optional quick-search client bundle                                                                          |
-
-## Anchors (v0 grammar)
-
-```text
-lines:12-40          # inclusive 1-based range in the primary file
-symbol:SomeExport    # opaque until a language plugin resolves it
-```
-
-Blocks tie Markdown segments to those anchors; see [`docs/spec/blocks.md`](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md).
-
-## Editor + CI split (feature tease)
+The plan on the left is the **script**; this note is what we’d say in the booth while it plays—intent, boundaries, and where the camera will not go in v0.
 
 ```mermaid
 flowchart LR
@@ -31,4 +10,14 @@ flowchart LR
   D --> F["schema + anchors"]
 ```
 
-Hook path: `commentray init scm`. Full gate: root `npm run quality:gate` → `scripts/quality-gate.sh`.
+**Product metaphor** — DVD-style commentary: voice-over without splicing new frames into the film.
+
+**Goals / non-goals** — v0 is deliberately small; the plan calls out what we deferred (LSP, every SCM, …) so “not yet” does not read as “forgotten.”
+
+**Data flow** — Mermaid in the plan’s source still renders on Pages when Mermaid is enabled; the diagram is the same idea as [`docs/spec/blocks.md`](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md) in a different costume.
+
+**Packages** — Read the table on the left as dependency pressure: core at the bottom, render above it, surfaces (CLI, VS Code, static generator) on top.
+
+**Anchors (v0 grammar)** — `lines:12-40` and `symbol:SomeExport` are the two dialects we committed to; blocks hang prose off those hooks.
+
+**Hook path** — `commentray init scm`. **Full gate** — root `npm run quality:gate` → `scripts/quality-gate.sh`.

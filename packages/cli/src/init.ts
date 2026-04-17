@@ -23,6 +23,8 @@ export const DEFAULT_COMMENTRAY_TOML = [
   "# When true, GitHub blob/tree links for static_site.github_url rewrite to paths",
   "# relative to generated HTML (Pages, `commentray render`). Needs a repo home URL.",
   "# relative_github_blob_links = false",
+  "# Local images: `/repo/path` = repo root; `./x` or `sub/x` = next to companion `.md`",
+  "# (see docs/spec/storage.md — Images and other local assets).",
   "",
   "[anchors]",
   "# defaultStrategy = [",

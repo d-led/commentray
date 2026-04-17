@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { type GithubBlobLinkRewriteOptions, renderCodeBrowserHtml } from "@commentray/render";
+import { type CommentrayOutputUrlOptions, renderCodeBrowserHtml } from "@commentray/render";
 
 export type BuildCommentrayStaticOptions = {
   /** Absolute or cwd-relative path to the source file whose contents are shown as code. */
@@ -22,8 +22,8 @@ export type BuildCommentrayStaticOptions = {
   githubRepoUrl?: string;
   /** Shown as “Rendered with Commentray” in the toolbar (`http`/`https` only). */
   toolHomeUrl?: string;
-  /** When set, rewrites matching GitHub links in companion Markdown to repo-relative URLs. */
-  githubBlobLinkRewrite?: GithubBlobLinkRewriteOptions;
+  /** When set, rewrites local and GitHub blob links in companion Markdown for static HTML output. */
+  commentrayOutputUrls?: CommentrayOutputUrlOptions;
 };
 
 export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions): Promise<void> {
@@ -47,7 +47,7 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     hljsTheme: opts.hljsTheme,
     githubRepoUrl: opts.githubRepoUrl,
     toolHomeUrl: opts.toolHomeUrl,
-    githubBlobLinkRewrite: opts.githubBlobLinkRewrite,
+    commentrayOutputUrls: opts.commentrayOutputUrls,
   });
 
   await mkdir(path.dirname(outPath), { recursive: true });

@@ -1,11 +1,7 @@
 # `code-browser.ts` — companion
 
-Emits the **static code browser** shell: code pane + Markdown pane, **draggable splitter**, optional **Mermaid** runtime injection, **Highlight.js** theme class, **line-number gutter** for the code column, and a clear **repo-relative path** label in the toolbar.
+This is the **wide shot**: code pane, Markdown pane, draggable splitter, optional Mermaid injection, Highlight.js theme wiring, and the line-number gutter so in-page search can land on a real row. The toolbar’s repo-relative label is the subtitle card—viewers should always know which reel they’re on.
 
-## Security posture
+**Security** — Markdown goes through **rehype-sanitize** with an explicit allow-list. Treat any change to fenced-code handling or class allow-lists as a security review, not a style pass.
 
-Markdown runs through **rehype-sanitize** with an explicit allow-list — treat any change to fenced code or class lists as a security review, not a style tweak.
-
-## Consumer
-
-[`code-commentray-static`](https://github.com/d-led/commentray/tree/main/packages/code-commentray-static) and root **`npm run pages:build`** both call into here; keep the HTML contract stable or bump the static generator in lockstep.
+**Callers** — [`code-commentray-static`](https://github.com/d-led/commentray/tree/main/packages/code-commentray-static) and root **`npm run pages:build`** share the HTML contract; if you change the DOM shape, bump both consumers in the same breath.

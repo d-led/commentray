@@ -1,12 +1,9 @@
 # `scroll-sync.ts` — companion
 
-Pure helpers: **`buildBlockScrollLinks`** joins `index.json` block ids with `<!-- commentray:block id=… -->` lines in the companion Markdown, then **`pickCommentrayLineForSourceScroll`** / **`pickSourceLine0ForCommentrayScroll`** drive editor scroll sync without VS Code imports.
+This file is the **math behind the sway**: no VS Code imports, just pure functions so the extension can stay thin.
 
-## Behaviour worth remembering
+**`buildBlockScrollLinks`** stitches `index.json` to the `<!-- commentray:block id=… -->` markers in the companion—without that join, scroll sync is only proportional scrolling and nobody feels clever.
 
-- Prefer the block whose **`lines:`** range **contains** the top visible source line; fall back to nearest earlier block, then ratio scroll if there are no links.
-- **0-based** commentray line numbers in the link model; **1-based** line anchors in metadata — the mismatch is intentional (matches VS Code `Range` vs anchor spec).
+When you scroll the source, we try to land the commentary on the **block that actually owns** the top visible line; if the index and markers disagree with reality, we degrade gracefully (nearest earlier block, then ratio). The **0-based** commentray lines versus **1-based** anchor lines in metadata look like a footgun on paper; in the editor it lines up with how `Range` and the anchor spec already think.
 
-## Spec
-
-[`docs/spec/anchors.md`](https://github.com/d-led/commentray/blob/main/docs/spec/anchors.md) · [`docs/spec/blocks.md`](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md)
+**Spec:** [`docs/spec/anchors.md`](https://github.com/d-led/commentray/blob/main/docs/spec/anchors.md) · [`docs/spec/blocks.md`](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md)

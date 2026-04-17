@@ -66,14 +66,16 @@ const ghParsed =
   cfg.render.relativeGithubBlobLinks && ss.githubUrl
     ? parseGithubRepoWebUrl(ss.githubUrl)
     : null;
-const githubBlobLinkRewrite = ghParsed
-  ? {
-      owner: ghParsed.owner,
-      repo: ghParsed.repo,
-      htmlOutputFileAbs: outHtml,
-      repoRootAbs: repoRoot,
-    }
-  : undefined;
+const markdownUrlBaseDirAbs = ss.commentrayMarkdownFile
+  ? path.join(repoRoot, path.dirname(ss.commentrayMarkdownFile))
+  : repoRoot;
+
+const commentrayOutputUrls = {
+  repoRootAbs: repoRoot,
+  htmlOutputFileAbs: outHtml,
+  markdownUrlBaseDirAbs,
+  ...(ghParsed ? { githubBlobRepo: { owner: ghParsed.owner, repo: ghParsed.repo } } : {}),
+};
 
 try {
   await mkdir(outDir, { recursive: true });
@@ -87,7 +89,7 @@ try {
     hljsTheme: cfg.render.syntaxTheme,
     githubRepoUrl: ss.githubUrl ?? undefined,
     toolHomeUrl: COMMENTRAY_TOOL_HOME,
-    githubBlobLinkRewrite,
+    commentrayOutputUrls,
   });
 } finally {
   await unlink(tmpMd).catch(() => {});
