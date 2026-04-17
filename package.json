@@ -28,6 +28,8 @@
     "ci:quick": "bash scripts/ci-quick.sh",
     "ci:full": "bash scripts/ci-full.sh",
     "commentray": "npm run commentray -w @commentray/cli --",
+    "cli:install": "bash scripts/install-cli.sh",
+    "cli:uninstall": "bash scripts/install-cli.sh --unlink",
     "binary:build": "npm run build:bundle -w @commentray/cli && node scripts/build-binary.mjs",
     "binary:smoke": "node scripts/smoke-binary.mjs",
     "extension:dogfood": "bash scripts/editor-extension.sh dogfood",
