@@ -48,7 +48,7 @@ packages/
   cli/
   vscode/
 scripts/
-  ci-quick.sh
+  quality-gate.sh
   ci-full.sh
   format.sh
   format-check.sh
@@ -149,7 +149,7 @@ Every recurring workflow exists as:
 
 ## GitHub Actions
 
-- `ci.yml`: `npm ci`, optional `npm audit` (informational), `bash scripts/ci-quick.sh`, `npm run test:integration`.
+- `ci.yml`: `npm ci`, optional `npm audit` (informational), `bash scripts/quality-gate.sh`, `npm run test:integration`.
 - `ci-expensive.yml`: `workflow_dispatch` and PR label `run-expensive-ci`, runs `npm run test:expensive`.
 - `pages.yml`: `npm run pages:build` then deploy `_site/` to **GitHub Pages** (on `main` and manual dispatch).
 

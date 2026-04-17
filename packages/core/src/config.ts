@@ -81,6 +81,24 @@ function assertSafeRepoRelativePath(label: string, value: string | undefined): v
   }
 }
 
+/**
+ * Commentray's storage directory must never live inside `.git/`. Git treats
+ * `.git/` as opaque metadata; colocating our storage there would both
+ * confuse Git (adding untracked-but-inside-.git files) and risk being wiped
+ * by routine Git operations (e.g. `git gc`, `git clean -fdx`, re-clone).
+ */
+function assertStorageDirNotInsideGit(value: string | undefined): void {
+  if (value === undefined || value === "") return;
+  const normalized = normalizeRepoRelativePath(value);
+  const firstSegment = normalized.split("/")[0] ?? "";
+  if (firstSegment.toLowerCase() === ".git") {
+    throw new Error(
+      `.commentray.toml storage.dir must not live inside .git/ (got: ${value}). ` +
+        `Git treats .git/ as opaque metadata and routine operations can wipe it.`,
+    );
+  }
+}
+
 function resolveStaticSite(parsed: CommentrayToml): ResolvedStaticSite {
   const ss = parsed.static_site;
   const mdFile =
@@ -98,6 +116,7 @@ function resolveStaticSite(parsed: CommentrayToml): ResolvedStaticSite {
 
 function assertSafeConfigPaths(parsed: CommentrayToml): void {
   assertSafeRepoRelativePath("storage.dir", parsed.storage?.dir);
+  assertStorageDirNotInsideGit(parsed.storage?.dir);
   const ss = parsed.static_site;
   assertSafeRepoRelativePath("static_site.source_file", ss?.source_file);
   assertSafeRepoRelativePath("static_site.commentray_markdown", ss?.commentray_markdown);

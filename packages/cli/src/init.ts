@@ -10,6 +10,8 @@ export const DEFAULT_COMMENTRAY_TOML = [
   "# Commentray configuration (defaults are commented)",
   "",
   "[storage]",
+  "# Repo-relative. Must not live inside .git/ (Git treats that directory as",
+  "# opaque metadata and routine operations can wipe it).",
   '# dir = ".commentray"',
   "",
   "[scm]",

@@ -13,7 +13,10 @@ defend, the boundary we cannot defend, and how to report an issue.
   hostile config redirect filesystem writes outside the repo
   (`storage.dir`, `static_site.source_file`, `static_site.commentray_markdown`
   are path-validated by `normalizeRepoRelativePath`; absolute paths and `..`
-  segments are rejected).
+  segments are rejected). `storage.dir` is additionally forbidden from
+  resolving inside `.git/`, since Git treats that directory as opaque
+  metadata and routine operations (`git gc`, `git clean -fdx`, re-clone)
+  can wipe it.
 - Parsing `.commentray/metadata/index.json`. JSON only; migrations never
   `eval`/`require` content.
 - Rendering Commentray Markdown to HTML. User Markdown passes through

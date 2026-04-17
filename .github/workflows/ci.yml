@@ -33,7 +33,7 @@ jobs:
         continue-on-error: true
 
       - name: Quick CI
-        run: bash scripts/ci-quick.sh
+        run: bash scripts/quality-gate.sh
 
       - name: Integration tests
         run: npm run test:integration

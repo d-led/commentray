@@ -51,4 +51,39 @@ describe("mergeCommentrayConfig", () => {
       mergeCommentrayConfig({ static_site: { commentray_markdown: "../outside.md" } }),
     ).toThrow(/static_site\.commentray_markdown/);
   });
+
+  describe("storage.dir must not live inside .git/", () => {
+    it("rejects exactly .git", () => {
+      expect(() => mergeCommentrayConfig({ storage: { dir: ".git" } })).toThrow(
+        /storage\.dir must not live inside \.git\//,
+      );
+    });
+
+    it("rejects nested paths under .git", () => {
+      expect(() => mergeCommentrayConfig({ storage: { dir: ".git/commentray" } })).toThrow(
+        /storage\.dir must not live inside \.git\//,
+      );
+    });
+
+    it("rejects Windows-style separators under .git", () => {
+      expect(() => mergeCommentrayConfig({ storage: { dir: ".git\\state" } })).toThrow(
+        /storage\.dir must not live inside \.git\//,
+      );
+    });
+
+    it("rejects case variants (fs may be case-insensitive)", () => {
+      expect(() => mergeCommentrayConfig({ storage: { dir: ".GIT/foo" } })).toThrow(
+        /storage\.dir must not live inside \.git\//,
+      );
+    });
+
+    it("accepts sibling names that merely share a prefix", () => {
+      expect(() => mergeCommentrayConfig({ storage: { dir: ".gitignore" } })).not.toThrow();
+      expect(() => mergeCommentrayConfig({ storage: { dir: ".git-backup" } })).not.toThrow();
+    });
+
+    it("accepts the default .commentray dir", () => {
+      expect(() => mergeCommentrayConfig({ storage: { dir: ".commentray" } })).not.toThrow();
+    });
+  });
 });

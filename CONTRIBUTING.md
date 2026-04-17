@@ -19,6 +19,14 @@ We like the lightweight spirit described in the Collective Code Construction Con
 
 These are not bureaucracy; they are the habits that keep this repo cheap to change.
 
+**One command before every review: `npm run quality:gate`.** It runs
+`scripts/quality-gate.sh`: format check, project + refactor-metrics
+ESLint, `jscpd` duplicate detection, a full `tsc -b` across the
+monorepo, and the unit tests. `ci:quick` and the GitHub Actions
+`ci.yml` pipeline invoke the same script, so local green ≈ CI green.
+For the slow lane (integration + expensive tests) run
+`npm run ci:full`.
+
 - **Tests always green, always run.** Before asking for review:
   - `npm run test:unit` (fast, default).
   - `npm run test:integration` if the PR touches the Git SCM adapter, `.commentray/` layout, or any fixture-backed behavior.
