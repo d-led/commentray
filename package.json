@@ -28,14 +28,19 @@
     "ci:quick": "bash scripts/ci-quick.sh",
     "ci:full": "bash scripts/ci-full.sh",
     "commentary": "npm run commentary -w @commentary/cli --",
+    "binary:build": "npm run build:bundle -w @commentary/cli && node scripts/build-binary.mjs",
+    "binary:smoke": "node scripts/smoke-binary.mjs",
     "extension:dogfood": "bash scripts/editor-extension.sh dogfood",
-    "code-commentary-static:build": "npm run build -w @commentary/render && npm run build -w code-commentary-static && npm run site -w code-commentary-static"
+    "code-commentary-static:build": "npm run build -w @commentary/render && npm run build -w code-commentary-static && npm run site -w code-commentary-static",
+    "pages:build": "npm run build -w @commentary/core && npm run build -w @commentary/render && npm run build -w code-commentary-static && node scripts/build-static-pages.mjs"
   },
   "devDependencies": {
+    "@commentary/core": "0.0.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
-    "eslint": "^10.2.0",
+    "code-commentary-static": "0.0.1",
+    "eslint": "^10.2.1",
     "jscpd": "^4.0.9",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3",

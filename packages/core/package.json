@@ -7,6 +7,7 @@
   "description": "Commentary models, validation, SCM adapters, and staleness helpers",
   "license": "MPL-2.0",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

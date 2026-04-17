@@ -12,3 +12,12 @@ syntaxTheme = "github-dark"
 
 [anchors]
 defaultStrategy = ["symbol", "lines"]
+
+# GitHub Pages: `npm run pages:build` → `_site/index.html` (see `.github/workflows/pages.yml`).
+[static_site]
+title = "Commentary"
+intro = """This page is generated from this repository using the **code-commentary-static** package (code on the left, commentary on the right)."""
+# Set to your public GitHub URL for the “View repository” link in the commentary pane.
+github_url = "https://github.com/OWNER/REPO"
+source_file = "README.md"
+commentary_markdown = "docs/static-site-commentary.md"

@@ -16,6 +16,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "build:bundle": "npm run build && node ./esbuild.cli.mjs",
     "clean": "rm -rf dist",
     "commentary": "node ./dist/cli.js"
   },
@@ -25,6 +26,8 @@
     "commander": "^13.1.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.1"
+    "@types/node": "^22.14.1",
+    "esbuild": "^0.25.12",
+    "postject": "^1.0.0-alpha.6"
   }
 }

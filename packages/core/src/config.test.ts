@@ -12,4 +12,21 @@ describe("mergeCommentaryConfig", () => {
   it("rejects unsupported scm providers", () => {
     expect(() => mergeCommentaryConfig({ scm: { provider: "p4" } })).toThrow(/Unsupported/);
   });
+
+  it("merges static_site from TOML", () => {
+    const cfg = mergeCommentaryConfig({
+      static_site: {
+        title: "Docs",
+        intro: "## Hello",
+        github_url: "https://github.com/a/b",
+        source_file: "src/index.ts",
+        commentary_markdown: "docs/x.md",
+      },
+    });
+    expect(cfg.staticSite.title).toBe("Docs");
+    expect(cfg.staticSite.introMarkdown).toBe("## Hello");
+    expect(cfg.staticSite.githubUrl).toBe("https://github.com/a/b");
+    expect(cfg.staticSite.sourceFile).toBe("src/index.ts");
+    expect(cfg.staticSite.commentaryMarkdownFile).toBe("docs/x.md");
+  });
 });

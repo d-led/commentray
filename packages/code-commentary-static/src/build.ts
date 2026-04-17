@@ -11,6 +11,8 @@ export type BuildCodeCommentaryStaticOptions = {
   outHtml: string;
   title?: string;
   includeMermaidRuntime?: boolean;
+  /** Highlight.js theme base name (e.g. github, github-dark); forwarded to `renderCodeBrowserHtml`. */
+  hljsTheme?: string;
 };
 
 export async function buildCodeCommentaryStatic(
@@ -31,6 +33,7 @@ export async function buildCodeCommentaryStatic(
     language,
     commentaryMarkdown,
     includeMermaidRuntime: opts.includeMermaidRuntime ?? false,
+    hljsTheme: opts.hljsTheme,
   });
 
   await mkdir(path.dirname(outPath), { recursive: true });

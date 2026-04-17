@@ -10,8 +10,8 @@ Inline comments are not always possible (generated files, tight formats, policy)
 
 - `@commentary/core`: models, TOML config, JSON metadata validation, Git SCM adapter, staleness helpers.
 - `@commentary/render`: Markdown → HTML (GFM), syntax highlighting (rehype-highlight / lowlight), Mermaid containers, HTML shells (side-by-side + interactive static code browser with token-in-line search and jump).
-- `code-commentary-static`: sample generator for a single static HTML “code + commentary” page (draggable splitter, code line-wrap toggle). Run `npm run code-commentary-static:build` (builds `@commentary/render` + this package, then writes `packages/code-commentary-static/site/index.html`).
-- `@commentary/cli`: `commentary` command for init/validate/doctor/migrate/render.
+- `code-commentary-static`: sample generator for a single static HTML “code + commentary” page (draggable splitter, code line-wrap toggle). Run `npm run code-commentary-static:build` (builds `@commentary/render` + this package, then writes `packages/code-commentary-static/site/index.html`). **GitHub Pages:** `[static_site]` in [`.commentary.toml`](.commentary.toml) drives `npm run pages:build` → `_site/index.html`; workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml) deploys on `main` (enable Pages → “GitHub Actions” in repo settings).
+- `@commentary/cli`: `commentary` command for `init` (idempotent workspace setup), `init config`, `init scm` (git pre-commit hook), validate/doctor/migrate/render.
 - `commentary-vscode`: VS Code / Cursor extension MVP (open paired commentary + basic scroll sync + workspace validation output; richer gutter UX is planned).
 
 ## Quickstart

@@ -11,7 +11,13 @@ type HitKind = "code" | "md";
 
 type Row = { kind: HitKind; line: number; text: string };
 
-type Hit = { kind: HitKind; line: number; text: string; score: number; source: "ordered" | "fuzzy" };
+type Hit = {
+  kind: HitKind;
+  line: number;
+  text: string;
+  score: number;
+  source: "ordered" | "fuzzy";
+};
 
 function tokenizeQuery(q: string): string[] {
   return q.trim().split(/\s+/).filter(Boolean);
@@ -118,7 +124,8 @@ type SearchUiContext = {
 };
 
 function wireSearchUi(ctx: SearchUiContext): void {
-  const { rawCode, rawMd, mdLines, searcher, searchInput, searchClear, searchResults, docPane } = ctx;
+  const { rawCode, rawMd, mdLines, searcher, searchInput, searchClear, searchResults, docPane } =
+    ctx;
 
   function runSearch(): void {
     const tokens = tokenizeQuery(searchInput.value);
@@ -188,7 +195,11 @@ function wireSearchUi(ctx: SearchUiContext): void {
   });
 }
 
-function wireWrapToggle(storageWrap: string, codePane: HTMLElement, wrapCb: HTMLInputElement): void {
+function wireWrapToggle(
+  storageWrap: string,
+  codePane: HTMLElement,
+  wrapCb: HTMLInputElement,
+): void {
   const wrap = localStorage.getItem(storageWrap) === "1";
   wrapCb.checked = wrap;
   if (wrap) codePane.classList.add("wrap");
@@ -251,7 +262,16 @@ function main(): void {
   const searchClear = document.getElementById("search-clear");
   const searchResults = document.getElementById("search-results");
 
-  if (!shell || !codePane || !docPane || !gutter || !wrapCb || !searchInput || !searchClear || !searchResults) {
+  if (
+    !shell ||
+    !codePane ||
+    !docPane ||
+    !gutter ||
+    !wrapCb ||
+    !searchInput ||
+    !searchClear ||
+    !searchResults
+  ) {
     return;
   }
 
@@ -265,7 +285,11 @@ function main(): void {
     ...mdLines.map((text, line) => ({ kind: "md" as const, line, text })),
   ];
   const searcher = SearcherFactory.createDefaultSearcher<Row, string>();
-  searcher.indexEntities(lineRows, (e) => `${e.kind}:${e.line}`, (e) => [e.text]);
+  searcher.indexEntities(
+    lineRows,
+    (e) => `${e.kind}:${e.line}`,
+    (e) => [e.text],
+  );
 
   wireSearchUi({
     rawCode,

@@ -7,6 +7,28 @@ export type CommentaryToml = {
   scm?: { provider?: string };
   render?: { mermaid?: boolean; syntaxTheme?: string };
   anchors?: { defaultStrategy?: string[] };
+  /**
+   * Optional settings for publishing a single-file static “code browser” (GitHub Pages, etc.).
+   * Keys use snake_case in TOML (`[static_site]`).
+   */
+  static_site?: {
+    title?: string;
+    /** Markdown shown above the optional commentary file and GitHub link. */
+    intro?: string;
+    github_url?: string;
+    /** Repo-relative path to the source file shown in the code pane (default README.md). */
+    source_file?: string;
+    /** Repo-relative path to additional commentary Markdown (optional). */
+    commentary_markdown?: string;
+  };
+};
+
+export type ResolvedStaticSite = {
+  title: string;
+  introMarkdown: string;
+  githubUrl: string | null;
+  sourceFile: string;
+  commentaryMarkdownFile: string;
 };
 
 export type ResolvedCommentaryConfig = {
@@ -14,6 +36,15 @@ export type ResolvedCommentaryConfig = {
   scmProvider: "git";
   render: { mermaid: boolean; syntaxTheme: string };
   anchors: { defaultStrategy: string[] };
+  staticSite: ResolvedStaticSite;
+};
+
+const defaultStaticSite: ResolvedStaticSite = {
+  title: "Commentary",
+  introMarkdown: "",
+  githubUrl: null,
+  sourceFile: "README.md",
+  commentaryMarkdownFile: "",
 };
 
 const defaultConfig: ResolvedCommentaryConfig = {
@@ -21,7 +52,25 @@ const defaultConfig: ResolvedCommentaryConfig = {
   scmProvider: "git",
   render: { mermaid: true, syntaxTheme: "github-dark" },
   anchors: { defaultStrategy: ["symbol", "lines"] },
+  staticSite: { ...defaultStaticSite },
 };
+
+function nonEmptyTrimmed(s: string | undefined): string | null {
+  const t = s?.trim();
+  return t ? t : null;
+}
+
+function resolveStaticSite(parsed: CommentaryToml): ResolvedStaticSite {
+  const ss = parsed.static_site;
+  return {
+    title: nonEmptyTrimmed(ss?.title) ?? defaultStaticSite.title,
+    introMarkdown: ss?.intro ?? defaultStaticSite.introMarkdown,
+    githubUrl: nonEmptyTrimmed(ss?.github_url),
+    sourceFile: nonEmptyTrimmed(ss?.source_file) ?? defaultStaticSite.sourceFile,
+    commentaryMarkdownFile:
+      ss?.commentary_markdown?.trim() ?? defaultStaticSite.commentaryMarkdownFile,
+  };
+}
 
 export function mergeCommentaryConfig(parsed: CommentaryToml | null): ResolvedCommentaryConfig {
   if (!parsed) return { ...defaultConfig };
@@ -39,6 +88,7 @@ export function mergeCommentaryConfig(parsed: CommentaryToml | null): ResolvedCo
     anchors: {
       defaultStrategy: parsed.anchors?.defaultStrategy ?? defaultConfig.anchors.defaultStrategy,
     },
+    staticSite: resolveStaticSite(parsed),
   };
 }
 

@@ -10,7 +10,10 @@ const MAX_ORDERED_SPANS = 400;
  * in `text` (case-insensitive). Spans may overlap; iteration advances by one code unit
  * from the start of the previous match.
  */
-export function findOrderedTokenSpans(text: string, tokens: string[]): Array<{ start: number; end: number }> {
+export function findOrderedTokenSpans(
+  text: string,
+  tokens: string[],
+): Array<{ start: number; end: number }> {
   const parts = tokens.map((t) => t.trim()).filter(Boolean);
   if (parts.length === 0) return [];
   const lower = text.toLowerCase();

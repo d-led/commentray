@@ -5,7 +5,7 @@ export {
   defaultMetadataIndexPath,
   normalizeRepoRelativePath,
 } from "./paths.js";
-export type { CommentaryToml, ResolvedCommentaryConfig } from "./config.js";
+export type { CommentaryToml, ResolvedCommentaryConfig, ResolvedStaticSite } from "./config.js";
 export { loadCommentaryConfig, mergeCommentaryConfig } from "./config.js";
 export { assertValidIndex, emptyIndex } from "./metadata.js";
 export { migrateIndex } from "./migrate.js";

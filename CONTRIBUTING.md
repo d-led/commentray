@@ -12,6 +12,8 @@ We like the lightweight spirit described in the Collective Code Construction Con
 - Keep pull requests focused; prefer several small PRs over one sweeping refactor.
 - Follow existing formatting (`npm run format`) and lint (`npm run lint`).
 - **Quality bar:** `npm run lint` already runs a second ESLint pass (refactor metrics: complexity, size, async hygiene). `npm run dupes` runs clone detection (`jscpd`). You can run both in one go with `npm run quality`. CI’s quick path runs lint and dupes with **no relaxations**—fix findings by refactoring or deduplicating code rather than widening ignores or thresholds.
+- **CLI init:** `npm run commentary -- init` is idempotent (storage dirs, seed `index.json` and `.commentary.toml` if missing). Use `npm run commentary -- init config` to ensure TOML defaults, or `init config --force` to replace. `npm run commentary -- init scm` installs or refreshes a marked block in `.git/hooks/pre-commit` that runs `commentary validate` when `node_modules/.bin/commentary` exists at the repo root.
+- **GitHub Pages:** configure `[static_site]` in `.commentary.toml` (title, intro Markdown, `github_url`, `source_file`, optional `commentary_markdown`). Run `npm run pages:build` to emit `_site/index.html`. The `pages.yml` workflow deploys on `main` once **Settings → Pages → Build: GitHub Actions** is enabled.
 - Run tests locally:
   - `npm run test:unit` (default, fast)
   - `npm run test:integration` (Git-backed checks)

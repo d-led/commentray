@@ -5,8 +5,6 @@ import process from "node:process";
 import {
   commentaryMarkdownPath,
   defaultMetadataIndexPath,
-  emptyIndex,
-  loadCommentaryConfig,
   migrateIndex,
   normalizeRepoRelativePath,
   runCommanderMain,
@@ -15,6 +13,8 @@ import {
 } from "@commentary/core";
 import { renderSideBySideHtml } from "@commentary/render";
 import { Command } from "commander";
+
+import { runInitConfig, runInitFull, runInitScm } from "./init.js";
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -51,48 +51,6 @@ async function commentaryRepoRootFrom(startDir: string): Promise<string> {
 
 async function repoRootFromCwd(): Promise<string> {
   return commentaryRepoRootFrom(process.cwd());
-}
-
-async function writeDefaultToml(repoRoot: string) {
-  const p = path.join(repoRoot, ".commentary.toml");
-  const body = [
-    "# Commentary configuration (defaults are commented)",
-    "",
-    "[storage]",
-    '# dir = ".commentary"',
-    "",
-    "[scm]",
-    '# provider = "git"',
-    "",
-    "[render]",
-    "# mermaid = true",
-    '# syntaxTheme = "github-dark"',
-    "",
-    "[anchors]",
-    '# defaultStrategy = ["symbol", "lines"]',
-    "",
-  ].join("\n");
-  await fs.writeFile(p, body, "utf8");
-}
-
-async function cmdInit() {
-  const repoRoot = await repoRootFromCwd();
-  const cfg = await loadCommentaryConfig(repoRoot);
-  const storage = path.join(repoRoot, cfg.storageDir);
-  await fs.mkdir(path.join(storage, "source"), { recursive: true });
-  await fs.mkdir(path.join(storage, "metadata"), { recursive: true });
-  const indexPath = path.join(repoRoot, defaultMetadataIndexPath());
-  try {
-    await fs.stat(indexPath);
-  } catch {
-    await fs.writeFile(indexPath, JSON.stringify(emptyIndex(), null, 2) + "\n", "utf8");
-  }
-  try {
-    await fs.stat(path.join(repoRoot, ".commentary.toml"));
-  } catch {
-    await writeDefaultToml(repoRoot);
-  }
-  console.log(`Initialized Commentary storage under ${cfg.storageDir}`);
 }
 
 async function cmdValidate(): Promise<number> {
@@ -166,12 +124,32 @@ async function cmdRender(opts: {
 const program = new Command();
 program.name("commentary").description("Commentary CLI").version("0.0.1");
 
-program
+const initCmd = program
   .command("init")
-  .description("Create storage directories and seed config")
-  .action(async () => {
-    await cmdInit();
+  .description(
+    "Idempotent workspace setup: storage dirs, index.json if missing, .commentary.toml if missing",
+  );
+
+initCmd
+  .command("config")
+  .description("Ensure .commentary.toml exists with commented defaults (use --force to overwrite)")
+  .option("--force", "Replace an existing .commentary.toml", false)
+  .action(async (opts: { force?: boolean }) => {
+    process.exitCode = await runInitConfig(await repoRootFromCwd(), { force: Boolean(opts.force) });
   });
+
+initCmd
+  .command("scm")
+  .description(
+    "Install or refresh Commentary's block in .git/hooks/pre-commit (runs validate when CLI is present)",
+  )
+  .action(async () => {
+    process.exitCode = await runInitScm(await repoRootFromCwd());
+  });
+
+initCmd.action(async () => {
+  await runInitFull(await repoRootFromCwd());
+});
 
 program
   .command("validate")

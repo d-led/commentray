@@ -21,7 +21,7 @@ The user-facing README should remain **terse and skimmable**, in the spirit of [
 - **Rendering**: `@commentary/render` provides Markdown → HTML with sanitization, highlighting, Mermaid containers, and HTML shells (simple side-by-side plus an interactive **static code browser** page).
 - **Static code browser sample**: the `code-commentary-static` package emits a self-contained HTML file: highlighted code, rendered Markdown commentary, a **draggable vertical splitter**, and a **line-wrap toggle** for the code pane (client-side persistence via `localStorage`).
 - **Manipulation library**: `@commentary/core` owns models, validation, migrations, and staleness helpers.
-- **CLI**: `@commentary/cli` provides `init`, `validate`, `doctor`, `migrate`, `render`, and `paths`.
+- **CLI**: `@commentary/cli` provides `init` (full idempotent setup), `init config`, `init scm` (git hooks), `validate`, `doctor`, `migrate`, `render`, and `paths`.
 - **Monorepo**: TypeScript, semantic versioning, packages start at **0.0.1**, **MPL-2.0** per published package.
 - **Config**: `.commentary.toml` at repo root with sensible defaults.
 - **Tooling**: Prettier for TS/JS/JSON/Markdown; ESLint for TS; Vitest at multiple tiers.
@@ -55,10 +55,14 @@ scripts/
   lint.sh
   test.sh
   test-coverage.sh
+  build-static-pages.mjs
 docs/
   plan/plan.md
   spec/
 .github/workflows/
+  ci.yml
+  ci-expensive.yml
+  pages.yml
 ```
 
 ## Data flow (high level)
@@ -105,6 +109,12 @@ Defaults (illustrative):
 - `render.mermaid = true`
 - `render.syntaxTheme = "github-dark"`
 - `anchors.defaultStrategy = ["symbol", "lines"]`
+- **`[static_site]`** (optional): drives the GitHub Pages build (`npm run pages:build` → `_site/index.html`):
+  - `title` — browser / toolbar title for the static code browser page
+  - `intro` — Markdown prepended in the commentary pane (before the GitHub link and optional file body)
+  - `github_url` — URL for a “View repository on GitHub” link
+  - `source_file` — repo-relative path whose contents fill the **code** pane (default `README.md`)
+  - `commentary_markdown` — optional repo-relative path to extra Markdown appended in the commentary pane
 
 Implementation note: configuration parsing uses `@iarna/toml` today; dependency choices should be revisited periodically for maintenance and security posture.
 
@@ -112,8 +122,9 @@ Implementation note: configuration parsing uses `@iarna/toml` today; dependency 
 
 - **Purpose**: dogfood and demo a file-plus-commentary reading experience without a server.
 - **Implementation**: `renderCodeBrowserHtml` lives in `@commentary/render`; `code-commentary-static` wires fixtures + CLI (`npm run site -w code-commentary-static`) and writes to `packages/code-commentary-static/site/` (gitignored).
+- **GitHub Pages**: root script `npm run pages:build` reads `.commentary.toml` `[static_site]`, composes commentary (intro + GitHub link + optional file), and emits `_site/index.html` via `scripts/build-static-pages.mjs`. Workflow `.github/workflows/pages.yml` runs on `main` + `workflow_dispatch` using `actions/upload-pages-artifact` + `actions/deploy-pages` (repository **Settings → Pages → Build: GitHub Actions**).
 - **UX**: movable vertical bar (mouse drag), “Wrap code lines” checkbox, Highlight.js themes via CDN, Markdown + Mermaid (optional).
-- **Quick search**: client-side only; the query is split on whitespace into **tokens**, and a **line matches only if every token appears on that same line** (substring, case-insensitive). Results list code hits (precise scroll to highlighted row) and commentary hits (scroll by approximate line ratio in the rendered pane). No extra npm dependency—logic is small and predictable for static hosting.
+- **Quick search**: client-side whole-source ordered tokens plus per-line fuzzy ranking (bundled client); see `packages/render` implementation.
 
 ## Markdown rendering stack
 
@@ -140,6 +151,7 @@ Every recurring workflow exists as:
 
 - `ci.yml`: `npm ci`, optional `npm audit` (informational), `bash scripts/ci-quick.sh`, `npm run test:integration`.
 - `ci-expensive.yml`: `workflow_dispatch` and PR label `run-expensive-ci`, runs `npm run test:expensive`.
+- `pages.yml`: `npm run pages:build` then deploy `_site/` to **GitHub Pages** (on `main` and manual dispatch).
 
 Maintainers can tighten expensive jobs later using GitHub Environments and required reviewers.
 

@@ -251,4 +251,7 @@ fabric.properties
 # Commentary generated static site (code-commentary-static)
 packages/code-commentary-static/site/
 
+# GitHub Pages output (`npm run pages:build`)
+_site/
+
 # End of https://www.toptal.com/developers/gitignore/api/node,webstorm+all,visualstudiocode
