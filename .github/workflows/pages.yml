@@ -13,6 +13,11 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  # `actions: write` lets the cleanup step below delete stale `github-pages`
+  # artifacts that earlier run attempts may have left behind; without this,
+  # re-running the workflow fails in `actions/deploy-pages@v4` with
+  # "Multiple artifacts named 'github-pages' were unexpectedly found".
+  actions: write
   contents: read
   pages: write
   id-token: write
@@ -37,6 +42,24 @@ jobs:
 
       - name: Build static site
         run: npm run pages:build
+
+      - name: Remove stale github-pages artifacts from earlier attempts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          ids=$(gh api --paginate "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "github-pages" and .expired == false) | .id')
+          if [ -z "$ids" ]; then
+            echo "No stale github-pages artifacts."
+            exit 0
+          fi
+          for id in $ids; do
+            echo "Deleting stale github-pages artifact $id"
+            gh api -X DELETE "repos/$GH_REPO/actions/artifacts/$id"
+          done
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
