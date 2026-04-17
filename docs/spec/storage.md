@@ -49,6 +49,8 @@ The `[angles]` table is optional:
 
 You can set `default_angle` alone to prefer a disk angle before the definitions table is filled in.
 
+The VS Code extension exposes **Add angle to project** (writes `[angles]` in `.commentray.toml` and creates the sentinel) and **Open commentray beside source (pick angle)** once Angles layout is enabled.
+
 ### On-disk layout: sentinel `{storage}/source/.default`
 
 Angles use a **different directory shape** than the flat default. The switch is explicit and file-system driven:
@@ -68,6 +70,14 @@ Examples (default `storage.dir = .commentray`):
 The sentinel `.default` does not by itself pick which Angle is “default” for a file; that remains **`angles.default_angle`** in TOML (and, when definitions are empty, convention in tooling may still treat a primary angle id as configured or as the only file present).
 
 **Migration:** existing flat files like `.commentray/source/README.md.md` do not automatically split into Angles; adopting Angles means creating the sentinel and moving or re-authoring content under `source/{P}/…`.
+
+## GitHub Pages static browser (single `index.html`)
+
+The Pages build emits **one** HTML file: one **code** pane (`static_site.source_file`) and one rendered **commentray** pane (intro + `static_site.commentray_markdown`). There is no built-in router for other source/commentray pairs on the same origin.
+
+- **`[[static_site.related_github_files]]`** — optional rows with repo-relative `path` and optional `label` (defaults to the file’s basename). When `static_site.github_url` is a GitHub **repository home** URL (`https://github.com/owner/repo`), the toolbar gains **Also on GitHub** links to `…/blob/<branch>/path` so readers can jump to other Markdown or code on GitHub. Set **`static_site.github_blob_branch`** when your default branch is not `main`.
+- **Search** — **Escape** clears the query and hides hit results (same as the **Clear** control).
+- **Generator** — emitted HTML includes `<meta name="generator" content="Commentray @commentray/render@…; code-commentray-static@…">` so the toolchain version is visible in page metadata (omit by passing an empty `generatorLabel` from the static builder API).
 
 ## Images and other local assets (static HTML)
 

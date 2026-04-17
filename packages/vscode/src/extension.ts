@@ -4,15 +4,21 @@ import {
   type CommentrayIndex,
   addBlockToIndex,
   appendBlockToCommentray,
+  assertValidAngleId,
   buildBlockScrollLinks,
-  commentrayMarkdownPath,
+  commentrayAnglesLayoutEnabled,
+  commentrayAnglesSentinelPath,
   createBlockForRange,
   defaultMetadataIndexPath,
   emptyIndex,
+  ensureAnglesSentinelFile,
+  loadCommentrayConfig,
   normalizeRepoRelativePath,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
   readIndex,
+  resolveCommentrayMarkdownPath,
+  upsertAngleDefinitionInCommentrayToml,
   validateProject,
   writeIndex,
 } from "@commentray/core";
@@ -26,25 +32,26 @@ type ScrollPair = {
   blocks: BlockScrollLink[];
   repoRoot: string;
   sourceRelative: string;
+  /** Repo-relative path to the open commentray `.md` (flat or per-angle). */
+  commentrayPathRel: string;
 };
 
 type PairedPaths = {
   repoRoot: string;
   sourceRelative: string;
   commentrayUri: vscode.Uri;
+  commentrayPathRel: string;
+  angleId: string | null;
 };
-
-const COMMENTRAY_STORAGE_PREFIX = ".commentray/";
-const PLACEHOLDER_TEXT = "_(write commentary here)_";
 
 let activePair: ScrollPair | undefined;
 let scrollSyncDisposable: vscode.Disposable | undefined;
 let ignoreScrollPairEvents = false;
 let blockRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
-function commentrayAbsolutePath(repoRoot: string, repoRelativeSource: string): string {
-  const rel = commentrayMarkdownPath(repoRelativeSource);
-  return path.join(repoRoot, ...rel.split("/"));
+function storageCommentraySourcePrefix(storageDir: string): string {
+  const sd = storageDir.replaceAll("\\", "/");
+  return `${sd}/source/`;
 }
 
 function disposeScrollSync() {
@@ -74,6 +81,7 @@ async function refreshActivePairBlocks(): Promise<void> {
   activePair.blocks = buildBlockScrollLinks(
     index,
     activePair.sourceRelative,
+    activePair.commentrayPathRel,
     activePair.commentray.document.getText(),
   );
 }
@@ -180,6 +188,7 @@ async function ensureCommentrayFile(uri: vscode.Uri): Promise<vscode.Uri> {
 async function resolvePairedPaths(
   editor: vscode.TextEditor,
   folder: vscode.WorkspaceFolder,
+  angleId?: string | null,
 ): Promise<PairedPaths | null> {
   const relative = vscode.workspace.asRelativePath(editor.document.uri, false);
   let normalized: string;
@@ -192,15 +201,26 @@ async function resolvePairedPaths(
     );
     return null;
   }
-  if (normalized.startsWith(COMMENTRAY_STORAGE_PREFIX)) {
+  const repoRoot = folder.uri.fsPath;
+  const cfg = await loadCommentrayConfig(repoRoot);
+  const sourcePrefix = storageCommentraySourcePrefix(cfg.storageDir);
+  if (normalized.startsWith(sourcePrefix)) {
     await vscode.window.showWarningMessage(
-      "Run this command from the source file — the active editor is already a commentray file.",
+      "Run this command from the primary source file — not from a file under .commentray/source/…",
     );
     return null;
   }
-  const repoRoot = folder.uri.fsPath;
-  const commentrayUri = vscode.Uri.file(commentrayAbsolutePath(repoRoot, normalized));
-  return { repoRoot, sourceRelative: normalized, commentrayUri };
+  const resolution = resolveCommentrayMarkdownPath(repoRoot, normalized, cfg, angleId ?? undefined);
+  const commentrayUri = vscode.Uri.file(
+    path.join(repoRoot, ...resolution.commentrayPath.split("/")),
+  );
+  return {
+    repoRoot,
+    sourceRelative: normalized,
+    commentrayUri,
+    commentrayPathRel: resolution.commentrayPath,
+    angleId: resolution.angleId,
+  };
 }
 
 /**
@@ -234,13 +254,19 @@ async function openBesideAndSync(
     vscode.window.visibleTextEditors.find((te) => te.document === sourceEditor.document) ??
     sourceEditor;
   const index = await readIndex(paths.repoRoot);
-  const blocks = buildBlockScrollLinks(index, paths.sourceRelative, commentrayDoc.getText());
+  const blocks = buildBlockScrollLinks(
+    index,
+    paths.sourceRelative,
+    paths.commentrayPathRel,
+    commentrayDoc.getText(),
+  );
   bindScrollSync({
     code: codeEditor,
     commentray: commentrayEditor,
     blocks,
     repoRoot: paths.repoRoot,
     sourceRelative: paths.sourceRelative,
+    commentrayPathRel: paths.commentrayPathRel,
   });
   return commentrayEditor;
 }
@@ -276,6 +302,7 @@ function findPlaceholderSelection(
   doc: vscode.TextDocument,
   blockId: string,
 ): vscode.Selection | null {
+  const PLACEHOLDER_TEXT = "_(write commentary here)_";
   const marker = `<!-- commentray:block id=${blockId} -->`;
   const text = doc.getText();
   const markerIndex = text.indexOf(marker);
@@ -290,12 +317,13 @@ function findPlaceholderSelection(
 async function upsertBlockMetadata(
   repoRoot: string,
   sourceRelative: string,
+  commentrayPathRel: string,
   block: Parameters<typeof addBlockToIndex>[1]["block"],
 ): Promise<void> {
   const current: CommentrayIndex = (await readIndex(repoRoot)) ?? emptyIndex();
   const next = addBlockToIndex(current, {
     sourcePath: sourceRelative,
-    commentrayPath: commentrayMarkdownPath(sourceRelative),
+    commentrayPath: commentrayPathRel,
     block,
   });
   await writeIndex(repoRoot, next);
@@ -306,13 +334,108 @@ async function openSideBySideCommand(): Promise<void> {
   if (!active) return;
   const paths = await resolvePairedPaths(active.editor, active.folder);
   if (!paths) return;
-  // Leave the source editor wherever the user put it. Open the
-  // Commentray markdown in a column to the right of it (`Beside`
-  // creates a split if none exists, or reuses the existing
-  // right-hand column). This is the tool's core affordance:
-  // source on one side, commentary on the other — never two tabs
-  // stacked in the same column.
   await openBesideAndSync(active.editor, paths);
+}
+
+async function openCommentrayAngleCommand(): Promise<void> {
+  const active = await requireActiveEditorInWorkspace();
+  if (!active) return;
+  const cfg = await loadCommentrayConfig(active.folder.uri.fsPath);
+  if (!commentrayAnglesLayoutEnabled(active.folder.uri.fsPath, cfg.storageDir)) {
+    const sentinel = commentrayAnglesSentinelPath(cfg.storageDir);
+    await vscode.window.showInformationMessage(
+      `Angles layout is off (missing ${sentinel}). Use “Add Angle to project…” to enable it and register angles in .commentray.toml.`,
+    );
+    return;
+  }
+  const items: vscode.QuickPickItem[] = cfg.angles.definitions.map((d) => ({
+    label: d.title,
+    description: d.id,
+  }));
+  items.push({ label: "Custom angle id…", alwaysShow: true });
+  const chosen = await vscode.window.showQuickPick(items, {
+    title: "Open Commentray angle",
+    placeHolder: "Pick an angle for the current source file",
+  });
+  if (!chosen) return;
+  let angleId: string;
+  if (chosen.label === "Custom angle id…") {
+    const raw = await vscode.window.showInputBox({
+      title: "Angle id",
+      prompt: "Use letters, digits, underscores, or hyphens (1–64 chars).",
+      validateInput: (value) => {
+        try {
+          assertValidAngleId(value);
+          return undefined;
+        } catch (e) {
+          return e instanceof Error ? e.message : String(e);
+        }
+      },
+    });
+    if (!raw) return;
+    angleId = assertValidAngleId(raw);
+  } else {
+    if (!chosen.description) return;
+    angleId = assertValidAngleId(chosen.description);
+  }
+  const paths = await resolvePairedPaths(active.editor, active.folder, angleId);
+  if (!paths) return;
+  await openBesideAndSync(active.editor, paths);
+}
+
+async function addAngleDefinitionCommand(): Promise<void> {
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (!folder) {
+    await vscode.window.showWarningMessage("Open a workspace folder first.");
+    return;
+  }
+  const repoRoot = folder.uri.fsPath;
+  const cfg = await loadCommentrayConfig(repoRoot);
+  const idRaw = await vscode.window.showInputBox({
+    title: "New Commentray angle",
+    prompt: "Short id (used in paths and .commentray.toml), e.g. architecture",
+    validateInput: (value) => {
+      try {
+        assertValidAngleId(value);
+        return undefined;
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e);
+      }
+    },
+  });
+  if (!idRaw) return;
+  const id = assertValidAngleId(idRaw);
+  const titleRaw = await vscode.window.showInputBox({
+    title: "Display title",
+    prompt: "Optional — shown in the angle picker",
+    value: id,
+  });
+  let makeDefault = cfg.angles.definitions.length === 0;
+  if (!makeDefault) {
+    const pick = await vscode.window.showQuickPick(
+      [
+        { label: "Yes", description: "Set as default_angle in .commentray.toml" },
+        { label: "No", description: "Keep the current default" },
+      ],
+      { placeHolder: `Set “${id}” as the default angle?` },
+    );
+    makeDefault = pick?.label === "Yes";
+  }
+  try {
+    await ensureAnglesSentinelFile(repoRoot, cfg.storageDir);
+    await upsertAngleDefinitionInCommentrayToml(repoRoot, {
+      id,
+      title: titleRaw?.trim() && titleRaw.trim() !== id ? titleRaw.trim() : undefined,
+      makeDefault,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await vscode.window.showErrorMessage(`Could not update .commentray.toml: ${msg}`);
+    return;
+  }
+  await vscode.window.showInformationMessage(
+    `Angle “${id}” was added to .commentray.toml and Angles layout is enabled (${commentrayAnglesSentinelPath(cfg.storageDir)}).`,
+  );
 }
 
 async function startBlockFromSelectionCommand(): Promise<void> {
@@ -334,7 +457,12 @@ async function startBlockFromSelectionCommand(): Promise<void> {
   await replaceDocumentContents(commentrayDoc, nextContent);
   await commentrayDoc.save();
 
-  await upsertBlockMetadata(paths.repoRoot, paths.sourceRelative, created.block);
+  await upsertBlockMetadata(
+    paths.repoRoot,
+    paths.sourceRelative,
+    paths.commentrayPathRel,
+    created.block,
+  );
 
   const commentrayEditor = await openBesideAndSync(active.editor, paths);
   const selection = findPlaceholderSelection(commentrayEditor.document, created.block.id);
@@ -379,6 +507,8 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(output);
   context.subscriptions.push(
     vscode.commands.registerCommand("commentray.openSideBySide", openSideBySideCommand),
+    vscode.commands.registerCommand("commentray.openCommentrayAngle", openCommentrayAngleCommand),
+    vscode.commands.registerCommand("commentray.addAngleDefinition", addAngleDefinitionCommand),
     vscode.commands.registerCommand(
       "commentray.startBlockFromSelection",
       startBlockFromSelectionCommand,

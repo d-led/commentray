@@ -48,7 +48,10 @@ export function commentrayAnglesSentinelPath(storageDir = ".commentray"): string
  * Returns true when the repository opts into **Angles** layout: `{storage}/source/.default` exists
  * (file or directory). When false, only the flat `{storage}/source/{P}.md` mapping applies.
  */
-export function commentrayAnglesLayoutEnabled(repoRoot: string, storageDir = ".commentray"): boolean {
+export function commentrayAnglesLayoutEnabled(
+  repoRoot: string,
+  storageDir = ".commentray",
+): boolean {
   const sentinel = commentrayAnglesSentinelPath(storageDir);
   const absolute = path.join(repoRoot, ...sentinel.split("/"));
   return fs.existsSync(absolute);

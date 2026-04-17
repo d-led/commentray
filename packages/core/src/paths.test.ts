@@ -60,7 +60,9 @@ describe("Angles paths", () => {
   });
 
   it("rejects invalid angle ids", () => {
-    expect(() => commentrayMarkdownPathForAngle("README.md", "../evil")).toThrow(/Invalid angle id/);
+    expect(() => commentrayMarkdownPathForAngle("README.md", "../evil")).toThrow(
+      /Invalid angle id/,
+    );
   });
 
   it("commentrayAnglesLayoutEnabled reflects presence of the sentinel file", () => {

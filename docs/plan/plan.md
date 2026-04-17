@@ -121,6 +121,8 @@ Defaults (illustrative):
   - `github_url` — URL for a “View repository on GitHub” link
   - `source_file` — repo-relative path whose contents fill the **code** pane (default `README.md`)
   - `commentray_markdown` — optional repo-relative path to extra Markdown appended in the commentray pane
+  - `github_blob_branch` — branch segment for toolbar “Also on GitHub” blob links (default `main`)
+  - `[[static_site.related_github_files]]` — optional `path` / `label` rows; toolbar links to other repo files on GitHub (single-page deploy cannot serve arbitrary siblings on Pages)
 
 Implementation note: configuration parsing uses `@iarna/toml` today; dependency choices should be revisited periodically for maintenance and security posture.
 
@@ -129,8 +131,8 @@ Implementation note: configuration parsing uses `@iarna/toml` today; dependency 
 - **Purpose**: dogfood and demo a file-plus-commentray reading experience without a server.
 - **Implementation**: `renderCodeBrowserHtml` lives in `@commentray/render`; `code-commentray-static` wires fixtures + CLI (`npm run site -w code-commentray-static`) and writes to `packages/code-commentray-static/site/` (gitignored).
 - **GitHub Pages**: root script `npm run pages:build` reads `.commentray.toml` `[static_site]`, composes commentray content (intro + GitHub link + optional file), and emits `_site/index.html` via `scripts/build-static-pages.mjs`. Workflow `.github/workflows/pages.yml` runs on `main` + `workflow_dispatch` using `actions/upload-pages-artifact` + `actions/deploy-pages` (repository **Settings → Pages → Build: GitHub Actions**).
-- **UX**: movable vertical bar (mouse drag), “Wrap code lines” checkbox, Highlight.js themes via CDN, Markdown + Mermaid (optional).
-- **Quick search**: client-side whole-source ordered tokens plus per-line fuzzy ranking (bundled client); see `packages/render` implementation.
+- **UX**: movable vertical bar (mouse drag), “Wrap code lines” checkbox, proportional **code ↔ commentray scroll sync** on the static page, Highlight.js themes via CDN, Markdown + Mermaid (optional); `<meta name="generator">` records `@commentray/render` + `code-commentray-static` versions (override via `buildCommentrayStatic({ generatorLabel })`).
+- **Quick search**: client-side whole-source ordered tokens plus per-line fuzzy ranking (bundled client); **Escape** clears search; see `packages/render` implementation.
 
 ## Markdown rendering stack
 

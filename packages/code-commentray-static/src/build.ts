@@ -1,6 +1,12 @@
+import { readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { type CommentrayOutputUrlOptions, renderCodeBrowserHtml } from "@commentray/render";
+import { fileURLToPath } from "node:url";
+import {
+  type CommentrayOutputUrlOptions,
+  commentrayRenderVersion,
+  renderCodeBrowserHtml,
+} from "@commentray/render";
 
 export type BuildCommentrayStaticOptions = {
   /** Absolute or cwd-relative path to the source file whose contents are shown as code. */
@@ -24,7 +30,30 @@ export type BuildCommentrayStaticOptions = {
   toolHomeUrl?: string;
   /** When set, rewrites local and GitHub blob links in commentray for static HTML output. */
   commentrayOutputUrls?: CommentrayOutputUrlOptions;
+  /** Optional toolbar links to other files on GitHub (forwarded to `renderCodeBrowserHtml`). */
+  relatedGithubNav?: { label: string; href: string }[];
+  /**
+   * `<meta name="generator">` value. When omitted, a default is built from `@commentray/render` and
+   * this package’s versions. Pass an empty string to omit the meta tag.
+   */
+  generatorLabel?: string;
 };
+
+const staticPackageDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+function defaultGeneratorLabel(): string {
+  const raw = readFileSync(path.join(staticPackageDir, "package.json"), "utf8");
+  const sv = (JSON.parse(raw) as { version?: string }).version ?? "0.0.0";
+  return `Commentray @commentray/render@${commentrayRenderVersion()}; code-commentray-static@${sv}`;
+}
+
+function resolveGeneratorLabel(explicit: string | undefined): string | undefined {
+  if (explicit !== undefined) {
+    const t = explicit.trim();
+    return t.length > 0 ? t : undefined;
+  }
+  return defaultGeneratorLabel();
+}
 
 export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions): Promise<void> {
   const sourcePath = path.resolve(opts.sourceFile);
@@ -48,6 +77,8 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     githubRepoUrl: opts.githubRepoUrl,
     toolHomeUrl: opts.toolHomeUrl,
     commentrayOutputUrls: opts.commentrayOutputUrls,
+    relatedGithubNav: opts.relatedGithubNav,
+    generatorLabel: resolveGeneratorLabel(opts.generatorLabel),
   });
 
   await mkdir(path.dirname(outPath), { recursive: true });

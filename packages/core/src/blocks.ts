@@ -91,11 +91,17 @@ export function addBlockToIndex(
   index: CommentrayIndex,
   input: AddBlockToIndexInput,
 ): CommentrayIndex {
-  const existing = index.bySourceFile[input.sourcePath];
+  const key = input.commentrayPath;
+  const existing = index.byCommentrayPath[key];
+  if (existing && existing.sourcePath !== input.sourcePath) {
+    throw new Error(
+      `commentrayPath ${key} is already indexed for ${existing.sourcePath}, not ${input.sourcePath}`,
+    );
+  }
   const previousBlocks = existing?.blocks ?? [];
   if (previousBlocks.some((b) => b.id === input.block.id)) {
     throw new Error(
-      `block id ${input.block.id} already exists under ${input.sourcePath}; choose a different id`,
+      `block id ${input.block.id} already exists under ${key}; choose a different id`,
     );
   }
   const nextEntry: SourceFileIndexEntry = {
@@ -105,7 +111,7 @@ export function addBlockToIndex(
   };
   return {
     schemaVersion: index.schemaVersion,
-    bySourceFile: { ...index.bySourceFile, [input.sourcePath]: nextEntry },
+    byCommentrayPath: { ...index.byCommentrayPath, [key]: nextEntry },
   };
 }
 

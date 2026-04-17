@@ -26,6 +26,21 @@ describe("buildCommentrayStatic", () => {
     const html = await readFile(outHtml, "utf8");
     expect(html).toContain("greet");
     expect(html).toContain("Resizable divider");
+    expect(html).toContain('<meta name="generator" content="Commentray @commentray/render@');
+    expect(html).toContain("code-commentray-static@");
+  });
+
+  it("omits generator meta when generatorLabel is an empty string", async () => {
+    outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
+    const outHtml = path.join(outDir, "index.html");
+    await buildCommentrayStatic({
+      sourceFile: path.join(pkgRoot, "fixtures", "sample.ts"),
+      markdownFile: path.join(pkgRoot, "fixtures", "sample.md"),
+      outHtml,
+      generatorLabel: "",
+    });
+    const html = await readFile(outHtml, "utf8");
+    expect(html).not.toContain('<meta name="generator"');
   });
 
   it("surfaces the repo-relative file path in the toolbar when provided", async () => {

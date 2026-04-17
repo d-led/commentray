@@ -6,12 +6,13 @@ import {
   pickSourceLine0ForCommentrayScroll,
 } from "./scroll-sync.js";
 
+const crPath = ".commentray/source/src/a.ts.md";
 const index = {
   schemaVersion: CURRENT_SCHEMA_VERSION,
-  bySourceFile: {
-    "src/a.ts": {
+  byCommentrayPath: {
+    [crPath]: {
       sourcePath: "src/a.ts",
-      commentrayPath: ".commentray/source/src/a.ts.md",
+      commentrayPath: crPath,
       blocks: [
         { id: "b1", anchor: "lines:1-5" },
         { id: "b2", anchor: "lines:20-25" },
@@ -27,12 +28,13 @@ const md =
 
 describe("buildBlockScrollLinks", () => {
   it("returns an empty list when there is no index entry", () => {
-    expect(buildBlockScrollLinks(undefined, "src/a.ts", md)).toEqual([]);
-    expect(buildBlockScrollLinks(index, "missing.ts", md)).toEqual([]);
+    expect(buildBlockScrollLinks(undefined, "src/a.ts", crPath, md)).toEqual([]);
+    expect(buildBlockScrollLinks(index, "missing.ts", crPath, md)).toEqual([]);
+    expect(buildBlockScrollLinks(index, "src/a.ts", ".commentray/source/other.md", md)).toEqual([]);
   });
 
   it("pairs markers in the markdown with line anchors from the index", () => {
-    expect(buildBlockScrollLinks(index, "src/a.ts", md)).toEqual([
+    expect(buildBlockScrollLinks(index, "src/a.ts", crPath, md)).toEqual([
       { commentrayLine: 0, sourceStart: 1, sourceEnd: 5 },
       { commentrayLine: 5, sourceStart: 20, sourceEnd: 25 },
     ]);
@@ -40,7 +42,7 @@ describe("buildBlockScrollLinks", () => {
 });
 
 describe("pickCommentrayLineForSourceScroll", () => {
-  const blocks = buildBlockScrollLinks(index, "src/a.ts", md);
+  const blocks = buildBlockScrollLinks(index, "src/a.ts", crPath, md);
 
   it("snaps to the block that contains the top source line", () => {
     expect(pickCommentrayLineForSourceScroll(blocks, 3)).toBe(0);
@@ -57,7 +59,7 @@ describe("pickCommentrayLineForSourceScroll", () => {
 });
 
 describe("pickSourceLine0ForCommentrayScroll", () => {
-  const blocks = buildBlockScrollLinks(index, "src/a.ts", md);
+  const blocks = buildBlockScrollLinks(index, "src/a.ts", crPath, md);
 
   it("reveals the start of the block whose marker is at or above the commentray top", () => {
     expect(pickSourceLine0ForCommentrayScroll(blocks, 0)).toBe(0);

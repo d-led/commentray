@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import { assertValidIndex } from "./metadata.js";
 import { CURRENT_SCHEMA_VERSION } from "./model.js";
 
+const cp = ".commentray/source/src/a.ts.md";
+
 function indexWithBlock(block: Record<string, unknown>): Record<string, unknown> {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    bySourceFile: {
-      "src/a.ts": {
+    byCommentrayPath: {
+      [cp]: {
         sourcePath: "src/a.ts",
-        commentrayPath: ".commentray/source/src/a.ts.md",
+        commentrayPath: cp,
         blocks: [block],
       },
     },
@@ -18,12 +20,27 @@ function indexWithBlock(block: Record<string, unknown>): Record<string, unknown>
 describe("assertValidIndex", () => {
   it("accepts a minimal valid index", () => {
     const idx = assertValidIndex(indexWithBlock({ id: "b1", anchor: "lines:1-2" }));
-    expect(idx.bySourceFile["src/a.ts"]?.blocks[0]?.id).toBe("b1");
+    expect(idx.byCommentrayPath[cp]?.blocks[0]?.id).toBe("b1");
   });
 
   it("rejects invalid shapes", () => {
     expect(() => assertValidIndex(null)).toThrow();
-    expect(() => assertValidIndex({ schemaVersion: 999, bySourceFile: {} })).toThrow();
+    expect(() => assertValidIndex({ schemaVersion: 999, byCommentrayPath: {} })).toThrow();
+  });
+
+  it("rejects when index key does not match entry.commentrayPath", () => {
+    expect(() =>
+      assertValidIndex({
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        byCommentrayPath: {
+          [cp]: {
+            sourcePath: "src/a.ts",
+            commentrayPath: ".commentray/source/wrong.md",
+            blocks: [],
+          },
+        },
+      }),
+    ).toThrow(/index key must equal entry\.commentrayPath/);
   });
 
   it("accepts an optional fingerprint and markerId on a block", () => {

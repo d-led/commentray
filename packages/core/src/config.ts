@@ -3,6 +3,7 @@ import path from "node:path";
 import { parse as parseToml } from "@iarna/toml";
 
 import { assertValidAngleId } from "./angles.js";
+import { githubRepoBlobFileUrl, parseGithubRepoWebUrl } from "./github-url.js";
 import { normalizeRepoRelativePath } from "./paths.js";
 
 export type CommentrayToml = {
@@ -44,15 +45,28 @@ export type CommentrayToml = {
     commentray_markdown?: string;
     /** @deprecated Renamed to `commentray_markdown`. */
     commentary_markdown?: string;
+    /** Branch name embedded in GitHub blob URLs for `related_github_files` (default `main`). */
+    github_blob_branch?: string;
+    /**
+     * Optional toolbar links on the static code browser: open other repo files on GitHub
+     * (single-page Pages deploys cannot serve arbitrary paths next to `index.html`).
+     */
+    related_github_files?: { label?: string; path: string }[];
   };
 };
+
+export type ResolvedGithubNavLink = { label: string; href: string };
 
 export type ResolvedStaticSite = {
   title: string;
   introMarkdown: string;
   githubUrl: string | null;
+  /** Branch used when building `relatedGithubNav` blob URLs. */
+  githubBlobBranch: string;
   sourceFile: string;
   commentrayMarkdownFile: string;
+  /** Toolbar “Also on GitHub …” links for the static code browser. */
+  relatedGithubNav: ResolvedGithubNavLink[];
 };
 
 export type ResolvedAngleDefinition = { id: string; title: string };
@@ -76,8 +90,10 @@ const defaultStaticSite: ResolvedStaticSite = {
   title: "Commentray",
   introMarkdown: "",
   githubUrl: null,
+  githubBlobBranch: "main",
   sourceFile: "README.md",
   commentrayMarkdownFile: "",
+  relatedGithubNav: [],
 };
 
 const defaultAngles: ResolvedAngles = { defaultAngleId: null, definitions: [] };
@@ -131,7 +147,9 @@ function assertStorageDirNotInsideGit(value: string | undefined): void {
   }
 }
 
-function mergeAngleDefinitions(raw: { id: string; title?: string }[] | undefined): ResolvedAngleDefinition[] {
+function mergeAngleDefinitions(
+  raw: { id: string; title?: string }[] | undefined,
+): ResolvedAngleDefinition[] {
   if (!raw?.length) return [];
   const out: ResolvedAngleDefinition[] = [];
   const seen = new Set<string>();
@@ -156,7 +174,11 @@ function resolveAngles(parsed: CommentrayToml): ResolvedAngles {
   const defaultRaw = a.default_angle?.trim();
   const defaultAngleId = defaultRaw ? assertValidAngleId(defaultRaw) : null;
 
-  if (definitions.length > 0 && defaultAngleId && !definitions.some((d) => d.id === defaultAngleId)) {
+  if (
+    definitions.length > 0 &&
+    defaultAngleId &&
+    !definitions.some((d) => d.id === defaultAngleId)
+  ) {
     throw new Error(
       `angles.default_angle "${defaultAngleId}" must match one of angles.definitions (got: ${definitions.map((d) => d.id).join(", ")})`,
     );
@@ -165,18 +187,44 @@ function resolveAngles(parsed: CommentrayToml): ResolvedAngles {
   return { defaultAngleId, definitions };
 }
 
+function mergeRelatedGithubNav(
+  githubUrl: string | null,
+  branch: string,
+  raw: { label?: string; path: string }[] | undefined,
+): ResolvedGithubNavLink[] {
+  const gh = githubUrl ? parseGithubRepoWebUrl(githubUrl) : null;
+  if (!gh || !raw?.length) return [];
+  const b = branch.trim() || defaultStaticSite.githubBlobBranch;
+  const out: ResolvedGithubNavLink[] = [];
+  for (const row of raw) {
+    if (!row?.path?.trim()) continue;
+    const p = normalizeRepoRelativePath(row.path.trim());
+    const label = row.label?.trim() || path.posix.basename(p);
+    out.push({
+      label,
+      href: githubRepoBlobFileUrl(gh.owner, gh.repo, b, p),
+    });
+  }
+  return out;
+}
+
 function resolveStaticSite(parsed: CommentrayToml): ResolvedStaticSite {
   const ss = parsed.static_site;
   const mdFile =
     ss?.commentray_markdown?.trim() ??
     ss?.commentary_markdown?.trim() ??
     defaultStaticSite.commentrayMarkdownFile;
+  const githubUrl = nonEmptyTrimmed(ss?.github_url);
+  const githubBlobBranch =
+    nonEmptyTrimmed(ss?.github_blob_branch) ?? defaultStaticSite.githubBlobBranch;
   return {
     title: nonEmptyTrimmed(ss?.title) ?? defaultStaticSite.title,
     introMarkdown: ss?.intro ?? defaultStaticSite.introMarkdown,
-    githubUrl: nonEmptyTrimmed(ss?.github_url),
+    githubUrl,
+    githubBlobBranch,
     sourceFile: nonEmptyTrimmed(ss?.source_file) ?? defaultStaticSite.sourceFile,
     commentrayMarkdownFile: mdFile,
+    relatedGithubNav: mergeRelatedGithubNav(githubUrl, githubBlobBranch, ss?.related_github_files),
   };
 }
 
@@ -187,6 +235,12 @@ function assertSafeConfigPaths(parsed: CommentrayToml): void {
   assertSafeRepoRelativePath("static_site.source_file", ss?.source_file);
   assertSafeRepoRelativePath("static_site.commentray_markdown", ss?.commentray_markdown);
   assertSafeRepoRelativePath("static_site.commentary_markdown", ss?.commentary_markdown);
+  for (let i = 0; i < (ss?.related_github_files?.length ?? 0); i++) {
+    assertSafeRepoRelativePath(
+      `static_site.related_github_files[${i}].path`,
+      ss?.related_github_files?.[i]?.path,
+    );
+  }
 }
 
 export function mergeCommentrayConfig(parsed: CommentrayToml | null): ResolvedCommentrayConfig {

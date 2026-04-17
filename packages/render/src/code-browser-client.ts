@@ -5,6 +5,7 @@ import {
   SearcherFactory,
   SubstringSearcher,
 } from "@m31coding/fuzzy-search";
+import { mirroredScrollTop } from "./code-browser-scroll-sync.js";
 import { findOrderedTokenSpans, lineAtIndex, offsetToLineIndex } from "./code-browser-search.js";
 
 type HitKind = "code" | "md";
@@ -127,6 +128,16 @@ function wireSearchUi(ctx: SearchUiContext): void {
   const { rawCode, rawMd, mdLines, searcher, searchInput, searchClear, searchResults, docPane } =
     ctx;
 
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function clearSearch(): void {
+    clearTimeout(debounceTimer);
+    debounceTimer = undefined;
+    searchInput.value = "";
+    searchResults.innerHTML = "";
+    searchResults.hidden = true;
+  }
+
   function runSearch(): void {
     const tokens = tokenizeQuery(searchInput.value);
     if (tokens.length === 0) {
@@ -182,16 +193,21 @@ function wireSearchUi(ctx: SearchUiContext): void {
     }
   });
 
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   searchInput.addEventListener("input", () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(runSearch, 200);
   });
-  searchClear.addEventListener("click", () => {
-    clearTimeout(debounceTimer);
-    searchInput.value = "";
-    searchResults.innerHTML = "";
-    searchResults.hidden = true;
+  searchClear.addEventListener("click", clearSearch);
+
+  document.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    const query = searchInput.value.trim().length > 0;
+    const searchFocused = document.activeElement === searchInput;
+    const resultsOpen = !searchResults.hidden;
+    if (!query && !searchFocused && !resultsOpen) return;
+    clearSearch();
+    if (searchFocused) searchInput.blur();
+    e.preventDefault();
   });
 }
 
@@ -213,6 +229,46 @@ function wireWrapToggle(
       localStorage.setItem(storageWrap, "0");
     }
   });
+}
+
+/** Proportional scroll sync between README (code) and commentray panes — try it on GitHub Pages. */
+function wireProportionalScrollSync(codePane: HTMLElement, docPane: HTMLElement): void {
+  type Syncing = "none" | "code" | "doc";
+  let syncing: Syncing = "none";
+
+  codePane.addEventListener(
+    "scroll",
+    () => {
+      if (syncing === "doc") return;
+      syncing = "code";
+      docPane.scrollTop = mirroredScrollTop(
+        codePane.scrollTop,
+        codePane.scrollHeight,
+        codePane.clientHeight,
+        docPane.scrollHeight,
+        docPane.clientHeight,
+      );
+      syncing = "none";
+    },
+    { passive: true },
+  );
+
+  docPane.addEventListener(
+    "scroll",
+    () => {
+      if (syncing === "code") return;
+      syncing = "doc";
+      codePane.scrollTop = mirroredScrollTop(
+        docPane.scrollTop,
+        docPane.scrollHeight,
+        docPane.clientHeight,
+        codePane.scrollHeight,
+        codePane.clientHeight,
+      );
+      syncing = "none";
+    },
+    { passive: true },
+  );
 }
 
 function wireSplitter(
@@ -308,6 +364,7 @@ function main(): void {
 
   wireWrapToggle(storageWrap, codePane, wrapCb);
   wireSplitter(storageSplit, shell, codePane, gutter, pct);
+  wireProportionalScrollSync(codePane, docPane);
 }
 
 if (document.readyState === "loading") {

@@ -44,6 +44,17 @@ export const DEFAULT_COMMENTRAY_TOML = [
   '# id = "architecture"',
   '# title = "Architecture"',
   "",
+  "# GitHub Pages static browser (optional). `related_github_files` adds toolbar links",
+  "# to other repo paths on github.com (single index.html cannot serve every file).",
+  "# [static_site]",
+  '# title = "My project"',
+  '# github_url = "https://github.com/you/repo"',
+  '# github_blob_branch = "main"',
+  '# source_file = "README.md"',
+  '# commentray_markdown = ".commentray/source/README.md.md"',
+  "# [[static_site.related_github_files]]",
+  '# path = "CONTRIBUTING.md"',
+  "",
 ].join("\n");
 
 async function pathExists(p: string): Promise<boolean> {

@@ -18,6 +18,14 @@ export {
   generateBlockId,
 } from "./blocks.js";
 export { assertValidAngleId } from "./angles.js";
+export { ensureAnglesSentinelFile, upsertAngleDefinitionInCommentrayToml } from "./angles-toml.js";
+export type { UpsertAngleDefinitionInput } from "./angles-toml.js";
+export {
+  defaultAngleIdForOpen,
+  FALLBACK_DEFAULT_ANGLE_ID,
+  resolveCommentrayMarkdownPath,
+} from "./commentray-path-resolution.js";
+export type { ResolvedCommentrayMarkdownPath } from "./commentray-path-resolution.js";
 export {
   commentrayAnglesLayoutEnabled,
   commentrayAnglesSentinelPath,
@@ -31,10 +39,11 @@ export type {
   ResolvedAngleDefinition,
   ResolvedAngles,
   ResolvedCommentrayConfig,
+  ResolvedGithubNavLink,
   ResolvedStaticSite,
 } from "./config.js";
 export { loadCommentrayConfig, mergeCommentrayConfig } from "./config.js";
-export { parseGithubRepoWebUrl } from "./github-url.js";
+export { githubRepoBlobFileUrl, parseGithubRepoWebUrl } from "./github-url.js";
 export { assertValidIndex, emptyIndex } from "./metadata.js";
 export { migrateIndex } from "./migrate.js";
 export type { ParsedAnchor } from "./anchors.js";

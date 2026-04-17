@@ -62,7 +62,9 @@ function validateBlock(commentrayPathKey: string, block: unknown): void {
     );
   }
   if (b.lastVerifiedBlob !== undefined && typeof b.lastVerifiedBlob !== "string") {
-    throw new TypeError(`block.lastVerifiedBlob must be a string when present under ${commentrayPathKey}`);
+    throw new TypeError(
+      `block.lastVerifiedBlob must be a string when present under ${commentrayPathKey}`,
+    );
   }
   if (b.markerId !== undefined && typeof b.markerId !== "string") {
     throw new TypeError(`block.markerId must be a string when present under ${commentrayPathKey}`);

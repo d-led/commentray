@@ -41,6 +41,12 @@ _(write commentary here)_
 - The heading is human-readable shorthand; the authoritative anchor lives in the metadata index keyed by the same `id`.
 - Tools locate a block's position in the commentray file by scanning for `<!-- commentray:block id=… -->`; authors should not edit the marker line.
 
+## Metadata index (`index.json`, schema v3)
+
+The workspace index groups blocks by **repo-relative commentray path** (`byCommentrayPath`), not by source path alone. That way each **Angle** file (see `storage.md`) keeps its own `blocks[]` without collisions when several commentrays exist for the same primary file.
+
+Each entry still records both `sourcePath` and `commentrayPath`; the object key must equal `commentrayPath`. Older v1–v2 indexes keyed by `sourcePath` are migrated automatically when read (and rewritten on disk).
+
 ## Drift resolution (informative)
 
 When a block's `anchor` is a `lines:<start>-<end>` range and a `fingerprint` is present, a drift resolver can re-sync the range after the source changes:

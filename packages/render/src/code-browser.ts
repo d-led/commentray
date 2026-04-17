@@ -35,7 +35,22 @@ export type CodeBrowserPageOptions = {
    * relative to the generated HTML file.
    */
   commentrayOutputUrls?: CommentrayOutputUrlOptions;
+  /**
+   * Optional “Also on GitHub …” toolbar links (other repo files). Used when only a single
+   * `index.html` is published so in-repo Markdown links cannot target sibling paths on Pages.
+   */
+  relatedGithubNav?: { label: string; href: string }[];
+  /**
+   * Free-form label for `<meta name="generator">` (e.g. package versions). Omitted when unset.
+   */
+  generatorLabel?: string;
 };
+
+function renderGeneratorMetaHtml(label: string | undefined): string {
+  const t = label?.trim();
+  if (!t) return "";
+  return `<meta name="generator" content="${escapeHtml(t)}" />\n    `;
+}
 
 function extractPreCodeInner(html: string): string {
   const m = /<pre(?:\s[^>]*)?>\s*<code(?:\s[^>]*)?>([\s\S]*?)<\/code>\s*<\/pre>/i.exec(html.trim());
@@ -124,6 +139,20 @@ function buildToolbarEndHtml(
   return `<div class="toolbar__end">${bits.join("")}</div>`;
 }
 
+function renderRelatedGithubNavHtml(links: { label: string; href: string }[]): string {
+  if (links.length === 0) return "";
+  const parts = links.map(
+    (l) =>
+      `<a href="${escapeHtml(l.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.label)}</a>`,
+  );
+  return (
+    `<nav class="toolbar-related" aria-label="Open other repository files on GitHub">` +
+    `<span class="toolbar-related__prefix">Also on GitHub</span>` +
+    `<span class="toolbar-related__links">${parts.join('<span class="toolbar-related__sep" aria-hidden="true"> · </span>')}</span>` +
+    `</nav>`
+  );
+}
+
 /** IIFE produced by `npm run build -w @commentray/render` (esbuild of `code-browser-client.ts`). */
 function loadCodeBrowserClientBundle(): string {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -187,6 +216,18 @@ const CODE_BROWSER_STYLES = `
         color: CanvasText; font-weight: 600;
       }
       .toolbar .file-path--title { font-weight: 600; }
+      .toolbar-related {
+        display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
+        max-width: min(520px, 90vw); font-size: 12px; line-height: 1.35;
+        color: color-mix(in oklab, CanvasText 88%, Canvas);
+      }
+      .toolbar-related__prefix { font-weight: 600; opacity: 0.85; white-space: nowrap; }
+      .toolbar-related__links { min-width: 0; }
+      .toolbar-related a {
+        color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 500;
+        word-break: break-word;
+      }
+      .toolbar-related__sep { opacity: 0.55; user-select: none; }
       .toolbar .search-field {
         display: inline-flex; align-items: center; gap: 6px; flex: 1 1 220px; min-width: 160px;
       }
@@ -265,7 +306,9 @@ const CODE_BROWSER_STYLES = `
 
 type CodeBrowserPageParts = {
   title: string;
+  generatorMetaHtml: string;
   filePathHtml: string;
+  relatedNavHtml: string;
   toolbarEndHtml: string;
   codeHtml: string;
   commentrayHtml: string;
@@ -279,7 +322,9 @@ type CodeBrowserPageParts = {
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
   const {
     title,
+    generatorMetaHtml,
     filePathHtml,
+    relatedNavHtml,
     toolbarEndHtml,
     codeHtml,
     commentrayHtml,
@@ -294,7 +339,7 @@ function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(title)}</title>
+    ${generatorMetaHtml}<title>${escapeHtml(title)}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/${escapeHtml(
       hljs,
     )}.min.css" media="(prefers-color-scheme: light)" />
@@ -315,6 +360,7 @@ ${CODE_BROWSER_STYLES}
             <input type="search" id="search-q" placeholder="Whole source (ordered tokens + fuzzy lines)…" autocomplete="off" spellcheck="false" />
             <button type="button" id="search-clear" title="Clear search">Clear</button>
           </span>
+          ${relatedNavHtml}
           <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
         </div>
         ${toolbarEndHtml}
@@ -370,9 +416,14 @@ mermaid.run({ querySelector: ".mermaid" });
 </script>`
     : "";
 
+  const relatedNavHtml = renderRelatedGithubNavHtml(opts.relatedGithubNav ?? []);
+  const generatorMetaHtml = renderGeneratorMetaHtml(opts.generatorLabel);
+
   return buildCodeBrowserPageHtml({
     title,
+    generatorMetaHtml,
     filePathHtml,
+    relatedNavHtml,
     toolbarEndHtml,
     codeHtml,
     commentrayHtml,

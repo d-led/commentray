@@ -3,6 +3,7 @@ import path from "node:path";
 import { type ResolvedCommentrayConfig, loadCommentrayConfig } from "./config.js";
 import { parseGithubRepoWebUrl } from "./github-url.js";
 import { assertValidIndex } from "./metadata.js";
+import { migrateIndex } from "./migrate.js";
 import { defaultMetadataIndexPath } from "./paths.js";
 import type { CommentrayIndex } from "./model.js";
 
@@ -38,20 +39,16 @@ export async function validateProject(repoRoot: string): Promise<ValidationResul
     }
   }
 
-  const indexPath = path.join(repoRoot, defaultMetadataIndexPath());
   try {
-    const raw = await fs.readFile(indexPath, "utf8");
-    assertValidIndex(JSON.parse(raw) as unknown);
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") {
+    const idx = await readIndex(repoRoot);
+    if (idx === null) {
       issues.push({ level: "warn", message: `No metadata index at ${defaultMetadataIndexPath()}` });
-    } else {
-      issues.push({
-        level: "error",
-        message: `Invalid metadata index: ${err instanceof Error ? err.message : String(err)}`,
-      });
     }
+  } catch (err) {
+    issues.push({
+      level: "error",
+      message: `Invalid metadata index: ${err instanceof Error ? err.message : String(err)}`,
+    });
   }
 
   pushRelativeGithubLinkConfigWarnings(config, issues);
@@ -78,7 +75,16 @@ export async function readIndex(repoRoot: string): Promise<CommentrayIndex | nul
   const indexPath = path.join(repoRoot, defaultMetadataIndexPath());
   try {
     const raw = await fs.readFile(indexPath, "utf8");
-    return assertValidIndex(JSON.parse(raw) as unknown);
+    const parsed = JSON.parse(raw) as unknown;
+    try {
+      return assertValidIndex(parsed);
+    } catch {
+      const { index, changed } = migrateIndex(parsed);
+      if (changed) {
+        await writeIndex(repoRoot, index);
+      }
+      return assertValidIndex(index as unknown);
+    }
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return null;

@@ -135,44 +135,60 @@ describe("addBlockToIndex", () => {
       commentrayPath: ".commentray/source/src/greet.ts.md",
       block,
     });
-    expect(next.bySourceFile["src/greet.ts"]).toEqual({
+    const cr = ".commentray/source/src/greet.ts.md";
+    expect(next.byCommentrayPath[cr]).toEqual({
       sourcePath: "src/greet.ts",
-      commentrayPath: ".commentray/source/src/greet.ts.md",
+      commentrayPath: cr,
       blocks: [block],
     });
   });
 
   it("appends to an existing source entry without mutating the input index", () => {
+    const cr = ".commentray/source/src/greet.ts.md";
     const base = addBlockToIndex(emptyIndex(), {
       sourcePath: "src/greet.ts",
-      commentrayPath: ".commentray/source/src/greet.ts.md",
+      commentrayPath: cr,
       block,
     });
     const next = addBlockToIndex(base, {
       sourcePath: "src/greet.ts",
-      commentrayPath: ".commentray/source/src/greet.ts.md",
+      commentrayPath: cr,
       block: { id: "def456", anchor: "lines:10-20" },
     });
-    expect(next.bySourceFile["src/greet.ts"]?.blocks.map((b) => b.id)).toEqual([
-      "abc123",
-      "def456",
-    ]);
-    expect(base.bySourceFile["src/greet.ts"]?.blocks.map((b) => b.id)).toEqual(["abc123"]);
+    expect(next.byCommentrayPath[cr]?.blocks.map((b) => b.id)).toEqual(["abc123", "def456"]);
+    expect(base.byCommentrayPath[cr]?.blocks.map((b) => b.id)).toEqual(["abc123"]);
   });
 
   it("refuses to overwrite a block whose id already exists", () => {
+    const cr = ".commentray/source/src/greet.ts.md";
     const base = addBlockToIndex(emptyIndex(), {
       sourcePath: "src/greet.ts",
-      commentrayPath: ".commentray/source/src/greet.ts.md",
+      commentrayPath: cr,
       block,
     });
     expect(() =>
       addBlockToIndex(base, {
         sourcePath: "src/greet.ts",
-        commentrayPath: ".commentray/source/src/greet.ts.md",
+        commentrayPath: cr,
         block: { id: "abc123", anchor: "lines:5-7" },
       }),
     ).toThrowError(/already exists/);
+  });
+
+  it("refuses the same commentrayPath indexed for a different source file", () => {
+    const cr = ".commentray/source/x.md";
+    const base = addBlockToIndex(emptyIndex(), {
+      sourcePath: "src/a.ts",
+      commentrayPath: cr,
+      block,
+    });
+    expect(() =>
+      addBlockToIndex(base, {
+        sourcePath: "src/other.ts",
+        commentrayPath: cr,
+        block: { id: "def456", anchor: "lines:1-2" },
+      }),
+    ).toThrow(/already indexed for/);
   });
 });
 

@@ -19,6 +19,34 @@ describe("renderCodeBrowserHtml", () => {
     expect(html).toContain("Notes");
   });
 
+  it("includes a generator meta tag when generatorLabel is set", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      generatorLabel: "Commentray @commentray/render@9.9.9-test",
+    });
+    expect(html).toContain(
+      '<meta name="generator" content="Commentray @commentray/render@9.9.9-test" />',
+    );
+  });
+
+  it("renders optional related GitHub file links in the toolbar", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      relatedGithubNav: [
+        { label: "CONTRIBUTING", href: "https://github.com/acme/demo/blob/main/CONTRIBUTING.md" },
+      ],
+    });
+    expect(html).toContain('class="toolbar-related"');
+    expect(html).toContain("Also on GitHub");
+    expect(html).toContain('href="https://github.com/acme/demo/blob/main/CONTRIBUTING.md"');
+  });
+
   it("renders a 1-based, non-selectable line number for every source line", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",

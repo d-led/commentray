@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseGithubRepoWebUrl } from "./github-url.js";
+import { githubRepoBlobFileUrl, parseGithubRepoWebUrl } from "./github-url.js";
 
 describe("parseGithubRepoWebUrl", () => {
   it("parses canonical https URLs", () => {
@@ -23,5 +23,16 @@ describe("parseGithubRepoWebUrl", () => {
     );
     expect(parseGithubRepoWebUrl("https://gitlab.com/a/b")).toBe(null);
     expect(parseGithubRepoWebUrl("not a url")).toBe(null);
+  });
+});
+
+describe("githubRepoBlobFileUrl", () => {
+  it("joins encoded path segments with slashes for the blob URL", () => {
+    expect(githubRepoBlobFileUrl("acme", "demo", "main", "docs/spec/storage.md")).toBe(
+      "https://github.com/acme/demo/blob/main/docs/spec/storage.md",
+    );
+    expect(githubRepoBlobFileUrl("acme", "demo", "main", "weird name.md")).toBe(
+      "https://github.com/acme/demo/blob/main/weird%20name.md",
+    );
   });
 });

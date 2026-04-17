@@ -23,6 +23,8 @@
   ],
   "activationEvents": [
     "onCommand:commentray.openSideBySide",
+    "onCommand:commentray.openCommentrayAngle",
+    "onCommand:commentray.addAngleDefinition",
     "onCommand:commentray.startBlockFromSelection",
     "onCommand:commentray.openCommentrayPreview",
     "onCommand:commentray.validateWorkspace"
@@ -32,7 +34,15 @@
     "commands": [
       {
         "command": "commentray.openSideBySide",
-        "title": "Commentray: Open commentray beside source"
+        "title": "Commentray: Open commentray beside source (default angle)"
+      },
+      {
+        "command": "commentray.openCommentrayAngle",
+        "title": "Commentray: Open commentray beside source (pick angle)"
+      },
+      {
+        "command": "commentray.addAngleDefinition",
+        "title": "Commentray: Add angle to project (updates .commentray.toml)"
       },
       {
         "command": "commentray.startBlockFromSelection",
@@ -60,6 +70,16 @@
         {
           "command": "commentray.openSideBySide",
           "group": "commentray@1",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "commentray.openCommentrayAngle",
+          "group": "commentray@1b",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "commentray.addAngleDefinition",
+          "group": "commentray@1c",
           "when": "editorTextFocus"
         },
         {

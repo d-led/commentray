@@ -40,6 +40,38 @@ describe("mergeCommentrayConfig", () => {
     expect(cfg.staticSite.githubUrl).toBe("https://github.com/a/b");
     expect(cfg.staticSite.sourceFile).toBe("src/index.ts");
     expect(cfg.staticSite.commentrayMarkdownFile).toBe("docs/x.md");
+    expect(cfg.staticSite.githubBlobBranch).toBe("main");
+    expect(cfg.staticSite.relatedGithubNav).toEqual([]);
+  });
+
+  it("builds related_github_nav from github_url and repo-relative paths", () => {
+    const cfg = mergeCommentrayConfig({
+      static_site: {
+        github_url: "https://github.com/acme/demo",
+        github_blob_branch: "develop",
+        related_github_files: [
+          { path: "CONTRIBUTING.md" },
+          { label: "Storage spec", path: "docs/spec/storage.md" },
+        ],
+      },
+    });
+    expect(cfg.staticSite.relatedGithubNav).toEqual([
+      {
+        label: "CONTRIBUTING.md",
+        href: "https://github.com/acme/demo/blob/develop/CONTRIBUTING.md",
+      },
+      {
+        label: "Storage spec",
+        href: "https://github.com/acme/demo/blob/develop/docs/spec/storage.md",
+      },
+    ]);
+  });
+
+  it("leaves related_github_nav empty when github_url is missing", () => {
+    const cfg = mergeCommentrayConfig({
+      static_site: { related_github_files: [{ path: "README.md" }] },
+    });
+    expect(cfg.staticSite.relatedGithubNav).toEqual([]);
   });
 
   it("accepts multiline basic strings and multiline arrays from real TOML", () => {

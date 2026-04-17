@@ -28,10 +28,11 @@ function markerLineByIdFromMarkdown(markdown: string): Map<string, number> {
 export function buildBlockScrollLinks(
   index: CommentrayIndex | null | undefined,
   sourceRelative: string,
+  commentrayPath: string,
   commentrayMarkdown: string,
 ): BlockScrollLink[] {
-  const entry = index?.bySourceFile[sourceRelative];
-  if (!entry || entry.blocks.length === 0) return [];
+  const entry = index?.byCommentrayPath[commentrayPath];
+  if (!entry || entry.sourcePath !== sourceRelative || entry.blocks.length === 0) return [];
   const markerLineById = markerLineByIdFromMarkdown(commentrayMarkdown);
   const links: BlockScrollLink[] = [];
   for (const block of entry.blocks) {

@@ -88,6 +88,7 @@ try {
     githubRepoUrl: ss.githubUrl ?? undefined,
     toolHomeUrl: COMMENTRAY_TOOL_HOME,
     commentrayOutputUrls,
+    relatedGithubNav: ss.relatedGithubNav.length > 0 ? ss.relatedGithubNav : undefined,
   });
 } finally {
   await unlink(tmpMd).catch(() => {});

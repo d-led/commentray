@@ -4,6 +4,16 @@ _You have the main [`README.md`](https://github.com/d-led/commentray/blob/main/R
 
 > **Director beat:** two panes, one checkout. The left column states facts; this **commentray** adds motive, trade-offs, and “we tried that already.” Same word names the tool (**Commentray**) and what you write beside the code (**commentray**); the README’s _Why_ section spells that out for newcomers.
 
+## Try scroll sync (why the editor extension exists)
+
+On **[GitHub Pages](https://d-led.github.io/commentray/)** you already get the split layout: **Code** is this repo’s `README.md`; **Commentray** is _this_ file, rendered as HTML. **Scroll either pane**—the other follows in **lockstep** (proportional sync: long README, shorter commentary, same “where am I in the story?” gesture). That is the “commentary track” metaphor made tangible without installing anything.
+
+**Other files:** the toolbar row includes **Also on GitHub** (from `[static_site.related_github_files]` in [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml))—each link opens that path on GitHub so you can read `CONTRIBUTING.md`, specs, or the plan beside the same mental model. Only one HTML file ships to Pages, so in-commentray Markdown links that get rewritten to repo-relative paths may **404** here; use full `https://github.com/…/blob/…` URLs for prose links when you need a guarantee, or list the file under `related_github_files` for a first-class shortcut.
+
+**Search:** **Escape** clears the query and hides hit results (same as **Clear**).
+
+The **VS Code / Cursor** extension goes further while you **author**: open **Commentray: Open commentray beside source**, keep both editors visible, and scroll the source—the commentray view tracks, and once you add **blocks** (**Commentray: Add block from selection**), scroll sync **snaps to the block heading** that matches the code you are looking at instead of only stretching by line ratio. Same storage and `index.json` model as the site; the plugin is where editing stays pleasant.
+
 ## Why this file exists
 
 The README has to stay scannable. Here we can linger: why `.commentray/` lives beside the code, when to reach for the extension versus the CLI, and where the sharp edges are—without pasting another full quickstart.
