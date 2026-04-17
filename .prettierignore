@@ -8,3 +8,4 @@ package-lock.json
 LICENSE
 packages/*/LICENSE
 packages/code-commentray-static/site
+.commentray-dev/

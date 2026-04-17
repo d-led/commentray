@@ -33,6 +33,9 @@
     "binary:build": "npm run build:bundle -w @commentray/cli && node scripts/build-binary.mjs",
     "binary:smoke": "node scripts/smoke-binary.mjs",
     "extension:dogfood": "bash scripts/editor-extension.sh dogfood",
+    "extension:install": "bash scripts/install-extension.sh",
+    "extension:package": "bash scripts/install-extension.sh --package-only",
+    "extension:uninstall": "bash scripts/install-extension.sh --uninstall",
     "code-commentray-static:build": "npm run build -w @commentray/render && npm run build -w code-commentray-static && npm run site -w code-commentray-static",
     "pages:build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w code-commentray-static && node scripts/build-static-pages.mjs"
   },

@@ -36,4 +36,19 @@ describe("mergeCommentrayConfig", () => {
     });
     expect(cfg.staticSite.commentrayMarkdownFile).toBe("legacy.md");
   });
+
+  it("rejects a storage.dir that escapes the repository root", () => {
+    expect(() => mergeCommentrayConfig({ storage: { dir: "../evil" } })).toThrow(
+      /storage\.dir.*repository-relative/,
+    );
+  });
+
+  it("rejects static_site paths that escape the repository root", () => {
+    expect(() =>
+      mergeCommentrayConfig({ static_site: { source_file: "../../../etc/passwd" } }),
+    ).toThrow(/static_site\.source_file/);
+    expect(() =>
+      mergeCommentrayConfig({ static_site: { commentray_markdown: "../outside.md" } }),
+    ).toThrow(/static_site\.commentray_markdown/);
+  });
 });

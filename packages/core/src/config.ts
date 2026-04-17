@@ -2,6 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { parse as parseToml } from "@iarna/toml";
 
+import { normalizeRepoRelativePath } from "./paths.js";
+
 export type CommentrayToml = {
   storage?: { dir?: string };
   scm?: { provider?: string };
@@ -62,6 +64,23 @@ function nonEmptyTrimmed(s: string | undefined): string | null {
   return t ? t : null;
 }
 
+/**
+ * Reject `.commentray.toml` path values that would escape the repository
+ * root. Trusting raw config strings would let a malicious `.commentray.toml`
+ * redirect Commentray's `mkdir`/read operations outside the repo on an
+ * otherwise unsuspecting developer machine.
+ */
+function assertSafeRepoRelativePath(label: string, value: string | undefined): void {
+  if (value === undefined || value === "") return;
+  try {
+    normalizeRepoRelativePath(value);
+  } catch {
+    throw new Error(
+      `.commentray.toml ${label} must be a repository-relative path without ".." segments (got: ${value})`,
+    );
+  }
+}
+
 function resolveStaticSite(parsed: CommentrayToml): ResolvedStaticSite {
   const ss = parsed.static_site;
   const mdFile =
@@ -77,12 +96,21 @@ function resolveStaticSite(parsed: CommentrayToml): ResolvedStaticSite {
   };
 }
 
+function assertSafeConfigPaths(parsed: CommentrayToml): void {
+  assertSafeRepoRelativePath("storage.dir", parsed.storage?.dir);
+  const ss = parsed.static_site;
+  assertSafeRepoRelativePath("static_site.source_file", ss?.source_file);
+  assertSafeRepoRelativePath("static_site.commentray_markdown", ss?.commentray_markdown);
+  assertSafeRepoRelativePath("static_site.commentary_markdown", ss?.commentary_markdown);
+}
+
 export function mergeCommentrayConfig(parsed: CommentrayToml | null): ResolvedCommentrayConfig {
   if (!parsed) return { ...defaultConfig };
   const scm = parsed.scm?.provider ?? defaultConfig.scmProvider;
   if (scm !== "git") {
     throw new Error(`Unsupported scm.provider: ${String(scm)} (only "git" is implemented)`);
   }
+  assertSafeConfigPaths(parsed);
   return {
     storageDir: parsed.storage?.dir ?? defaultConfig.storageDir,
     scmProvider: "git",

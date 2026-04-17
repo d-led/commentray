@@ -44,15 +44,31 @@ This repository is developed with **npm** (`package-lock.json` is committed).
 
 ## Dogfood the `commentray-vscode` extension
 
+There are two complementary workflows. Use the one that matches your goal.
+
+### Extension development: `npm run extension:dogfood`
+
 From the repo root:
 
 ```bash
-npm run extension:dogfood
+npm run extension:dogfood              # opens packages/vscode/fixtures/dogfood
+npm run extension:dogfood -- <path>    # or open a specific folder
 ```
 
 This builds `@commentray/core` and the extension, then starts **Cursor** (if `cursor` is on `PATH`) or **VS Code** with `--extensionDevelopmentPath=packages/vscode`. Override the editor binary with `COMMENTRAY_EDITOR`.
 
-The Extension Development Host runs with an isolated `--user-data-dir` and `--extensions-dir` under `.commentray-dev/` (git-ignored) so you can open this repo in the dev host alongside your normal Cursor window — without the editor's "one folder per profile" rule stealing focus back to your main window.
+By default it opens [`packages/vscode/fixtures/dogfood`](packages/vscode/fixtures/dogfood) — a committed sample workspace — rather than the Commentray repository itself. This sidesteps VS Code / Cursor's *"one folder per profile"* rule: if you try to open a folder that your main Cursor window already holds open, the editor focus-steals back to the main window and the dev host is effectively unusable. Using a dedicated fixture avoids the collision entirely and keeps the dev host in your normal (logged-in) Cursor profile.
+
+### Using Commentray in your own projects: `npm run extension:install`
+
+For actually using the extension against real codebases, don't use the dev host — build and install the packaged `.vsix` into your regular editor:
+
+```bash
+npm run extension:install       # build, bundle, package, install the .vsix
+npm run extension:uninstall     # remove it
+```
+
+After install, reload the target window (Command Palette → *Developer: Reload Window*) and the `Commentray:` commands appear there.
 
 ## Expensive CI
 

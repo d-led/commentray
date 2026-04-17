@@ -1,11 +1,62 @@
 # Security
 
-If you believe you have found a security vulnerability, please contact the maintainers privately (for now: open a **draft** security-relevant issue only if you must, but prefer direct maintainer contact if available).
+Commentray is a local developer tool: the CLI, the git hook, and the rendered
+HTML all run on the machine of whoever invokes them, against content already
+checked into the repository. This file documents the trust boundary we actually
+defend, the boundary we cannot defend, and how to report an issue.
 
-Please include:
+## Trust model
 
-- a short description of the issue,
-- steps to reproduce,
-- impacted versions/commits if known.
+**In-scope — Commentray must not make these worse than plain files on disk:**
 
-We aim to respond quickly, but this project is early-stage; thank you for responsible disclosure.
+- Parsing `.commentray.toml`. Must never execute code, and must not let a
+  hostile config redirect filesystem writes outside the repo
+  (`storage.dir`, `static_site.source_file`, `static_site.commentray_markdown`
+  are path-validated by `normalizeRepoRelativePath`; absolute paths and `..`
+  segments are rejected).
+- Parsing `.commentray/metadata/index.json`. JSON only; migrations never
+  `eval`/`require` content.
+- Rendering Commentray Markdown to HTML. User Markdown passes through
+  `remark` → `rehype-sanitize` (allowlist schema) → `rehype-highlight`.
+  No inline `<script>`, no `on*` handlers, no `javascript:` URLs survive.
+  Mermaid runs with `securityLevel: "strict"`.
+- Installing the git hook. `commentray init scm` writes a fixed shell block
+  into `.git/hooks/pre-commit`; it never interpolates user input.
+- Invoking `git`. `spawn("git", argv)` with the array form; no shell, no
+  string interpolation.
+
+**Out of scope — same trust level as source code:**
+
+- **Prompt injection into AI coding assistants** (Cursor, Copilot, other IDE
+  AIs) via the contents of `.commentray/source/**/*.md`. Commentray Markdown
+  lives in the repo and will be read by AI tooling exactly like any
+  `README.md` or source comment. Review `.commentray/**` changes with the
+  same rigor as code; a malicious PR that rewrites commentary is a social /
+  supply-chain problem, not a Commentray bug.
+- Code executed by the developer's own editor, test runner, or build tools
+  in response to any repository content.
+
+## What is deliberately _not_ a hardening layer
+
+- The CLI runs with the invoking user's full filesystem rights. It resolves
+  the project root from `.commentray.toml` → `.git` → the current directory
+  (see `packages/cli/src/project-root.ts`); it does not attempt to sandbox
+  itself.
+- `commentray render --markdown PATH --out PATH` accepts absolute paths
+  because it is a local convenience command driven by the user on the
+  command line. Command-line arguments are trusted input.
+
+## Reporting a vulnerability
+
+If you think you've found a flaw that breaches the in-scope guarantees above
+(for example: a `.commentray.toml` value that causes writes outside the repo,
+XSS in rendered Markdown that bypasses `rehype-sanitize`, or shell injection
+through any Commentray-controlled string), please open a private report via
+[GitHub Security Advisories](https://github.com/d-led/commentray/security/advisories/new)
+rather than a public issue.
+
+Include:
+
+- The Commentray version (`commentray --version`) and platform.
+- A minimal repo or config that reproduces the behavior.
+- What you expected vs. observed.

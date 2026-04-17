@@ -254,7 +254,8 @@ packages/code-commentray-static/site/
 # GitHub Pages output (`npm run pages:build`)
 _site/
 
-# Extension Development Host isolated profile (scripts/editor-extension.sh dogfood)
-.commentray-dev/
+# Packaged VS Code extension artifacts (scripts/install-extension.sh)
+packages/vscode/dist/*.vsix
 
 # End of https://www.toptal.com/developers/gitignore/api/node,webstorm+all,visualstudiocode
+.commentray-dev/

@@ -2,4 +2,6 @@
 src/**
 **/*.tsbuildinfo
 tsconfig*.json
+esbuild.extension.mjs
 *.vsix
+dist/*.vsix

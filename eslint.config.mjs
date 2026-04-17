@@ -5,7 +5,14 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.strict,
   {
-    ignores: ["**/dist/**", "**/out/**", "coverage/**", "**/*.mjs", "eslint.config.mjs"],
+    ignores: [
+      "**/dist/**",
+      "**/out/**",
+      "coverage/**",
+      "**/*.mjs",
+      "eslint.config.mjs",
+      "packages/vscode/fixtures/**",
+    ],
   },
   {
     files: ["packages/cli/src/**/*.ts", "packages/code-commentray-static/src/**/*.ts"],

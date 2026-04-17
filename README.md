@@ -31,6 +31,14 @@ npm run cli:install      # bash scripts/install-cli.sh
 npm run cli:uninstall    # bash scripts/install-cli.sh --unlink
 ```
 
+To install the **editor extension** into your regular Cursor / VS Code (bundled `.vsix`, not the Extension Development Host):
+
+```bash
+npm run extension:install        # build, bundle, package, and install
+npm run extension:package        # just produce the .vsix at packages/vscode/dist/
+npm run extension:uninstall      # remove the installed extension
+```
+
 Coverage (opens HTML report on macOS/Linux when possible):
 
 ```bash

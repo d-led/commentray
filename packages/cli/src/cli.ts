@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
 import {
@@ -90,8 +91,14 @@ async function cmdRender(opts: {
   console.log(`Wrote ${outPath}`);
 }
 
+// Read the CLI's own version from its shipped package.json so that
+// `bump-version.sh` needs to touch only package.json files — not source.
+// esbuild inlines this JSON when bundling for the SEA binary, so it also
+// works for the standalone executable.
+const cliPackage = createRequire(import.meta.url)("../package.json") as { version: string };
+
 const program = new Command();
-program.name("commentray").description("Commentray CLI").version("0.0.1");
+program.name("commentray").description("Commentray CLI").version(cliPackage.version);
 
 const initCmd = program
   .command("init")

@@ -49,6 +49,7 @@ export default tseslint.config(
       "**/coverage/**",
       "**/cypress/**",
       "packages/code-commentray-static/site/**",
+      "packages/vscode/fixtures/**",
     ],
   },
   {

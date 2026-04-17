@@ -1,69 +1,78 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build and launch Cursor / VS Code with this repo's Commentray extension loaded
-# from packages/vscode (development install — no .vsix).
+# Build and launch Cursor / VS Code with this repo's Commentray extension
+# loaded from packages/vscode (development install — no .vsix).
 #
 # Usage:
-#   bash scripts/editor-extension.sh dogfood [path...]   # default: open this repo
+#   bash scripts/editor-extension.sh dogfood              # open the fixture folder
+#   bash scripts/editor-extension.sh dogfood <path>       # open a specific folder
+#
+# By default this opens `packages/vscode/fixtures/dogfood`, a minimal
+# commentray-enabled workspace committed to this repo. That avoids VS Code /
+# Cursor's "one folder per profile" rule, which otherwise steals focus back to
+# your main window when you try to open a folder it already has open.
+#
+# To actually USE the extension in your own projects, install the packaged
+# .vsix instead:
+#   npm run extension:install
 #
 # Editor CLI:
-#   Set COMMENTRAY_EDITOR (e.g. "cursor", "code", or a full path).
-#   Otherwise: prefer "cursor" if on PATH, else "code".
+#   $COMMENTRAY_EDITOR (path or command) is honored first.
+#   Otherwise: prefer `cursor` if on PATH, else `code`.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-pick_editor_cli() {
-  if [[ -n "${COMMENTRAY_EDITOR:-}" ]]; then
-    echo "$COMMENTRAY_EDITOR"
-    return
-  fi
-  if command -v cursor >/dev/null 2>&1; then
-    echo cursor
-    return
-  fi
-  if command -v code >/dev/null 2>&1; then
-    echo code
-    return
-  fi
-  echo "Could not find 'cursor' or 'code' on PATH. Install the editor's shell command, or set COMMENTRAY_EDITOR." >&2
-  exit 1
-}
+# shellcheck source=lib/pick-editor-cli.sh
+source "$REPO_ROOT/scripts/lib/pick-editor-cli.sh"
+
+DEFAULT_DOGFOOD_FOLDER="$REPO_ROOT/packages/vscode/fixtures/dogfood"
 
 build_extension() {
   npm run build -w @commentray/core
   npm run build -w commentray-vscode
 }
 
+warn_if_folder_collides_with_main() {
+  local target_abs="$1"
+  # Heuristic: if the user points the dev host at this very repo, Cursor/VS
+  # Code will focus-steal to any existing window holding it. We can't detect
+  # "already open" reliably, so warn unconditionally for this one known case.
+  if [[ "$target_abs" == "$REPO_ROOT" ]]; then
+    cat >&2 <<EOF
+warning: opening the Commentray repository itself in the dev host.
+         If your regular Cursor window already has this folder open,
+         VS Code / Cursor will focus that window instead of the dev host.
+         Close the main window first, or use the default fixture:
+           bash scripts/editor-extension.sh dogfood
+EOF
+  fi
+}
+
 cmd_dogfood() {
   build_extension
-  local editor_cli
-  editor_cli="$(pick_editor_cli)"
+
+  local target
   if [[ "$#" -eq 0 ]]; then
-    set -- "$REPO_ROOT"
+    target="$DEFAULT_DOGFOOD_FOLDER"
+  else
+    target="$(cd "$1" && pwd)"
+    shift
   fi
 
-  # Isolate the Extension Development Host with its own user-data and
-  # extensions directories. Without this, Cursor/VS Code enforces "one
-  # window per folder per profile": opening this repo in the dev host
-  # steals focus back to the main window that already has it open.
-  # A dedicated data dir makes the dev host a separate instance for
-  # window-tracking purposes, so the same folder can be open in both.
-  local dev_home="$REPO_ROOT/.commentray-dev"
-  local dev_data="$dev_home/editor-data"
-  local dev_exts="$dev_home/editor-extensions"
-  mkdir -p "$dev_data" "$dev_exts"
+  warn_if_folder_collides_with_main "$target"
+
+  local editor_cli
+  editor_cli="$(commentray_pick_editor_cli)"
 
   # VS Code / Cursor expect the camelCase form `--extensionDevelopmentPath`.
   # The kebab-case variant is parsed by Electron/Chromium, not VS Code's
   # extension host, and the dev window never opens.
-  echo "Launching ${editor_cli} (isolated profile at ${dev_home})" >&2
+  echo "Launching ${editor_cli} against ${target}" >&2
   exec "$editor_cli" \
-    --new-window \
-    --user-data-dir="$dev_data" \
-    --extensions-dir="$dev_exts" \
     --extensionDevelopmentPath="$REPO_ROOT/packages/vscode" \
+    "$target" \
     "$@"
 }
 
@@ -73,7 +82,7 @@ case "${1:-}" in
     cmd_dogfood "$@"
     ;;
   *)
-    echo "Usage: $0 dogfood [folder...]" >&2
+    echo "Usage: $0 dogfood [folder]" >&2
     exit 2
     ;;
 esac
