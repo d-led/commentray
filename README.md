@@ -23,6 +23,14 @@ npm run commentray -- init
 npm run commentray -- doctor
 ```
 
+To get a global `commentray` on your `PATH` (symlinked to the local workspace build — no reinstall needed after rebuilds):
+
+```bash
+npm run cli:install      # bash scripts/install-cli.sh
+# ...later:
+npm run cli:uninstall    # bash scripts/install-cli.sh --unlink
+```
+
 Coverage (opens HTML report on macOS/Linux when possible):
 
 ```bash
