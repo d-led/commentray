@@ -1,6 +1,36 @@
 import { parseAnchor } from "./anchors.js";
 import type { CommentrayIndex } from "./model.js";
 
+const START_RE = /commentray:start\s+id=([a-z0-9]+)\b/i;
+const END_RE = /commentray:end\s+id=([a-z0-9]+)\b/i;
+
+/**
+ * 1-based inclusive source lines **between** paired marker comments (markers
+ * on their own lines). Returns null when markers are missing or mis-ordered.
+ */
+export function sourceLineRangeForMarkerId(sourceText: string, markerId: string): {
+  start: number;
+  end: number;
+} | null {
+  const id = markerId.trim().toLowerCase();
+  const lines = sourceText.split("\n");
+  let startMarkerIdx = -1;
+  let endMarkerIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const sm = START_RE.exec(lines[i]);
+    if (sm && sm[1].toLowerCase() === id) startMarkerIdx = i;
+    const em = END_RE.exec(lines[i]);
+    if (em && em[1].toLowerCase() === id) endMarkerIdx = i;
+  }
+  if (startMarkerIdx < 0 || endMarkerIdx < 0 || endMarkerIdx < startMarkerIdx + 2) {
+    return null;
+  }
+  const start = startMarkerIdx + 2;
+  const end = endMarkerIdx;
+  if (end < start) return null;
+  return { start, end };
+}
+
 /** One block as needed for scroll correlation (0-based commentray line, 1-based source range). */
 export type BlockScrollLink = {
   commentrayLine: number;
@@ -21,15 +51,17 @@ function markerLineByIdFromMarkdown(markdown: string): Map<string, number> {
 }
 
 /**
- * Correlate index blocks (line anchors + ids) with `<!-- commentray:block id=… -->`
- * markers in commentray. Only `lines:` anchors with a visible
- * marker participate. Sorted by `sourceStart`.
+ * Correlate index blocks with `<!-- commentray:block id=… -->` markers in
+ * commentray. Supports legacy `lines:` anchors and `marker:` anchors (the
+ * latter needs `sourceText` to resolve marker comments in the primary file).
+ * Sorted by `sourceStart`.
  */
 export function buildBlockScrollLinks(
   index: CommentrayIndex | null | undefined,
   sourceRelative: string,
   commentrayPath: string,
   commentrayMarkdown: string,
+  sourceText?: string,
 ): BlockScrollLink[] {
   const entry = index?.byCommentrayPath[commentrayPath];
   if (!entry || entry.sourcePath !== sourceRelative || entry.blocks.length === 0) return [];
@@ -37,14 +69,26 @@ export function buildBlockScrollLinks(
   const links: BlockScrollLink[] = [];
   for (const block of entry.blocks) {
     const anchor = parseAnchor(block.anchor);
-    if (anchor.kind !== "lines") continue;
     const commentrayLine = markerLineById.get(block.id);
     if (commentrayLine === undefined) continue;
-    links.push({
-      commentrayLine,
-      sourceStart: anchor.range.start,
-      sourceEnd: anchor.range.end,
-    });
+    if (anchor.kind === "lines") {
+      links.push({
+        commentrayLine,
+        sourceStart: anchor.range.start,
+        sourceEnd: anchor.range.end,
+      });
+      continue;
+    }
+    if (anchor.kind === "marker") {
+      if (sourceText === undefined) continue;
+      const range = sourceLineRangeForMarkerId(sourceText, anchor.id);
+      if (range === null) continue;
+      links.push({
+        commentrayLine,
+        sourceStart: range.start,
+        sourceEnd: range.end,
+      });
+    }
   }
   links.sort((a, b) => a.sourceStart - b.sourceStart);
   return links;

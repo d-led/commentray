@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { type ResolvedCommentrayConfig, loadCommentrayConfig } from "./config.js";
 import { parseGithubRepoWebUrl } from "./github-url.js";
+import { normalizeCommentrayIndex } from "./index-normalize.js";
 import { assertValidIndex } from "./metadata.js";
 import { migrateIndex } from "./migrate.js";
 import { defaultMetadataIndexPath } from "./paths.js";
@@ -76,15 +77,12 @@ export async function readIndex(repoRoot: string): Promise<CommentrayIndex | nul
   try {
     const raw = await fs.readFile(indexPath, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    try {
-      return assertValidIndex(parsed);
-    } catch {
-      const { index, changed } = migrateIndex(parsed);
-      if (changed) {
-        await writeIndex(repoRoot, index);
-      }
-      return assertValidIndex(index as unknown);
+    const { index: migrated, changed: schemaChanged } = migrateIndex(parsed);
+    const { index: normalized, changed: snippetChanged } = normalizeCommentrayIndex(migrated);
+    if (schemaChanged || snippetChanged) {
+      await writeIndex(repoRoot, normalized);
     }
+    return assertValidIndex(normalized as unknown);
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return null;

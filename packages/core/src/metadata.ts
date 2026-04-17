@@ -69,23 +69,12 @@ function validateBlock(commentrayPathKey: string, block: unknown): void {
   if (b.markerId !== undefined && typeof b.markerId !== "string") {
     throw new TypeError(`block.markerId must be a string when present under ${commentrayPathKey}`);
   }
-  if (b.fingerprint !== undefined) validateFingerprint(commentrayPathKey, b.fingerprint);
-}
-
-function validateFingerprint(commentrayPathKey: string, fp: unknown): void {
-  if (typeof fp !== "object" || fp === null) {
-    throw new TypeError(`block.fingerprint must be an object under ${commentrayPathKey}`);
+  if (b.snippet !== undefined && typeof b.snippet !== "string") {
+    throw new TypeError(`block.snippet must be a string when present under ${commentrayPathKey}`);
   }
-  const f = fp as Record<string, unknown>;
-  if (typeof f.startLine !== "string") {
-    throw new TypeError(`block.fingerprint.startLine must be a string under ${commentrayPathKey}`);
-  }
-  if (typeof f.endLine !== "string") {
-    throw new TypeError(`block.fingerprint.endLine must be a string under ${commentrayPathKey}`);
-  }
-  if (typeof f.lineCount !== "number" || !Number.isInteger(f.lineCount) || f.lineCount < 1) {
+  if (b.fingerprint !== undefined) {
     throw new TypeError(
-      `block.fingerprint.lineCount must be a positive integer under ${commentrayPathKey}`,
+      `block.fingerprint is no longer supported under ${commentrayPathKey}; re-open the repo to migrate index.json`,
     );
   }
 }

@@ -3,15 +3,22 @@ export type LineRange = { start: number; end: number };
 export type ParsedAnchor =
   | { kind: "lines"; range: LineRange }
   | { kind: "symbol"; name: string }
+  | { kind: "marker"; id: string }
   | { kind: "opaque"; raw: string };
 
 /**
  * Minimal anchor grammar (versioned; see docs/spec/anchors.md).
  * - lines:12-34
  * - symbol:SomeName
+ * - marker:<id> (paired `commentray:start id=<id>` / `commentray:end id=<id>` in source)
  */
 export function parseAnchor(anchor: string): ParsedAnchor {
   const trimmed = anchor.trim();
+  const markerMatch = /^marker:([a-z0-9]{1,64})$/i.exec(trimmed);
+  if (markerMatch) {
+    const id = markerMatch[1].toLowerCase();
+    return { kind: "marker", id };
+  }
   const linesMatch = /^lines:(\d+)-(\d+)$/.exec(trimmed);
   if (linesMatch) {
     const start = Number(linesMatch[1]);
@@ -32,4 +39,12 @@ export function parseAnchor(anchor: string): ParsedAnchor {
 
 export function formatLineRange(range: LineRange): string {
   return `lines:${range.start}-${range.end}`;
+}
+
+export function formatMarkerAnchor(markerId: string): string {
+  const trimmed = markerId.trim().toLowerCase();
+  if (!/^[a-z0-9]{1,64}$/.test(trimmed)) {
+    throw new Error(`Invalid marker id for anchor: ${markerId}`);
+  }
+  return `marker:${trimmed}`;
 }

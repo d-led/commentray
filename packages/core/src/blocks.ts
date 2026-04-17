@@ -1,10 +1,6 @@
-import { formatLineRange } from "./anchors.js";
-import type {
-  CommentrayBlock,
-  CommentrayBlockFingerprint,
-  CommentrayIndex,
-  SourceFileIndexEntry,
-} from "./model.js";
+import { buildCommentraySnippetV1 } from "./block-snippet.js";
+import { formatMarkerAnchor } from "./anchors.js";
+import type { CommentrayBlock, CommentrayIndex, SourceFileIndexEntry } from "./model.js";
 
 /** 1-based inclusive range of source lines a block points to. */
 export type BlockRange = {
@@ -55,10 +51,10 @@ const CARET_PLACEHOLDER = "_(write commentary here)_";
  */
 export function createBlockForRange(input: CreateBlockForRangeInput): CreatedBlock {
   const range = clampRange(input.range, input.sourceText);
-  const anchor = formatLineRange({ start: range.startLine, end: range.endLine });
-  const fingerprint = computeFingerprint(input.sourceText, range);
   const id = input.id ?? generateBlockId(input.rng);
-  const block: CommentrayBlock = { id, anchor, fingerprint };
+  const anchor = formatMarkerAnchor(id);
+  const snippet = snippetFromRange(input.sourceText, range);
+  const block: CommentrayBlock = { id, anchor, markerId: id, snippet };
   const markdown = renderBlockMarkdown({ block, sourcePath: input.sourcePath, range });
   const caretLineOffset = placeholderLineOffset(markdown);
   return { block, markdown, caretLineOffset };
@@ -139,15 +135,13 @@ function clampRange(range: BlockRange, sourceText: string): BlockRange {
   return { startLine: start, endLine: end };
 }
 
-function computeFingerprint(sourceText: string, range: BlockRange): CommentrayBlockFingerprint {
+function snippetFromRange(sourceText: string, range: BlockRange): string {
   const lines = sourceText.split("\n");
-  const startText = (lines[range.startLine - 1] ?? "").trim();
-  const endText = (lines[range.endLine - 1] ?? "").trim();
-  return {
-    startLine: startText,
-    endLine: endText,
-    lineCount: range.endLine - range.startLine + 1,
-  };
+  const trimmed: string[] = [];
+  for (let ln = range.startLine; ln <= range.endLine; ln++) {
+    trimmed.push((lines[ln - 1] ?? "").trim());
+  }
+  return buildCommentraySnippetV1(trimmed);
 }
 
 function renderBlockMarkdown(args: {
