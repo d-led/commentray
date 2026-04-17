@@ -1,0 +1,10 @@
+node_modules
+dist
+out
+coverage
+*.vsix
+package-lock.json
+.yarn
+LICENSE
+packages/*/LICENSE
+packages/code-commentary-static/site

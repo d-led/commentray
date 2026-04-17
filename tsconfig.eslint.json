@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "baseUrl": ".",
+    "paths": {
+      "@commentary/core": ["packages/core/src/index.ts"],
+      "@commentary/render": ["packages/render/src/index.ts"]
+    },
+    "types": ["node", "vscode"],
+    "lib": ["ES2022"]
+  },
+  "include": [
+    "eslint.config.mjs",
+    "vitest.config.ts",
+    "vitest.*.config.ts",
+    "packages/core/src/**/*.ts",
+    "packages/render/src/**/*.ts",
+    "packages/cli/src/**/*.ts",
+    "packages/vscode/src/**/*.ts",
+    "packages/code-commentary-static/src/**/*.ts",
+    "packages/code-commentary-static/fixtures/**/*.ts",
+    "scripts/**/*.mjs"
+  ],
+  "exclude": ["**/node_modules/**", "**/dist/**"]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@commentary/cli",
+  "version": "0.0.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Commentary command-line interface",
+  "license": "MPL-2.0",
+  "type": "module",
+  "bin": {
+    "commentary": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "commentary": "node ./dist/cli.js"
+  },
+  "dependencies": {
+    "@commentary/core": "0.0.1",
+    "@commentary/render": "0.0.1",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1"
+  }
+}

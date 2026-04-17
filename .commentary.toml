@@ -1,0 +1,14 @@
+# Commentary defaults live here. Most keys are optional.
+
+[storage]
+dir = ".commentary"
+
+[scm]
+provider = "git"
+
+[render]
+mermaid = true
+syntaxTheme = "github-dark"
+
+[anchors]
+defaultStrategy = ["symbol", "lines"]
