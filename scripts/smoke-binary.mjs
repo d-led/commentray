@@ -22,7 +22,11 @@ function expectSuccess(label, args, { expectOutput } = {}) {
   const result = spawnSync(binPath, args, { encoding: "utf8" });
   const out = (result.stdout ?? "") + (result.stderr ?? "");
   if (result.status !== 0) {
-    console.error(`[fail] ${label}: exit ${result.status}`);
+    const detail =
+      result.status === null
+        ? `no exit code (signal=${result.signal ?? "?"})${result.error ? ` ${result.error.message}` : ""}`
+        : `exit ${result.status}`;
+    console.error(`[fail] ${label}: ${detail}`);
     console.error(out);
     process.exit(1);
   }

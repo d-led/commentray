@@ -11,7 +11,7 @@ Inline comments are not always possible (generated files, tight formats, policy)
 - `@commentary/core`: models, TOML config, JSON metadata validation, Git SCM adapter, staleness helpers.
 - `@commentary/render`: Markdown → HTML (GFM), syntax highlighting (rehype-highlight / lowlight), Mermaid containers, HTML shells (side-by-side + interactive static code browser with token-in-line search and jump).
 - `code-commentary-static`: sample generator for a single static HTML “code + commentary” page (draggable splitter, code line-wrap toggle). Run `npm run code-commentary-static:build` (builds `@commentary/render` + this package, then writes `packages/code-commentary-static/site/index.html`). **GitHub Pages:** `[static_site]` in [`.commentary.toml`](.commentary.toml) drives `npm run pages:build` → `_site/index.html`; workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml) deploys on `main` (enable Pages → “GitHub Actions” in repo settings).
-- `@commentary/cli`: `commentary` command for `init` (idempotent workspace setup), `init config`, `init scm` (git pre-commit hook), validate/doctor/migrate/render.
+- `@commentary/cli`: `commentary` command for `init` (idempotent workspace setup), `init config`, `init scm` (git pre-commit hook), validate/doctor/migrate/render. **Standalone executables** (Node SEA, no separate Node install) are built per OS/arch in [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml) and attached to GitHub Releases on version tags; see **Standalone CLI binaries** below.
 - `commentary-vscode`: VS Code / Cursor extension MVP (open paired commentary + basic scroll sync + workspace validation output; richer gutter UX is planned).
 
 ## Quickstart
@@ -29,6 +29,34 @@ Coverage (opens HTML report on macOS/Linux when possible):
 npm run test:coverage
 npm run test:coverage:all
 ```
+
+## Standalone CLI binaries
+
+The workflow [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml) produces one self-contained binary per row (uploaded as workflow artifacts on every run; on `v*` tags they are also attached to the GitHub Release):
+
+| Runner | Artifact name (example) |
+| --- | --- |
+| Linux x64 | `commentary-linux-x64` |
+| Linux arm64 | `commentary-linux-arm64` |
+| macOS x64 (Intel) | `commentary-darwin-x64` |
+| macOS arm64 (Apple Silicon) | `commentary-darwin-arm64` |
+| Windows x64 | `commentary-windows-x64.exe` |
+
+Local build (from repo root, after `npm ci`): `npm run binary:build` then `npm run binary:smoke`. On macOS, if your `node` is from **Homebrew**, set `COMMENTARY_SEA_NODE` to a **nodejs.org**-style `node` binary (same major as CI, e.g. 22.x); the build script prints which binary it used.
+
+**macOS quarantine (downloads):** if Gatekeeper blocks a downloaded binary, remove the quarantine attribute (pick one):
+
+```bash
+xattr -d com.apple.quarantine /path/to/commentary-darwin-arm64
+```
+
+To drop **all** extended attributes on that file (broader than quarantine only):
+
+```bash
+xattr -c /path/to/commentary-darwin-arm64
+```
+
+(`xattr -r` is not valid on macOS; use `find` with `-exec xattr -c` if you ever need a directory tree.)
 
 ## Layout
 

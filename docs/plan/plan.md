@@ -21,7 +21,7 @@ The user-facing README should remain **terse and skimmable**, in the spirit of [
 - **Rendering**: `@commentary/render` provides Markdown → HTML with sanitization, highlighting, Mermaid containers, and HTML shells (simple side-by-side plus an interactive **static code browser** page).
 - **Static code browser sample**: the `code-commentary-static` package emits a self-contained HTML file: highlighted code, rendered Markdown commentary, a **draggable vertical splitter**, and a **line-wrap toggle** for the code pane (client-side persistence via `localStorage`).
 - **Manipulation library**: `@commentary/core` owns models, validation, migrations, and staleness helpers.
-- **CLI**: `@commentary/cli` provides `init` (full idempotent setup), `init config`, `init scm` (git hooks), `validate`, `doctor`, `migrate`, `render`, and `paths`.
+- **CLI**: `@commentary/cli` provides `init` (full idempotent setup), `init config`, `init scm` (git hooks), `validate`, `doctor`, `migrate`, `render`, and `paths`; **standalone SEA binaries** for Linux (x64, arm64), macOS (x64, arm64), and Windows (x64) are built in [`.github/workflows/binaries.yml`](../../.github/workflows/binaries.yml) and attached to GitHub Releases on `v*` tags.
 - **Monorepo**: TypeScript, semantic versioning, packages start at **0.0.1**, **MPL-2.0** per published package.
 - **Config**: `.commentary.toml` at repo root with sensible defaults.
 - **Tooling**: Prettier for TS/JS/JSON/Markdown; ESLint for TS; Vitest at multiple tiers.

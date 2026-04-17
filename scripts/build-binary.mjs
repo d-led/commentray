@@ -71,9 +71,13 @@ function ensureBundle() {
   });
 }
 
-function generateBlob() {
+function generateBlob(nodeBinary) {
+  // The blob must be produced by the same major Node version that will embed
+  // it; V8 code-cache format and module resolution tables move between
+  // majors. We therefore run `--experimental-sea-config` with the exact Node
+  // that will host the SEA.
   if (existsSync(BLOB)) rmSync(BLOB);
-  run(process.execPath, ["--experimental-sea-config", SEA_CONFIG], { cwd: CLI_DIR });
+  run(nodeBinary, ["--experimental-sea-config", SEA_CONFIG], { cwd: CLI_DIR });
   if (!existsSync(BLOB)) {
     throw new Error(`Expected blob at ${BLOB} but it was not produced.`);
   }
@@ -132,12 +136,12 @@ function reportSize(targetPath) {
 }
 
 ensureBundle();
-generateBlob();
+const source = resolveSourceNode();
+console.log(`Using source Node binary: ${source}`);
+generateBlob(source);
 
 const { name } = binarySuffix();
 const targetPath = join(OUT_DIR, name);
-const source = resolveSourceNode();
-console.log(`Using source Node binary: ${source}`);
 copyNodeBinary(source, targetPath);
 prepareForInjection(targetPath);
 postjectInject(targetPath);

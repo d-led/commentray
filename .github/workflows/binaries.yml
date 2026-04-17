@@ -1,0 +1,83 @@
+name: binaries
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: binaries-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+          - os: macos-13
+            target: darwin-x64
+          - os: macos-14
+            target: darwin-arm64
+          - os: windows-2022
+            target: windows-x64
+    runs-on: ${{ matrix.os }}
+    name: build-${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build CLI bundle
+        run: npm run build:bundle -w @commentary/cli
+
+      - name: Build standalone binary
+        shell: bash
+        run: node scripts/build-binary.mjs
+
+      - name: Smoke test binary
+        shell: bash
+        run: node scripts/smoke-binary.mjs
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: commentary-${{ matrix.target }}
+          path: packages/cli/dist/bin/commentary-*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Stage release attachments
+        run: |
+          mkdir -p release-binaries
+          find artifacts -type f -name 'commentary-*' -exec cp -v {} release-binaries/ \;
+          ls -lah release-binaries/
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-binaries/*
+          generate_release_notes: true
