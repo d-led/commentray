@@ -114,11 +114,6 @@ if git rev-parse --verify --quiet "$tag" >/dev/null; then
   exit 1
 fi
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  log_error "You have uncommitted changes. Commit or stash them before bumping."
-  exit 1
-fi
-
 if [[ "$dry_run" == true ]]; then
   echo ""
   echo "=== DRY RUN ==="
@@ -126,6 +121,11 @@ if [[ "$dry_run" == true ]]; then
   echo "sync @commentray/* deps, update CHANGELOG.md if present,"
   echo "commit, and create tag $tag."
   exit 0
+fi
+
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  log_error "You have uncommitted changes. Commit or stash them before bumping."
+  exit 1
 fi
 
 log_info "Bumping all workspace packages to $new_version..."

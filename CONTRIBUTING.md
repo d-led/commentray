@@ -57,7 +57,7 @@ npm run extension:dogfood -- <path>    # or open a specific folder
 
 This builds `@commentray/core` and the extension, then starts **Cursor** (if `cursor` is on `PATH`) or **VS Code** with `--extensionDevelopmentPath=packages/vscode`. Override the editor binary with `COMMENTRAY_EDITOR`.
 
-By default it opens [`packages/vscode/fixtures/dogfood`](packages/vscode/fixtures/dogfood) — a committed sample workspace — rather than the Commentray repository itself. This sidesteps VS Code / Cursor's *"one folder per profile"* rule: if you try to open a folder that your main Cursor window already holds open, the editor focus-steals back to the main window and the dev host is effectively unusable. Using a dedicated fixture avoids the collision entirely and keeps the dev host in your normal (logged-in) Cursor profile.
+By default it opens [`packages/vscode/fixtures/dogfood`](packages/vscode/fixtures/dogfood) — a committed sample workspace — rather than the Commentray repository itself. This sidesteps VS Code / Cursor's _"one folder per profile"_ rule: if you try to open a folder that your main Cursor window already holds open, the editor focus-steals back to the main window and the dev host is effectively unusable. Using a dedicated fixture avoids the collision entirely and keeps the dev host in your normal (logged-in) Cursor profile.
 
 ### Using Commentray in your own projects: `npm run extension:install`
 
@@ -68,7 +68,7 @@ npm run extension:install       # build, bundle, package, install the .vsix
 npm run extension:uninstall     # remove it
 ```
 
-After install, reload the target window (Command Palette → *Developer: Reload Window*) and the `Commentray:` commands appear there.
+After install, reload the target window (Command Palette → _Developer: Reload Window_) and the `Commentray:` commands appear there.
 
 ## Expensive CI
 
@@ -80,6 +80,34 @@ GitHub Actions workflow `ci-expensive.yml` runs on:
 Maintainers may additionally protect these jobs with a GitHub Environment (optional) to require approval before secrets-heavy steps are introduced later.
 
 ## Publishing to npm (maintainers)
+
+Two cooperating scripts keep releases boring:
+
+- `scripts/bump-version.sh` — bumps every workspace `package.json` in
+  lockstep, runs `scripts/sync-workspace-deps.mjs` so intra-monorepo
+  `@commentray/*` pins follow along, refreshes `package-lock.json`,
+  commits, and tags `v<version>`. Supports `patch`, `minor`, `major`,
+  `rc`, `release`, `set <version>`, and `--dry-run`. Refuses to run on a
+  dirty tree or if the tag already exists.
+- `scripts/publish.sh` — verifies the working tree is clean and that
+  HEAD is tagged with the canonical version, runs a reproducible
+  `npm ci`, builds all workspaces, runs unit tests, then
+  `npm publish --access public` for each public workspace in dependency
+  order. Supports `--dry-run`, `--otp=…`, and `--tag=next` (for RCs).
+
+Convenience scripts are wired at the repo root: `npm run version:bump`,
+`npm run version:sync`, `npm run publish:all`.
+
+Typical flow:
+
+```bash
+npm run version:bump -- minor              # bump + commit + tag
+git push && git push --tags                # CI builds SEA binaries
+npm run publish:all                        # publish to npm
+```
+
+The `commentray-vscode` extension is private on npm and is released by
+packaging a `.vsix` (`npm run extension:package`) and uploading it.
 
 Prefer **OIDC trusted publishing** and **npm provenance** for `@commentray/*` packages:
 

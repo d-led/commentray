@@ -74,6 +74,32 @@ xattr -c /path/to/commentray-darwin-arm64
 
 (`xattr -r` is not valid on macOS; use `find` with `-exec xattr -c` if you ever need a directory tree.)
 
+## Releasing
+
+Version all workspace packages in lockstep, then publish. The bump script
+rewrites every workspace `package.json`, keeps intra-monorepo
+`@commentray/*` deps aligned, commits, and tags.
+
+```bash
+npm run version:bump -- patch          # 0.1.2 -> 0.1.3
+npm run version:bump -- minor          # 0.1.2 -> 0.2.0
+npm run version:bump -- major          # 0.1.2 -> 1.0.0
+npm run version:bump -- rc             # -> x.y.z-rc.N
+npm run version:bump -- release        # drop -rc suffix
+npm run version:bump -- set 1.2.3      # explicit
+npm run version:bump -- patch --dry-run
+
+git push && git push --tags            # triggers binary build workflow
+npm run publish:all                    # npm publish every public package
+npm run publish:all -- --dry-run       # rehearsal
+npm run publish:all -- --otp=123456    # 2FA
+npm run publish:all -- --tag=next      # publish RC under a dist-tag
+```
+
+The VS Code extension is released separately — build the `.vsix` with
+`npm run extension:package` and upload it to the Marketplace or a GitHub
+Release.
+
 ## Layout
 
 - Config: [`.commentray.toml`](.commentray.toml)
