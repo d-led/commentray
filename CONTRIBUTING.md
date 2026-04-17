@@ -52,6 +52,8 @@ npm run extension:dogfood
 
 This builds `@commentray/core` and the extension, then starts **Cursor** (if `cursor` is on `PATH`) or **VS Code** with `--extensionDevelopmentPath=packages/vscode`. Override the editor binary with `COMMENTRAY_EDITOR`.
 
+The Extension Development Host runs with an isolated `--user-data-dir` and `--extensions-dir` under `.commentray-dev/` (git-ignored) so you can open this repo in the dev host alongside your normal Cursor window — without the editor's "one folder per profile" rule stealing focus back to your main window.
+
 ## Expensive CI
 
 GitHub Actions workflow `ci-expensive.yml` runs on:
