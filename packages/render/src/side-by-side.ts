@@ -1,5 +1,9 @@
 import { escapeHtml } from "./html-utils.js";
-import { renderFencedCode, renderMarkdownToHtml } from "./markdown-pipeline.js";
+import {
+  type GithubBlobLinkRewriteOptions,
+  renderFencedCode,
+  renderMarkdownToHtml,
+} from "./markdown-pipeline.js";
 
 export type SideBySideOptions = {
   title?: string;
@@ -11,13 +15,17 @@ export type SideBySideOptions = {
   commentrayMarkdown: string;
   /** When true, include Mermaid runtime from CDN in the footer. */
   includeMermaidRuntime?: boolean;
+  /** Optional GitHub blob/tree → relative file link rewriting for the commentray pane. */
+  githubBlobLinkRewrite?: GithubBlobLinkRewriteOptions;
 };
 
 export async function renderSideBySideHtml(opts: SideBySideOptions): Promise<string> {
   const fence = "```" + opts.language + "\n" + opts.code + "\n```\n";
   const [codeHtml, commentrayHtml] = await Promise.all([
     renderFencedCode(fence),
-    renderMarkdownToHtml(opts.commentrayMarkdown),
+    renderMarkdownToHtml(opts.commentrayMarkdown, {
+      githubBlobLinkRewrite: opts.githubBlobLinkRewrite,
+    }),
   ]);
 
   const mermaidScript = opts.includeMermaidRuntime

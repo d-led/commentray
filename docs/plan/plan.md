@@ -90,6 +90,10 @@ flowchart LR
 - Anchor grammar: [`docs/spec/anchors.md`](../spec/anchors.md)
 - Blocks: [`docs/spec/blocks.md`](../spec/blocks.md)
 
+## Dogfood companion tracks
+
+This repository keeps **terse** Commentray Markdown beside selected sources under [`.commentray/source/`](../../.commentray/source/) (companion path = repo-relative primary + `.md`, e.g. this file → [`plan.md.md`](../../.commentray/source/docs/plan/plan.md.md)). Those notes are for contributors skimming the tree in an editor or on GitHub; they intentionally overlap only lightly with this plan and link out to specs and workflows.
+
 ## Packages
 
 | Package                  | Responsibility                                                                                       |
@@ -185,7 +189,7 @@ The plan doc, the specs under `docs/spec/`, and README/CONTRIBUTING cover engine
    - **CLI `commentray validate`** (no hook, no editor): schema validation of `.commentray/metadata/index.json`, anchor integrity (symbol present, line range still in file), and staleness evidence via the Git SCM adapter (blob SHA / last-known commit) for every recorded source file. Non-zero exit on errors; warnings do not fail. Run manually or in CI.
    - **CLI `commentray doctor`**: `validate` plus environment checks (`.git` present in the working directory, Git CLI reachable, Node engine acceptable). Intended for pre-flight troubleshooting, not CI gating.
    - **CLI `commentray migrate`**: offline schema migration of the metadata index (e.g. legacy `commentaryPath` → `commentrayPath`); runs without touching SCM.
-   - **Editor extension (`commentray-vscode`)**: paired-pane opening and workspace validation output channel today; richer live gutter diagnostics are on the roadmap. Catches what you see while editing; does **not** replace hooks or CI.
+   - **Editor extension (`commentray-vscode`)**: paired-pane opening, bidirectional scroll sync (block-aware when `index.json` + markers align), “add block from selection”, and workspace validation output channel today; richer live gutter diagnostics are on the roadmap. Catches what you see while editing; does **not** replace hooks or CI.
    - **What is not yet detected (known gaps, linkable to issues when filed)**: cross-file refactors (symbol moved to another file without Git rename), deletions of commentary's source file without matching cleanup, staleness against a non-default branch, and large-scale content drift that needs content hashing beyond blob SHA. Mitigations: run `validate` in CI on PRs, require `run-expensive-ci` for fuzzed/large fixture suites, and plan follow-ups per gap.
 
 Both pieces are documentation-only and can land incrementally (install + quickstart first, then the detection matrix, then the rest).

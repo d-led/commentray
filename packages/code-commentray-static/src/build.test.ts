@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,5 +55,49 @@ describe("buildCommentrayStatic", () => {
     const html = await readFile(outHtml, "utf8");
     expect(html).toContain("file-path__dir--root");
     expect(html).toContain('<span class="file-path__base">sample.ts</span>');
+  });
+
+  it("forwards githubBlobLinkRewrite into rendered commentray links", async () => {
+    outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
+    const repoRoot = path.join(outDir, "repo");
+    await mkdir(path.join(repoRoot, "docs"), { recursive: true });
+    await writeFile(path.join(repoRoot, "docs", "guide.md"), "# Guide\n", "utf8");
+    const mdPath = path.join(outDir, "body.md");
+    await writeFile(
+      mdPath,
+      "[Guide](https://github.com/acme/demo/blob/main/docs/guide.md)\n",
+      "utf8",
+    );
+    const outHtml = path.join(repoRoot, "_site", "index.html");
+    await mkdir(path.dirname(outHtml), { recursive: true });
+    await buildCommentrayStatic({
+      sourceFile: path.join(pkgRoot, "fixtures", "sample.ts"),
+      markdownFile: mdPath,
+      outHtml,
+      githubBlobLinkRewrite: {
+        owner: "acme",
+        repo: "demo",
+        htmlOutputFileAbs: outHtml,
+        repoRootAbs: repoRoot,
+      },
+    });
+    const html = await readFile(outHtml, "utf8");
+    expect(html).toContain('href="../docs/guide.md"');
+  });
+
+  it("forwards GitHub + tool URLs into the rendered toolbar chrome", async () => {
+    outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
+    const outHtml = path.join(outDir, "index.html");
+    await buildCommentrayStatic({
+      sourceFile: path.join(pkgRoot, "fixtures", "sample.ts"),
+      markdownFile: path.join(pkgRoot, "fixtures", "sample.md"),
+      outHtml,
+      githubRepoUrl: "https://github.com/example/repo",
+      toolHomeUrl: "https://github.com/d-led/commentray",
+    });
+    const html = await readFile(outHtml, "utf8");
+    expect(html).toContain('class="toolbar-github"');
+    expect(html).toContain('href="https://github.com/example/repo"');
+    expect(html).toContain('class="toolbar-attribution"');
   });
 });

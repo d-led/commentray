@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { type ResolvedCommentrayConfig, loadCommentrayConfig } from "./config.js";
+import { parseGithubRepoWebUrl } from "./github-url.js";
 import { assertValidIndex } from "./metadata.js";
 import { defaultMetadataIndexPath } from "./paths.js";
 import type { CommentrayIndex } from "./model.js";
@@ -53,7 +54,24 @@ export async function validateProject(repoRoot: string): Promise<ValidationResul
     }
   }
 
+  pushRelativeGithubLinkConfigWarnings(config, issues);
+
   return { issues };
+}
+
+function pushRelativeGithubLinkConfigWarnings(
+  config: ResolvedCommentrayConfig,
+  issues: ValidationIssue[],
+): void {
+  if (!config.render.relativeGithubBlobLinks) return;
+  const gh = config.staticSite.githubUrl;
+  if (gh && parseGithubRepoWebUrl(gh)) return;
+  issues.push({
+    level: "warn",
+    message:
+      "render.relative_github_blob_links is true but static_site.github_url is missing or " +
+      "not a repository home URL (expected https://github.com/owner/repo). Link rewriting is skipped at build time.",
+  });
 }
 
 export async function readIndex(repoRoot: string): Promise<CommentrayIndex | null> {

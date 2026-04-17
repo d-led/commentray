@@ -74,6 +74,31 @@ The installer script bundles the extension with esbuild (inlining
 `@commentray/core`) before `vsce` packages the `.vsix`. This bundling
 step matters — see "Common failure modes" below.
 
+## Scroll sync and paired panes
+
+After **Commentray: Open commentray beside source** (or **Add block from
+selection**, which opens the pair for you), the extension wires a scroll
+listener on **both** editors:
+
+- **Source → commentray:** the top visible line of the source picks a target
+  line in the Markdown. If `index.json` lists `lines:` anchors that match
+  `<!-- commentray:block id=… -->` markers in the companion file, the
+  commentary scroll snaps to the block whose source range **contains** that
+  top line (or the nearest sensible block when you are in a gap). Without
+  blocks, a lightweight proportional scroll is used instead.
+- **Commentray → source:** the top visible line in the Markdown maps back to
+  the start of the corresponding source range for the same block list.
+
+Edits to either file or saving `index.json` refresh the block map on a short
+debounce so markers and metadata edits stay in sync without reloading the
+window.
+
+If `tsc -b` suddenly claims `@commentray/core` has no exported symbols from
+`packages/vscode`, check for a stale nested dependency at
+`packages/vscode/node_modules/@commentray` (left over from an older install).
+Removing that folder and running `npm install` from the repo root restores
+the workspace symlink to `packages/core`.
+
 ## Observing the extension at runtime
 
 ### The `Commentray` output channel

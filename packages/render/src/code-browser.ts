@@ -3,7 +3,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { escapeHtml } from "./html-utils.js";
-import { renderFencedCode, renderMarkdownToHtml } from "./markdown-pipeline.js";
+import {
+  type GithubBlobLinkRewriteOptions,
+  renderFencedCode,
+  renderMarkdownToHtml,
+} from "./markdown-pipeline.js";
 
 export type CodeBrowserPageOptions = {
   title?: string;
@@ -15,6 +19,22 @@ export type CodeBrowserPageOptions = {
   includeMermaidRuntime?: boolean;
   /** Highlight.js stylesheet base name (e.g. github, github-dark). */
   hljsTheme?: string;
+  /**
+   * Public Git (or other) URL for the repository whose source is shown — renders
+   * as an Octocat link in the toolbar (top-right cluster on wide viewports).
+   * Only `http:` / `https:` URLs are emitted.
+   */
+  githubRepoUrl?: string;
+  /**
+   * Home URL for the Commentray project (shown as “Rendered with Commentray”).
+   * Only `http:` / `https:` URLs are emitted.
+   */
+  toolHomeUrl?: string;
+  /**
+   * When set, GitHub `blob` / `tree` links for this repository are rewritten to paths
+   * relative to the generated HTML file (offline-friendly).
+   */
+  githubBlobLinkRewrite?: GithubBlobLinkRewriteOptions;
 };
 
 function extractPreCodeInner(html: string): string {
@@ -68,6 +88,39 @@ function renderFilePathLabel(filePath: string | undefined, fallbackTitle: string
   );
 }
 
+/** GitHub “mark” glyph (Octicons-style path), MIT-licensed silhouette. */
+const GITHUB_MARK_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true">' +
+  '<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>' +
+  "</svg>";
+
+function safeExternalHttpUrl(url: string | undefined): string | null {
+  const t = url?.trim();
+  if (!t) return null;
+  if (!/^https?:\/\//i.test(t)) return null;
+  return t;
+}
+
+function buildToolbarEndHtml(githubRepoUrl: string | undefined, toolHomeUrl: string | undefined): string {
+  const gh = safeExternalHttpUrl(githubRepoUrl);
+  const tool = safeExternalHttpUrl(toolHomeUrl);
+  const bits: string[] = [];
+  if (gh) {
+    const he = escapeHtml(gh);
+    bits.push(
+      `<a class="toolbar-github" href="${he}" target="_blank" rel="noopener noreferrer" aria-label="View repository on GitHub" title="View repository on GitHub">${GITHUB_MARK_SVG}</a>`,
+    );
+  }
+  if (tool) {
+    const te = escapeHtml(tool);
+    bits.push(
+      `<span class="toolbar-attribution" role="note">Rendered with <a href="${te}" target="_blank" rel="noopener noreferrer">Commentray</a></span>`,
+    );
+  }
+  if (bits.length === 0) return "";
+  return `<div class="toolbar__end">${bits.join("")}</div>`;
+}
+
 /** IIFE produced by `npm run build -w @commentray/render` (esbuild of `code-browser-client.ts`). */
 function loadCodeBrowserClientBundle(): string {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -92,6 +145,30 @@ const CODE_BROWSER_STYLES = `
         border-bottom: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
         font-size: 13px; flex: 0 0 auto;
       }
+      .toolbar__main {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+        flex: 1 1 280px;
+        min-width: 0;
+      }
+      .toolbar__end {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+        margin-left: auto;
+        justify-content: flex-end;
+      }
+      .toolbar-github {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 34px; height: 34px; border-radius: 8px;
+        border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+        background: color-mix(in oklab, CanvasText 6%, Canvas);
+        color: CanvasText;
+      }
+      .toolbar-github:hover { background: color-mix(in oklab, CanvasText 11%, Canvas); }
+      .toolbar-github:focus-visible { outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas); outline-offset: 2px; }
+      .toolbar-attribution {
+        font-size: 11px; line-height: 1.35; opacity: 0.82; max-width: min(360px, 42vw);
+        text-align: right; color: color-mix(in oklab, CanvasText 88%, Canvas);
+      }
+      .toolbar-attribution a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
       .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
       .toolbar .file-path {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
@@ -186,6 +263,7 @@ const CODE_BROWSER_STYLES = `
 type CodeBrowserPageParts = {
   title: string;
   filePathHtml: string;
+  toolbarEndHtml: string;
   codeHtml: string;
   commentrayHtml: string;
   rawCodeB64: string;
@@ -199,6 +277,7 @@ function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
   const {
     title,
     filePathHtml,
+    toolbarEndHtml,
     codeHtml,
     commentrayHtml,
     rawCodeB64,
@@ -226,13 +305,16 @@ ${CODE_BROWSER_STYLES}
   <body>
     <div class="app">
       <header class="toolbar" aria-label="View options">
-        ${filePathHtml}
-        <span class="search-field">
-          <label for="search-q">Search</label>
-          <input type="search" id="search-q" placeholder="Whole source (ordered tokens + fuzzy lines)…" autocomplete="off" spellcheck="false" />
-          <button type="button" id="search-clear" title="Clear search">Clear</button>
-        </span>
-        <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
+        <div class="toolbar__main">
+          ${filePathHtml}
+          <span class="search-field">
+            <label for="search-q">Search</label>
+            <input type="search" id="search-q" placeholder="Whole source (ordered tokens + fuzzy lines)…" autocomplete="off" spellcheck="false" />
+            <button type="button" id="search-clear" title="Clear search">Clear</button>
+          </span>
+          <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
+        </div>
+        ${toolbarEndHtml}
       </header>
       <div class="search-results" id="search-results" hidden aria-live="polite"></div>
       <div class="shell" id="shell">
@@ -263,7 +345,9 @@ ${loadCodeBrowserClientBundle()}
 export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promise<string> {
   const [codeHtml, commentrayHtml] = await Promise.all([
     renderCodeLineBlocks(opts.code, opts.language),
-    renderMarkdownToHtml(opts.commentrayMarkdown),
+    renderMarkdownToHtml(opts.commentrayMarkdown, {
+      githubBlobLinkRewrite: opts.githubBlobLinkRewrite,
+    }),
   ]);
 
   const rawCodeB64 = Buffer.from(opts.code, "utf8").toString("base64");
@@ -271,6 +355,7 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
 
   const title = opts.title ?? opts.filePath ?? "Commentray";
   const filePathHtml = renderFilePathLabel(opts.filePath, title);
+  const toolbarEndHtml = buildToolbarEndHtml(opts.githubRepoUrl, opts.toolHomeUrl);
   const hljs = opts.hljsTheme ?? "github";
   const hljsDark = opts.hljsTheme?.includes("dark") ? opts.hljsTheme : "github-dark";
 
@@ -285,6 +370,7 @@ mermaid.run({ querySelector: ".mermaid" });
   return buildCodeBrowserPageHtml({
     title,
     filePathHtml,
+    toolbarEndHtml,
     codeHtml,
     commentrayHtml,
     rawCodeB64,

@@ -8,7 +8,18 @@ workspace.
 
 - `Commentray: Open commentray beside source` — opens (or creates) the
   commentray Markdown file that is paired with the active source file,
-  side-by-side, with scroll sync from the code editor to the Markdown.
+  side-by-side. While the pair is active, **scroll sync** keeps the two panes
+  aligned: scrolling the source updates the commentray view, and scrolling
+  the commentray snaps the source to the block you are reading. When you have
+  [blocks](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md)
+  (metadata index + `<!-- commentray:block id=… -->` markers), sync prefers
+  those anchors; otherwise it falls back to a simple proportional map.
+- `Commentray: Add block from selection` — appends a new block for the current
+  selection (or current line) to the paired Markdown, updates
+  `.commentray/metadata/index.json`, opens the pair, and selects the
+  placeholder so you can type immediately. Default keybinding: **Cmd+Alt+K**
+  (macOS) / **Ctrl+Alt+K** (Windows/Linux). Also available from the editor
+  context menu under the same commands as _Open commentray beside source_.
 - `Commentray: Open Markdown preview for commentray file` — opens VS Code's
   built-in Markdown preview for the active `.md` file.
 - `Commentray: Validate workspace metadata` — runs the same validation as

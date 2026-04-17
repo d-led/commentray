@@ -7,8 +7,10 @@ import cliPackage from "../package.json" with { type: "json" };
 import {
   commentrayMarkdownPath,
   defaultMetadataIndexPath,
+  loadCommentrayConfig,
   migrateIndex,
   normalizeRepoRelativePath,
+  parseGithubRepoWebUrl,
   runCommanderMain,
   type ValidationIssue,
   validateProject,
@@ -79,14 +81,28 @@ async function cmdRender(opts: {
   const md = await fs.readFile(path.resolve(repoRoot, opts.markdown), "utf8");
   const code = await fs.readFile(path.resolve(repoRoot, source), "utf8");
   const ext = path.extname(source).slice(1) || "txt";
+  const outPath = path.resolve(repoRoot, opts.out);
+  const cfg = await loadCommentrayConfig(repoRoot);
+  const ghParsed =
+    cfg.render.relativeGithubBlobLinks && cfg.staticSite.githubUrl
+      ? parseGithubRepoWebUrl(cfg.staticSite.githubUrl)
+      : null;
+  const githubBlobLinkRewrite = ghParsed
+    ? {
+        owner: ghParsed.owner,
+        repo: ghParsed.repo,
+        htmlOutputFileAbs: outPath,
+        repoRootAbs: repoRoot,
+      }
+    : undefined;
   const html = await renderSideBySideHtml({
     title: source,
     code,
     language: ext === "ts" ? "ts" : ext,
     commentrayMarkdown: md,
     includeMermaidRuntime: opts.mermaid,
+    githubBlobLinkRewrite,
   });
-  const outPath = path.resolve(repoRoot, opts.out);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
   await fs.writeFile(outPath, html, "utf8");
   console.log(`Wrote ${outPath}`);

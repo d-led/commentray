@@ -65,4 +65,36 @@ describe("renderCodeBrowserHtml", () => {
     expect(html).not.toContain("<script>x</script>/evil.ts");
     expect(html).toContain("&lt;script&gt;x&lt;/script&gt;/");
   });
+
+  it("adds an Octocat toolbar link and Commentray attribution for safe http(s) URLs", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      githubRepoUrl: "https://github.com/example/demo",
+      toolHomeUrl: "https://github.com/d-led/commentray",
+    });
+    expect(html).toContain('class="toolbar-github"');
+    expect(html).toContain('href="https://github.com/example/demo"');
+    expect(html).toContain('class="toolbar-attribution"');
+    expect(html).toContain('href="https://github.com/d-led/commentray"');
+    expect(html).toContain("Rendered with");
+  });
+
+  it("does not emit toolbar links for javascript: or other non-http(s) URLs", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      githubRepoUrl: "javascript:alert(1)",
+      toolHomeUrl: "data:text/html,hi",
+    });
+    // CSS still defines `.toolbar-github` / `.toolbar-attribution`; assert markup only.
+    expect(html).not.toContain('<a class="toolbar-github"');
+    expect(html).not.toContain('<span class="toolbar-attribution"');
+    expect(html).not.toContain("javascript:");
+    expect(html).not.toContain('href="data:');
+  });
 });

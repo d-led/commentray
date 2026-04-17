@@ -1,13 +1,17 @@
 import {
   type BlockRange,
+  type BlockScrollLink,
   type CommentrayIndex,
   addBlockToIndex,
   appendBlockToCommentray,
+  buildBlockScrollLinks,
   commentrayMarkdownPath,
   createBlockForRange,
+  defaultMetadataIndexPath,
   emptyIndex,
   normalizeRepoRelativePath,
-  parseAnchor,
+  pickCommentrayLineForSourceScroll,
+  pickSourceLine0ForCommentrayScroll,
   readIndex,
   validateProject,
   writeIndex,
@@ -15,25 +19,13 @@ import {
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-/**
- * A block's position in both panes, used by scroll sync to snap the
- * commentray pane to the heading of the block that covers the currently
- * visible top line of the source pane.
- */
-type BlockLink = {
-  /** 0-based line of the `<!-- commentray:block ... -->` marker in the commentray file. */
-  commentrayLine: number;
-  /** 1-based inclusive start line in the source file. */
-  sourceStart: number;
-  /** 1-based inclusive end line in the source file. */
-  sourceEnd: number;
-};
-
 type ScrollPair = {
   code: vscode.TextEditor;
   commentray: vscode.TextEditor;
   /** Block anchors sorted ascending by `sourceStart`; empty when no blocks exist yet. */
-  blocks: BlockLink[];
+  blocks: BlockScrollLink[];
+  repoRoot: string;
+  sourceRelative: string;
 };
 
 type PairedPaths = {
@@ -46,7 +38,9 @@ const COMMENTRAY_STORAGE_PREFIX = ".commentray/";
 const PLACEHOLDER_TEXT = "_(write commentary here)_";
 
 let activePair: ScrollPair | undefined;
-let scrollDisposable: vscode.Disposable | undefined;
+let scrollSyncDisposable: vscode.Disposable | undefined;
+let ignoreScrollPairEvents = false;
+let blockRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 function commentrayAbsolutePath(repoRoot: string, repoRelativeSource: string): string {
   const rel = commentrayMarkdownPath(repoRelativeSource);
@@ -54,48 +48,66 @@ function commentrayAbsolutePath(repoRoot: string, repoRelativeSource: string): s
 }
 
 function disposeScrollSync() {
-  scrollDisposable?.dispose();
-  scrollDisposable = undefined;
+  if (blockRefreshTimer !== undefined) {
+    clearTimeout(blockRefreshTimer);
+    blockRefreshTimer = undefined;
+  }
+  scrollSyncDisposable?.dispose();
+  scrollSyncDisposable = undefined;
   activePair = undefined;
 }
 
-function bindScrollSync(pair: ScrollPair) {
-  disposeScrollSync();
-  activePair = pair;
-  scrollDisposable = vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
-    if (!activePair) return;
-    if (event.textEditor !== activePair.code) return;
-    const range = event.visibleRanges.at(0);
-    if (!range) return;
-    syncCommentrayForVisibleSourceRange(activePair, range);
-  });
+function withIgnoredScrollPairEvents(fn: () => void): void {
+  ignoreScrollPairEvents = true;
+  try {
+    fn();
+  } finally {
+    setTimeout(() => {
+      ignoreScrollPairEvents = false;
+    }, 16);
+  }
+}
+
+async function refreshActivePairBlocks(): Promise<void> {
+  if (!activePair) return;
+  const index = await readIndex(activePair.repoRoot);
+  activePair.blocks = buildBlockScrollLinks(
+    index,
+    activePair.sourceRelative,
+    activePair.commentray.document.getText(),
+  );
+}
+
+function scheduleRefreshActivePairBlocks(): void {
+  if (!activePair) return;
+  if (blockRefreshTimer !== undefined) clearTimeout(blockRefreshTimer);
+  blockRefreshTimer = setTimeout(() => {
+    blockRefreshTimer = undefined;
+    void refreshActivePairBlocks();
+  }, 120);
 }
 
 function syncCommentrayForVisibleSourceRange(pair: ScrollPair, range: vscode.Range): void {
   const topSourceLine = range.start.line + 1;
-  const blockLine = pickBlockLineForSourceLine(pair.blocks, topSourceLine);
-  const targetLine = blockLine ?? ratioTargetLine(pair, range);
+  const blockLine = pickCommentrayLineForSourceScroll(pair.blocks, topSourceLine);
+  const targetLine = blockLine ?? ratioCommentrayLineFromSourceScroll(pair, range);
   const reveal = new vscode.Range(targetLine, 0, targetLine, 0);
-  pair.commentray.revealRange(reveal, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  withIgnoredScrollPairEvents(() =>
+    pair.commentray.revealRange(reveal, vscode.TextEditorRevealType.InCenterIfOutsideViewport),
+  );
 }
 
-/**
- * Snap to the block whose source range covers `topSourceLine`, or — if none
- * covers it — to the nearest preceding block, or to the first block when the
- * user is above all of them. Returns `null` when no blocks exist so the
- * caller can fall back to a proportional scroll.
- */
-function pickBlockLineForSourceLine(blocks: BlockLink[], topSourceLine: number): number | null {
-  if (blocks.length === 0) return null;
-  let best: BlockLink | undefined;
-  for (const b of blocks) {
-    if (b.sourceStart <= topSourceLine) best = b;
-    else break;
-  }
-  return (best ?? blocks[0]).commentrayLine;
+function syncCodeForVisibleCommentrayRange(pair: ScrollPair, range: vscode.Range): void {
+  const topCommentrayLine = range.start.line;
+  const sourceLine0 = pickSourceLine0ForCommentrayScroll(pair.blocks, topCommentrayLine);
+  const targetLine = sourceLine0 ?? ratioSourceLine0FromCommentrayScroll(pair, range);
+  const reveal = new vscode.Range(targetLine, 0, targetLine, 0);
+  withIgnoredScrollPairEvents(() =>
+    pair.code.revealRange(reveal, vscode.TextEditorRevealType.InCenterIfOutsideViewport),
+  );
 }
 
-function ratioTargetLine(pair: ScrollPair, range: vscode.Range): number {
+function ratioCommentrayLineFromSourceScroll(pair: ScrollPair, range: vscode.Range): number {
   const codeLines = Math.max(1, pair.code.document.lineCount);
   const commentrayLines = Math.max(1, pair.commentray.document.lineCount);
   const center = (range.start.line + range.end.line) / 2;
@@ -103,48 +115,55 @@ function ratioTargetLine(pair: ScrollPair, range: vscode.Range): number {
   return Math.min(commentrayLines - 1, Math.max(0, Math.round(fraction * (commentrayLines - 1))));
 }
 
-const BLOCK_MARKER_RE = /<!-- commentray:block id=([a-z0-9]+) -->/;
-
-/**
- * Build the block links for scroll sync by correlating the metadata index
- * (anchors, by id) with `<!-- commentray:block id=... -->` markers found in
- * the commentray file. Blocks whose anchor is not a `lines:` range — or
- * whose marker cannot be located in the file — are skipped silently: they
- * simply fall through to the ratio-based fallback.
- */
-async function collectBlockLinks(
-  repoRoot: string,
-  sourceRelative: string,
-  commentrayDoc: vscode.TextDocument,
-): Promise<BlockLink[]> {
-  const index = await readIndex(repoRoot);
-  const entry = index?.bySourceFile[sourceRelative];
-  if (!entry || entry.blocks.length === 0) return [];
-  const markerLineById = findMarkerLines(commentrayDoc.getText());
-  const links: BlockLink[] = [];
-  for (const block of entry.blocks) {
-    const anchor = parseAnchor(block.anchor);
-    if (anchor.kind !== "lines") continue;
-    const commentrayLine = markerLineById.get(block.id);
-    if (commentrayLine === undefined) continue;
-    links.push({
-      commentrayLine,
-      sourceStart: anchor.range.start,
-      sourceEnd: anchor.range.end,
-    });
-  }
-  links.sort((a, b) => a.sourceStart - b.sourceStart);
-  return links;
+function ratioSourceLine0FromCommentrayScroll(pair: ScrollPair, range: vscode.Range): number {
+  const commentrayLines = Math.max(1, pair.commentray.document.lineCount);
+  const codeLines = Math.max(1, pair.code.document.lineCount);
+  const center = (range.start.line + range.end.line) / 2;
+  const fraction = center / Math.max(1, commentrayLines - 1);
+  return Math.min(codeLines - 1, Math.max(0, Math.round(fraction * (codeLines - 1))));
 }
 
-function findMarkerLines(text: string): Map<string, number> {
-  const markerLineById = new Map<string, number>();
-  const lines = text.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const match = BLOCK_MARKER_RE.exec(lines[i]);
-    if (match) markerLineById.set(match[1], i);
-  }
-  return markerLineById;
+function metadataIndexAbsolutePath(repoRoot: string): string {
+  return path.join(repoRoot, ...defaultMetadataIndexPath().split("/"));
+}
+
+function bindScrollSync(pair: ScrollPair): void {
+  disposeScrollSync();
+  activePair = pair;
+
+  const onVisibleRanges = (event: vscode.TextEditorVisibleRangesChangeEvent) => {
+    if (!activePair || ignoreScrollPairEvents) return;
+    const range = event.visibleRanges.at(0);
+    if (!range) return;
+    if (event.textEditor === activePair.code) {
+      syncCommentrayForVisibleSourceRange(activePair, range);
+    } else if (event.textEditor === activePair.commentray) {
+      syncCodeForVisibleCommentrayRange(activePair, range);
+    }
+  };
+
+  const onDocChange = (e: vscode.TextDocumentChangeEvent) => {
+    if (!activePair) return;
+    if (e.document !== activePair.code.document && e.document !== activePair.commentray.document) {
+      return;
+    }
+    scheduleRefreshActivePairBlocks();
+  };
+
+  const onIndexSave = (doc: vscode.TextDocument) => {
+    if (!activePair) return;
+    if (doc.uri.fsPath !== metadataIndexAbsolutePath(activePair.repoRoot)) return;
+    void refreshActivePairBlocks();
+  };
+
+  scrollSyncDisposable = vscode.Disposable.from(
+    vscode.window.onDidChangeTextEditorVisibleRanges(onVisibleRanges),
+    vscode.workspace.onDidChangeTextDocument(onDocChange),
+    vscode.workspace.onDidSaveTextDocument(onIndexSave),
+  );
+
+  const initial = pair.code.visibleRanges.at(0);
+  if (initial) syncCommentrayForVisibleSourceRange(pair, initial);
 }
 
 async function ensureCommentrayFile(uri: vscode.Uri): Promise<vscode.Uri> {
@@ -214,8 +233,15 @@ async function openBesideAndSync(
   const codeEditor =
     vscode.window.visibleTextEditors.find((te) => te.document === sourceEditor.document) ??
     sourceEditor;
-  const blocks = await collectBlockLinks(paths.repoRoot, paths.sourceRelative, commentrayDoc);
-  bindScrollSync({ code: codeEditor, commentray: commentrayEditor, blocks });
+  const index = await readIndex(paths.repoRoot);
+  const blocks = buildBlockScrollLinks(index, paths.sourceRelative, commentrayDoc.getText());
+  bindScrollSync({
+    code: codeEditor,
+    commentray: commentrayEditor,
+    blocks,
+    repoRoot: paths.repoRoot,
+    sourceRelative: paths.sourceRelative,
+  });
   return commentrayEditor;
 }
 

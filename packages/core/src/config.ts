@@ -7,7 +7,16 @@ import { normalizeRepoRelativePath } from "./paths.js";
 export type CommentrayToml = {
   storage?: { dir?: string };
   scm?: { provider?: string };
-  render?: { mermaid?: boolean; syntaxTheme?: string };
+  render?: {
+    mermaid?: boolean;
+    syntaxTheme?: string;
+    /**
+     * When true, `https://github.com/<owner>/<repo>/blob|tree/<branch>/…` links in companion
+     * Markdown are rewritten to paths relative to the generated HTML file (see
+     * `static_site.github_url` for owner/repo). Requires a parseable repository URL.
+     */
+    relative_github_blob_links?: boolean;
+  };
   anchors?: { defaultStrategy?: string[] };
   /**
    * Optional settings for publishing a single-file static “code browser” (GitHub Pages, etc.).
@@ -38,7 +47,7 @@ export type ResolvedStaticSite = {
 export type ResolvedCommentrayConfig = {
   storageDir: string;
   scmProvider: "git";
-  render: { mermaid: boolean; syntaxTheme: string };
+  render: { mermaid: boolean; syntaxTheme: string; relativeGithubBlobLinks: boolean };
   anchors: { defaultStrategy: string[] };
   staticSite: ResolvedStaticSite;
 };
@@ -54,7 +63,7 @@ const defaultStaticSite: ResolvedStaticSite = {
 const defaultConfig: ResolvedCommentrayConfig = {
   storageDir: ".commentray",
   scmProvider: "git",
-  render: { mermaid: true, syntaxTheme: "github-dark" },
+  render: { mermaid: true, syntaxTheme: "github-dark", relativeGithubBlobLinks: false },
   anchors: { defaultStrategy: ["symbol", "lines"] },
   staticSite: { ...defaultStaticSite },
 };
@@ -136,6 +145,8 @@ export function mergeCommentrayConfig(parsed: CommentrayToml | null): ResolvedCo
     render: {
       mermaid: parsed.render?.mermaid ?? defaultConfig.render.mermaid,
       syntaxTheme: parsed.render?.syntaxTheme ?? defaultConfig.render.syntaxTheme,
+      relativeGithubBlobLinks:
+        parsed.render?.relative_github_blob_links ?? defaultConfig.render.relativeGithubBlobLinks,
     },
     anchors: {
       defaultStrategy: parsed.anchors?.defaultStrategy ?? defaultConfig.anchors.defaultStrategy,

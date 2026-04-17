@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { renderCodeBrowserHtml } from "@commentray/render";
+import { type GithubBlobLinkRewriteOptions, renderCodeBrowserHtml } from "@commentray/render";
 
 export type BuildCommentrayStaticOptions = {
   /** Absolute or cwd-relative path to the source file whose contents are shown as code. */
@@ -18,6 +18,12 @@ export type BuildCommentrayStaticOptions = {
   includeMermaidRuntime?: boolean;
   /** Highlight.js theme base name (e.g. github, github-dark); forwarded to `renderCodeBrowserHtml`. */
   hljsTheme?: string;
+  /** If set, toolbar shows an Octocat link to this repository (`http`/`https` only). */
+  githubRepoUrl?: string;
+  /** Shown as “Rendered with Commentray” in the toolbar (`http`/`https` only). */
+  toolHomeUrl?: string;
+  /** When set, rewrites matching GitHub links in companion Markdown to repo-relative URLs. */
+  githubBlobLinkRewrite?: GithubBlobLinkRewriteOptions;
 };
 
 export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions): Promise<void> {
@@ -39,6 +45,9 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     commentrayMarkdown,
     includeMermaidRuntime: opts.includeMermaidRuntime ?? false,
     hljsTheme: opts.hljsTheme,
+    githubRepoUrl: opts.githubRepoUrl,
+    toolHomeUrl: opts.toolHomeUrl,
+    githubBlobLinkRewrite: opts.githubBlobLinkRewrite,
   });
 
   await mkdir(path.dirname(outPath), { recursive: true });

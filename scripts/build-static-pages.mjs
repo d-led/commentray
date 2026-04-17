@@ -10,10 +10,13 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { loadCommentrayConfig } from "@commentray/core";
+import { loadCommentrayConfig, parseGithubRepoWebUrl } from "@commentray/core";
 import { buildCommentrayStatic } from "code-commentray-static";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/** Canonical Commentray monorepo (toolbar “Rendered with …” attribution on Pages). */
+const COMMENTRAY_TOOL_HOME = "https://github.com/d-led/commentray";
 
 async function pathExists(p) {
   try {
@@ -24,10 +27,10 @@ async function pathExists(p) {
   }
 }
 
-function composeCommentrayMarkdown(intro, githubUrl, fileMarkdown) {
+/** Intro + companion body. Repository link is shown in the page toolbar (Octocat), not duplicated here. */
+function composeCommentrayMarkdown(intro, fileMarkdown) {
   const parts = [];
   if (intro.trim()) parts.push(intro.trim());
-  if (githubUrl) parts.push(`[View repository on GitHub](${githubUrl})`);
   if (fileMarkdown.trim()) parts.push(fileMarkdown.trim());
   if (parts.length === 0) return "_No commentray content configured._\n";
   return `${parts.join("\n\n")}\n`;
@@ -52,12 +55,25 @@ if (ss.commentrayMarkdownFile) {
   fileMarkdown = await readFile(mdAbs, "utf8");
 }
 
-const commentrayBody = composeCommentrayMarkdown(ss.introMarkdown, ss.githubUrl, fileMarkdown);
+const commentrayBody = composeCommentrayMarkdown(ss.introMarkdown, fileMarkdown);
 const tmpMd = path.join(tmpdir(), `commentray-pages-${process.pid}.md`);
 await writeFile(tmpMd, commentrayBody, "utf8");
 
 const outDir = path.join(repoRoot, "_site");
 const outHtml = path.join(outDir, "index.html");
+
+const ghParsed =
+  cfg.render.relativeGithubBlobLinks && ss.githubUrl
+    ? parseGithubRepoWebUrl(ss.githubUrl)
+    : null;
+const githubBlobLinkRewrite = ghParsed
+  ? {
+      owner: ghParsed.owner,
+      repo: ghParsed.repo,
+      htmlOutputFileAbs: outHtml,
+      repoRootAbs: repoRoot,
+    }
+  : undefined;
 
 try {
   await mkdir(outDir, { recursive: true });
@@ -69,6 +85,9 @@ try {
     filePath: ss.sourceFile,
     includeMermaidRuntime: cfg.render.mermaid,
     hljsTheme: cfg.render.syntaxTheme,
+    githubRepoUrl: ss.githubUrl ?? undefined,
+    toolHomeUrl: COMMENTRAY_TOOL_HOME,
+    githubBlobLinkRewrite,
   });
 } finally {
   await unlink(tmpMd).catch(() => {});

@@ -20,9 +20,15 @@ export const DEFAULT_COMMENTRAY_TOML = [
   "[render]",
   "# mermaid = true",
   '# syntaxTheme = "github-dark"',
+  "# When true, GitHub blob/tree links for static_site.github_url rewrite to paths",
+  "# relative to generated HTML (Pages, `commentray render`). Needs a repo home URL.",
+  "# relative_github_blob_links = false",
   "",
   "[anchors]",
-  '# defaultStrategy = ["symbol", "lines"]',
+  "# defaultStrategy = [",
+  '#   "symbol",',
+  '#   "lines",',
+  "# ]",
   "",
 ].join("\n");
 

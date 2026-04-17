@@ -9,19 +9,24 @@ provider = "git"
 [render]
 mermaid = true
 syntaxTheme = "github-dark"
+# Companion links like https://github.com/…/blob/main/docs/… → ../docs/… in static HTML.
+relative_github_blob_links = true
 
 [anchors]
-defaultStrategy = ["symbol", "lines"]
+defaultStrategy = [
+  "symbol",
+  "lines",
+]
 
 # GitHub Pages: `npm run pages:build` → `_site/index.html` (see `.github/workflows/pages.yml`).
-# The commentary shown on the right of the rendered page is sourced from
-# `commentray_markdown`. Per Commentray's own convention, a file at path `<p>`
-# has its companion at `.commentray/source/<p>.md`, so the README's companion
-# lives at `.commentray/source/README.md.md`.
+# The commentary on the right comes from `commentray_markdown` (repo-relative).
+# Per Commentray’s convention, source path `<p>` pairs with `.commentray/source/<p>.md`.
 [static_site]
 title = "Commentray"
-# `intro` is intentionally empty: the companion Markdown below is self-contained.
-# Set to your public GitHub URL for the “View repository” link in the commentray pane.
-github_url = "https://github.com/d-led/commentray"
+# Optional longer welcome copy above the panes can use the same """ … """ form as `github_url`.
+# `github_url` becomes the Octocat toolbar link on static Pages (http/https only).
+github_url = """
+https://github.com/d-led/commentray"""
 source_file = "README.md"
-commentray_markdown = ".commentray/source/README.md.md"
+commentray_markdown = """
+.commentray/source/README.md.md"""

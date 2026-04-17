@@ -54,7 +54,21 @@
         "mac": "cmd+alt+k",
         "when": "editorTextFocus && !editorReadonly"
       }
-    ]
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "commentray.openSideBySide",
+          "group": "commentray@1",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "commentray.startBlockFromSelection",
+          "group": "commentray@2",
+          "when": "editorTextFocus && !editorReadonly"
+        }
+      ]
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

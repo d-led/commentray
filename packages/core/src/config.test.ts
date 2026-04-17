@@ -1,5 +1,7 @@
+import { parse as parseToml } from "@iarna/toml";
 import { describe, expect, it } from "vitest";
-import { mergeCommentrayConfig } from "./config.js";
+
+import { type CommentrayToml, mergeCommentrayConfig } from "./config.js";
 
 describe("mergeCommentrayConfig", () => {
   it("applies defaults for empty input", () => {
@@ -7,6 +9,14 @@ describe("mergeCommentrayConfig", () => {
     expect(cfg.storageDir).toBe(".commentray");
     expect(cfg.scmProvider).toBe("git");
     expect(cfg.render.mermaid).toBe(true);
+    expect(cfg.render.relativeGithubBlobLinks).toBe(false);
+  });
+
+  it("merges render.relative_github_blob_links from TOML", () => {
+    const cfg = mergeCommentrayConfig({
+      render: { relative_github_blob_links: true },
+    });
+    expect(cfg.render.relativeGithubBlobLinks).toBe(true);
   });
 
   it("rejects unsupported scm providers", () => {
@@ -28,6 +38,26 @@ describe("mergeCommentrayConfig", () => {
     expect(cfg.staticSite.githubUrl).toBe("https://github.com/a/b");
     expect(cfg.staticSite.sourceFile).toBe("src/index.ts");
     expect(cfg.staticSite.commentrayMarkdownFile).toBe("docs/x.md");
+  });
+
+  it("accepts multiline basic strings and multiline arrays from real TOML", () => {
+    const raw = parseToml(`
+[anchors]
+defaultStrategy = [
+  "symbol",
+  "lines",
+]
+
+[static_site]
+github_url = """
+https://github.com/foo/bar"""
+commentray_markdown = """
+.commentray/source/README.md.md"""
+`) as CommentrayToml;
+    const cfg = mergeCommentrayConfig(raw);
+    expect(cfg.anchors.defaultStrategy).toEqual(["symbol", "lines"]);
+    expect(cfg.staticSite.githubUrl).toBe("https://github.com/foo/bar");
+    expect(cfg.staticSite.commentrayMarkdownFile).toBe(".commentray/source/README.md.md");
   });
 
   it("accepts deprecated commentary_markdown key", () => {
