@@ -1,4 +1,4 @@
-# `code-browser.ts` — companion
+# `code-browser.ts` — commentray
 
 This is the **wide shot**: code pane, Markdown pane, draggable splitter, optional Mermaid injection, Highlight.js theme wiring, and the line-number gutter so in-page search can land on a real row. The toolbar’s repo-relative label is the subtitle card—viewers should always know which reel they’re on.
 

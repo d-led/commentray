@@ -1,8 +1,8 @@
-# `blocks.md` — companion
+# `blocks.md` — commentray
 
 The spec on the left is normative; here we only add **why the split exists**.
 
-Humans own the companion Markdown—headings, tone, diagrams. The machine owns **`index.json`**: ids, **`lines:`** / **`symbol:`** anchors, optional **fingerprints** when we want drift to be diagnosable instead of silent. Keeping those walls up is what lets “validate in CI” mean something without a parser rewriting your prose.
+Humans own the **commentray** prose—headings, tone, diagrams. The machine owns **`index.json`**: ids, **`lines:`** / **`symbol:`** anchors, optional **fingerprints** when we want drift to be diagnosable instead of silent. Keeping those walls up is what lets “validate in CI” mean something without a parser rewriting your prose.
 
 **Staleness (v0)** — Diagnostics only; the same file’s staleness section is the contract. We’re not auto-healing commentary on branch mismatch—that’s a product decision, not an oversight.
 

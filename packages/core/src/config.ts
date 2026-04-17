@@ -11,7 +11,7 @@ export type CommentrayToml = {
     mermaid?: boolean;
     syntaxTheme?: string;
     /**
-     * When true, `https://github.com/<owner>/<repo>/blob|tree/<branch>/…` links in companion
+     * When true, `https://github.com/<owner>/<repo>/blob|tree/<branch>/…` links in commentray
      * Markdown are rewritten to paths relative to the generated HTML file (see
      * `static_site.github_url` for owner/repo). Requires a parseable repository URL.
      */

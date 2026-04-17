@@ -1,4 +1,4 @@
-# `quality-gate.sh` — companion
+# `quality-gate.sh` — commentray
 
 One script name so docs and CI never drift to a forgotten alias. The order is the story: **`format:check`** → **`lint`** (ESLint + shellcheck) → **`dupes`** → **`typecheck`** → **`COMMENTRAY_TEST_MODE=unit` tests**. Expensive tiers stay opt-in (`ci-expensive.yml`, PR label) so local iteration does not pay for the whole studio.
 

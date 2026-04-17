@@ -1,4 +1,4 @@
-# `config.ts` — companion
+# `config.ts` — commentray
 
 Every entrypoint funnels through here so **one** definition of “safe path” wins. New knobs mean extending `CommentrayToml`, `mergeCommentrayConfig`, and **`assertSafeConfigPaths`** together—otherwise someone’s `init` or `validate` quietly disagrees.
 

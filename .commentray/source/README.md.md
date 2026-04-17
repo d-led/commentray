@@ -1,8 +1,8 @@
 # Commentray — quick-start
 
-_You have the main [`README.md`](https://github.com/d-led/commentray/blob/main/README.md) in the left column: packages, scripts, release flow. This column is the other microphone—same premiere, different job._
+_You have the main [`README.md`](https://github.com/d-led/commentray/blob/main/README.md) in the left column: packages, scripts, release flow. This file **is** commentray for that README—the running voice-over, not a second brochure._
 
-> **Director beat:** two panes, one checkout. The left column states facts; this one adds motive, trade-offs, and “we tried that already.” Nothing here replaces the README—it annotates it.
+> **Director beat:** two panes, one checkout. The left column states facts; this **commentray** adds motive, trade-offs, and “we tried that already.” Same word names the tool (**Commentray**) and what you write beside the code (**commentray**); the README’s _Why_ section spells that out for newcomers.
 
 ## Why this file exists
 
@@ -19,7 +19,7 @@ You may be reading a **generated** page: `code-commentray-static` plus [`build-s
 ## Cookbook (tone, not a second README)
 
 - **Greenfield adopt** — `commentray init` is deliberately boring (idempotent, safe to re-run). The “aha” is that nothing in your primary tree _has_ to move.
-- **Hook paranoia** — `init scm` is for teams who want the index validated **before** a misleading companion can merge; it is opt-in because hooks are a social contract, not a library concern.
+- **Hook paranoia** — `init scm` is for teams who want the index validated **before** misleading commentray can merge; it is opt-in because hooks are a social contract, not a library concern.
 - **“Why is my tree red?”** — `doctor` layers environment noise on top of `validate` so humans get a single front door.
 - **Binaries** — Releases and [`binaries.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml) are the distribution story; the README tables stay canonical for artifact names.
 - **Your own Pages** — Copy [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml), adjust `[static_site]`, run `npm run pages:build`. The dogfood site is proof the pipeline is boring enough to reuse.
@@ -40,4 +40,4 @@ Treat the left README’s bullet list as the roster. In practice: **`@commentray
 
 ## What Commentray is not (one beat each)
 
-Not a substitute for good inline comments where the medium allows. Not a hosted blog—the companion travels in **git**. Not editor-exclusive—the CLI is the same story without a GUI.
+Not a substitute for good inline comments where the medium allows. Not a hosted blog—**commentray** travels in **git** with the code it explains. Not editor-exclusive—the CLI is the same story without a GUI.

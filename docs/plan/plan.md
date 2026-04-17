@@ -6,7 +6,7 @@ This document is the canonical engineering plan for the Commentray ecosystem. It
 
 Commentary tracks on DVDs and streaming extras: optional audio where filmmakers explain choices, constraints, and intent **without** altering the film itself.
 
-Commentray applies that metaphor to software and texts: the **primary artifact stays clean** (code, config, generated formats where inline notes are impossible), while explanations, rationale, warnings, and diagrams live beside it in companion Markdown, synchronized by **blocks** and **anchors** rather than by fragile line numbers alone.
+Commentray applies that metaphor to software and texts: the **primary artifact stays clean** (code, config, generated formats where inline notes are impossible), while explanations, rationale, warnings, and diagrams live beside it in **commentray** (paired Markdown under `.commentray/source/`), synchronized by **blocks** and **anchors** rather than by fragile line numbers alone.
 
 The user-facing README should remain **terse and skimmable**, in the spirit of [chumak’s README](https://raw.githubusercontent.com/zeromq/chumak/refs/heads/master/README.md).
 
@@ -90,9 +90,9 @@ flowchart LR
 - Anchor grammar: [`docs/spec/anchors.md`](../spec/anchors.md)
 - Blocks: [`docs/spec/blocks.md`](../spec/blocks.md)
 
-## Dogfood companion tracks
+## Dogfood commentray
 
-This repository keeps **terse** Commentray Markdown beside selected sources under [`.commentray/source/`](../../.commentray/source/) (companion path = repo-relative primary + `.md`, e.g. this file → [`plan.md.md`](../../.commentray/source/docs/plan/plan.md.md)). Those notes are for contributors skimming the tree in an editor or on GitHub; they intentionally overlap only lightly with this plan and link out to specs and workflows.
+This repository keeps **terse** commentray beside selected sources under [`.commentray/source/`](../../.commentray/source/) (path = repo-relative primary + `.md`, e.g. this file → [`plan.md.md`](../../.commentray/source/docs/plan/plan.md.md)). Those notes are for contributors skimming the tree in an editor or on GitHub; they intentionally overlap only lightly with this plan and link out to specs and workflows.
 
 ## Packages
 

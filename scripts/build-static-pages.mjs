@@ -27,7 +27,7 @@ async function pathExists(p) {
   }
 }
 
-/** Intro + companion body. Repository link is shown in the page toolbar (Octocat), not duplicated here. */
+/** Intro + commentray body. Repository link is shown in the page toolbar (Octocat), not duplicated here. */
 function composeCommentrayMarkdown(intro, fileMarkdown) {
   const parts = [];
   if (intro.trim()) parts.push(intro.trim());
@@ -63,9 +63,7 @@ const outDir = path.join(repoRoot, "_site");
 const outHtml = path.join(outDir, "index.html");
 
 const ghParsed =
-  cfg.render.relativeGithubBlobLinks && ss.githubUrl
-    ? parseGithubRepoWebUrl(ss.githubUrl)
-    : null;
+  cfg.render.relativeGithubBlobLinks && ss.githubUrl ? parseGithubRepoWebUrl(ss.githubUrl) : null;
 const markdownUrlBaseDirAbs = ss.commentrayMarkdownFile
   ? path.join(repoRoot, path.dirname(ss.commentrayMarkdownFile))
   : repoRoot;

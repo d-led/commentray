@@ -1,4 +1,4 @@
-# `extension.ts` — companion
+# `extension.ts` — commentray
 
 This is the **handheld camera** version of Commentray: open beside, start a block from selection, validate into an output channel, and lean on the built-in Markdown preview when you want stock rendering.
 

@@ -22,7 +22,7 @@ export type BuildCommentrayStaticOptions = {
   githubRepoUrl?: string;
   /** Shown as “Rendered with Commentray” in the toolbar (`http`/`https` only). */
   toolHomeUrl?: string;
-  /** When set, rewrites local and GitHub blob links in companion Markdown for static HTML output. */
+  /** When set, rewrites local and GitHub blob links in commentray for static HTML output. */
   commentrayOutputUrls?: CommentrayOutputUrlOptions;
 };
 

@@ -82,7 +82,7 @@ listener on **both** editors:
 
 - **Source → commentray:** the top visible line of the source picks a target
   line in the Markdown. If `index.json` lists `lines:` anchors that match
-  `<!-- commentray:block id=… -->` markers in the companion file, the
+  `<!-- commentray:block id=… -->` markers in the commentray file, the
   commentary scroll snaps to the block whose source range **contains** that
   top line (or the nearest sensible block when you are in a gap). Without
   blocks, a lightweight proportional scroll is used instead.

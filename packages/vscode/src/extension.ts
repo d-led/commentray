@@ -194,7 +194,7 @@ async function resolvePairedPaths(
   }
   if (normalized.startsWith(COMMENTRAY_STORAGE_PREFIX)) {
     await vscode.window.showWarningMessage(
-      "Run this command from the source file — the active editor is already a Commentray companion.",
+      "Run this command from the source file — the active editor is already a commentray file.",
     );
     return null;
   }

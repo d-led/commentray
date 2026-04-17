@@ -17,9 +17,9 @@ import { escapeHtml } from "./html-utils.js";
  * When generating static HTML (Pages, `commentray render`), rewrites `img[src]` and `a[href]`
  * so local assets work from the output file location.
  *
- * **URL rules** (same companion file as in the editor):
+ * **URL rules** (same commentray file as in the editor):
  * - **`/path/to/file`** — repository root (leading slash), POSIX-style.
- * - **`./` / `../` / `figures/a.png`** — relative to the companion Markdown file’s directory
+ * - **`./` / `../` / `figures/a.png`** — relative to the commentray file’s directory
  *   (`markdownUrlBaseDirAbs`), i.e. normal Markdown resolution.
  */
 export type CommentrayOutputUrlOptions = {

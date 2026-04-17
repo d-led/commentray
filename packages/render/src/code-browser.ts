@@ -101,7 +101,10 @@ function safeExternalHttpUrl(url: string | undefined): string | null {
   return t;
 }
 
-function buildToolbarEndHtml(githubRepoUrl: string | undefined, toolHomeUrl: string | undefined): string {
+function buildToolbarEndHtml(
+  githubRepoUrl: string | undefined,
+  toolHomeUrl: string | undefined,
+): string {
   const gh = safeExternalHttpUrl(githubRepoUrl);
   const tool = safeExternalHttpUrl(toolHomeUrl);
   const bits: string[] = [];

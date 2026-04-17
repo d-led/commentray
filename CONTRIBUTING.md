@@ -2,6 +2,8 @@
 
 Thank you for helping build Commentray.
 
+**Terminology:** **Commentray** (capitalized) is the tool and packages in this repo. **commentray** (lowercase) is also what we call the paired Markdown under `.commentray/source/`—the thing you write _in commentray_ next to a source file (e.g. _“we have to document our architecture in commentray so that newcomers can have an effective source code onboarding experience”_).
+
 ## Principles (aspiration)
 
 We like the lightweight spirit described in the Collective Code Construction Contract (C4), as linked from the [chumak contributing guide](https://raw.githubusercontent.com/zeromq/chumak/refs/heads/master/CONTRIBUTING.md). We are **not** claiming full C4 compliance yet; we grow conventions **continuously and on demand**.

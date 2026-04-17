@@ -22,7 +22,7 @@ function markerLineByIdFromMarkdown(markdown: string): Map<string, number> {
 
 /**
  * Correlate index blocks (line anchors + ids) with `<!-- commentray:block id=… -->`
- * markers in the companion markdown. Only `lines:` anchors with a visible
+ * markers in commentray. Only `lines:` anchors with a visible
  * marker participate. Sorted by `sourceStart`.
  */
 export function buildBlockScrollLinks(

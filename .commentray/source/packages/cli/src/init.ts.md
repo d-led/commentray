@@ -1,4 +1,4 @@
-# `init.ts` — companion
+# `init.ts` — commentray
 
 **`runInitFull`** is the “first day on set” pass: directories, empty index if needed, `.commentray.toml` only if missing—idempotent so reruns feel like continuity, not a reshoot. **`runInitConfig --force`** is when you deliberately want the template voice-over again. **`runInitScm`** is a small delegation: the interesting merge logic lives in **`git-hooks.ts`**, not here.
 

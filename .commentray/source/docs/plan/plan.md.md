@@ -1,4 +1,4 @@
-# Plan — companion
+# Plan — commentray
 
 The plan on the left is the **script**; this note is what we’d say in the booth while it plays—intent, boundaries, and where the camera will not go in v0.
 

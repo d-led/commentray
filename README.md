@@ -4,7 +4,7 @@ Have you ever wished a “commentary track” for code the way DVD extras let fi
 
 ## Why
 
-Inline comments are not always possible (generated files, tight formats, policy). Commentray keeps the primary artifact clean while storing rationale, warnings, and diagrams in companion Markdown under `.commentray/`.
+Inline comments are not always possible (generated files, tight formats, policy). Commentray keeps the primary artifact clean while storing rationale, warnings, and diagrams in **commentray**—Markdown that lives under `.commentray/source/` beside the code it explains. In a meeting you might hear: _“We have to document our architecture **in commentray** so that newcomers can have an effective source code onboarding experience.”_ Same word names the tool and the practice; context disambiguates.
 
 ## What’s in this repo
 
@@ -12,7 +12,7 @@ Inline comments are not always possible (generated files, tight formats, policy)
 - `@commentray/render`: Markdown → HTML (GFM), syntax highlighting (rehype-highlight / lowlight), Mermaid containers, HTML shells (side-by-side + interactive static code browser with token-in-line search and jump).
 - `code-commentray-static`: sample generator for a single static HTML “code + commentray” page (draggable splitter, code line-wrap toggle). Run `npm run code-commentray-static:build` (builds `@commentray/render` + this package, then writes `packages/code-commentray-static/site/index.html`). **GitHub Pages:** `[static_site]` in [`.commentray.toml`](.commentray.toml) drives `npm run pages:build` → `_site/index.html`; workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml) deploys on `main` (enable Pages → “GitHub Actions” in repo settings).
 - `@commentray/cli`: `commentray` command for `init` (idempotent workspace setup), `init config`, `init scm` (git pre-commit hook), validate/doctor/migrate/render. **Standalone executables** (Node SEA, no separate Node install) are built per OS/arch in [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml) and attached to GitHub Releases on version tags; see **Standalone CLI binaries** below.
-- `commentray-vscode`: VS Code / Cursor extension MVP (open paired commentray + basic scroll sync + workspace validation output; richer gutter UX is planned).
+- `commentray-vscode`: VS Code / Cursor extension MVP (open a source file beside its **commentray** + basic scroll sync + workspace validation output; richer gutter UX is planned).
 
 ## Quickstart
 
