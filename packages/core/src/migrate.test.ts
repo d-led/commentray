@@ -15,4 +15,21 @@ describe("migrateIndex", () => {
     expect(changed).toBe(false);
     expect(index).toEqual(input);
   });
+
+  it("renames commentaryPath to commentrayPath when migrating from v1", () => {
+    const { index, changed } = migrateIndex({
+      schemaVersion: 1,
+      bySourceFile: {
+        "src/a.ts": {
+          sourcePath: "src/a.ts",
+          commentaryPath: ".commentray/source/src/a.ts.md",
+          blocks: [],
+        },
+      },
+    });
+    expect(changed).toBe(true);
+    expect(index.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(index.bySourceFile["src/a.ts"]?.commentrayPath).toBe(".commentray/source/src/a.ts.md");
+    expect("commentaryPath" in (index.bySourceFile["src/a.ts"] as object)).toBe(false);
+  });
 });

@@ -7,17 +7,17 @@ export type SideBySideOptions = {
   code: string;
   /** Highlight.js / common language id, e.g. ts, go, json */
   language: string;
-  /** Commentary markdown body. */
-  commentaryMarkdown: string;
+  /** Commentray markdown body. */
+  commentrayMarkdown: string;
   /** When true, include Mermaid runtime from CDN in the footer. */
   includeMermaidRuntime?: boolean;
 };
 
 export async function renderSideBySideHtml(opts: SideBySideOptions): Promise<string> {
   const fence = "```" + opts.language + "\n" + opts.code + "\n```\n";
-  const [codeHtml, commentaryHtml] = await Promise.all([
+  const [codeHtml, commentrayHtml] = await Promise.all([
     renderFencedCode(fence),
-    renderMarkdownToHtml(opts.commentaryMarkdown),
+    renderMarkdownToHtml(opts.commentrayMarkdown),
   ]);
 
   const mermaidScript = opts.includeMermaidRuntime
@@ -28,7 +28,7 @@ mermaid.run({ querySelector: ".mermaid" });
 </script>`
     : "";
 
-  const title = opts.title ?? "Commentary";
+  const title = opts.title ?? "Commentray";
 
   return `<!doctype html>
 <html lang="en">
@@ -44,8 +44,8 @@ mermaid.run({ querySelector: ".mermaid" });
       .pane:last-child { border-right: none; }
       .pane h2 { margin-top: 0; font-size: 14px; letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.8; }
       pre { margin: 0; }
-      .commentary { font-size: 15px; line-height: 1.45; }
-      .commentary img { max-width: 100%; height: auto; }
+      .commentray { font-size: 15px; line-height: 1.45; }
+      .commentray img { max-width: 100%; height: auto; }
     </style>
   </head>
   <body>
@@ -54,9 +54,9 @@ mermaid.run({ querySelector: ".mermaid" });
         <h2>Code</h2>
         ${codeHtml}
       </section>
-      <section class="pane commentary" aria-label="Commentary">
-        <h2>Commentary</h2>
-        ${commentaryHtml}
+      <section class="pane commentray" aria-label="Commentray">
+        <h2>Commentray</h2>
+        ${commentrayHtml}
       </section>
     </div>
     ${mermaidScript}

@@ -9,7 +9,7 @@ describe("assertValidIndex", () => {
       bySourceFile: {
         "src/a.ts": {
           sourcePath: "src/a.ts",
-          commentaryPath: ".commentary/source/src/a.ts.md",
+          commentrayPath: ".commentray/source/src/a.ts.md",
           blocks: [{ id: "b1", anchor: "lines:1-2" }],
         },
       },

@@ -7,7 +7,7 @@ describe("renderCodeBrowserHtml", () => {
       title: "Demo",
       code: "const x = 1;",
       language: "ts",
-      commentaryMarkdown: "## Notes\n\nHello.",
+      commentrayMarkdown: "## Notes\n\nHello.",
     });
     expect(html).toContain('id="gutter"');
     expect(html).toContain('id="wrap-lines"');

@@ -2,9 +2,9 @@
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { runCommanderMain } from "@commentary/core";
+import { runCommanderMain } from "@commentray/core";
 import { Command } from "commander";
-import { buildCodeCommentaryStatic } from "./build.js";
+import { buildCommentrayStatic } from "./build.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pkgRoot = path.join(here, "..");
@@ -14,15 +14,15 @@ const defaultOut = path.join(pkgRoot, "site", "index.html");
 
 const program = new Command();
 program
-  .name("code-commentary-static")
-  .description("Emit a static HTML code + commentary browser page")
+  .name("code-commentray-static")
+  .description("Emit a static HTML code + commentray browser page")
   .option("--source <path>", "Source file to display", defaultSource)
-  .option("--markdown <path>", "Commentary Markdown file", defaultMarkdown)
+  .option("--markdown <path>", "Commentray Markdown file", defaultMarkdown)
   .option("--out <path>", "Output HTML file", defaultOut)
   .option("--title <text>", "HTML title override")
   .option("--mermaid", "Include Mermaid runtime (CDN)", false)
   .action(async (opts) => {
-    await buildCodeCommentaryStatic({
+    await buildCommentrayStatic({
       sourceFile: opts.source as string,
       markdownFile: opts.markdown as string,
       outHtml: opts.out as string,

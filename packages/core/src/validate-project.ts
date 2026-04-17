@@ -1,9 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { type ResolvedCommentaryConfig, loadCommentaryConfig } from "./config.js";
+import { type ResolvedCommentrayConfig, loadCommentrayConfig } from "./config.js";
 import { assertValidIndex } from "./metadata.js";
 import { defaultMetadataIndexPath } from "./paths.js";
-import type { CommentaryIndex } from "./model.js";
+import type { CommentrayIndex } from "./model.js";
 
 export type ValidationIssue = { level: "error" | "warn"; message: string };
 
@@ -13,13 +13,13 @@ export type ValidationResult = {
 
 export async function validateProject(repoRoot: string): Promise<ValidationResult> {
   const issues: ValidationIssue[] = [];
-  let config: ResolvedCommentaryConfig;
+  let config: ResolvedCommentrayConfig;
   try {
-    config = await loadCommentaryConfig(repoRoot);
+    config = await loadCommentrayConfig(repoRoot);
   } catch (err) {
     issues.push({
       level: "error",
-      message: `Failed to load .commentary.toml: ${err instanceof Error ? err.message : String(err)}`,
+      message: `Failed to load .commentray.toml: ${err instanceof Error ? err.message : String(err)}`,
     });
     return { issues };
   }
@@ -56,7 +56,7 @@ export async function validateProject(repoRoot: string): Promise<ValidationResul
   return { issues };
 }
 
-export async function readIndex(repoRoot: string): Promise<CommentaryIndex | null> {
+export async function readIndex(repoRoot: string): Promise<CommentrayIndex | null> {
   const indexPath = path.join(repoRoot, defaultMetadataIndexPath());
   try {
     const raw = await fs.readFile(indexPath, "utf8");

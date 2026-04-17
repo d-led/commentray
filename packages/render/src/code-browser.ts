@@ -9,7 +9,7 @@ export type CodeBrowserPageOptions = {
   title?: string;
   code: string;
   language: string;
-  commentaryMarkdown: string;
+  commentrayMarkdown: string;
   includeMermaidRuntime?: boolean;
   /** Highlight.js stylesheet base name (e.g. github, github-dark). */
   hljsTheme?: string;
@@ -37,7 +37,7 @@ async function renderCodeLineBlocks(code: string, language: string): Promise<str
   return parts.join("\n");
 }
 
-/** IIFE produced by `npm run build -w @commentary/render` (esbuild of `code-browser-client.ts`). */
+/** IIFE produced by `npm run build -w @commentray/render` (esbuild of `code-browser-client.ts`). */
 function loadCodeBrowserClientBundle(): string {
   const here = dirname(fileURLToPath(import.meta.url));
   const inDist = join(here, "code-browser-client.bundle.js");
@@ -48,7 +48,7 @@ function loadCodeBrowserClientBundle(): string {
     }
   }
   throw new Error(
-    "Missing code-browser-client.bundle.js. Run `npm run build -w @commentary/render` to bundle the browser client.",
+    "Missing code-browser-client.bundle.js. Run `npm run build -w @commentray/render` to bundle the browser client.",
   );
 }
 
@@ -125,7 +125,7 @@ const CODE_BROWSER_STYLES = `
 type CodeBrowserPageParts = {
   title: string;
   codeHtml: string;
-  commentaryHtml: string;
+  commentrayHtml: string;
   rawCodeB64: string;
   rawMdB64: string;
   hljs: string;
@@ -134,7 +134,7 @@ type CodeBrowserPageParts = {
 };
 
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
-  const { title, codeHtml, commentaryHtml, rawCodeB64, rawMdB64, hljs, hljsDark, mermaidScript } =
+  const { title, codeHtml, commentrayHtml, rawCodeB64, rawMdB64, hljs, hljsDark, mermaidScript } =
     p;
   return `<!doctype html>
 <html lang="en">
@@ -170,9 +170,9 @@ ${CODE_BROWSER_STYLES}
           ${codeHtml}
         </section>
         <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>
-        <section class="pane--doc commentary" id="doc-pane" aria-label="Commentary">
-          <h2 class="pane-title">Commentary</h2>
-          ${commentaryHtml}
+        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">
+          <h2 class="pane-title">Commentray</h2>
+          ${commentrayHtml}
         </section>
       </div>
     </div>
@@ -185,20 +185,20 @@ ${loadCodeBrowserClientBundle()}
 }
 
 /**
- * Static HTML shell for a minimal “code browser”: code + rendered commentary,
+ * Static HTML shell for a minimal “code browser”: code + rendered commentray,
  * draggable vertical splitter, togglable line wrap for the code pane, and
  * token-in-line quick search (all non-whitespace tokens must appear on the same line).
  */
 export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promise<string> {
-  const [codeHtml, commentaryHtml] = await Promise.all([
+  const [codeHtml, commentrayHtml] = await Promise.all([
     renderCodeLineBlocks(opts.code, opts.language),
-    renderMarkdownToHtml(opts.commentaryMarkdown),
+    renderMarkdownToHtml(opts.commentrayMarkdown),
   ]);
 
   const rawCodeB64 = Buffer.from(opts.code, "utf8").toString("base64");
-  const rawMdB64 = Buffer.from(opts.commentaryMarkdown, "utf8").toString("base64");
+  const rawMdB64 = Buffer.from(opts.commentrayMarkdown, "utf8").toString("base64");
 
-  const title = opts.title ?? "Commentary";
+  const title = opts.title ?? "Commentray";
   const hljs = opts.hljsTheme ?? "github";
   const hljsDark = opts.hljsTheme?.includes("dark") ? opts.hljsTheme : "github-dark";
 
@@ -213,7 +213,7 @@ mermaid.run({ querySelector: ".mermaid" });
   return buildCodeBrowserPageHtml({
     title,
     codeHtml,
-    commentaryHtml,
+    commentrayHtml,
     rawCodeB64,
     rawMdB64,
     hljs,

@@ -1,11 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { renderCodeBrowserHtml } from "@commentary/render";
+import { renderCodeBrowserHtml } from "@commentray/render";
 
-export type BuildCodeCommentaryStaticOptions = {
+export type BuildCommentrayStaticOptions = {
   /** Absolute or cwd-relative path to the source file whose contents are shown as code. */
   sourceFile: string;
-  /** Absolute or cwd-relative path to commentary Markdown. */
+  /** Absolute or cwd-relative path to commentray Markdown. */
   markdownFile: string;
   /** Output HTML path (directories created as needed). */
   outHtml: string;
@@ -15,15 +15,13 @@ export type BuildCodeCommentaryStaticOptions = {
   hljsTheme?: string;
 };
 
-export async function buildCodeCommentaryStatic(
-  opts: BuildCodeCommentaryStaticOptions,
-): Promise<void> {
+export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions): Promise<void> {
   const sourcePath = path.resolve(opts.sourceFile);
   const mdPath = path.resolve(opts.markdownFile);
   const outPath = path.resolve(opts.outHtml);
 
   const code = await readFile(sourcePath, "utf8");
-  const commentaryMarkdown = await readFile(mdPath, "utf8");
+  const commentrayMarkdown = await readFile(mdPath, "utf8");
   const ext = path.extname(sourcePath).slice(1) || "txt";
   const language = ext === "ts" ? "ts" : ext === "tsx" ? "tsx" : ext;
 
@@ -31,7 +29,7 @@ export async function buildCodeCommentaryStatic(
     title: opts.title ?? path.basename(sourcePath),
     code,
     language,
-    commentaryMarkdown,
+    commentrayMarkdown,
     includeMermaidRuntime: opts.includeMermaidRuntime ?? false,
     hljsTheme: opts.hljsTheme,
   });

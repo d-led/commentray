@@ -1,21 +1,21 @@
 import {
-  commentaryMarkdownPath,
+  commentrayMarkdownPath,
   normalizeRepoRelativePath,
   validateProject,
-} from "@commentary/core";
+} from "@commentray/core";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
 type ScrollPair = {
   code: vscode.TextEditor;
-  commentary: vscode.TextEditor;
+  commentray: vscode.TextEditor;
 };
 
 let activePair: ScrollPair | undefined;
 let scrollDisposable: vscode.Disposable | undefined;
 
-function commentaryAbsolutePath(repoRoot: string, repoRelativeSource: string): string {
-  const rel = commentaryMarkdownPath(repoRelativeSource);
+function commentrayAbsolutePath(repoRoot: string, repoRelativeSource: string): string {
+  const rel = commentrayMarkdownPath(repoRelativeSource);
   return path.join(repoRoot, ...rel.split("/"));
 }
 
@@ -35,37 +35,37 @@ function bindScrollSync(pair: ScrollPair) {
     if (!range) return;
 
     const codeLines = Math.max(1, activePair.code.document.lineCount);
-    const commentaryLines = Math.max(1, activePair.commentary.document.lineCount);
+    const commentrayLines = Math.max(1, activePair.commentray.document.lineCount);
 
     const center = (range.start.line + range.end.line) / 2;
     const fraction = center / Math.max(1, codeLines - 1);
     const targetLine = Math.min(
-      commentaryLines - 1,
-      Math.max(0, Math.round(fraction * (commentaryLines - 1))),
+      commentrayLines - 1,
+      Math.max(0, Math.round(fraction * (commentrayLines - 1))),
     );
 
     const reveal = new vscode.Range(targetLine, 0, targetLine, 0);
-    activePair.commentary.revealRange(
+    activePair.commentray.revealRange(
       reveal,
       vscode.TextEditorRevealType.InCenterIfOutsideViewport,
     );
   });
 }
 
-async function ensureCommentaryFile(uri: vscode.Uri): Promise<vscode.Uri> {
+async function ensureCommentrayFile(uri: vscode.Uri): Promise<vscode.Uri> {
   try {
     await vscode.workspace.fs.stat(uri);
     return uri;
   } catch {
     const enc = new TextEncoder();
-    await vscode.workspace.fs.writeFile(uri, enc.encode("# Commentary\n\n"));
+    await vscode.workspace.fs.writeFile(uri, enc.encode("# Commentray\n\n"));
     return uri;
   }
 }
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
-    vscode.commands.registerCommand("commentary.openSideBySide", async () => {
+    vscode.commands.registerCommand("commentray.openSideBySide", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
         await vscode.window.showWarningMessage("Open a source file first.");
@@ -92,15 +92,15 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      const commentaryUri = vscode.Uri.file(commentaryAbsolutePath(repoRoot, normalized));
+      const commentrayUri = vscode.Uri.file(commentrayAbsolutePath(repoRoot, normalized));
       await vscode.window.showTextDocument(editor.document, {
         viewColumn: vscode.ViewColumn.One,
         preview: false,
       });
 
-      const ensured = await ensureCommentaryFile(commentaryUri);
-      const commentaryDoc = await vscode.workspace.openTextDocument(ensured);
-      const commentaryEditor = await vscode.window.showTextDocument(commentaryDoc, {
+      const ensured = await ensureCommentrayFile(commentrayUri);
+      const commentrayDoc = await vscode.workspace.openTextDocument(ensured);
+      const commentrayEditor = await vscode.window.showTextDocument(commentrayDoc, {
         viewColumn: vscode.ViewColumn.Two,
         preview: false,
       });
@@ -108,14 +108,14 @@ export function activate(context: vscode.ExtensionContext) {
       const codeEditor =
         vscode.window.visibleTextEditors.find((te) => te.document === editor.document) ?? editor;
 
-      bindScrollSync({ code: codeEditor, commentary: commentaryEditor });
+      bindScrollSync({ code: codeEditor, commentray: commentrayEditor });
     }),
   );
 
-  const output = vscode.window.createOutputChannel("Commentary");
+  const output = vscode.window.createOutputChannel("Commentray");
   context.subscriptions.push(output);
   context.subscriptions.push(
-    vscode.commands.registerCommand("commentary.validateWorkspace", async () => {
+    vscode.commands.registerCommand("commentray.validateWorkspace", async () => {
       const folder = vscode.workspace.workspaceFolders?.[0];
       if (!folder) {
         await vscode.window.showWarningMessage("Open a workspace folder first.");
@@ -134,10 +134,10 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("commentary.openCommentaryPreview", async () => {
+    vscode.commands.registerCommand("commentray.openCommentrayPreview", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
-        await vscode.window.showWarningMessage("Open a commentary markdown file first.");
+        await vscode.window.showWarningMessage("Open a commentray markdown file first.");
         return;
       }
       if (!editor.document.fileName.endsWith(".md")) {

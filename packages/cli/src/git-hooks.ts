@@ -1,20 +1,24 @@
 /**
- * Idempotent injection of a Commentary-managed block into `.git/hooks/pre-commit`.
- * Re-running replaces only the marked region.
+ * Idempotent injection of a Commentray-managed block into `.git/hooks/pre-commit`.
+ * Re-running replaces only the marked region. Legacy `commentary-cli-hook` blocks
+ * from older installs are removed when inserting the current block.
  */
 
-export const COMMENTARY_HOOK_BEGIN = "# <<<< commentary-cli-hook v1 BEGIN >>>>";
-export const COMMENTARY_HOOK_END = "# <<<< commentary-cli-hook v1 END >>>>";
+export const COMMENTRAY_HOOK_BEGIN = "# <<<< commentray-cli-hook v1 BEGIN >>>>";
+export const COMMENTRAY_HOOK_END = "# <<<< commentray-cli-hook v1 END >>>>";
+
+const LEGACY_HOOK_BEGIN = "# <<<< commentary-cli-hook v1 BEGIN >>>>";
+const LEGACY_HOOK_END = "# <<<< commentary-cli-hook v1 END >>>>";
 
 /** Shell fragment: validate from repo root when CLI is installed under `node_modules/.bin`. */
-export const COMMENTARY_PRE_COMMIT_BODY = `root=$(git rev-parse --show-toplevel)
-commentary_bin="$root/node_modules/.bin/commentary"
-if [ -f "$root/.commentary.toml" ] && [ -x "$commentary_bin" ]; then
-  "$commentary_bin" validate || exit $?
+export const COMMENTRAY_PRE_COMMIT_BODY = `root=$(git rev-parse --show-toplevel)
+commentray_bin="$root/node_modules/.bin/commentray"
+if [ -f "$root/.commentray.toml" ] && [ -x "$commentray_bin" ]; then
+  "$commentray_bin" validate || exit $?
 fi`;
 
-export function commentaryManagedHookBlock(): string {
-  return `${COMMENTARY_HOOK_BEGIN}\n${COMMENTARY_PRE_COMMIT_BODY}\n${COMMENTARY_HOOK_END}\n`;
+export function commentrayManagedHookBlock(): string {
+  return `${COMMENTRAY_HOOK_BEGIN}\n${COMMENTRAY_PRE_COMMIT_BODY}\n${COMMENTRAY_HOOK_END}\n`;
 }
 
 /** Normalize newlines for stable merging. */
@@ -22,23 +26,32 @@ export function normalizeHookNewlines(content: string): string {
   return content.replace(/\r\n/g, "\n");
 }
 
+function stripLegacyCommentaryHook(trimmed: string): string {
+  if (!trimmed.includes(LEGACY_HOOK_BEGIN)) return trimmed;
+  const start = trimmed.indexOf(LEGACY_HOOK_BEGIN);
+  const end = trimmed.indexOf(LEGACY_HOOK_END);
+  if (end === -1) return trimmed;
+  const tail = trimmed.slice(end + LEGACY_HOOK_END.length).replace(/^\n+/, "\n");
+  return `${trimmed.slice(0, start).trimEnd()}\n${tail}`.replace(/\n{3,}/g, "\n\n");
+}
+
 /**
- * Merge or append the Commentary hook block into existing `pre-commit` contents.
+ * Merge or append the Commentray hook block into existing `pre-commit` contents.
  * @param existingContent full file body (may be empty)
  */
-export function mergeCommentaryPreCommitHook(existingContent: string): string {
-  const block = commentaryManagedHookBlock();
-  const trimmed = normalizeHookNewlines(existingContent);
+export function mergeCommentrayPreCommitHook(existingContent: string): string {
+  const block = commentrayManagedHookBlock();
+  const trimmed = stripLegacyCommentaryHook(normalizeHookNewlines(existingContent));
   if (!trimmed.trim()) {
     return `#!/bin/sh\n${block}`;
   }
-  if (trimmed.includes(COMMENTARY_HOOK_BEGIN)) {
-    const start = trimmed.indexOf(COMMENTARY_HOOK_BEGIN);
-    const end = trimmed.indexOf(COMMENTARY_HOOK_END);
+  if (trimmed.includes(COMMENTRAY_HOOK_BEGIN)) {
+    const start = trimmed.indexOf(COMMENTRAY_HOOK_BEGIN);
+    const end = trimmed.indexOf(COMMENTRAY_HOOK_END);
     if (end === -1) {
       return `${trimmed.trimEnd()}\n\n${block}`;
     }
-    const tail = trimmed.slice(end + COMMENTARY_HOOK_END.length).replace(/^\n+/, "\n");
+    const tail = trimmed.slice(end + COMMENTRAY_HOOK_END.length).replace(/^\n+/, "\n");
     return `${trimmed.slice(0, start)}${block}${tail}`;
   }
   return `${trimmed.trimEnd()}\n\n${block}`;

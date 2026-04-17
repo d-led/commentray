@@ -17,7 +17,7 @@ function remarkMermaidPlaceholders() {
       const value = node.value;
       const html: Html = {
         type: "html",
-        value: `<div class="commentary-mermaid"><pre class="mermaid"><code>${escapeHtml(
+        value: `<div class="commentray-mermaid"><pre class="mermaid"><code>${escapeHtml(
           value,
         )}</code></pre></div>`,
       };

@@ -1,7 +1,7 @@
 {
-  "name": "commentary",
+  "name": "commentray",
   "private": true,
-  "description": "Commentary monorepo — out-of-file documentation anchored to code",
+  "description": "Commentray monorepo — out-of-file documentation anchored to code",
   "license": "MPL-2.0",
   "engines": {
     "node": ">=20"
@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "bootstrap": "npm install",
-    "build": "npm run build -w @commentary/core && npm run build -w @commentary/render && npm run build -w code-commentary-static && npm run build -w @commentary/cli && npm run build -w commentary-vscode",
+    "build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w code-commentray-static && npm run build -w @commentray/cli && npm run build -w commentray-vscode",
     "clean": "npm run -ws --if-present clean",
     "format": "bash scripts/format.sh",
     "format:check": "bash scripts/format-check.sh",
@@ -20,26 +20,26 @@
     "quality": "npm run lint && npm run dupes",
     "typecheck": "tsc -b",
     "test": "bash scripts/test.sh",
-    "test:unit": "npm run build -w @commentary/render && vitest run -c vitest.config.ts",
+    "test:unit": "npm run build -w @commentray/render && vitest run -c vitest.config.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:expensive": "vitest run -c vitest.expensive.config.ts",
     "test:coverage": "bash scripts/test-coverage.sh",
-    "test:coverage:all": "COMMENTARY_COVERAGE_MODE=all bash scripts/test-coverage.sh",
+    "test:coverage:all": "COMMENTRAY_COVERAGE_MODE=all bash scripts/test-coverage.sh",
     "ci:quick": "bash scripts/ci-quick.sh",
     "ci:full": "bash scripts/ci-full.sh",
-    "commentary": "npm run commentary -w @commentary/cli --",
-    "binary:build": "npm run build:bundle -w @commentary/cli && node scripts/build-binary.mjs",
+    "commentray": "npm run commentray -w @commentray/cli --",
+    "binary:build": "npm run build:bundle -w @commentray/cli && node scripts/build-binary.mjs",
     "binary:smoke": "node scripts/smoke-binary.mjs",
     "extension:dogfood": "bash scripts/editor-extension.sh dogfood",
-    "code-commentary-static:build": "npm run build -w @commentary/render && npm run build -w code-commentary-static && npm run site -w code-commentary-static",
-    "pages:build": "npm run build -w @commentary/core && npm run build -w @commentary/render && npm run build -w code-commentary-static && node scripts/build-static-pages.mjs"
+    "code-commentray-static:build": "npm run build -w @commentray/render && npm run build -w code-commentray-static && npm run site -w code-commentray-static",
+    "pages:build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w code-commentray-static && node scripts/build-static-pages.mjs"
   },
   "devDependencies": {
-    "@commentary/core": "0.0.1",
+    "@commentray/core": "0.0.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
-    "code-commentary-static": "0.0.1",
+    "code-commentray-static": "0.0.1",
     "eslint": "^10.2.1",
     "jscpd": "^4.0.9",
     "prettier": "^3.8.3",

@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build and launch Cursor / VS Code with this repo's Commentary extension loaded
+# Build and launch Cursor / VS Code with this repo's Commentray extension loaded
 # from packages/vscode (development install — no .vsix).
 #
 # Usage:
 #   bash scripts/editor-extension.sh dogfood [path...]   # default: open this repo
 #
 # Editor CLI:
-#   Set COMMENTARY_EDITOR (e.g. "cursor", "code", or a full path).
+#   Set COMMENTRAY_EDITOR (e.g. "cursor", "code", or a full path).
 #   Otherwise: prefer "cursor" if on PATH, else "code".
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 pick_editor_cli() {
-  if [[ -n "${COMMENTARY_EDITOR:-}" ]]; then
-    echo "$COMMENTARY_EDITOR"
+  if [[ -n "${COMMENTRAY_EDITOR:-}" ]]; then
+    echo "$COMMENTRAY_EDITOR"
     return
   fi
   if command -v cursor >/dev/null 2>&1; then
@@ -27,13 +27,13 @@ pick_editor_cli() {
     echo code
     return
   fi
-  echo "Could not find 'cursor' or 'code' on PATH. Install the editor's shell command, or set COMMENTARY_EDITOR." >&2
+  echo "Could not find 'cursor' or 'code' on PATH. Install the editor's shell command, or set COMMENTRAY_EDITOR." >&2
   exit 1
 }
 
 build_extension() {
-  npm run build -w @commentary/core
-  npm run build -w commentary-vscode
+  npm run build -w @commentray/core
+  npm run build -w commentray-vscode
 }
 
 cmd_dogfood() {

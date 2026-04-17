@@ -7,4 +7,4 @@ package-lock.json
 .yarn
 LICENSE
 packages/*/LICENSE
-packages/code-commentary-static/site
+packages/code-commentray-static/site

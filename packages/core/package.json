@@ -1,10 +1,10 @@
 {
-  "name": "@commentary/core",
+  "name": "@commentray/core",
   "version": "0.0.1",
   "publishConfig": {
     "access": "public"
   },
-  "description": "Commentary models, validation, SCM adapters, and staleness helpers",
+  "description": "Commentray models, validation, SCM adapters, and staleness helpers",
   "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,

@@ -1,6 +1,6 @@
-/** Commentary block aligned to a region of a primary source file. */
-export type CommentaryBlock = {
-  /** Stable id within the commentary file. */
+/** Commentray block aligned to a region of a primary source file. */
+export type CommentrayBlock = {
+  /** Stable id within the commentray markdown file. */
   id: string;
   /** Human or machine anchor string (see anchor grammar in docs). */
   anchor: string;
@@ -13,17 +13,17 @@ export type CommentaryBlock = {
 };
 
 export type SourceFileIndexEntry = {
-  /** Repo-relative path to the primary file this commentary belongs to. */
+  /** Repo-relative path to the primary file this commentray belongs to. */
   sourcePath: string;
-  /** Repo-relative path to the Markdown commentary file. */
-  commentaryPath: string;
-  blocks: CommentaryBlock[];
+  /** Repo-relative path to the Markdown commentray file. */
+  commentrayPath: string;
+  blocks: CommentrayBlock[];
 };
 
-/** Root metadata document stored as JSON under `.commentary/metadata/`. */
-export type CommentaryIndex = {
+/** Root metadata document stored as JSON under `.commentray/metadata/`. */
+export type CommentrayIndex = {
   schemaVersion: number;
   bySourceFile: Record<string, SourceFileIndexEntry>;
 };
 
-export const CURRENT_SCHEMA_VERSION = 1 as const;
+export const CURRENT_SCHEMA_VERSION = 2 as const;

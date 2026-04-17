@@ -1,27 +1,27 @@
-# Commentary storage layout
+# Commentray storage layout
 
 ## Repository root
 
-- **Config**: `.commentary.toml` (TOML). Omitted keys use built-in defaults.
-- **Storage root**: defaults to `.commentary/` under the repository root.
+- **Config**: `.commentray.toml` (TOML). Omitted keys use built-in defaults.
+- **Storage root**: defaults to `.commentray/` under the repository root.
 
 ## Directories
 
-- **`.commentary/source/`**: Markdown commentary files.
-- **`.commentary/metadata/`**: Machine-oriented JSON (indices, fingerprints, diagnostics).
+- **`.commentray/source/`**: Markdown commentray files.
+- **`.commentray/metadata/`**: Machine-oriented JSON (indices, fingerprints, diagnostics).
 
-## Commentary file naming
+## Commentray file naming
 
-Given a **repo-relative** primary file path `P` (POSIX-style, no `..` segments), the commentary Markdown path is:
+Given a **repo-relative** primary file path `P` (POSIX-style, no `..` segments), the commentray Markdown path is:
 
 ```text
-.commentary/source/{P}.md
+.commentray/source/{P}.md
 ```
 
 Examples:
 
-- `src/server.ts` → `.commentary/source/src/server.ts.md`
-- `README.md` → `.commentary/source/README.md.md`
+- `src/server.ts` → `.commentray/source/src/server.ts.md`
+- `README.md` → `.commentray/source/README.md.md`
 
 The mapping is intentionally transparent: append `.md` to the original path under a stable prefix.
 
@@ -30,7 +30,7 @@ The mapping is intentionally transparent: append `.md` to the original path unde
 The default index file is:
 
 ```text
-.commentary/metadata/index.json
+.commentray/metadata/index.json
 ```
 
 It is plain JSON with a `schemaVersion` field so migrations remain explicit and auditable.

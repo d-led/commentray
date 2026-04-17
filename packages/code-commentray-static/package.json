@@ -1,7 +1,7 @@
 {
-  "name": "code-commentary-static",
+  "name": "code-commentray-static",
   "version": "0.0.1",
-  "description": "Build static HTML pages for code + Commentary (resizable panes, wrap toggle)",
+  "description": "Build static HTML pages for code + Commentray (resizable panes, wrap toggle)",
   "license": "MPL-2.0",
   "type": "module",
   "main": "./dist/build.js",
@@ -26,8 +26,8 @@
     "site": "node ./dist/cli.js"
   },
   "dependencies": {
-    "@commentary/core": "0.0.1",
-    "@commentary/render": "0.0.1",
+    "@commentray/core": "0.0.1",
+    "@commentray/render": "0.0.1",
     "commander": "^13.1.0"
   },
   "devDependencies": {

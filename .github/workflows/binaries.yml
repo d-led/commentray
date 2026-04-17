@@ -42,7 +42,7 @@ jobs:
       - run: npm ci
 
       - name: Build CLI bundle
-        run: npm run build:bundle -w @commentary/cli
+        run: npm run build:bundle -w @commentray/cli
 
       - name: Build standalone binary
         shell: bash
@@ -55,8 +55,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: commentary-${{ matrix.target }}
-          path: packages/cli/dist/bin/commentary-*
+          name: commentray-${{ matrix.target }}
+          path: packages/cli/dist/bin/commentray-*
           if-no-files-found: error
           retention-days: 14
 
@@ -73,7 +73,7 @@ jobs:
       - name: Stage release attachments
         run: |
           mkdir -p release-binaries
-          find artifacts -type f -name 'commentary-*' -exec cp -v {} release-binaries/ \;
+          find artifacts -type f -name 'commentray-*' -exec cp -v {} release-binaries/ \;
           ls -lah release-binaries/
 
       - name: Create GitHub release

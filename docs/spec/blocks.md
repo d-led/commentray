@@ -1,10 +1,10 @@
-# Commentary blocks
+# Commentray blocks
 
 ## Concept
 
-Commentary is authored in **blocks**: segments of Markdown aligned to regions of a primary artifact (usually source code). Blocks are the unit of:
+Commentray is authored in **blocks**: segments of Markdown aligned to regions of a primary artifact (usually source code). Blocks are the unit of:
 
-- alignment in side-by-side UI (code left, commentary right),
+- alignment in side-by-side UI (code left, commentray right),
 - staleness review,
 - optional future automation (including LLM-assisted maintenance).
 
@@ -17,7 +17,7 @@ Blocks are represented in two layers:
 
 Each block has:
 
-- **`id`**: stable string within the commentary file.
+- **`id`**: stable string within the commentray file.
 - **`anchor`**: string in the anchor grammar (see `anchors.md`).
 - **Optional verification**:
   - `lastVerifiedCommit`: full Git SHA when a human verified the block against the repo.
@@ -33,4 +33,4 @@ The core library computes lightweight diagnostics:
   - `lastVerifiedBlob` differs from the current `HEAD:<path>` blob id, or
   - the primary file is not tracked at `HEAD` while verification metadata exists.
 
-These diagnostics are designed to be surfaced in editors and CI without silently rewriting commentary.
+These diagnostics are designed to be surfaced in editors and CI without silently rewriting commentray content.

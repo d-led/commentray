@@ -9,13 +9,13 @@ export function normalizeRepoRelativePath(relativePath: string): string {
   return trimmed;
 }
 
-/** Commentary Markdown path for a repo-relative source file. */
-export function commentaryMarkdownPath(sourceRepoRelativePath: string): string {
+/** Commentray Markdown path for a repo-relative source file. */
+export function commentrayMarkdownPath(sourceRepoRelativePath: string): string {
   const normalized = normalizeRepoRelativePath(sourceRepoRelativePath);
-  return path.posix.join(".commentary", "source", `${normalized}.md`);
+  return path.posix.join(".commentray", "source", `${normalized}.md`);
 }
 
 /** Default metadata index location (repo-relative). */
 export function defaultMetadataIndexPath(): string {
-  return path.posix.join(".commentary", "metadata", "index.json");
+  return path.posix.join(".commentray", "metadata", "index.json");
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Smoke test the built standalone Commentary binary for this platform.
+ * Smoke test the built standalone Commentray binary for this platform.
  * Exits non-zero with a clear message on the first failure.
  */
 
@@ -15,7 +15,7 @@ const OUT_DIR = join(REPO_ROOT, "packages", "cli", "dist", "bin");
 function binaryName() {
   const platform = process.platform === "win32" ? "windows" : process.platform;
   const ext = process.platform === "win32" ? ".exe" : "";
-  return `commentary-${platform}-${process.arch}${ext}`;
+  return `commentray-${platform}-${process.arch}${ext}`;
 }
 
 function expectSuccess(label, args, { expectOutput } = {}) {
@@ -47,8 +47,8 @@ if (!existsSync(binPath)) {
 expectSuccess("--version prints 0.0.1", ["--version"], { expectOutput: "0.0.1" });
 expectSuccess("--help lists init", ["--help"], { expectOutput: "init" });
 expectSuccess("init --help shows scm subcommand", ["init", "--help"], { expectOutput: "scm" });
-expectSuccess("paths prints .commentary/source path", ["paths", "src/foo.ts"], {
-  expectOutput: ".commentary/source/src/foo.ts.md",
+expectSuccess("paths prints .commentray/source path", ["paths", "src/foo.ts"], {
+  expectOutput: ".commentray/source/src/foo.ts.md",
 });
 
 console.log("binary smoke tests passed");

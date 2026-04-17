@@ -1,9 +1,9 @@
 {
-  "name": "commentary-vscode",
-  "displayName": "Commentary",
-  "description": "Side-by-side authoring for Commentary markdown tracks",
+  "name": "commentray-vscode",
+  "displayName": "Commentray",
+  "description": "Side-by-side authoring for Commentray markdown tracks",
   "version": "0.0.1",
-  "publisher": "commentary",
+  "publisher": "d-led",
   "private": true,
   "license": "MPL-2.0",
   "engines": {
@@ -13,24 +13,24 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:commentary.openSideBySide",
-    "onCommand:commentary.openCommentaryPreview",
-    "onCommand:commentary.validateWorkspace"
+    "onCommand:commentray.openSideBySide",
+    "onCommand:commentray.openCommentrayPreview",
+    "onCommand:commentray.validateWorkspace"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "commentary.openSideBySide",
-        "title": "Commentary: Open commentary beside source"
+        "command": "commentray.openSideBySide",
+        "title": "Commentray: Open commentray beside source"
       },
       {
-        "command": "commentary.openCommentaryPreview",
-        "title": "Commentary: Open Markdown preview for commentary file"
+        "command": "commentray.openCommentrayPreview",
+        "title": "Commentray: Open Markdown preview for commentray file"
       },
       {
-        "command": "commentary.validateWorkspace",
-        "title": "Commentary: Validate workspace metadata"
+        "command": "commentray.validateWorkspace",
+        "title": "Commentray: Validate workspace metadata"
       }
     ]
   },
@@ -39,7 +39,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@commentary/core": "0.0.1"
+    "@commentray/core": "0.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.1",

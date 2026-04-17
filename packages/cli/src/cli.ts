@@ -3,15 +3,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import {
-  commentaryMarkdownPath,
+  commentrayMarkdownPath,
   defaultMetadataIndexPath,
   migrateIndex,
   normalizeRepoRelativePath,
   runCommanderMain,
   type ValidationIssue,
   validateProject,
-} from "@commentary/core";
-import { renderSideBySideHtml } from "@commentary/render";
+} from "@commentray/core";
+import { renderSideBySideHtml } from "@commentray/render";
 import { Command } from "commander";
 
 import { runInitConfig, runInitFull, runInitScm } from "./init.js";
@@ -25,24 +25,24 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
-async function commentaryRepoRootFrom(startDir: string): Promise<string> {
+async function commentrayRepoRootFrom(startDir: string): Promise<string> {
   let dir = startDir;
   for (;;) {
     const pkgPath = path.join(dir, "package.json");
     if (await pathExists(pkgPath)) {
       try {
         const pkg = JSON.parse(await fs.readFile(pkgPath, "utf8")) as { name?: string };
-        if (pkg.name === "commentary") return dir;
+        if (pkg.name === "commentray") return dir;
       } catch {
         // ignore invalid package.json
       }
     }
-    if (await pathExists(path.join(dir, ".commentary.toml"))) return dir;
+    if (await pathExists(path.join(dir, ".commentray.toml"))) return dir;
 
     const parent = path.dirname(dir);
     if (parent === dir) {
       throw new Error(
-        'Unable to locate Commentary repository root (expected a root package.json named "commentary" or a .commentary.toml file).',
+        'Unable to locate Commentray repository root (expected a root package.json named "commentray" or a .commentray.toml file).',
       );
     }
     dir = parent;
@@ -50,7 +50,7 @@ async function commentaryRepoRootFrom(startDir: string): Promise<string> {
 }
 
 async function repoRootFromCwd(): Promise<string> {
-  return commentaryRepoRootFrom(process.cwd());
+  return commentrayRepoRootFrom(process.cwd());
 }
 
 async function cmdValidate(): Promise<number> {
@@ -82,7 +82,7 @@ async function cmdMigrate(): Promise<number> {
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT") {
-      console.error(`Missing index at ${defaultMetadataIndexPath()}. Run: commentary init`);
+      console.error(`Missing index at ${defaultMetadataIndexPath()}. Run: commentray init`);
       return 1;
     }
     throw err;
@@ -112,7 +112,7 @@ async function cmdRender(opts: {
     title: source,
     code,
     language: ext === "ts" ? "ts" : ext,
-    commentaryMarkdown: md,
+    commentrayMarkdown: md,
     includeMermaidRuntime: opts.mermaid,
   });
   const outPath = path.resolve(repoRoot, opts.out);
@@ -122,18 +122,18 @@ async function cmdRender(opts: {
 }
 
 const program = new Command();
-program.name("commentary").description("Commentary CLI").version("0.0.1");
+program.name("commentray").description("Commentray CLI").version("0.0.1");
 
 const initCmd = program
   .command("init")
   .description(
-    "Idempotent workspace setup: storage dirs, index.json if missing, .commentary.toml if missing",
+    "Idempotent workspace setup: storage dirs, index.json if missing, .commentray.toml if missing",
   );
 
 initCmd
   .command("config")
-  .description("Ensure .commentary.toml exists with commented defaults (use --force to overwrite)")
-  .option("--force", "Replace an existing .commentary.toml", false)
+  .description("Ensure .commentray.toml exists with commented defaults (use --force to overwrite)")
+  .option("--force", "Replace an existing .commentray.toml", false)
   .action(async (opts: { force?: boolean }) => {
     process.exitCode = await runInitConfig(await repoRootFromCwd(), { force: Boolean(opts.force) });
   });
@@ -141,7 +141,7 @@ initCmd
 initCmd
   .command("scm")
   .description(
-    "Install or refresh Commentary's block in .git/hooks/pre-commit (runs validate when CLI is present)",
+    "Install or refresh Commentray's block in .git/hooks/pre-commit (runs validate when CLI is present)",
   )
   .action(async () => {
     process.exitCode = await runInitScm(await repoRootFromCwd());
@@ -153,7 +153,7 @@ initCmd.action(async () => {
 
 program
   .command("validate")
-  .description("Validate Commentary metadata and configuration")
+  .description("Validate Commentray metadata and configuration")
   .action(async () => {
     process.exitCode = await cmdValidate();
   });
@@ -175,16 +175,16 @@ program
 program
   .command("paths")
   .argument("<file>", "Repo-relative source file path")
-  .description("Print the commentary Markdown path for a source file")
+  .description("Print the commentray Markdown path for a source file")
   .action(async (file: string) => {
     const normalized = normalizeRepoRelativePath(file);
-    console.log(commentaryMarkdownPath(normalized));
+    console.log(commentrayMarkdownPath(normalized));
   });
 
 program
   .command("render")
   .requiredOption("--source <path>", "Repo-relative source file")
-  .requiredOption("--markdown <path>", "Path to commentary markdown file")
+  .requiredOption("--markdown <path>", "Path to commentray markdown file")
   .requiredOption("--out <path>", "Output HTML path")
   .option("--mermaid", "Include Mermaid runtime in HTML output", false)
   .action(async (opts) => {

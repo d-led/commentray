@@ -20,10 +20,10 @@ describe("GitScmProvider", () => {
   });
 
   it("resolves blob ids at HEAD and ancestry", async () => {
-    repo = await mkdtemp(path.join(tmpdir(), "commentary-git-"));
+    repo = await mkdtemp(path.join(tmpdir(), "commentray-git-"));
     await git(repo, ["init", "-b", "main"]);
     await git(repo, ["config", "user.email", "test@example.com"]);
-    await git(repo, ["config", "user.name", "Commentary Test"]);
+    await git(repo, ["config", "user.name", "Commentray Test"]);
     await mkdir(path.join(repo, "src"), { recursive: true });
     await writeFile(path.join(repo, "src", "a.ts"), "v1\n");
     await git(repo, ["add", "src/a.ts"]);

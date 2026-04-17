@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { commentaryMarkdownPath, normalizeRepoRelativePath } from "./paths.js";
+import { commentrayMarkdownPath, normalizeRepoRelativePath } from "./paths.js";
 
 describe("normalizeRepoRelativePath", () => {
   it("normalizes separators and rejects escapes", () => {
-    expect(normalizeRepoRelativePath("src\\foo.ts")).toBe("src/foo.ts");
-    expect(() => normalizeRepoRelativePath("../evil")).toThrow(/escapes/);
+    expect(normalizeRepoRelativePath("src\\a.ts")).toBe("src/a.ts");
+    expect(() => normalizeRepoRelativePath("../escape")).toThrow(/escapes/);
   });
 });
 
-describe("commentaryMarkdownPath", () => {
-  it("appends .md under .commentary/source", () => {
-    expect(commentaryMarkdownPath("src/a.ts")).toBe(".commentary/source/src/a.ts.md");
+describe("commentrayMarkdownPath", () => {
+  it("appends .md under .commentray/source", () => {
+    expect(commentrayMarkdownPath("src/a.ts")).toBe(".commentray/source/src/a.ts.md");
   });
 });

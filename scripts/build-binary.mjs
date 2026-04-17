@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Build a standalone Commentary CLI binary for the current platform using
+ * Build a standalone Commentray CLI binary for the current platform using
  * Node.js Single Executable Applications (SEA).
  *
- * Output: packages/cli/dist/bin/commentary-<platform>-<arch>[.exe]
+ * Output: packages/cli/dist/bin/commentray-<platform>-<arch>[.exe]
  *
  * Steps:
- *   1. Ensure the CLI bundle exists (`npm run build:bundle -w @commentary/cli`).
+ *   1. Ensure the CLI bundle exists (`npm run build:bundle -w @commentray/cli`).
  *   2. Generate the SEA blob via `node --experimental-sea-config`.
  *   3. Copy the current `node` binary to the output path.
  *   4. Inject the blob via `postject` (with platform-specific options).
@@ -59,13 +59,13 @@ function binarySuffix() {
   const platform = process.platform === "win32" ? "windows" : process.platform;
   const arch = process.arch;
   const ext = process.platform === "win32" ? ".exe" : "";
-  return { name: `commentary-${platform}-${arch}${ext}`, platform, arch, ext };
+  return { name: `commentray-${platform}-${arch}${ext}`, platform, arch, ext };
 }
 
 function ensureBundle() {
   if (existsSync(BUNDLE)) return;
-  console.log("Bundle missing; running `npm run build:bundle -w @commentary/cli`.");
-  run("npm", ["run", "build:bundle", "-w", "@commentary/cli"], {
+  console.log("Bundle missing; running `npm run build:bundle -w @commentray/cli`.");
+  run("npm", ["run", "build:bundle", "-w", "@commentray/cli"], {
     cwd: REPO_ROOT,
     shell: process.platform === "win32",
   });
@@ -88,10 +88,10 @@ function resolveSourceNode() {
   // Apple Silicon) ship a dynamically-linked shim that postject can't patch.
   // Official Node builds from nodejs.org (and `actions/setup-node` in CI) are
   // statically linked and work out of the box.
-  const override = process.env.COMMENTARY_SEA_NODE;
+  const override = process.env.COMMENTRAY_SEA_NODE;
   if (override) {
     if (!existsSync(override)) {
-      throw new Error(`COMMENTARY_SEA_NODE=${override} does not exist.`);
+      throw new Error(`COMMENTRAY_SEA_NODE=${override} does not exist.`);
     }
     return override;
   }

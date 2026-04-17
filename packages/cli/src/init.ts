@@ -2,15 +2,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
-import { defaultMetadataIndexPath, emptyIndex, loadCommentaryConfig } from "@commentary/core";
+import { defaultMetadataIndexPath, emptyIndex, loadCommentrayConfig } from "@commentray/core";
 
-import { mergeCommentaryPreCommitHook } from "./git-hooks.js";
+import { mergeCommentrayPreCommitHook } from "./git-hooks.js";
 
-export const DEFAULT_COMMENTARY_TOML = [
-  "# Commentary configuration (defaults are commented)",
+export const DEFAULT_COMMENTRAY_TOML = [
+  "# Commentray configuration (defaults are commented)",
   "",
   "[storage]",
-  '# dir = ".commentary"',
+  '# dir = ".commentray"',
   "",
   "[scm]",
   '# provider = "git"',
@@ -33,9 +33,9 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
-/** Full idempotent init: storage dirs, index.json if missing, .commentary.toml if missing. */
+/** Full idempotent init: storage dirs, index.json if missing, .commentray.toml if missing. */
 export async function runInitFull(repoRoot: string): Promise<void> {
-  const cfg = await loadCommentaryConfig(repoRoot);
+  const cfg = await loadCommentrayConfig(repoRoot);
   const storage = path.join(repoRoot, cfg.storageDir);
   await fs.mkdir(path.join(storage, "source"), { recursive: true });
   await fs.mkdir(path.join(storage, "metadata"), { recursive: true });
@@ -47,44 +47,44 @@ export async function runInitFull(repoRoot: string): Promise<void> {
     await fs.writeFile(indexPath, JSON.stringify(emptyIndex(), null, 2) + "\n", "utf8");
   }
 
-  const tomlPath = path.join(repoRoot, ".commentary.toml");
+  const tomlPath = path.join(repoRoot, ".commentray.toml");
   let createdToml = false;
   try {
     await fs.stat(tomlPath);
   } catch {
-    await fs.writeFile(tomlPath, DEFAULT_COMMENTARY_TOML, "utf8");
+    await fs.writeFile(tomlPath, DEFAULT_COMMENTRAY_TOML, "utf8");
     createdToml = true;
   }
   if (createdToml) {
-    console.log("Created .commentary.toml with commented defaults.");
+    console.log("Created .commentray.toml with commented defaults.");
   }
 
-  console.log(`Initialized Commentary storage under ${cfg.storageDir}`);
+  console.log(`Initialized Commentray storage under ${cfg.storageDir}`);
 }
 
 /**
- * Ensure `.commentary.toml` exists (or overwrite with `--force`).
+ * Ensure `.commentray.toml` exists (or overwrite with `--force`).
  * @returns exit code (0 or 1)
  */
 export async function runInitConfig(repoRoot: string, opts: { force: boolean }): Promise<number> {
-  const tomlPath = path.join(repoRoot, ".commentary.toml");
+  const tomlPath = path.join(repoRoot, ".commentray.toml");
   const exists = await pathExists(tomlPath);
   if (exists && !opts.force) {
     console.log(
-      ".commentary.toml already exists (use `commentary init config --force` to replace).",
+      ".commentray.toml already exists (use `commentray init config --force` to replace).",
     );
     return 0;
   }
   if (exists && opts.force) {
-    console.warn("Overwriting .commentary.toml (--force).");
+    console.warn("Overwriting .commentray.toml (--force).");
   }
-  await fs.writeFile(tomlPath, DEFAULT_COMMENTARY_TOML, "utf8");
+  await fs.writeFile(tomlPath, DEFAULT_COMMENTRAY_TOML, "utf8");
   console.log(`Wrote ${tomlPath}`);
   return 0;
 }
 
 /**
- * Install or refresh the Commentary-managed `pre-commit` hook block.
+ * Install or refresh the Commentray-managed `pre-commit` hook block.
  * @returns exit code (0 or 1)
  */
 export async function runInitScm(repoRoot: string): Promise<number> {
@@ -100,12 +100,12 @@ export async function runInitScm(repoRoot: string): Promise<number> {
   } catch {
     prior = "";
   }
-  const next = mergeCommentaryPreCommitHook(prior);
+  const next = mergeCommentrayPreCommitHook(prior);
   await fs.mkdir(path.dirname(hookPath), { recursive: true });
   await fs.writeFile(hookPath, next, "utf8");
   if (process.platform !== "win32") {
     await fs.chmod(hookPath, 0o755);
   }
-  console.log(`Updated ${path.relative(repoRoot, hookPath)} (Commentary validate block).`);
+  console.log(`Updated ${path.relative(repoRoot, hookPath)} (Commentray validate block).`);
   return 0;
 }

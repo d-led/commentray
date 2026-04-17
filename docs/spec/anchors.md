@@ -1,6 +1,6 @@
 # Anchor grammar (v0)
 
-Anchors connect commentary **blocks** to spans inside a primary file. The grammar is intentionally small and versioned; language-specific plugins may interpret additional opaque anchors later.
+Anchors connect commentray **blocks** to spans inside a primary file. The grammar is intentionally small and versioned; language-specific plugins may interpret additional opaque anchors later.
 
 ## Supported forms
 

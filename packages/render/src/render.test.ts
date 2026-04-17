@@ -16,7 +16,7 @@ describe("renderSideBySideHtml", () => {
       title: "Demo",
       code: "const x = 1;",
       language: "ts",
-      commentaryMarkdown: "## Notes\n\nSee `x`.",
+      commentrayMarkdown: "## Notes\n\nSee `x`.",
       includeMermaidRuntime: false,
     });
     expect(html).toContain("grid-template-columns");

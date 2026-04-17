@@ -1,4 +1,4 @@
-# Build `_site/` with `code-commentary-static` + `.commentary.toml` [static_site], deploy to GitHub Pages.
+# Build `_site/` with `code-commentray-static` + `.commentray.toml` [static_site], deploy to GitHub Pages.
 # Repository Settings → Pages → Source: GitHub Actions.
 
 name: pages

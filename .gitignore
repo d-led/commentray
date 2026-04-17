@@ -248,8 +248,8 @@ fabric.properties
 !.idea/codeStyles
 !.idea/runConfigurations
 
-# Commentary generated static site (code-commentary-static)
-packages/code-commentary-static/site/
+# Commentray generated static site (code-commentray-static)
+packages/code-commentray-static/site/
 
 # GitHub Pages output (`npm run pages:build`)
 _site/

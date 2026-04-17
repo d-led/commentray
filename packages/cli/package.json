@@ -1,14 +1,14 @@
 {
-  "name": "@commentary/cli",
+  "name": "@commentray/cli",
   "version": "0.0.1",
   "publishConfig": {
     "access": "public"
   },
-  "description": "Commentary command-line interface",
+  "description": "Commentray command-line interface",
   "license": "MPL-2.0",
   "type": "module",
   "bin": {
-    "commentary": "./dist/cli.js"
+    "commentray": "./dist/cli.js"
   },
   "files": [
     "dist",
@@ -18,11 +18,11 @@
     "build": "tsc -p tsconfig.build.json",
     "build:bundle": "npm run build && node ./esbuild.cli.mjs",
     "clean": "rm -rf dist",
-    "commentary": "node ./dist/cli.js"
+    "commentray": "node ./dist/cli.js"
   },
   "dependencies": {
-    "@commentary/core": "0.0.1",
-    "@commentary/render": "0.0.1",
+    "@commentray/core": "0.0.1",
+    "@commentray/render": "0.0.1",
     "commander": "^13.1.0"
   },
   "devDependencies": {

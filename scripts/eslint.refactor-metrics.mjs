@@ -48,7 +48,7 @@ export default tseslint.config(
       "**/node_modules/**",
       "**/coverage/**",
       "**/cypress/**",
-      "packages/code-commentary-static/site/**",
+      "packages/code-commentray-static/site/**",
     ],
   },
   {

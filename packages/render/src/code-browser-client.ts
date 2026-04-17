@@ -151,7 +151,7 @@ function wireSearchUi(ctx: SearchUiContext): void {
       `<div class="hint">Whole source: whitespace tokens in order (may span lines). Per-line fuzzy ranking for typos. ${combined.length} hit(s).</div>`,
     );
     for (const h of combined) {
-      const label = h.kind === "code" ? `Code L${h.line + 1}` : `Commentary L${h.line + 1}`;
+      const label = h.kind === "code" ? `Code L${h.line + 1}` : `Commentray L${h.line + 1}`;
       const tag = h.source === "ordered" ? "ordered" : "fuzzy";
       buf.push(
         `<button type="button" class="hit" data-kind="${h.kind}" data-line="${String(h.line)}">` +
@@ -251,8 +251,8 @@ function wireSplitter(
 }
 
 function main(): void {
-  const storageSplit = "commentary.codeCommentaryStatic.splitPct";
-  const storageWrap = "commentary.codeCommentaryStatic.wrap";
+  const storageSplit = "commentray.codeCommentrayStatic.splitPct";
+  const storageWrap = "commentray.codeCommentrayStatic.wrap";
   const shell = document.getElementById("shell");
   const codePane = document.getElementById("code-pane");
   const docPane = document.getElementById("doc-pane");

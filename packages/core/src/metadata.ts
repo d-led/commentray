@@ -1,10 +1,10 @@
-import { type CommentaryIndex, CURRENT_SCHEMA_VERSION } from "./model.js";
+import { type CommentrayIndex, CURRENT_SCHEMA_VERSION } from "./model.js";
 
-export function emptyIndex(): CommentaryIndex {
+export function emptyIndex(): CommentrayIndex {
   return { schemaVersion: CURRENT_SCHEMA_VERSION, bySourceFile: {} };
 }
 
-export function assertValidIndex(value: unknown): CommentaryIndex {
+export function assertValidIndex(value: unknown): CommentrayIndex {
   if (typeof value !== "object" || value === null) {
     throw new Error("index.json must be a JSON object");
   }
@@ -20,7 +20,7 @@ export function assertValidIndex(value: unknown): CommentaryIndex {
   for (const [key, entry] of Object.entries(bySourceFile)) {
     validateSourceEntry(key, entry);
   }
-  return obj as CommentaryIndex;
+  return obj as CommentrayIndex;
 }
 
 function validateSourceEntry(sourcePath: string, entry: unknown): void {
@@ -29,8 +29,8 @@ function validateSourceEntry(sourcePath: string, entry: unknown): void {
   }
   const e = entry as Record<string, unknown>;
   if (typeof e.sourcePath !== "string") throw new Error(`Missing sourcePath for ${sourcePath}`);
-  if (typeof e.commentaryPath !== "string") {
-    throw new Error(`Missing commentaryPath for ${sourcePath}`);
+  if (typeof e.commentrayPath !== "string") {
+    throw new Error(`Missing commentrayPath for ${sourcePath}`);
   }
   if (!Array.isArray(e.blocks)) throw new Error(`blocks must be an array for ${sourcePath}`);
   for (const block of e.blocks) validateBlock(sourcePath, block);

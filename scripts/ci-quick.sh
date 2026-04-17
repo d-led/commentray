@@ -6,4 +6,4 @@ npm run format:check
 npm run lint
 npm run dupes
 npm run typecheck
-COMMENTARY_TEST_MODE=unit npm run test
+COMMENTRAY_TEST_MODE=unit npm run test

@@ -8,7 +8,7 @@ export default tseslint.config(
     ignores: ["**/dist/**", "**/out/**", "coverage/**", "**/*.mjs", "eslint.config.mjs"],
   },
   {
-    files: ["packages/cli/src/**/*.ts", "packages/code-commentary-static/src/**/*.ts"],
+    files: ["packages/cli/src/**/*.ts", "packages/code-commentray-static/src/**/*.ts"],
     rules: {
       "no-console": "off",
     },

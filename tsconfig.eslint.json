@@ -9,8 +9,8 @@
     "sourceMap": false,
     "baseUrl": ".",
     "paths": {
-      "@commentary/core": ["packages/core/src/index.ts"],
-      "@commentary/render": ["packages/render/src/index.ts"]
+      "@commentray/core": ["packages/core/src/index.ts"],
+      "@commentray/render": ["packages/render/src/index.ts"]
     },
     "types": ["node", "vscode"],
     "lib": ["ES2022"]
@@ -23,8 +23,8 @@
     "packages/render/src/**/*.ts",
     "packages/cli/src/**/*.ts",
     "packages/vscode/src/**/*.ts",
-    "packages/code-commentary-static/src/**/*.ts",
-    "packages/code-commentary-static/fixtures/**/*.ts",
+    "packages/code-commentray-static/src/**/*.ts",
+    "packages/code-commentray-static/fixtures/**/*.ts",
     "scripts/**/*.mjs"
   ],
   "exclude": ["**/node_modules/**", "**/dist/**"]

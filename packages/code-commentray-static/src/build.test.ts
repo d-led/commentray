@@ -3,21 +3,21 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildCodeCommentaryStatic } from "./build.js";
+import { buildCommentrayStatic } from "./build.js";
 
 const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-describe("buildCodeCommentaryStatic", () => {
+describe("buildCommentrayStatic", () => {
   let outDir: string;
 
   afterEach(async () => {
     if (outDir) await rm(outDir, { recursive: true, force: true });
   });
 
-  it("writes HTML that includes code and commentary", async () => {
-    outDir = await mkdtemp(path.join(tmpdir(), "ccs-"));
+  it("writes HTML that includes code and commentray", async () => {
+    outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const outHtml = path.join(outDir, "index.html");
-    await buildCodeCommentaryStatic({
+    await buildCommentrayStatic({
       sourceFile: path.join(pkgRoot, "fixtures", "sample.ts"),
       markdownFile: path.join(pkgRoot, "fixtures", "sample.md"),
       outHtml,

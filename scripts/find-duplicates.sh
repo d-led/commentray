@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 # jscpd keeps one -i value: single comma-separated ignore list.
-JSCPD_IGNORE="**/node_modules/**,**/dist/**,**/coverage/**,**/.cache/**,**/.git/**,packages/code-commentary-static/site/**,*.vsix,.yarn/**"
+JSCPD_IGNORE="**/node_modules/**,**/dist/**,**/coverage/**,**/.cache/**,**/.git/**,packages/code-commentray-static/site/**,*.vsix,.yarn/**"
 
 # Bash 3.2 + set -u: empty "${array[@]}" is treated as unset; guard expansion.
 exec npx jscpd . \
