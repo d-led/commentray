@@ -22,12 +22,12 @@ The user-facing README should remain **terse and skimmable**, in the spirit of [
 - **Rendering**: `@commentray/render` provides Markdown → HTML with sanitization, highlighting, Mermaid containers, and HTML shells (simple side-by-side plus an interactive **static code browser** page).
 - **Static code browser sample**: the `code-commentray-static` package emits a self-contained HTML file: highlighted code, rendered Markdown commentray, a **draggable vertical splitter**, and a **line-wrap toggle** for the code pane (client-side persistence via `localStorage`).
 - **Manipulation library**: `@commentray/core` owns models, validation, migrations, and staleness helpers.
-- **CLI**: `@commentray/cli` provides `init` (full idempotent setup), `init config`, `init scm` (git hooks), `validate`, `doctor`, `migrate`, `render`, and `paths`; **standalone SEA binaries** for Linux (x64, arm64), macOS (x64, arm64), and Windows (x64) are built in [`.github/workflows/binaries.yml`](../../.github/workflows/binaries.yml) and attached to GitHub Releases on `v*` tags.
+- **CLI**: `@commentray/cli` provides `init` (full idempotent setup), `init config`, `init scm` (git hooks), `validate`, `doctor`, `migrate`, `render`, and `paths`; **standalone SEA binaries** for Linux (x64, arm64), macOS (x64, arm64), and Windows (x64) are built in [`.github/workflows/binaries.yml`](../../.github/workflows/binaries.yml). CI workflow **artifacts expire** (14-day retention); **`v*`** tags attach binaries to **GitHub Releases** as the long-lived distribution surface (GitHub’s release asset store).
 - **Monorepo**: TypeScript, semantic versioning, packages start at **0.0.1**, **MPL-2.0** per published package.
 - **Config**: `.commentray.toml` at repo root with sensible defaults.
 - **Tooling**: Prettier for TS/JS/JSON/Markdown; ESLint for TS; Vitest at multiple tiers.
 - **CI**: GitHub Actions runs quick checks broadly; expensive workflows are opt-in.
-- **npm publishing**: prefer **OIDC trusted publishing** + **npm provenance**; avoid long-lived tokens.
+- **npm publishing**: **manual** from maintainer machines with **2FA** (not from GitHub Actions for now); prefer **OIDC trusted publishing** + **npm provenance** if automation is added later; avoid long-lived tokens.
 
 ## Non-goals (initial iterations)
 

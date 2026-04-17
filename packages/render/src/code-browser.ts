@@ -263,11 +263,29 @@ const CODE_BROWSER_STYLES = `
         flex: 0 0 50%;
         min-width: 120px; overflow: auto; padding: 12px 16px;
         border-right: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
+        --code-line-font-size: 13px;
+        --code-line-height: 1.5;
       }
       .pane--code .code-line {
-        display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: start;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 12px;
+        align-items: baseline;
       }
-      .pane--code .code-line pre { margin: 0; min-width: 0; }
+      .pane--code .code-line pre {
+        margin: 0;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+      }
+      .pane--code .code-line pre code.hljs {
+        display: block;
+        margin: 0;
+        padding: 0;
+        font-size: var(--code-line-font-size);
+        line-height: var(--code-line-height);
+      }
       .pane--code .code-line .ln {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
         font-variant-numeric: tabular-nums;
@@ -276,6 +294,8 @@ const CODE_BROWSER_STYLES = `
         padding-right: 8px;
         border-right: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
         min-width: 3ch;
+        font-size: var(--code-line-font-size);
+        line-height: var(--code-line-height);
       }
       .pane--code .code-line:target .ln,
       .pane--code .code-line:hover .ln {

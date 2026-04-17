@@ -15,7 +15,7 @@ We like the lightweight spirit described in the Collective Code Construction Con
 - Before asking for review, follow the **Keeping quality high** section below.
 - For extension-specific debugging (Output channels, Extension Host logs, common "command not found" failures), see [`docs/development.md`](docs/development.md).
 - **CLI init:** `npm run commentray -- init` is idempotent (storage dirs, seed `index.json` and `.commentray.toml` if missing). Use `npm run commentray -- init config` to ensure TOML defaults, or `init config --force` to replace. `npm run commentray -- init scm` installs or refreshes a marked block in `.git/hooks/pre-commit` that runs `commentray validate` when `node_modules/.bin/commentray` exists at the repo root.
-- **Standalone CLI binaries:** `npm run binary:build` then `npm run binary:smoke` (see README **Standalone CLI binaries**). CI builds Linux x64/arm64, macOS x64/arm64, and Windows x64 via [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml); tags matching `v*` publish those files to the GitHub Release. On macOS with Homebrew Node, use `COMMENTRAY_SEA_NODE` pointing at an official `node` binary when building locally.
+- **Standalone CLI binaries:** `npm run binary:build` then `npm run binary:smoke` (see README **Standalone CLI binaries**). CI builds Linux x64/arm64, macOS x64/arm64, and Windows x64 via [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml). Workflow **artifacts expire** (14-day retention); **`v*`** tags attach the same files to a **[GitHub Release](https://github.com/d-led/commentray/releases)** as the durable download location (GitHub’s native release asset store—no separate artifact registry). On macOS with Homebrew Node, use `COMMENTRAY_SEA_NODE` pointing at an official `node` binary when building locally.
 - **GitHub Pages:** configure `[static_site]` in `.commentray.toml` (title, intro Markdown, `github_url`, `source_file`, optional `commentray_markdown`). Run `npm run pages:build` to emit `_site/index.html`. The `pages.yml` workflow deploys on `main` once **Settings → Pages → Build: GitHub Actions** is enabled.
 
 ## Keeping quality high
@@ -141,7 +141,9 @@ npm run publish:all             # publish to npm
 The `commentray-vscode` extension is private on npm and is released by
 packaging a `.vsix` (`npm run extension:package`) and uploading it.
 
-Prefer **OIDC trusted publishing** and **npm provenance** for `@commentray/*` packages:
+**npm publishing** is **manual** from a maintainer machine (`npm run publish:all`, with **2FA** / OTP as required by npm)—we do **not** publish from GitHub Actions today so no publish token lives in CI. That may change later (e.g. OIDC trusted publishing).
+
+When automating in the future, prefer **OIDC trusted publishing** and **npm provenance** for `@commentray/*` packages:
 
 - npm documentation: [Trusted publishing with OIDC](https://docs.npmjs.com/trusted-publishers)
 - GitHub documentation: [OIDC for publishing](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)

@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { ensureAnglesSentinelFile } from "./angles-toml.js";
 import { mergeCommentrayConfig } from "./config.js";
 import { resolveCommentrayMarkdownPath } from "./commentray-path-resolution.js";
 
@@ -44,6 +45,30 @@ describe("resolveCommentrayMarkdownPath", () => {
     const r = resolveCommentrayMarkdownPath(dir, "src/a.ts", cfg, "deep-dive");
     expect(r.angleId).toBe("deep-dive");
     expect(r.commentrayPath).toBe(".commentray/source/src/a.ts/deep-dive.md");
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("when Angles layout is turned on, tooling resolves per-angle paths but legacy flat files stay on disk", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "commentray-flat-to-ang-"));
+    const storage = ".commentray";
+    const flatMd = path.join(dir, storage, "source", "pkg", "mod.ts.md");
+    await fs.mkdir(path.dirname(flatMd), { recursive: true });
+    await fs.writeFile(flatMd, "legacy flat body\n", "utf8");
+
+    await ensureAnglesSentinelFile(dir, storage);
+    const cfg = mergeCommentrayConfig({
+      angles: { default_angle: "main", definitions: [{ id: "main", title: "Main" }] },
+    });
+    const r = resolveCommentrayMarkdownPath(dir, "pkg/mod.ts", cfg, null);
+
+    expect(r.anglesLayout).toBe(true);
+    expect(r.angleId).toBe("main");
+    expect(r.commentrayPath).toBe(".commentray/source/pkg/mod.ts/main.md");
+
+    expect(await fs.readFile(flatMd, "utf8")).toBe("legacy flat body\n");
+    const angleAbs = path.join(dir, ...r.commentrayPath.split("/"));
+    await expect(fs.access(angleAbs)).rejects.toMatchObject({ code: "ENOENT" });
+
     await fs.rm(dir, { recursive: true, force: true });
   });
 });

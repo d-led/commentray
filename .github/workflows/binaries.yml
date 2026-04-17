@@ -1,3 +1,12 @@
+# Standalone `commentray` CLI (Node SEA) per OS/arch.
+#
+# - **Workflow artifacts** (`actions/upload-artifact`): short-lived by design
+#   (`retention-days` below). Use them to debug a run or bridge jobs in this workflow only.
+# - **GitHub Releases** (job `release` on `v*` tags): the supported long-term “registry” for
+#   end-user downloads — assets live with the release until removed. Prefer Releases over
+#   re-downloading expired workflow artifacts.
+#
+# npm packages are **not** published from Actions (maintainers publish locally with 2FA); see README / CONTRIBUTING.
 name: binaries
 
 on:
@@ -58,6 +67,7 @@ jobs:
           name: commentray-${{ matrix.target }}
           path: packages/cli/dist/bin/commentray-*
           if-no-files-found: error
+          # Expire CI blobs automatically; tagged releases copy these into GitHub Release assets first.
           retention-days: 14
 
   release:

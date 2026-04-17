@@ -45,7 +45,7 @@ npm run test:coverage:all
 
 ## Standalone CLI binaries
 
-The workflow [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml) produces one self-contained binary per row (uploaded as workflow artifacts on every run; on `v*` tags they are also attached to the GitHub Release):
+The workflow [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml) produces one self-contained binary per row. Each run uploads **workflow artifacts** that **expire after 14 days** (by design—do not treat them as long-term storage). When you push a **`v*`** tag, the same workflow attaches those files to a **[GitHub Release](https://github.com/d-led/commentray/releases)**; **download binaries from the Release**, not from old workflow runs.
 
 | Runner                      | Artifact name (example)      |
 | --------------------------- | ---------------------------- |
@@ -78,7 +78,7 @@ rewrites every workspace `package.json` and keeps intra-monorepo
 `@commentray/*` deps aligned; it does **not** commit or tag. Tagging is a
 separate step (`npm run version:tag`) after you commit the bump.
 
-One-command release from a **clean** tree (bump files → commit → tag → push → publish):
+One-command release from a **clean** tree (bump files → commit → tag → push → **local** npm publish with your 2FA device):
 
 ```bash
 npm run release -- patch                # standard patch release
@@ -93,7 +93,7 @@ Lower-level flow (e.g. bump while you still have other local edits):
 npm run version:bump -- patch           # edit versions only; works on a dirty tree
 # … commit when ready …
 npm run version:tag                     # annotated v* tag at HEAD
-npm run publish:all                     # npm publish every public package
+npm run publish:all                     # npm publish every public package (manual; not run in GitHub Actions)
 npm run publish:all -- --otp=123456     # forward a 2FA one-time password
 ```
 

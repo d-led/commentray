@@ -59,7 +59,7 @@ export async function upsertAngleDefinitionInCommentrayToml(
     if (code !== "ENOENT") throw err;
   }
 
-  const parsed: CommentrayToml = raw.trim() ? (parseToml(raw) as CommentrayToml) : {};
+  const parsed: CommentrayToml = raw.trim() ? parseToml(raw) : {};
   const angles = parsed.angles ?? {};
   const definitions = [...(angles.definitions ?? [])];
   if (

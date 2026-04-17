@@ -31,7 +31,7 @@ You may be reading a **generated** page: `code-commentray-static` plus [`build-s
 - **Greenfield adopt** — `commentray init` is deliberately boring (idempotent, safe to re-run). The “aha” is that nothing in your primary tree _has_ to move.
 - **Hook paranoia** — `init scm` is for teams who want the index validated **before** misleading commentray can merge; it is opt-in because hooks are a social contract, not a library concern.
 - **“Why is my tree red?”** — `doctor` layers environment noise on top of `validate` so humans get a single front door.
-- **Binaries** — Releases and [`binaries.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml) are the distribution story; the README tables stay canonical for artifact names.
+- **Binaries** — Use **GitHub Releases** for downloads; CI workflow artifacts from [`binaries.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml) expire after 14 days by design.
 - **Your own Pages** — Copy [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml), adjust `[static_site]`, run `npm run pages:build`. The dogfood site is proof the pipeline is boring enough to reuse.
 
 ## Architecture (who talks to whom)
