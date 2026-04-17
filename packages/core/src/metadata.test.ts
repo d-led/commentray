@@ -43,39 +43,28 @@ describe("assertValidIndex", () => {
     ).toThrow(/index key must equal entry\.commentrayPath/);
   });
 
-  it("accepts an optional fingerprint and markerId on a block", () => {
+  it("accepts an optional snippet string and markerId on a block", () => {
     expect(() =>
       assertValidIndex(
         indexWithBlock({
           id: "b1",
-          anchor: "lines:1-3",
-          markerId: "marker-42",
-          fingerprint: { startLine: "function foo() {", endLine: "}", lineCount: 3 },
+          anchor: "marker:b1",
+          markerId: "b1",
+          snippet: "commentray-snippet/v1\n x",
         }),
       ),
     ).not.toThrow();
   });
 
-  it("rejects a fingerprint whose lineCount is zero or negative", () => {
-    const makeIndex = (lineCount: number) =>
-      indexWithBlock({
-        id: "b1",
-        anchor: "lines:1-1",
-        fingerprint: { startLine: "x", endLine: "x", lineCount },
-      });
-    expect(() => assertValidIndex(makeIndex(0))).toThrow(/positive integer/);
-    expect(() => assertValidIndex(makeIndex(-2))).toThrow(/positive integer/);
-  });
-
-  it("rejects a fingerprint whose start or end line is not a string", () => {
+  it("rejects legacy fingerprint objects", () => {
     expect(() =>
       assertValidIndex(
         indexWithBlock({
           id: "b1",
           anchor: "lines:1-1",
-          fingerprint: { startLine: 42, endLine: "x", lineCount: 1 },
+          fingerprint: { startLine: "x", endLine: "x", lineCount: 1 },
         }),
       ),
-    ).toThrow(/fingerprint\.startLine/);
+    ).toThrow(/fingerprint is no longer supported/);
   });
 });

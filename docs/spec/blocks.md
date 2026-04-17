@@ -41,6 +41,12 @@ _(write commentary here)_
 - The heading is human-readable shorthand; the authoritative anchor lives in the metadata index keyed by the same `id`.
 - Tools locate a block's position in the commentray file by scanning for `<!-- commentray:block id=… -->`; authors should not edit the marker line.
 
+## Source markers (language-dependent)
+
+When the index uses a **`marker:<id>`** anchor, the primary file carries paired delimiters in real comments. Where a **`#region` / `//#region`** style is a widespread editor convention (JavaScript/TypeScript, SCSS, C#, Ruby, C/C++ `#pragma`, Python `# region`, HTML, Lua, VB, …), Commentray follows the same shapes as [Region Marker](https://marketplace.visualstudio.com/items?itemName=txava.region-marker), naming the region **`commentray:<id>`**. For languages **without** that shared idiom (Rust, Java, Kotlin, plain **CSS**, Docker/YAML/Make, …), tools fall back to ordinary **`//` / `#` / `/* … */`** comments and our explicit tokens **`commentray:start id=<id>`** / **`commentray:end id=<id>`**. Both families are understood by `@commentray/core` (`commentrayRegionInsertions`, `parseCommentrayRegionBoundary`).
+
+To **rewrite** existing markers after you change language or convention, use **`convertCommentraySourceMarkersToLanguage`** (pairs are discovered with `findCommentrayMarkerPairs`, then each span is rebuilt for the target language id). The CLI exposes the same behaviour as **`commentray convert-source-markers --file <repo-relative> --language <vscode-language-id>`** (optional `--dry-run`).
+
 ## Metadata index (`index.json`, schema v3)
 
 The workspace index groups blocks by **repo-relative commentray path** (`byCommentrayPath`), not by source path alone. That way each **Angle** file (see `storage.md`) keeps its own `blocks[]` without collisions when several commentrays exist for the same primary file.

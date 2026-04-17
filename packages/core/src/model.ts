@@ -11,8 +11,10 @@ export type CommentrayBlock = {
    */
   snippet?: string;
   /**
-   * When the anchor is `marker:<id>`, the same id appears in source line
-   * comments (`commentray:start id=…` / `commentray:end id=…`).
+   * When the anchor is `marker:<id>`, the same id appears in source as the
+   * region name `commentray:<id>` (e.g. `//#region` / `//#endregion` in
+   * TypeScript, aligned with the Region Marker extension), or in legacy
+   * `commentray:start id=…` / `commentray:end id=…` line comments.
    */
   markerId?: string;
   /** Last human-verified commit (full SHA) when this block was considered accurate. */

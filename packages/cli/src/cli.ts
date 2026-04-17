@@ -6,6 +6,7 @@ import process from "node:process";
 import cliPackage from "../package.json" with { type: "json" };
 import {
   commentrayMarkdownPath,
+  convertCommentraySourceMarkersToLanguage,
   defaultMetadataIndexPath,
   loadCommentrayConfig,
   migrateIndex,
@@ -44,6 +45,42 @@ async function cmdDoctor(): Promise<number> {
     console.warn("[warn] No .git directory detected in cwd; SCM features require a Git checkout.");
   }
   return code;
+}
+
+async function cmdConvertSourceMarkers(opts: {
+  file: string;
+  language: string;
+  dryRun: boolean;
+}): Promise<number> {
+  const repoRoot = await repoRootFromCwd();
+  const rel = normalizeRepoRelativePath(opts.file);
+  const abs = path.join(repoRoot, ...rel.split("/"));
+  let raw: string;
+  try {
+    raw = await fs.readFile(abs, "utf8");
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      console.error(`File not found: ${rel}`);
+      return 1;
+    }
+    throw err;
+  }
+  const { sourceText, changed, convertedPairs } = convertCommentraySourceMarkersToLanguage(
+    raw,
+    opts.language,
+  );
+  if (!changed) {
+    console.log("No changes (no marker pairs, already target style, or only line-ending normalisation).");
+    return 0;
+  }
+  if (opts.dryRun) {
+    console.log(`Would rewrite ${convertedPairs} marker pair(s) in ${rel}.`);
+    return 0;
+  }
+  await fs.writeFile(abs, sourceText, "utf8");
+  console.log(`Rewrote ${convertedPairs} marker pair(s) in ${rel}.`);
+  return 0;
 }
 
 async function cmdMigrate(): Promise<number> {
@@ -156,6 +193,22 @@ program
   .description("Migrate metadata JSON to the current schema")
   .action(async () => {
     process.exitCode = await cmdMigrate();
+  });
+
+program
+  .command("convert-source-markers")
+  .description(
+    "Rewrite Commentray marker pairs in a source file to the delimiter style for a VS Code language id",
+  )
+  .requiredOption("--file <path>", "Repo-relative path to the source file")
+  .requiredOption("--language <id>", "VS Code language id (e.g. typescript, rust, yaml, css)")
+  .option("--dry-run", "Report how many pairs would change without writing the file", false)
+  .action(async (opts: { file?: string; language?: string; dryRun?: boolean }) => {
+    process.exitCode = await cmdConvertSourceMarkers({
+      file: opts.file as string,
+      language: opts.language as string,
+      dryRun: Boolean(opts.dryRun),
+    });
   });
 
 program

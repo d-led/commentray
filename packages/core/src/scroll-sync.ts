@@ -1,35 +1,8 @@
 import { parseAnchor } from "./anchors.js";
 import type { CommentrayIndex } from "./model.js";
+import { sourceLineRangeForMarkerId } from "./source-markers.js";
 
-const START_RE = /commentray:start\s+id=([a-z0-9]+)\b/i;
-const END_RE = /commentray:end\s+id=([a-z0-9]+)\b/i;
-
-/**
- * 1-based inclusive source lines **between** paired marker comments (markers
- * on their own lines). Returns null when markers are missing or mis-ordered.
- */
-export function sourceLineRangeForMarkerId(sourceText: string, markerId: string): {
-  start: number;
-  end: number;
-} | null {
-  const id = markerId.trim().toLowerCase();
-  const lines = sourceText.split("\n");
-  let startMarkerIdx = -1;
-  let endMarkerIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const sm = START_RE.exec(lines[i]);
-    if (sm && sm[1].toLowerCase() === id) startMarkerIdx = i;
-    const em = END_RE.exec(lines[i]);
-    if (em && em[1].toLowerCase() === id) endMarkerIdx = i;
-  }
-  if (startMarkerIdx < 0 || endMarkerIdx < 0 || endMarkerIdx < startMarkerIdx + 2) {
-    return null;
-  }
-  const start = startMarkerIdx + 2;
-  const end = endMarkerIdx;
-  if (end < start) return null;
-  return { start, end };
-}
+export { sourceLineRangeForMarkerId };
 
 /** One block as needed for scroll correlation (0-based commentray line, 1-based source range). */
 export type BlockScrollLink = {

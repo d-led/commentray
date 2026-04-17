@@ -1,9 +1,4 @@
-export type {
-  CommentrayBlock,
-  CommentrayBlockFingerprint,
-  CommentrayIndex,
-  SourceFileIndexEntry,
-} from "./model.js";
+export type { CommentrayBlock, CommentrayIndex, SourceFileIndexEntry } from "./model.js";
 export { CURRENT_SCHEMA_VERSION } from "./model.js";
 export type {
   AddBlockToIndexInput,
@@ -60,4 +55,16 @@ export {
   buildBlockScrollLinks,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
+  sourceLineRangeForMarkerId,
 } from "./scroll-sync.js";
+export {
+  commentrayRegionInsertions,
+  lineCommentLeaderForLanguage,
+  parseCommentrayRegionBoundary,
+} from "./source-markers.js";
+export type { CommentrayMarkerPair } from "./region-marker-convert.js";
+export {
+  convertCommentraySourceMarkersToLanguage,
+  findCommentrayMarkerPairs,
+  leadingIndentOfLine,
+} from "./region-marker-convert.js";

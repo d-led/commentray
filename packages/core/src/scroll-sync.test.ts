@@ -39,6 +39,27 @@ describe("buildBlockScrollLinks", () => {
       { commentrayLine: 5, sourceStart: 20, sourceEnd: 25 },
     ]);
   });
+
+  it("resolves marker: anchors using Region Marker-style #region delimiters in source", () => {
+    const idx = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [crPath]: {
+          sourcePath: "src/a.ts",
+          commentrayPath: crPath,
+          blocks: [{ id: "b1", anchor: "marker:b1", markerId: "b1" }],
+        },
+      },
+    };
+    const source = [
+      "//#region commentray:b1",
+      "const x = 1;",
+      "//#endregion commentray:b1",
+    ].join("\n");
+    expect(buildBlockScrollLinks(idx, "src/a.ts", crPath, md, source)).toEqual([
+      { commentrayLine: 0, sourceStart: 2, sourceEnd: 2 },
+    ]);
+  });
 });
 
 describe("pickCommentrayLineForSourceScroll", () => {

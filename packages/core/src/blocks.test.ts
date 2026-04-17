@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildCommentraySnippetV1 } from "./block-snippet.js";
 import {
   addBlockToIndex,
   appendBlockToCommentray,
@@ -16,28 +17,31 @@ function seeded(values: number[]): () => number {
 }
 
 describe("createBlockForRange", () => {
-  it("anchors the block to the selected 1-based range", () => {
+  it("anchors the block with a marker id tied to the block id (source regions use the same id)", () => {
     const { block } = createBlockForRange({
       sourcePath: "src/greet.ts",
       sourceText: SOURCE,
       range: { startLine: 1, endLine: 3 },
       id: "fixed1",
     });
-    expect(block.anchor).toBe("lines:1-3");
+    expect(block.anchor).toBe("marker:fixed1");
+    expect(block.markerId).toBe("fixed1");
   });
 
-  it("captures the first and last line content as a drift-resolution fingerprint", () => {
+  it("stores a unified-diff-style snippet of trimmed source lines (not a JSON object)", () => {
     const { block } = createBlockForRange({
       sourcePath: "src/greet.ts",
       sourceText: SOURCE,
       range: { startLine: 1, endLine: 3 },
       id: "fixed1",
     });
-    expect(block.fingerprint).toEqual({
-      startLine: "export function greet(name) {",
-      endLine: "}",
-      lineCount: 3,
-    });
+    expect(block.snippet).toBe(
+      buildCommentraySnippetV1([
+        "export function greet(name) {",
+        "return `Hello, ${name}!`;",
+        "}",
+      ]),
+    );
   });
 
   it("recognises a single-line range and labels it as such in the heading", () => {
@@ -68,8 +72,10 @@ describe("createBlockForRange", () => {
       range: { startLine: 2, endLine: 999 },
       id: "fixed1",
     });
-    expect(block.anchor).toBe("lines:2-3");
-    expect(block.fingerprint?.lineCount).toBe(2);
+    expect(block.anchor).toBe("marker:fixed1");
+    expect(block.snippet).toBe(
+      buildCommentraySnippetV1(["return `Hello, ${name}!`;", "}"]),
+    );
   });
 
   it("emits an invisible id marker that renders to nothing in HTML", () => {
