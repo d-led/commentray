@@ -1,0 +1,53 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+
+/**
+ * How a project root was located. `config` means a `.commentray.toml` was
+ * found; `git` means a `.git` directory; `cwd` means no marker was found
+ * and the starting directory itself is used (useful for first-time `init`).
+ */
+export type ProjectRootSource = "config" | "git" | "cwd";
+
+export type ProjectRoot = {
+  dir: string;
+  source: ProjectRootSource;
+};
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function walkUpFor(startDir: string, marker: string): Promise<string | null> {
+  let dir = path.resolve(startDir);
+  for (;;) {
+    if (await pathExists(path.join(dir, marker))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/**
+ * Locate a Commentray project root from `startDir`, in priority order:
+ *
+ *   1. Nearest ancestor containing `.commentray.toml` (the declarative marker).
+ *   2. Nearest ancestor containing a `.git` directory (natural project boundary).
+ *   3. `startDir` itself — so `commentray init` can bootstrap a fresh directory.
+ *
+ * Never throws: callers decide whether the resolved source is acceptable for
+ * their command (e.g. `init scm` insists on a git checkout).
+ */
+export async function findProjectRoot(startDir: string): Promise<ProjectRoot> {
+  const configRoot = await walkUpFor(startDir, ".commentray.toml");
+  if (configRoot) return { dir: configRoot, source: "config" };
+
+  const gitRoot = await walkUpFor(startDir, ".git");
+  if (gitRoot) return { dir: gitRoot, source: "git" };
+
+  return { dir: path.resolve(startDir), source: "cwd" };
+}

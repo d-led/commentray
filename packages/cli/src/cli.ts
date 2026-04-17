@@ -15,42 +15,11 @@ import { renderSideBySideHtml } from "@commentray/render";
 import { Command } from "commander";
 
 import { runInitConfig, runInitFull, runInitScm } from "./init.js";
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function commentrayRepoRootFrom(startDir: string): Promise<string> {
-  let dir = startDir;
-  for (;;) {
-    const pkgPath = path.join(dir, "package.json");
-    if (await pathExists(pkgPath)) {
-      try {
-        const pkg = JSON.parse(await fs.readFile(pkgPath, "utf8")) as { name?: string };
-        if (pkg.name === "commentray") return dir;
-      } catch {
-        // ignore invalid package.json
-      }
-    }
-    if (await pathExists(path.join(dir, ".commentray.toml"))) return dir;
-
-    const parent = path.dirname(dir);
-    if (parent === dir) {
-      throw new Error(
-        'Unable to locate Commentray repository root (expected a root package.json named "commentray" or a .commentray.toml file).',
-      );
-    }
-    dir = parent;
-  }
-}
+import { findProjectRoot } from "./project-root.js";
 
 async function repoRootFromCwd(): Promise<string> {
-  return commentrayRepoRootFrom(process.cwd());
+  const root = await findProjectRoot(process.cwd());
+  return root.dir;
 }
 
 async function cmdValidate(): Promise<number> {
