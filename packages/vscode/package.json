@@ -16,7 +16,7 @@
     "url": "https://github.com/d-led/commentray/issues"
   },
   "engines": {
-    "vscode": "^1.96.0"
+    "vscode": "^1.116.0"
   },
   "categories": [
     "Other"
@@ -98,8 +98,8 @@
     "@commentray/core": "0.0.3"
   },
   "devDependencies": {
-    "@types/node": "^22.14.1",
-    "@types/vscode": "^1.96.0",
-    "esbuild": "^0.25.12"
+    "@types/node": "^25.6.0",
+    "@types/vscode": "^1.116.0",
+    "esbuild": "^0.28.0"
   }
 }
