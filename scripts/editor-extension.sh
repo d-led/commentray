@@ -43,8 +43,28 @@ cmd_dogfood() {
   if [[ "$#" -eq 0 ]]; then
     set -- "$REPO_ROOT"
   fi
-  echo "Launching ${editor_cli} with --extension-development-path=$REPO_ROOT/packages/vscode" >&2
-  exec "$editor_cli" --extension-development-path="$REPO_ROOT/packages/vscode" "$@"
+
+  # Isolate the Extension Development Host with its own user-data and
+  # extensions directories. Without this, Cursor/VS Code enforces "one
+  # window per folder per profile": opening this repo in the dev host
+  # steals focus back to the main window that already has it open.
+  # A dedicated data dir makes the dev host a separate instance for
+  # window-tracking purposes, so the same folder can be open in both.
+  local dev_home="$REPO_ROOT/.commentray-dev"
+  local dev_data="$dev_home/editor-data"
+  local dev_exts="$dev_home/editor-extensions"
+  mkdir -p "$dev_data" "$dev_exts"
+
+  # VS Code / Cursor expect the camelCase form `--extensionDevelopmentPath`.
+  # The kebab-case variant is parsed by Electron/Chromium, not VS Code's
+  # extension host, and the dev window never opens.
+  echo "Launching ${editor_cli} (isolated profile at ${dev_home})" >&2
+  exec "$editor_cli" \
+    --new-window \
+    --user-data-dir="$dev_data" \
+    --extensions-dir="$dev_exts" \
+    --extensionDevelopmentPath="$REPO_ROOT/packages/vscode" \
+    "$@"
 }
 
 case "${1:-}" in
