@@ -2,8 +2,6 @@
 
 Have you ever wished a “commentary track” for code the way DVD extras let filmmakers talk over a film **without** changing the picture? When looking at code, that might answer the whys, reveal the intent **besides** the code itself.
 
-**Repository:** [github.com/d-led/commentray](https://github.com/d-led/commentray). The name **Commentray** avoids collision with the unrelated VSX id [`jaredhughes.commentary`](https://marketplace.cursorapi.com/items/?itemName=jaredhughes.commentary) on Open VSX.
-
 ## Why
 
 Inline comments are not always possible (generated files, tight formats, policy). Commentray keeps the primary artifact clean while storing rationale, warnings, and diagrams in companion Markdown under `.commentray/`.
@@ -92,6 +90,10 @@ COMMENTRAY_EDITOR=code npm run extension:dogfood
 ```
 
 Packaging a self-contained `.vsix` from this monorepo needs a small bundling step (so `@commentray/core` ships inside the extension). Until that exists, **dogfood mode is the supported workflow**.
+
+## On the Name
+
+**Repository:** [github.com/d-led/commentray](https://github.com/d-led/commentray). The name **Commentray** avoids collision with the unrelated VSX id [`jaredhughes.commentary`](https://marketplace.cursorapi.com/items/?itemName=jaredhughes.commentary) on Open VSX.
 
 ## Contributing
 
