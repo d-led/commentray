@@ -13,11 +13,7 @@ npm install @commentray/core
 ## Use
 
 ```ts
-import {
-  commentrayMarkdownPath,
-  loadCommentrayConfig,
-  validateProject,
-} from "@commentray/core";
+import { commentrayMarkdownPath, loadCommentrayConfig, validateProject } from "@commentray/core";
 
 const config = await loadCommentrayConfig(process.cwd());
 const report = await validateProject(process.cwd());
