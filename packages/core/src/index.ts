@@ -17,12 +17,22 @@ export {
   createBlockForRange,
   generateBlockId,
 } from "./blocks.js";
+export { assertValidAngleId } from "./angles.js";
 export {
+  commentrayAnglesLayoutEnabled,
+  commentrayAnglesSentinelPath,
   commentrayMarkdownPath,
+  commentrayMarkdownPathForAngle,
   defaultMetadataIndexPath,
   normalizeRepoRelativePath,
 } from "./paths.js";
-export type { CommentrayToml, ResolvedCommentrayConfig, ResolvedStaticSite } from "./config.js";
+export type {
+  CommentrayToml,
+  ResolvedAngleDefinition,
+  ResolvedAngles,
+  ResolvedCommentrayConfig,
+  ResolvedStaticSite,
+} from "./config.js";
 export { loadCommentrayConfig, mergeCommentrayConfig } from "./config.js";
 export { parseGithubRepoWebUrl } from "./github-url.js";
 export { assertValidIndex, emptyIndex } from "./metadata.js";

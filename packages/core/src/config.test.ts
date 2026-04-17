@@ -10,6 +10,8 @@ describe("mergeCommentrayConfig", () => {
     expect(cfg.scmProvider).toBe("git");
     expect(cfg.render.mermaid).toBe(true);
     expect(cfg.render.relativeGithubBlobLinks).toBe(false);
+    expect(cfg.angles.defaultAngleId).toBeNull();
+    expect(cfg.angles.definitions).toEqual([]);
   });
 
   it("merges render.relative_github_blob_links from TOML", () => {
@@ -114,6 +116,61 @@ commentray_markdown = """
 
     it("accepts the default .commentray dir", () => {
       expect(() => mergeCommentrayConfig({ storage: { dir: ".commentray" } })).not.toThrow();
+    });
+  });
+
+  describe("angles", () => {
+    it("merges definitions and default_angle", () => {
+      const cfg = mergeCommentrayConfig({
+        angles: {
+          default_angle: "architecture",
+          definitions: [
+            { id: "introduction", title: "Introduction" },
+            { id: "architecture", title: "Architecture" },
+          ],
+        },
+      });
+      expect(cfg.angles.defaultAngleId).toBe("architecture");
+      expect(cfg.angles.definitions).toEqual([
+        { id: "introduction", title: "Introduction" },
+        { id: "architecture", title: "Architecture" },
+      ]);
+    });
+
+    it("uses the id as title when title is omitted", () => {
+      const cfg = mergeCommentrayConfig({
+        angles: {
+          definitions: [{ id: "main" }],
+        },
+      });
+      expect(cfg.angles.definitions).toEqual([{ id: "main", title: "main" }]);
+    });
+
+    it("rejects duplicate definition ids", () => {
+      expect(() =>
+        mergeCommentrayConfig({
+          angles: { definitions: [{ id: "x" }, { id: "x" }] },
+        }),
+      ).toThrow(/Duplicate angles\.definitions id: x/);
+    });
+
+    it("rejects default_angle that is not listed when definitions is non-empty", () => {
+      expect(() =>
+        mergeCommentrayConfig({
+          angles: {
+            default_angle: "missing",
+            definitions: [{ id: "a" }],
+          },
+        }),
+      ).toThrow(/angles\.default_angle "missing" must match one of angles\.definitions/);
+    });
+
+    it("allows default_angle without definitions (disk-only angles)", () => {
+      const cfg = mergeCommentrayConfig({
+        angles: { default_angle: "main" },
+      });
+      expect(cfg.angles.defaultAngleId).toBe("main");
+      expect(cfg.angles.definitions).toEqual([]);
     });
   });
 });

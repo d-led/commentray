@@ -18,6 +18,17 @@ defaultStrategy = [
   "lines",
 ]
 
+# Optional: named Angles (multiple commentrays per source). Uncomment when you add
+# `{storage.dir}/source/.default` and per-source folders — see docs/spec/storage.md.
+# [angles]
+# default_angle = "introduction"
+# [[angles.definitions]]
+# id = "introduction"
+# title = "Introduction"
+# [[angles.definitions]]
+# id = "architecture"
+# title = "Architecture"
+
 # GitHub Pages: `npm run pages:build` → `_site/index.html` (see `.github/workflows/pages.yml`).
 # The commentary on the right comes from `commentray_markdown` (repo-relative).
 # Per Commentray’s convention, source path `<p>` pairs with `.commentray/source/<p>.md`.

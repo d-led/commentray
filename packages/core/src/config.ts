@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { parse as parseToml } from "@iarna/toml";
 
+import { assertValidAngleId } from "./angles.js";
 import { normalizeRepoRelativePath } from "./paths.js";
 
 export type CommentrayToml = {
@@ -18,6 +19,16 @@ export type CommentrayToml = {
     relative_github_blob_links?: boolean;
   };
   anchors?: { defaultStrategy?: string[] };
+  /**
+   * Named **Angles** — multiple commentrays per source file (see `docs/spec/storage.md`).
+   * Keys use snake_case in TOML (`[angles]`).
+   */
+  angles?: {
+    /** Which Angle is selected by default in tooling and the static viewer (must match a `definitions` id when that list is non-empty). */
+    default_angle?: string;
+    /** Optional list of known Angles with display titles for UI (static browser, editor). */
+    definitions?: { id: string; title?: string }[];
+  };
   /**
    * Optional settings for publishing a single-file static “code browser” (GitHub Pages, etc.).
    * Keys use snake_case in TOML (`[static_site]`).
@@ -44,11 +55,20 @@ export type ResolvedStaticSite = {
   commentrayMarkdownFile: string;
 };
 
+export type ResolvedAngleDefinition = { id: string; title: string };
+
+export type ResolvedAngles = {
+  /** When `definitions` is non-empty, this must match one of them (enforced at merge). */
+  defaultAngleId: string | null;
+  definitions: ResolvedAngleDefinition[];
+};
+
 export type ResolvedCommentrayConfig = {
   storageDir: string;
   scmProvider: "git";
   render: { mermaid: boolean; syntaxTheme: string; relativeGithubBlobLinks: boolean };
   anchors: { defaultStrategy: string[] };
+  angles: ResolvedAngles;
   staticSite: ResolvedStaticSite;
 };
 
@@ -60,11 +80,14 @@ const defaultStaticSite: ResolvedStaticSite = {
   commentrayMarkdownFile: "",
 };
 
+const defaultAngles: ResolvedAngles = { defaultAngleId: null, definitions: [] };
+
 const defaultConfig: ResolvedCommentrayConfig = {
   storageDir: ".commentray",
   scmProvider: "git",
   render: { mermaid: true, syntaxTheme: "github-dark", relativeGithubBlobLinks: false },
   anchors: { defaultStrategy: ["symbol", "lines"] },
+  angles: { ...defaultAngles },
   staticSite: { ...defaultStaticSite },
 };
 
@@ -106,6 +129,40 @@ function assertStorageDirNotInsideGit(value: string | undefined): void {
         `Git treats .git/ as opaque metadata and routine operations can wipe it.`,
     );
   }
+}
+
+function mergeAngleDefinitions(raw: { id: string; title?: string }[] | undefined): ResolvedAngleDefinition[] {
+  if (!raw?.length) return [];
+  const out: ResolvedAngleDefinition[] = [];
+  const seen = new Set<string>();
+  for (const row of raw) {
+    const id = assertValidAngleId(row.id);
+    if (seen.has(id)) {
+      throw new Error(`Duplicate angles.definitions id: ${id}`);
+    }
+    seen.add(id);
+    const title = row.title?.trim() || id;
+    out.push({ id, title });
+  }
+  return out;
+}
+
+function resolveAngles(parsed: CommentrayToml): ResolvedAngles {
+  const a = parsed.angles;
+  if (!a) {
+    return { ...defaultAngles };
+  }
+  const definitions = mergeAngleDefinitions(a.definitions);
+  const defaultRaw = a.default_angle?.trim();
+  const defaultAngleId = defaultRaw ? assertValidAngleId(defaultRaw) : null;
+
+  if (definitions.length > 0 && defaultAngleId && !definitions.some((d) => d.id === defaultAngleId)) {
+    throw new Error(
+      `angles.default_angle "${defaultAngleId}" must match one of angles.definitions (got: ${definitions.map((d) => d.id).join(", ")})`,
+    );
+  }
+
+  return { defaultAngleId, definitions };
 }
 
 function resolveStaticSite(parsed: CommentrayToml): ResolvedStaticSite {
@@ -151,6 +208,7 @@ export function mergeCommentrayConfig(parsed: CommentrayToml | null): ResolvedCo
     anchors: {
       defaultStrategy: parsed.anchors?.defaultStrategy ?? defaultConfig.anchors.defaultStrategy,
     },
+    angles: resolveAngles(parsed),
     staticSite: resolveStaticSite(parsed),
   };
 }

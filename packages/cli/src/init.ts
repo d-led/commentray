@@ -32,6 +32,18 @@ export const DEFAULT_COMMENTRAY_TOML = [
   '#   "lines",',
   "# ]",
   "",
+  "# Named **Angles** — multiple commentrays per source (Introduction, Architecture, …).",
+  "# Optional UI list + default selection. On disk, multi-angle layout is enabled only when",
+  "# `{storage.dir}/source/.default` exists (file or dir); see docs/spec/storage.md.",
+  "# [angles]",
+  '# default_angle = "introduction"',
+  "# [[angles.definitions]]",
+  '# id = "introduction"',
+  '# title = "Introduction"',
+  "# [[angles.definitions]]",
+  '# id = "architecture"',
+  '# title = "Architecture"',
+  "",
 ].join("\n");
 
 async function pathExists(p: string): Promise<boolean> {

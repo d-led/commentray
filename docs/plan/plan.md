@@ -13,6 +13,7 @@ The user-facing README should remain **terse and skimmable**, in the spirit of [
 ## Goals (v0)
 
 - **Out-of-file docs** under `.commentray/` with transparent paths: `.commentray/source/<repo-relative-path>.md` (append `.md` to the original path; normalize separators; reject `..`).
+- **Angles** (named perspectives): optional `[angles]` in `.commentray.toml` (`default_angle`, `[[angles.definitions]]`); on disk, multi-angle layout when `{storage}/source/.default` exists → per-source `source/{P}/{angleId}.md` (see `docs/spec/storage.md`). Static viewer and editor should expose an Angle switcher; core exposes path helpers and config merge validation today.
 - **Block model**: commentray segments align to code ranges; UI layout is **code left, commentray right** (GitHub blame–style columns) with **scroll sync** while editing and viewing.
 - **Anchoring & drift**: metadata records evidence (symbol names when available, line ranges, Git blob SHA, commits, timestamps). **Git is the default SCM** behind a pluggable `ScmProvider` interface (`git` CLI first).
 - **Staleness**: non-blocking diagnostics for humans and automation (including LLM agents).
@@ -113,6 +114,7 @@ Defaults (illustrative):
 - `render.mermaid = true`
 - `render.syntaxTheme = "github-dark"`
 - `anchors.defaultStrategy = ["symbol", "lines"]`
+- **`[angles]`** (optional): `default_angle`, `[[angles.definitions]]` with `id` / `title` for UI; ids validated; duplicate ids and default not in definitions are errors when definitions is non-empty.
 - **`[static_site]`** (optional): drives the GitHub Pages build (`npm run pages:build` → `_site/index.html`):
   - `title` — browser / toolbar title for the static code browser page
   - `intro` — Markdown prepended in the commentray pane (before the GitHub link and optional file body)
@@ -171,6 +173,7 @@ Root `LICENSE` is MPL-2.0 (Mozilla template). Each publishable package includes 
 
 1. **Language intelligence**: expand beyond minimal anchors using tree-sitter and/or LSP-backed resolvers.
 2. **VS Code**: evolve toward webview preview parity with `@commentray/render` output and richer block gutter UX.
+3. **Angles rollout**: static code browser (`build-static-pages.mjs`, client bundle) loads multiple Angle bodies and adds a switcher; VS Code opens/picks the correct `source/{P}/{angle}.md`; `index.json` / scroll-sync may key blocks by `(sourcePath, angleId)` in a forward-compatible migration.
 
 ## Documentation roadmap (pending)
 

@@ -34,6 +34,41 @@ Examples:
 
 The mapping is intentionally transparent: append `.md` to the original path under a stable prefix.
 
+This is the **single-angle (implicit default)** layout: one commentray Markdown file per primary file.
+
+## Angles (named perspectives on the same source)
+
+Sometimes one source file deserves **more than one** commentray: an **Introduction**, an **Architecture** walkthrough, a **Meeting notes** angle, and so on. Commentray calls these **Angles**.
+
+### Configuration (`.commentray.toml`)
+
+The `[angles]` table is optional:
+
+- **`default_angle`** — Angle id selected by default in tooling and the static viewer when several exist. When `[[angles.definitions]]` is non-empty, this id must match one of the listed definitions (validated at config merge).
+- **`[[angles.definitions]]`** — Optional list of `{ id, title? }` rows. Titles are for UI (switcher labels); if omitted, the id is shown.
+
+You can set `default_angle` alone to prefer a disk angle before the definitions table is filled in.
+
+### On-disk layout: sentinel `{storage}/source/.default`
+
+Angles use a **different directory shape** than the flat default. The switch is explicit and file-system driven:
+
+- **No** path `{storage}/source/.default` → only the **flat** layout above (`.commentray/source/{P}.md`).
+- **Any** file or directory at `{storage}/source/.default` → the repo opts into **per-source folders** under `source/`. For each repo-relative primary path `P` and Angle id `A` (see `@commentray/core` `assertValidAngleId`: `[a-zA-Z0-9_-]{1,64}`):
+
+```text
+{storage}/source/{P}/{A}.md
+```
+
+Examples (default `storage.dir = .commentray`):
+
+- `README.md` + angle `architecture` → `.commentray/source/README.md/architecture.md`
+- `src/app.ts` + angle `introduction` → `.commentray/source/src/app.ts/introduction.md`
+
+The sentinel `.default` does not by itself pick which Angle is “default” for a file; that remains **`angles.default_angle`** in TOML (and, when definitions are empty, convention in tooling may still treat a primary angle id as configured or as the only file present).
+
+**Migration:** existing flat files like `.commentray/source/README.md.md` do not automatically split into Angles; adopting Angles means creating the sentinel and moving or re-authoring content under `source/{P}/…`.
+
 ## Images and other local assets (static HTML)
 
 When commentray Markdown is rendered to static HTML (GitHub Pages, `commentray render`), `img[src]` and local `a[href]` are rewritten so links work from the output HTML file. Use normal Markdown URL rules with one extension for the **repository root**:

@@ -55,7 +55,11 @@ export type SourceFileIndexEntry = {
 /** Root metadata document stored as JSON under `.commentray/metadata/`. */
 export type CommentrayIndex = {
   schemaVersion: number;
-  bySourceFile: Record<string, SourceFileIndexEntry>;
+  /**
+   * Blocks grouped by repo-relative commentray Markdown path so multiple **Angles**
+   * for the same `sourcePath` each keep their own block lists (schema v3+).
+   */
+  byCommentrayPath: Record<string, SourceFileIndexEntry>;
 };
 
-export const CURRENT_SCHEMA_VERSION = 2 as const;
+export const CURRENT_SCHEMA_VERSION = 3 as const;
