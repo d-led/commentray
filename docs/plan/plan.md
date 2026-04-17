@@ -168,6 +168,28 @@ Root `LICENSE` is MPL-2.0 (Mozilla template). Each publishable package includes 
 1. **Language intelligence**: expand beyond minimal anchors using tree-sitter and/or LSP-backed resolvers.
 2. **VS Code**: evolve toward webview preview parity with `@commentray/render` output and richer block gutter UX.
 
+## Documentation roadmap (pending)
+
+The plan doc, the specs under `docs/spec/`, and README/CONTRIBUTING cover engineering. Two user-facing pieces are still missing and are tracked here:
+
+1. **User docs — terse but usable**: a `docs/user/` tree, each page short and runnable-command-first, in the spirit of the README.
+   - `docs/user/install.md` — install a release binary (macOS quarantine note), or `npm i -g @commentray/cli`, or build from source.
+   - `docs/user/quickstart.md` — `commentray init`, write first `.commentray/source/<file>.md`, run `commentray validate`, open pairing in the editor.
+   - `docs/user/cli.md` — condensed reference for `init`, `init config`, `init scm`, `validate`, `doctor`, `migrate`, `render`, `paths`; exit codes; env vars (`COMMENTRAY_EDITOR`, `COMMENTRAY_SEA_NODE`).
+   - `docs/user/config.md` — every `.commentray.toml` key with a one-line explanation and the default.
+   - `docs/user/troubleshooting.md` — common failure modes (missing `.git`, Homebrew Node + SEA, quarantine, stale metadata after rebase).
+   - README links into this tree; each page stays short enough to read in one screen.
+
+2. **Detection matrix doc**: `docs/user/detection.md` — what is caught **where**, and where the gaps are. Outline:
+   - **Pre-commit hook (`commentray init scm`)**: runs `commentray validate` against the working tree from the `pre-commit` stage; scope is whatever `validate` scans (full repo today, candidate for staged-files-only in a later pass); exits non-zero on schema errors and broken anchors so the commit is blocked; hook is a marked idempotent block, safe alongside other hooks.
+   - **CLI `commentray validate`** (no hook, no editor): schema validation of `.commentray/metadata/index.json`, anchor integrity (symbol present, line range still in file), and staleness evidence via the Git SCM adapter (blob SHA / last-known commit) for every recorded source file. Non-zero exit on errors; warnings do not fail. Run manually or in CI.
+   - **CLI `commentray doctor`**: `validate` plus environment checks (`.git` present in the working directory, Git CLI reachable, Node engine acceptable). Intended for pre-flight troubleshooting, not CI gating.
+   - **CLI `commentray migrate`**: offline schema migration of the metadata index (e.g. legacy `commentaryPath` → `commentrayPath`); runs without touching SCM.
+   - **Editor extension (`commentray-vscode`)**: paired-pane opening and workspace validation output channel today; richer live gutter diagnostics are on the roadmap. Catches what you see while editing; does **not** replace hooks or CI.
+   - **What is not yet detected (known gaps, linkable to issues when filed)**: cross-file refactors (symbol moved to another file without Git rename), deletions of commentary's source file without matching cleanup, staleness against a non-default branch, and large-scale content drift that needs content hashing beyond blob SHA. Mitigations: run `validate` in CI on PRs, require `run-expensive-ci` for fuzzed/large fixture suites, and plan follow-ups per gap.
+
+Both pieces are documentation-only and can land incrementally (install + quickstart first, then the detection matrix, then the rest).
+
 ## Implementation status (living)
 
 This repository contains an initial vertical slice: monorepo scaffolding, core library, renderer, static code browser sample (`code-commentray-static`), CLI, VS Code MVP, tiered Vitest configs, and baseline GitHub Actions.
