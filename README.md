@@ -17,10 +17,7 @@ Inline comments are not always possible (generated files, tight formats, policy)
 ## Quickstart
 
 ```bash
-npm install
-npm run build
-npm run commentray -- init
-npm run commentray -- doctor
+npm run setup       # install, build, init, doctor — idempotent
 ```
 
 To get a global `commentray` on your `PATH` (symlinked to the local workspace build — no reinstall needed after rebuilds):
@@ -80,20 +77,21 @@ Version all workspace packages in lockstep, then publish. The bump script
 rewrites every workspace `package.json`, keeps intra-monorepo
 `@commentray/*` deps aligned, commits, and tags.
 
-```bash
-npm run version:bump -- patch          # 0.1.2 -> 0.1.3
-npm run version:bump -- minor          # 0.1.2 -> 0.2.0
-npm run version:bump -- major          # 0.1.2 -> 1.0.0
-npm run version:bump -- rc             # -> x.y.z-rc.N
-npm run version:bump -- release        # drop -rc suffix
-npm run version:bump -- set 1.2.3      # explicit
-npm run version:bump -- patch --dry-run
+One-command release (bump → push → publish):
 
-git push && git push --tags            # triggers binary build workflow
-npm run publish:all                    # npm publish every public package
-npm run publish:all -- --dry-run       # rehearsal
-npm run publish:all -- --otp=123456    # 2FA
-npm run publish:all -- --tag=next      # publish RC under a dist-tag
+```bash
+npm run release -- patch                # standard patch release
+npm run release -- minor --dry-run      # rehearse everything
+npm run release -- rc                   # -> x.y.z-rc.N on the `next` dist-tag
+npm run release -- patch --no-publish   # bump + push only
+```
+
+Lower-level scripts, if you want to drive each step yourself:
+
+```bash
+npm run version:bump -- patch           # bump + commit + tag locally
+npm run publish:all                     # npm publish every public package
+npm run publish:all -- --otp=123456     # forward a 2FA one-time password
 ```
 
 The VS Code extension is released separately — build the `.vsix` with
@@ -106,6 +104,7 @@ Release.
 - Storage: [`.commentray/`](.commentray/)
 - Spec: [`docs/spec/storage.md`](docs/spec/storage.md), [`docs/spec/anchors.md`](docs/spec/anchors.md), [`docs/spec/blocks.md`](docs/spec/blocks.md)
 - Plan: [`docs/plan/plan.md`](docs/plan/plan.md)
+- Development (debugging the extension, common failures): [`docs/development.md`](docs/development.md)
 
 ## License
 

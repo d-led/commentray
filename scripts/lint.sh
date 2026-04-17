@@ -19,6 +19,9 @@ CONFIG_ABS="${REPO_ROOT}/scripts/eslint.refactor-metrics.mjs"
 echo "== ESLint (project) ==" >&2
 npx eslint .
 
+echo "== ShellCheck (scripts/) ==" >&2
+bash "${REPO_ROOT}/scripts/shellcheck.sh"
+
 echo "== ESLint (refactor metrics) ==" >&2
 eslint_cmd=(npx eslint --no-config-lookup -c "${CONFIG_ABS}" --max-warnings 0 .)
 

@@ -7,6 +7,8 @@ import { renderFencedCode, renderMarkdownToHtml } from "./markdown-pipeline.js";
 
 export type CodeBrowserPageOptions = {
   title?: string;
+  /** Repo-relative (or otherwise meaningful) path to display prominently in the toolbar. */
+  filePath?: string;
   code: string;
   language: string;
   commentrayMarkdown: string;
@@ -30,11 +32,40 @@ async function renderCodeLineBlocks(code: string, language: string): Promise<str
     const fence = "```" + language + "\n" + line + "\n```\n";
     const block = await renderFencedCode(fence);
     const inner = extractPreCodeInner(block);
+    const num = i + 1;
     parts.push(
-      `<div class="code-line" id="code-line-${i}" data-line="${i}"><pre><code class="hljs language-${langAttr}">${inner}</code></pre></div>`,
+      `<div class="code-line" id="code-line-${i}" data-line="${i}">` +
+        `<span class="ln" aria-hidden="true">${num}</span>` +
+        `<pre><code class="hljs language-${langAttr}">${inner}</code></pre>` +
+        `</div>`,
     );
   }
   return parts.join("\n");
+}
+
+/** Split a repo-relative path into its directory prefix (with trailing slash) and basename. */
+function splitFilePath(p: string): { dir: string; base: string } {
+  const normalized = p.replaceAll("\\", "/").replace(/^\/+/, "");
+  const idx = normalized.lastIndexOf("/");
+  if (idx < 0) return { dir: "", base: normalized };
+  return { dir: normalized.slice(0, idx + 1), base: normalized.slice(idx + 1) };
+}
+
+function renderFilePathLabel(filePath: string | undefined, fallbackTitle: string): string {
+  const shown = (filePath ?? "").trim();
+  if (!shown) {
+    return `<strong class="file-path file-path--title">${escapeHtml(fallbackTitle)}</strong>`;
+  }
+  const { dir, base } = splitFilePath(shown);
+  const dirHtml = dir
+    ? `<span class="file-path__dir">${escapeHtml(dir)}</span>`
+    : `<span class="file-path__dir file-path__dir--root" title="Repository root">/ </span>`;
+  return (
+    `<strong class="file-path" title="${escapeHtml(shown)}">` +
+    dirHtml +
+    `<span class="file-path__base">${escapeHtml(base)}</span>` +
+    `</strong>`
+  );
 }
 
 /** IIFE produced by `npm run build -w @commentray/render` (esbuild of `code-browser-client.ts`). */
@@ -62,6 +93,20 @@ const CODE_BROWSER_STYLES = `
         font-size: 13px; flex: 0 0 auto;
       }
       .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+      .toolbar .file-path {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        font-size: 13px; font-weight: 500;
+        display: inline-flex; align-items: baseline; gap: 0; margin-right: 4px;
+        max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .toolbar .file-path__dir {
+        color: color-mix(in oklab, CanvasText 55%, Canvas);
+      }
+      .toolbar .file-path__dir--root { letter-spacing: 0; }
+      .toolbar .file-path__base {
+        color: CanvasText; font-weight: 600;
+      }
+      .toolbar .file-path--title { font-weight: 600; }
       .toolbar .search-field {
         display: inline-flex; align-items: center; gap: 6px; flex: 1 1 220px; min-width: 160px;
       }
@@ -98,7 +143,23 @@ const CODE_BROWSER_STYLES = `
         min-width: 120px; overflow: auto; padding: 12px 16px;
         border-right: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
       }
-      .pane--code .code-line pre { margin: 0; }
+      .pane--code .code-line {
+        display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: start;
+      }
+      .pane--code .code-line pre { margin: 0; min-width: 0; }
+      .pane--code .code-line .ln {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        font-variant-numeric: tabular-nums;
+        text-align: right; user-select: none; -webkit-user-select: none;
+        color: color-mix(in oklab, CanvasText 45%, Canvas);
+        padding-right: 8px;
+        border-right: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+        min-width: 3ch;
+      }
+      .pane--code .code-line:target .ln,
+      .pane--code .code-line:hover .ln {
+        color: color-mix(in oklab, CanvasText 75%, Canvas);
+      }
       .pane--code.wrap .code-line pre, .pane--code.wrap .code-line pre code {
         white-space: pre-wrap; word-break: break-word;
       }
@@ -124,6 +185,7 @@ const CODE_BROWSER_STYLES = `
 
 type CodeBrowserPageParts = {
   title: string;
+  filePathHtml: string;
   codeHtml: string;
   commentrayHtml: string;
   rawCodeB64: string;
@@ -134,8 +196,17 @@ type CodeBrowserPageParts = {
 };
 
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
-  const { title, codeHtml, commentrayHtml, rawCodeB64, rawMdB64, hljs, hljsDark, mermaidScript } =
-    p;
+  const {
+    title,
+    filePathHtml,
+    codeHtml,
+    commentrayHtml,
+    rawCodeB64,
+    rawMdB64,
+    hljs,
+    hljsDark,
+    mermaidScript,
+  } = p;
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -155,7 +226,7 @@ ${CODE_BROWSER_STYLES}
   <body>
     <div class="app">
       <header class="toolbar" aria-label="View options">
-        <strong style="margin-right:4px">${escapeHtml(title)}</strong>
+        ${filePathHtml}
         <span class="search-field">
           <label for="search-q">Search</label>
           <input type="search" id="search-q" placeholder="Whole source (ordered tokens + fuzzy lines)…" autocomplete="off" spellcheck="false" />
@@ -198,7 +269,8 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const rawCodeB64 = Buffer.from(opts.code, "utf8").toString("base64");
   const rawMdB64 = Buffer.from(opts.commentrayMarkdown, "utf8").toString("base64");
 
-  const title = opts.title ?? "Commentray";
+  const title = opts.title ?? opts.filePath ?? "Commentray";
+  const filePathHtml = renderFilePathLabel(opts.filePath, title);
   const hljs = opts.hljsTheme ?? "github";
   const hljsDark = opts.hljsTheme?.includes("dark") ? opts.hljsTheme : "github-dark";
 
@@ -212,6 +284,7 @@ mermaid.run({ querySelector: ".mermaid" });
 
   return buildCodeBrowserPageHtml({
     title,
+    filePathHtml,
     codeHtml,
     commentrayHtml,
     rawCodeB64,

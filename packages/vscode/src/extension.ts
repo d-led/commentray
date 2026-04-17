@@ -92,16 +92,17 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
+      // Leave the source editor wherever the user put it. Open the
+      // Commentray markdown in a column to the right of it (`Beside`
+      // creates a split if none exists, or reuses the existing
+      // right-hand column). This is the tool's core affordance:
+      // source on one side, commentary on the other — never two tabs
+      // stacked in the same column.
       const commentrayUri = vscode.Uri.file(commentrayAbsolutePath(repoRoot, normalized));
-      await vscode.window.showTextDocument(editor.document, {
-        viewColumn: vscode.ViewColumn.One,
-        preview: false,
-      });
-
       const ensured = await ensureCommentrayFile(commentrayUri);
       const commentrayDoc = await vscode.workspace.openTextDocument(ensured);
       const commentrayEditor = await vscode.window.showTextDocument(commentrayDoc, {
-        viewColumn: vscode.ViewColumn.Two,
+        viewColumn: vscode.ViewColumn.Beside,
         preview: false,
       });
 

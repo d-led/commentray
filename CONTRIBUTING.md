@@ -11,6 +11,7 @@ We like the lightweight spirit described in the Collective Code Construction Con
 - Open an issue before very large changes unless you have maintainer alignment.
 - Keep pull requests focused; prefer several small PRs over one sweeping refactor.
 - Before asking for review, follow the **Keeping quality high** section below.
+- For extension-specific debugging (Output channels, Extension Host logs, common "command not found" failures), see [`docs/development.md`](docs/development.md).
 - **CLI init:** `npm run commentray -- init` is idempotent (storage dirs, seed `index.json` and `.commentray.toml` if missing). Use `npm run commentray -- init config` to ensure TOML defaults, or `init config --force` to replace. `npm run commentray -- init scm` installs or refreshes a marked block in `.git/hooks/pre-commit` that runs `commentray validate` when `node_modules/.bin/commentray` exists at the repo root.
 - **Standalone CLI binaries:** `npm run binary:build` then `npm run binary:smoke` (see README **Standalone CLI binaries**). CI builds Linux x64/arm64, macOS x64/arm64, and Windows x64 via [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml); tags matching `v*` publish those files to the GitHub Release. On macOS with Homebrew Node, use `COMMENTRAY_SEA_NODE` pointing at an official `node` binary when building locally.
 - **GitHub Pages:** configure `[static_site]` in `.commentray.toml` (title, intro Markdown, `github_url`, `source_file`, optional `commentray_markdown`). Run `npm run pages:build` to emit `_site/index.html`. The `pages.yml` workflow deploys on `main` once **Settings → Pages → Build: GitHub Actions** is enabled.
@@ -32,10 +33,12 @@ For the slow lane (integration + expensive tests) run
   - `npm run test:integration` if the PR touches the Git SCM adapter, `.commentray/` layout, or any fixture-backed behavior.
   - `npm run test:expensive` on demand for fuzzed / large-repo suites.
   - Red tests are never skipped. Fix the implementation or fix the test — whichever is wrong — but never silence a failure with a conditional, a `try`/`catch`, or an `xit`/`.skip`.
-- **Lint never relaxed.** `npm run lint` runs the project ESLint pass **and** a refactor-metrics pass (complexity, size, async hygiene). Treat findings as design feedback: refactor, extract, simplify. Do not widen ignore lists or raise thresholds to hide them.
+- **Lint never relaxed.** `npm run lint` runs the project ESLint pass, `shellcheck` against every script under `scripts/`, **and** a refactor-metrics pass (complexity, size, async hygiene). Treat findings as design feedback: refactor, extract, simplify. Do not widen ignore lists or raise thresholds to hide them. If `shellcheck` is not installed locally the script skips with a note (CI always runs it).
 - **Duplicate detection taken seriously.** `npm run dupes` runs `jscpd`. Address flagged clones by extracting a shared helper, not by bumping the threshold or adding exclusions. `npm run quality` runs lint + dupes together; CI's quick path runs them with **no relaxations**.
 - **Dependencies stay fresh.**
-  - Watch `npm outdated` periodically; prefer routine, small update PRs over big year-end bumps.
+  - Preview: `npm run deps:upgrade -- --check` (delegates to `taze` recursively; excludes intra-monorepo packages).
+  - Apply: `npm run deps:upgrade` (default: major). Also accepts `minor`, `patch`, `latest`. The script writes package.json changes, re-pins `@commentray/*` via `scripts/sync-workspace-deps.mjs`, and reinstalls to regenerate the lockfile. Follow up with `npm run quality:gate`.
+  - Prefer routine, small update PRs over big year-end bumps.
   - `npm audit --audit-level=high` runs informationally in CI; triage real findings instead of muting them. Don't add blanket `--force` upgrades; update the offending package or its parent.
   - `package-lock.json` is committed and authoritative; regenerate it intentionally, not as a side-effect.
   - When adding a new runtime dependency, justify it in the PR description (pick one existing choice over a new transitive surface when reasonable).
@@ -43,6 +46,7 @@ For the slow lane (integration + expensive tests) run
 - **Coverage is observed, not gamed.** `npm run test:coverage` (unit) and `npm run test:coverage:all` (unit + integration) write HTML + `lcov` under `./coverage/` (gitignored) and open `coverage/index.html` when possible (`COMMENTRAY_COVERAGE_OPEN=0` to suppress). Treat coverage as a discovery tool: modules trending to zero deserve attention; 100% on trivial files proves nothing.
 - **Prefer behavior tests.** Tests should read like `given … when … then …`. If you find yourself asserting implementation details (private calls, concrete types behind interfaces, exact formulas), the test is probably the wrong abstraction — refactor it.
 - **Small, reversible changes.** Keep PRs shaped so that a revert is a one-commit operation. Land refactors that don't change behavior in their own PRs so that feature PRs remain easy to review.
+- **Automate multi-step invocations.** If a task needs more than two commands run in sequence, add a script to `scripts/` and wire an `npm run …` entry — do not bury the sequence in documentation where it will rot. Docs cite the script; the script is the source of truth. Menus of alternative single commands (e.g. `extension:install`, `extension:package`, `extension:uninstall`) are fine as lists; _sequences_ are not. Current examples: `scripts/setup.sh` (install → build → init → doctor), `scripts/release.sh` (bump → push → publish), `scripts/quality-gate.sh` (format → lint × 2 → shellcheck → dupes → typecheck → unit tests).
 
 ## Package managers
 
@@ -104,14 +108,23 @@ Two cooperating scripts keep releases boring:
   order. Supports `--dry-run`, `--otp=…`, and `--tag=next` (for RCs).
 
 Convenience scripts are wired at the repo root: `npm run version:bump`,
-`npm run version:sync`, `npm run publish:all`.
+`npm run version:sync`, `npm run publish:all`, and `npm run release`
+(the one-shot form that chains all three steps).
 
 Typical flow:
 
 ```bash
-npm run version:bump -- minor              # bump + commit + tag
-git push && git push --tags                # CI builds SEA binaries
-npm run publish:all                        # publish to npm
+npm run release -- minor        # bumps, pushes, publishes
+```
+
+If you need to pause between steps (e.g. to wait for CI binary builds
+to attach to the release before announcing it), drive the steps
+yourself:
+
+```bash
+npm run version:bump -- minor   # bump + commit + tag locally
+git push && git push --tags     # CI builds SEA binaries
+npm run publish:all             # publish to npm
 ```
 
 The `commentray-vscode` extension is private on npm and is released by

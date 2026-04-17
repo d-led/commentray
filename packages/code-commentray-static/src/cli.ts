@@ -20,6 +20,10 @@ program
   .option("--markdown <path>", "Commentray Markdown file", defaultMarkdown)
   .option("--out <path>", "Output HTML file", defaultOut)
   .option("--title <text>", "HTML title override")
+  .option(
+    "--file-path <text>",
+    "Repo-relative path label shown in the toolbar (defaults to basename of --source)",
+  )
   .option("--mermaid", "Include Mermaid runtime (CDN)", false)
   .action(async (opts) => {
     await buildCommentrayStatic({
@@ -27,6 +31,7 @@ program
       markdownFile: opts.markdown as string,
       outHtml: opts.out as string,
       title: opts.title as string | undefined,
+      filePath: opts.filePath as string | undefined,
       includeMermaidRuntime: Boolean(opts.mermaid),
     });
     console.log(`Wrote ${path.resolve(opts.out as string)}`);

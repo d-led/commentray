@@ -11,11 +11,13 @@
   ],
   "scripts": {
     "bootstrap": "npm install",
+    "setup": "bash scripts/setup.sh",
     "build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w code-commentray-static && npm run build -w @commentray/cli && npm run build -w commentray-vscode",
     "clean": "npm run -ws --if-present clean",
     "format": "bash scripts/format.sh",
     "format:check": "bash scripts/format-check.sh",
     "lint": "bash scripts/lint.sh",
+    "lint:shell": "bash scripts/shellcheck.sh",
     "dupes": "bash scripts/find-duplicates.sh",
     "quality": "npm run lint && npm run dupes",
     "quality:gate": "bash scripts/quality-gate.sh",
@@ -39,7 +41,9 @@
     "extension:uninstall": "bash scripts/install-extension.sh --uninstall",
     "version:bump": "bash scripts/bump-version.sh",
     "version:sync": "node scripts/sync-workspace-deps.mjs",
+    "deps:upgrade": "bash scripts/upgrade-deps.sh",
     "publish:all": "bash scripts/publish.sh",
+    "release": "bash scripts/release.sh",
     "code-commentray-static:build": "npm run build -w @commentray/render && npm run build -w code-commentray-static && npm run site -w code-commentray-static",
     "pages:build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w code-commentray-static && node scripts/build-static-pages.mjs"
   },

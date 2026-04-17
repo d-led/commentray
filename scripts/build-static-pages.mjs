@@ -66,6 +66,7 @@ try {
     markdownFile: tmpMd,
     outHtml,
     title: ss.title,
+    filePath: ss.sourceFile,
     includeMermaidRuntime: cfg.render.mermaid,
     hljsTheme: cfg.render.syntaxTheme,
   });

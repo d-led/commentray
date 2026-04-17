@@ -10,6 +10,11 @@ export type BuildCommentrayStaticOptions = {
   /** Output HTML path (directories created as needed). */
   outHtml: string;
   title?: string;
+  /**
+   * Repo-relative path displayed prominently in the toolbar so viewers can see at a glance
+   * which file they are looking at. Falls back to the source file's basename.
+   */
+  filePath?: string;
   includeMermaidRuntime?: boolean;
   /** Highlight.js theme base name (e.g. github, github-dark); forwarded to `renderCodeBrowserHtml`. */
   hljsTheme?: string;
@@ -25,8 +30,10 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
   const ext = path.extname(sourcePath).slice(1) || "txt";
   const language = ext === "ts" ? "ts" : ext === "tsx" ? "tsx" : ext;
 
+  const filePath = opts.filePath ?? path.basename(sourcePath);
   const html = await renderCodeBrowserHtml({
-    title: opts.title ?? path.basename(sourcePath),
+    title: opts.title ?? filePath,
+    filePath,
     code,
     language,
     commentrayMarkdown,
