@@ -186,6 +186,7 @@ Rough mental map for new contributors:
 ## Releasing
 
 See `CONTRIBUTING.md → Publishing to npm (maintainers)` for the
-`scripts/bump-version.sh` + `scripts/publish.sh` workflow. Do not hand-
-edit individual `package.json` versions; `scripts/sync-workspace-deps.mjs`
+`scripts/bump-version.sh` (version files only), `scripts/tag-version.sh`
+(annotated tag after commit), and `scripts/publish.sh` workflow. Do not
+hand-edit individual `package.json` versions; `scripts/sync-workspace-deps.mjs`
 keeps intra-monorepo pins in lockstep.

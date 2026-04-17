@@ -68,7 +68,7 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 if ! git describe --exact-match --tags HEAD 2>/dev/null | grep -qx "$expected_tag"; then
-  log_error "HEAD is not tagged $expected_tag. Run scripts/bump-version.sh first, or tag HEAD manually."
+  log_error "HEAD is not tagged $expected_tag. After committing the version bump, run: bash scripts/tag-version.sh"
   exit 1
 fi
 

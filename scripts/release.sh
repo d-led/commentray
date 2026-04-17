@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One-command release: bump version, push tag (so CI builds binaries),
-# publish every public package to npm.
+# One-command release: bump version files, commit, tag, push (so CI builds
+# binaries), publish every public package to npm.
 #
 # Usage:
 #   bash scripts/release.sh patch                 # standard patch release
@@ -12,20 +12,26 @@ set -euo pipefail
 #   bash scripts/release.sh release               # drop -rc suffix
 #   bash scripts/release.sh set 1.2.3             # explicit version
 #   bash scripts/release.sh patch --dry-run       # rehearse everything
-#   bash scripts/release.sh patch --no-publish    # bump + push only (skip npm)
-#   bash scripts/release.sh patch --no-push       # bump + publish only (skip CI trigger)
+#   bash scripts/release.sh patch --no-publish    # bump + commit + tag + push only (skip npm)
+#   bash scripts/release.sh patch --no-push       # bump + commit + tag + publish only (skip CI trigger)
 #
-# Exits early with clear errors on any step. Safe to rerun after fixing
-# the failing step — each underlying script is idempotent on clean input.
+# Requires a clean working tree before the first step: this script commits
+# the bump output then creates v<version>. For bump-only (no commit/tag) on a
+# dirty tree, use scripts/bump-version.sh alone, then commit and
+# scripts/tag-version.sh.
+#
+# Exits early with clear errors on any step.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'
 YELLOW=$'\033[1;33m'
 NC=$'\033[0m'
-log_step() { printf "\n%s== %s ==%s\n" "$YELLOW" "$1" "$NC"; }
-log_ok()   { printf "%s[OK]%s %s\n"    "$GREEN"  "$NC" "$1"; }
+log_step()  { printf "\n%s== %s ==%s\n" "$YELLOW" "$1" "$NC"; }
+log_ok()    { printf "%s[OK]%s %s\n"    "$GREEN"  "$NC" "$1"; }
+log_error() { printf "%s[ERROR]%s %s\n" "$RED"    "$NC" "$1" >&2; }
 
 dry_run=false
 do_push=true
@@ -34,7 +40,7 @@ bump_args=()
 set_version=""
 
 if [[ $# -lt 1 ]]; then
-  sed -n '3,18p' "$0" >&2
+  sed -n '3,21p' "$0" >&2
   exit 2
 fi
 
@@ -58,7 +64,18 @@ for a in "$@"; do
   esac
 done
 
-log_step "Step 1/3: bump version"
+if [[ "$dry_run" != true ]]; then
+  if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    log_error "Not inside a git repository."
+    exit 1
+  fi
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    log_error "Uncommitted changes present. Commit or stash first — release.sh will commit the version bump."
+    exit 1
+  fi
+fi
+
+log_step "Step 1/4: bump version (files only)"
 if [[ "$dry_run" == true ]]; then
   bash scripts/bump-version.sh "${bump_args[@]}" --dry-run
 else
@@ -66,32 +83,46 @@ else
 fi
 
 if [[ "$dry_run" == true ]]; then
-  log_step "Step 2/3: git push (dry run — skipped)"
-  log_step "Step 3/3: npm publish (dry run — would run publish.sh --dry-run)"
+  log_step "Step 2/4: commit + tag (dry run — skipped)"
+  log_step "Step 3/4: git push (dry run — skipped)"
+  log_step "Step 4/4: npm publish (dry run — would run publish.sh --dry-run)"
   bash scripts/publish.sh --dry-run || true
   echo ""
-  log_ok "Dry run complete. Nothing was committed, pushed, or published."
+  log_ok "Dry run complete. Nothing was bumped, committed, tagged, pushed, or published."
   exit 0
 fi
 
+new_version=$(node -e "process.stdout.write(require('./packages/core/package.json').version)")
+release_tag="v$new_version"
+if git rev-parse --verify --quiet "$release_tag" >/dev/null; then
+  log_error "Tag $release_tag already exists. Remove it or choose a different bump."
+  exit 1
+fi
+
+log_step "Step 2/4: commit + annotated tag"
+git add -A
+git commit -m "Bump version to $new_version"
+git tag -a "$release_tag" -m "Version $new_version"
+log_ok "Committed and created tag $release_tag"
+
 if [[ "$do_push" == true ]]; then
-  log_step "Step 2/3: git push (branch + tags)"
+  log_step "Step 3/4: git push (branch + tags)"
   git push
   git push --tags
   log_ok "Pushed. Binary-build workflow will trigger on the tag."
 else
-  log_step "Step 2/3: git push (skipped via --no-push)"
+  log_step "Step 3/4: git push (skipped via --no-push)"
 fi
 
 if [[ "$do_publish" == true ]]; then
-  log_step "Step 3/3: npm publish"
+  log_step "Step 4/4: npm publish"
   tag_flag=()
   case "$bump_command" in
     rc) tag_flag=(--tag=next) ;;
   esac
   bash scripts/publish.sh "${tag_flag[@]}"
 else
-  log_step "Step 3/3: npm publish (skipped via --no-publish)"
+  log_step "Step 4/4: npm publish (skipped via --no-publish)"
 fi
 
 echo ""

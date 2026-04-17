@@ -2,8 +2,12 @@
 set -euo pipefail
 
 # Bump the version of every Commentray workspace package in lockstep,
-# sync intra-workspace @commentray/* dep pins, update CHANGELOG.md if it
-# exists, commit, and tag.
+# sync intra-workspace @commentray/* dep pins, and update CHANGELOG.md if it
+# exists. Does not run git: no commit, no tag. Use when you want to edit
+# versions alongside other work, then commit when ready.
+#
+# Tagging is separate: `bash scripts/tag-version.sh` after committing, or
+# `bash scripts/release.sh …` for bump + commit + tag + push + publish.
 #
 # Usage:
 #   bash scripts/bump-version.sh patch                  # 0.1.2 -> 0.1.3
@@ -15,9 +19,11 @@ set -euo pipefail
 #   bash scripts/bump-version.sh set 1.2.3[-rc.0]       # set an explicit version
 #   bash scripts/bump-version.sh <command> --dry-run    # preview only, no writes
 #
-# Follow-up:
-#   git push && git push --tags          # triggers CI binary build
-#   bash scripts/publish.sh              # npm publishes the new version
+# Next steps (pick one):
+#   git add -A && git commit … && bash scripts/tag-version.sh
+#   bash scripts/release.sh patch                       # clean tree required; does commit+tag
+#   git push && git push --tags                         # after you tag
+#   bash scripts/publish.sh                             # npm publish
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -28,9 +34,9 @@ RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'
 YELLOW=$'\033[1;33m'
 NC=$'\033[0m'
-log_info()    { printf "%s[INFO]%s %s\n" "$YELLOW" "$NC" "$1"; }
-log_ok()      { printf "%s[OK]%s %s\n"   "$GREEN"  "$NC" "$1"; }
-log_error()   { printf "%s[ERROR]%s %s\n" "$RED"   "$NC" "$1" >&2; }
+log_info()  { printf "%s[INFO]%s %s\n" "$YELLOW" "$NC" "$1"; }
+log_ok()    { printf "%s[OK]%s %s\n"   "$GREEN"  "$NC" "$1"; }
+log_error() { printf "%s[ERROR]%s %s\n" "$RED"   "$NC" "$1" >&2; }
 
 dry_run=false
 args=()
@@ -46,7 +52,7 @@ set -- "${args[@]:-}"
 command="${1:-}"
 if [[ -z "$command" ]]; then
   log_error "Missing command."
-  sed -n '3,22p' "$0" >&2
+  sed -n '3,26p' "$0" >&2
   exit 2
 fi
 
@@ -96,36 +102,20 @@ case "$command" in
     ;;
   *)
     log_error "Unknown command: $command"
-    sed -n '3,22p' "$0" >&2
+    sed -n '3,26p' "$0" >&2
     exit 2
     ;;
 esac
 
 echo "New version:     $new_version"
-tag="v$new_version"
-
-if ! git rev-parse --git-dir >/dev/null 2>&1; then
-  log_error "Not inside a git repository."
-  exit 1
-fi
-
-if git rev-parse --verify --quiet "$tag" >/dev/null; then
-  log_error "Tag $tag already exists."
-  exit 1
-fi
 
 if [[ "$dry_run" == true ]]; then
   echo ""
   echo "=== DRY RUN ==="
   echo "Would bump every workspace package.json ($current -> $new_version),"
-  echo "sync @commentray/* deps, update CHANGELOG.md if present,"
-  echo "commit, and create tag $tag."
+  echo "sync @commentray/* deps, update CHANGELOG.md if present, and refresh"
+  echo "package-lock.json. No git commit or tag."
   exit 0
-fi
-
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  log_error "You have uncommitted changes. Commit or stash them before bumping."
-  exit 1
 fi
 
 log_info "Bumping all workspace packages to $new_version..."
@@ -157,19 +147,21 @@ if [[ -f "$changelog" ]]; then
   fi
 fi
 
-log_info "Staging + committing..."
-git add -A
-git commit -m "Bump version to $new_version"
-git tag -a "$tag" -m "Version $new_version"
-log_ok "Committed and tagged $tag"
+log_ok "Version files updated: $current -> $new_version (uncommitted)"
 
 echo ""
-log_ok "Version: $current -> $new_version"
-echo ""
 echo "Next steps:"
-echo "  1. Review:  git show $tag"
-echo "  2. Push:    git push && git push --tags       # triggers binary builds"
-echo "  3. Publish: bash scripts/publish.sh"
+echo "  1. Review the diff, then commit:"
+echo "       git add -A && git commit -m \"Bump version to $new_version\""
+echo "  2. Create the annotated tag:"
+echo "       bash scripts/tag-version.sh"
+echo "  3. Push and publish:"
+echo "       git push && git push --tags"
+echo "       bash scripts/publish.sh"
+echo ""
+echo "From a clean tree, an all-in-one alternative is:"
+echo "       bash scripts/release.sh $command"
+echo "       (runs this bump, then commit, tag, push, and publish.)"
 if [[ $new_version =~ -rc\. ]]; then
   echo ""
   echo "(Pre-release: add '--tag next' to 'npm publish' if you want to keep"

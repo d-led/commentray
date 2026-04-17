@@ -1,6 +1,6 @@
 {
   "name": "@commentray/cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publishConfig": {
     "access": "public"
   },
@@ -21,8 +21,8 @@
     "commentray": "node ./dist/cli.js"
   },
   "dependencies": {
-    "@commentray/core": "0.0.1",
-    "@commentray/render": "0.0.1",
+    "@commentray/core": "0.0.2",
+    "@commentray/render": "0.0.2",
     "commander": "^13.1.0"
   },
   "devDependencies": {

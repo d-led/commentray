@@ -67,3 +67,15 @@ export async function readIndex(repoRoot: string): Promise<CommentrayIndex | nul
     throw err;
   }
 }
+
+/**
+ * Write the metadata index to the default location under `repoRoot`, creating
+ * the `.commentray/metadata/` directory if missing. The file is written with
+ * two-space indentation and a trailing newline so diffs are easy to read.
+ */
+export async function writeIndex(repoRoot: string, index: CommentrayIndex): Promise<void> {
+  const indexPath = path.join(repoRoot, defaultMetadataIndexPath());
+  await fs.mkdir(path.dirname(indexPath), { recursive: true });
+  const serialized = `${JSON.stringify(index, null, 2)}\n`;
+  await fs.writeFile(indexPath, serialized, "utf8");
+}

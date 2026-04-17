@@ -46,7 +46,7 @@ For the slow lane (integration + expensive tests) run
 - **Coverage is observed, not gamed.** `npm run test:coverage` (unit) and `npm run test:coverage:all` (unit + integration) write HTML + `lcov` under `./coverage/` (gitignored) and open `coverage/index.html` when possible (`COMMENTRAY_COVERAGE_OPEN=0` to suppress). Treat coverage as a discovery tool: modules trending to zero deserve attention; 100% on trivial files proves nothing.
 - **Prefer behavior tests.** Tests should read like `given … when … then …`. If you find yourself asserting implementation details (private calls, concrete types behind interfaces, exact formulas), the test is probably the wrong abstraction — refactor it.
 - **Small, reversible changes.** Keep PRs shaped so that a revert is a one-commit operation. Land refactors that don't change behavior in their own PRs so that feature PRs remain easy to review.
-- **Automate multi-step invocations.** If a task needs more than two commands run in sequence, add a script to `scripts/` and wire an `npm run …` entry — do not bury the sequence in documentation where it will rot. Docs cite the script; the script is the source of truth. Menus of alternative single commands (e.g. `extension:install`, `extension:package`, `extension:uninstall`) are fine as lists; _sequences_ are not. Current examples: `scripts/setup.sh` (install → build → init → doctor), `scripts/release.sh` (bump → push → publish), `scripts/quality-gate.sh` (format → lint × 2 → shellcheck → dupes → typecheck → unit tests).
+- **Automate multi-step invocations.** If a task needs more than two commands run in sequence, add a script to `scripts/` and wire an `npm run …` entry — do not bury the sequence in documentation where it will rot. Docs cite the script; the script is the source of truth. Menus of alternative single commands (e.g. `extension:install`, `extension:package`, `extension:uninstall`) are fine as lists; _sequences_ are not. Current examples: `scripts/setup.sh` (install → build → init → doctor), `scripts/release.sh` (bump → commit → tag → push → publish), `scripts/quality-gate.sh` (format → lint × 2 → shellcheck → dupes → typecheck → unit tests).
 
 ## Package managers
 
@@ -93,36 +93,45 @@ Maintainers may additionally protect these jobs with a GitHub Environment (optio
 
 ## Publishing to npm (maintainers)
 
-Two cooperating scripts keep releases boring:
+Release scripts are split on purpose: **bumping** versions is not the same
+as **tagging** a release.
 
 - `scripts/bump-version.sh` — bumps every workspace `package.json` in
   lockstep, runs `scripts/sync-workspace-deps.mjs` so intra-monorepo
-  `@commentray/*` pins follow along, refreshes `package-lock.json`,
-  commits, and tags `v<version>`. Supports `patch`, `minor`, `major`,
-  `rc`, `release`, `set <version>`, and `--dry-run`. Refuses to run on a
-  dirty tree or if the tag already exists.
+  `@commentray/*` pins follow along, refreshes `package-lock.json`, and
+  updates `CHANGELOG.md` when an `[Unreleased]` section exists. Supports
+  `patch`, `minor`, `major`, `rc`, `release`, `set <version>`, and
+  `--dry-run`. Does **not** run git: you can run it on a dirty tree, commit
+  the result with your other work, then tag when ready.
+- `scripts/tag-version.sh` — reads `packages/core/package.json`, requires a
+  **clean** working tree, and creates the annotated `v<version>` tag at
+  `HEAD`. Use after the version bump is committed.
 - `scripts/publish.sh` — verifies the working tree is clean and that
   HEAD is tagged with the canonical version, runs a reproducible
   `npm ci`, builds all workspaces, runs unit tests, then
   `npm publish --access public` for each public workspace in dependency
   order. Supports `--dry-run`, `--otp=…`, and `--tag=next` (for RCs).
+- `scripts/release.sh` — from a **clean** tree: runs bump, then `git
+commit`, then `tag-version.sh`-equivalent tagging, then `git push` /
+  `git push --tags`, then `publish.sh`.
 
 Convenience scripts are wired at the repo root: `npm run version:bump`,
-`npm run version:sync`, `npm run publish:all`, and `npm run release`
-(the one-shot form that chains all three steps).
+`npm run version:tag`, `npm run version:sync`, `npm run publish:all`, and
+`npm run release`.
 
-Typical flow:
+Typical flow (all-in-one, clean tree):
 
 ```bash
-npm run release -- minor        # bumps, pushes, publishes
+npm run release -- minor        # bump → commit → tag → push → publish
 ```
 
-If you need to pause between steps (e.g. to wait for CI binary builds
-to attach to the release before announcing it), drive the steps
-yourself:
+If you need to bump versions while other files are still dirty, or to
+pause between steps (e.g. wait for CI binary builds before publishing):
 
 ```bash
-npm run version:bump -- minor   # bump + commit + tag locally
+npm run version:bump -- minor   # file edits only
+git add -A && git commit -m "Bump version to …"
+npm run version:tag
 git push && git push --tags     # CI builds SEA binaries
 npm run publish:all             # publish to npm
 ```

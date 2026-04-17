@@ -2,7 +2,7 @@
   "name": "commentray-vscode",
   "displayName": "Commentray",
   "description": "Side-by-side authoring for Commentray markdown tracks",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "d-led",
   "private": true,
   "license": "MPL-2.0",
@@ -23,6 +23,7 @@
   ],
   "activationEvents": [
     "onCommand:commentray.openSideBySide",
+    "onCommand:commentray.startBlockFromSelection",
     "onCommand:commentray.openCommentrayPreview",
     "onCommand:commentray.validateWorkspace"
   ],
@@ -34,12 +35,24 @@
         "title": "Commentray: Open commentray beside source"
       },
       {
+        "command": "commentray.startBlockFromSelection",
+        "title": "Commentray: Add block from selection"
+      },
+      {
         "command": "commentray.openCommentrayPreview",
         "title": "Commentray: Open Markdown preview for commentray file"
       },
       {
         "command": "commentray.validateWorkspace",
         "title": "Commentray: Validate workspace metadata"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "commentray.startBlockFromSelection",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k",
+        "when": "editorTextFocus && !editorReadonly"
       }
     ]
   },
@@ -48,7 +61,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@commentray/core": "0.0.1"
+    "@commentray/core": "0.0.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.1",

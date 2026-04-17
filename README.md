@@ -74,22 +74,25 @@ xattr -c /path/to/commentray-darwin-arm64
 ## Releasing
 
 Version all workspace packages in lockstep, then publish. The bump script
-rewrites every workspace `package.json`, keeps intra-monorepo
-`@commentray/*` deps aligned, commits, and tags.
+rewrites every workspace `package.json` and keeps intra-monorepo
+`@commentray/*` deps aligned; it does **not** commit or tag. Tagging is a
+separate step (`npm run version:tag`) after you commit the bump.
 
-One-command release (bump → push → publish):
+One-command release from a **clean** tree (bump files → commit → tag → push → publish):
 
 ```bash
 npm run release -- patch                # standard patch release
 npm run release -- minor --dry-run      # rehearse everything
 npm run release -- rc                   # -> x.y.z-rc.N on the `next` dist-tag
-npm run release -- patch --no-publish   # bump + push only
+npm run release -- patch --no-publish   # bump + commit + tag + push only
 ```
 
-Lower-level scripts, if you want to drive each step yourself:
+Lower-level flow (e.g. bump while you still have other local edits):
 
 ```bash
-npm run version:bump -- patch           # bump + commit + tag locally
+npm run version:bump -- patch           # edit versions only; works on a dirty tree
+# … commit when ready …
+npm run version:tag                     # annotated v* tag at HEAD
 npm run publish:all                     # npm publish every public package
 npm run publish:all -- --otp=123456     # forward a 2FA one-time password
 ```

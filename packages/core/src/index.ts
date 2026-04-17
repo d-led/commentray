@@ -1,5 +1,22 @@
-export type { CommentrayBlock, CommentrayIndex, SourceFileIndexEntry } from "./model.js";
+export type {
+  CommentrayBlock,
+  CommentrayBlockFingerprint,
+  CommentrayIndex,
+  SourceFileIndexEntry,
+} from "./model.js";
 export { CURRENT_SCHEMA_VERSION } from "./model.js";
+export type {
+  AddBlockToIndexInput,
+  BlockRange,
+  CreateBlockForRangeInput,
+  CreatedBlock,
+} from "./blocks.js";
+export {
+  addBlockToIndex,
+  appendBlockToCommentray,
+  createBlockForRange,
+  generateBlockId,
+} from "./blocks.js";
 export {
   commentrayMarkdownPath,
   defaultMetadataIndexPath,
@@ -16,5 +33,5 @@ export { GitScmProvider } from "./scm/git-scm-provider.js";
 export type { BlockDiagnostic } from "./staleness.js";
 export { diagnoseBlock } from "./staleness.js";
 export type { ValidationIssue, ValidationResult } from "./validate-project.js";
-export { readIndex, validateProject } from "./validate-project.js";
+export { readIndex, validateProject, writeIndex } from "./validate-project.js";
 export { runCommanderMain } from "./cli-bootstrap.js";

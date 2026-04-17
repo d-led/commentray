@@ -7,6 +7,7 @@ set -euo pipefail
 # Usage:
 #   bash scripts/install-extension.sh                  # build + install
 #   bash scripts/install-extension.sh --package-only   # just produce the .vsix
+#   bash scripts/install-extension.sh --publish       # build, package, vsce publish (Marketplace)
 #   bash scripts/install-extension.sh --uninstall      # remove the installed extension
 #
 # Honors $COMMENTRAY_EDITOR (path or command), else prefers `cursor`, else `code`.
@@ -27,6 +28,7 @@ ext_version() {
 mode="install"
 case "${1:-}" in
   --package-only) mode="package" ;;
+  --publish) mode="publish" ;;
   --uninstall) mode="uninstall" ;;
   "" ) mode="install" ;;
   *) echo "Unknown option: $1" >&2; exit 2 ;;
@@ -54,6 +56,12 @@ echo "Packaging .vsix at $vsix_path..."
 
 if [[ "$mode" == "package" ]]; then
   echo "Built $vsix_path (not installed)."
+  exit 0
+fi
+
+if [[ "$mode" == "publish" ]]; then
+  echo "Publishing to Visual Studio Marketplace: $vsix_path"
+  npx --yes @vscode/vsce@^3 publish -i "$vsix_path"
   exit 0
 fi
 

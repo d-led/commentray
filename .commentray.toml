@@ -14,10 +14,14 @@ syntaxTheme = "github-dark"
 defaultStrategy = ["symbol", "lines"]
 
 # GitHub Pages: `npm run pages:build` → `_site/index.html` (see `.github/workflows/pages.yml`).
+# The commentary shown on the right of the rendered page is sourced from
+# `commentray_markdown`. Per Commentray's own convention, a file at path `<p>`
+# has its companion at `.commentray/source/<p>.md`, so the README's companion
+# lives at `.commentray/source/README.md.md`.
 [static_site]
 title = "Commentray"
-intro = """This page is generated from this repository using the **code-commentray-static** package (code on the left, commentray on the right)."""
+# `intro` is intentionally empty: the companion Markdown below is self-contained.
 # Set to your public GitHub URL for the “View repository” link in the commentray pane.
 github_url = "https://github.com/d-led/commentray"
 source_file = "README.md"
-commentray_markdown = "docs/static-site-commentray.md"
+commentray_markdown = ".commentray/source/README.md.md"
