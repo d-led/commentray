@@ -1,13 +1,8 @@
 # Commentray VS Code dogfood fixture
 
-Minimal fixture used by `scripts/editor-extension.sh dogfood` to exercise the
-Commentray extension in the Extension Development Host without colliding with
-the main repository's window.
+Minimal workspace opened by `npm run extension:dogfood` when no folder argument is passed (see `scripts/editor-extension.sh`).
 
-To try the extension here:
-
-1. Run `npm run extension:dogfood` (or `bash scripts/editor-extension.sh dogfood`).
-2. In the opened dev-host window, open `sample.ts`.
+1. `npm run extension:dogfood` — build and install the extension from this repo, then open this folder in the editor.
+2. Open `sample.ts`.
 3. Command Palette → **Commentray: Open commentray beside source**.
-4. A paired `.commentray/source/sample.ts.md` opens (created on demand), with
-   scroll sync from the code editor to the Markdown.
+4. Paired `.commentray/source/sample.ts.md` is created on demand, with scroll sync from the code editor to the Markdown.

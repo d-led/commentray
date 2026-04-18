@@ -33,36 +33,24 @@ npm run ci:full
 If a check is failing, fix the root cause. Do not widen ignore lists or
 raise thresholds to hide it. See `CONTRIBUTING.md` for the reasoning.
 
-## Two ways to run the editor extension
+## Editor extension workflows
 
-Pick the one that matches your task.
+### 1. Dogfood: install from this repo + open a folder
 
-### 1. Extension Development Host (fast feedback loop)
-
-For iterating on extension code. Starts your editor (Cursor preferred,
-else VS Code) pointed at a dedicated fixture workspace
-(`packages/vscode/fixtures/dogfood/`) with the extension loaded from
-source.
+`npm run extension:dogfood` runs **`scripts/install-extension.sh`** (build, bundle,
+package `.vsix`, uninstall old id, `--force` install), then opens a new editor window on
+a folder (`-n` / `--new-window` when the CLI supports it).
 
 ```bash
-npm run extension:dogfood
+npm run extension:dogfood           # fixture workspace
+npm run extension:dogfood:repo      # this monorepo root
+npm run extension:dogfood -- .      # same; `--` forwards `.` to the script
 ```
 
-Why a fixture folder and not the monorepo root? Cursor / VS Code refuse
-to open a second window onto a folder that is already open, which means
-you cannot both edit Commentray and dogfood it in the same folder. The
-fixture sidesteps that and keeps the dev host away from your real login
-/ settings.
+After changing extension sources, re-run dogfood or `npm run extension:install`, then reload
+the window if that workspace was already open.
 
-Reload after rebuilding: **Cmd/Ctrl+R** in the dev host window, or
-**Developer: Reload Window** from the Command Palette. Source changes
-under `packages/vscode/src/**` need a fresh compile first — run
-`npm run build -w commentray-vscode` (or just `npm run build`).
-
-### 2. Packaged `.vsix` installed into your regular editor
-
-For using Commentray against your real projects, or for reproducing bugs
-that only show up in a fully installed extension.
+### 2. Install only (no automatic folder launch)
 
 ```bash
 npm run extension:install      # build + bundle + package + install
@@ -71,8 +59,14 @@ npm run extension:uninstall    # remove it
 ```
 
 The installer script bundles the extension with esbuild (inlining
-`@commentray/core`) before `vsce` packages the `.vsix`. This bundling
-step matters — see "Common failure modes" below.
+`@commentray/core`) before `vsce` packages the `.vsix`.
+
+### 3. Extension Development Host + debugger (F5)
+
+To set breakpoints in `packages/vscode/src/**`, open the `packages/vscode` folder in the
+editor and use the **Run and Debug** / **Extension** launch configuration (add
+`launch.json` if your editor has not generated one). That path attaches a debugger;
+`npm run extension:dogfood` installs the packaged extension into your normal editor instead.
 
 ## Scroll sync and paired panes
 
@@ -93,12 +87,6 @@ Edits to either file or saving `index.json` refresh the block map on a short
 debounce so markers and metadata edits stay in sync without reloading the
 window.
 
-If `tsc -b` suddenly claims `@commentray/core` has no exported symbols from
-`packages/vscode`, check for a stale nested dependency at
-`packages/vscode/node_modules/@commentray` (left over from an older install).
-Removing that folder and running `npm install` from the repo root restores
-the workspace symlink to `packages/core`.
-
 ## Observing the extension at runtime
 
 ### The `Commentray` output channel
@@ -115,19 +103,9 @@ If you are adding a new command and want visible, structured logging,
 reuse that same channel rather than `console.log` — users see Output,
 they do not see the Developer Tools console.
 
-### The extension host log (for activation failures)
+### Extension Host log
 
-Activation errors (including `Cannot find module '@commentray/core'` in
-a broken `.vsix`) surface in the **Extension Host** log rather than in
-any user-facing channel. To open it:
-
-- Command Palette → **Developer: Show Logs…** → **Extension Host**.
-
-A failed activation is also why you see the error in the screenshot
-below. The command is _declared_ in `package.json` but `activate()`
-never finished, so nothing registered it.
-
-> _command 'commentray.openSideBySide' not found_
+Activation errors and stack traces from the extension host appear under **Developer: Show Logs… → Extension Host**.
 
 ### The Developer Tools console
 
@@ -138,41 +116,11 @@ For extension code paths that touch the webview preview or for any
 - Console tab shows `console.log` output from both the extension host
   and any webviews.
 
-### Breakpoints
+## Debugging
 
-Launching via `npm run extension:dogfood` runs the extension in the
-regular extension host, not under a debugger. To step through
-extension code:
+`npm run extension:dogfood` installs the packaged build into your normal editor without a debugger; use **Run and Debug** on the `packages/vscode` workspace to attach one.
 
-1. Open `packages/vscode` as a folder in VS Code / Cursor.
-2. Run the built-in **Extension** launch configuration (VS Code's
-   default for extension projects will be picked up if `launch.json`
-   exists, or you can create one).
-3. Set breakpoints in `packages/vscode/src/**`.
-
-The standalone `npm run extension:dogfood` script is optimized for fast
-reload cycles, not for attaching a debugger.
-
-## Common failure modes
-
-### "command 'commentray.X' not found"
-
-`activate()` threw before it could register the command. Almost always
-one of:
-
-- **Stale `.vsix` installed.** The installed extension predates the
-  esbuild bundling step, so at runtime Node cannot resolve
-  `@commentray/core`. Fix:
-  ```bash
-  npm run extension:uninstall
-  npm run extension:install
-  # Command Palette → Developer: Reload Window
-  ```
-- **Rebuild skipped.** In the dev host, code changes under
-  `packages/vscode/src/**` need `npm run build -w commentray-vscode`
-  before reloading the window.
-- **Real exception in `activate()`.** Check **Developer: Show Logs… →
-  Extension Host** for the stack trace.
+If a `Commentray:` command is missing after install, run `npm run extension:install` (or dogfood) and reload the window. After editing extension sources in the **Extension** dev host, run `npm run build -w commentray-vscode` before reloading.
 
 ### The `.commentray/` folder did not appear
 

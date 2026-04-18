@@ -30,7 +30,7 @@ npm run cli:install      # bash scripts/install-cli.sh
 npm run cli:uninstall    # bash scripts/install-cli.sh --unlink
 ```
 
-To install the **editor extension** into your regular Cursor / VS Code (bundled `.vsix`, not the Extension Development Host):
+To install the **editor extension** into Cursor or VS Code from a built `.vsix`:
 
 ```bash
 npm run extension:install        # build, bundle, package, and install
@@ -45,14 +45,17 @@ npm run test:coverage
 npm run test:coverage:all
 ```
 
-**Static site E2E** (Cypress + Chrome, same task shape as [my-mvg-departures](https://github.com/d-led/my-mvg-departures)): builds `_site`, serves it on port **4173**, then runs Cypress. Requires **Google Chrome** installed.
+**Static site E2E:** builds `_site`, serves it on port **4173**, then runs the browser test suite. **Google Chrome** must be installed.
 
 ```bash
-npm run e2e    # headless: pages:build → serve → cypress run
-npm run cy     # interactive: pages:build → serve → cypress open
+npm run e2e       # headless
+npm run e2e:ci    # same with CYPRESS_CI=true (matches GitLab / typical CI)
+npm run cy        # interactive
 ```
 
-Specs live under `cypress/e2e/*.cy.ts`. Files matching `screenshot*.cy.ts` are excluded (optional local screenshot runs).
+Tests live under `cypress/e2e/`. Custom assertions live in [`cypress/support/commands.ts`](cypress/support/commands.ts). JUnit output is written to `test-results/` (same reporter setup as [my-mvg-departures](https://github.com/d-led/my-mvg-departures)).
+
+**GitLab CI:** [`.gitlab-ci.yml`](.gitlab-ci.yml) runs `npm run e2e` in a [`cypress/browsers`](https://hub.docker.com/r/cypress/browsers/tags) image and publishes JUnit plus Cypress videos/screenshots as job artifacts.
 
 ## Standalone CLI binaries
 
@@ -120,7 +123,7 @@ Release.
 - Keeping metadata in sync: [`docs/user/keeping-blocks-in-sync.md`](docs/user/keeping-blocks-in-sync.md)
 - `commentray init` merges [`d-led.commentray-vscode`](https://marketplace.visualstudio.com/items?itemName=d-led.commentray-vscode) into [`.vscode/extensions.json`](.vscode/extensions.json) when the file is mergeable JSON
 - Plan: [`docs/plan/plan.md`](docs/plan/plan.md)
-- Development (debugging the extension, common failures): [`docs/development.md`](docs/development.md)
+- Extension development: [`docs/development.md`](docs/development.md)
 
 ## License
 
@@ -130,13 +133,12 @@ Packages in this monorepo are licensed under **MPL-2.0** (see `LICENSE` and per-
 
 **Dogfood** rebuilds the extension, produces a `.vsix`, uninstalls any old
 `d-led.commentray-vscode`, **installs** the new package (`--force`), then opens a **new**
-editor window on a folder (same install path as `npm run extension:install`, plus a
-launch so you are not debugging broken `--extensionDevelopmentPath` behavior).
+editor window on a folder (same steps as `npm run extension:install`, then launch).
 
 ```bash
 npm run extension:dogfood              # fixture folder + install + open
-npm run extension:dogfood:repo         # this repo (.) without needing npm’s `--`
-npm run extension:dogfood -- .         # this repo — `--` required so `.` reaches the script
+npm run extension:dogfood:repo         # this repo — opens `.` without passing args through npm
+npm run extension:dogfood -- .         # this repo — use `--` so npm forwards `.` to the script
 npm run extension:dogfood -- /path/to/project
 ```
 
@@ -146,7 +148,7 @@ If both `cursor` and `code` exist on `PATH`, **Cursor wins**; override with:
 COMMENTRAY_EDITOR=code npm run extension:dogfood
 ```
 
-If a tab was already open on that folder, run **Developer: Reload Window** so it picks up the new install.
+Reload the editor window if that workspace was already open so it picks up the new install.
 
 ## On the Name
 

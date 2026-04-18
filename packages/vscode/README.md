@@ -36,26 +36,13 @@ block list out of the index.
 
 ## Troubleshooting
 
-**`Unsupported schemaVersion: …`** means the extension’s bundled `@commentray/core`
-refuses that `index.json` shape (often: **Marketplace / old `.vsix` install** while
-the repo’s CLI wrote a newer schema). **Fix:** from the Commentray repo run
-`bash scripts/install-extension.sh`, then **Developer: Reload Window**.
+**`Unsupported schemaVersion: …`** — the extension’s bundled `@commentray/core` does not accept the current `index.json` shape. From the Commentray repo run `bash scripts/install-extension.sh`, then reload the editor window.
 
-**Dogfood** (`npm run extension:dogfood`) is now the same **install path** as
-`bash scripts/install-extension.sh`: build → `.vsix` → uninstall old `d-led.commentray-vscode`
-→ `--force` install, then open a **new** editor window on the folder (`-n` / `--new-window`
-when supported). Use `npm run extension:dogfood:repo` to open this repo, or
-`npm run extension:dogfood -- .` (npm requires `--` before `.`). Reload any tab that was
-already on that folder.
+**Dogfood** (`npm run extension:dogfood`) matches `bash scripts/install-extension.sh` (build, package `.vsix`, install), then opens a new editor window on a folder. Use `npm run extension:dogfood:repo` for this repo, or `npm run extension:dogfood -- .` (use `--` so npm forwards `.`). Reload the window if that workspace was already open.
 
-**Install from repo** (`bash scripts/install-extension.sh`) is the same packaging and
-install steps without opening a window afterward.
+**Install from repo** (`bash scripts/install-extension.sh`) performs the same packaging and install steps without opening a folder afterward.
 
-When `index.json` has a **higher** `schemaVersion` than the bundled library, opening
-the repo now **writes a timestamped backup** next to `index.json`
-(`index.schema-<N>-backup-<ms>.json`) and **rewrites** `index.json` to the schema this
-build understands (best-effort). Prefer reinstalling from the same git revision so
-you do not rely on downgrade.
+When `index.json` has a **higher** `schemaVersion` than the bundled library, the extension writes a timestamped backup next to `index.json` (`index.schema-<N>-backup-<ms>.json`) and rewrites `index.json` to a schema this build understands.
 
 ## Pairing convention
 

@@ -254,6 +254,11 @@ packages/code-commentray-static/site/
 # GitHub Pages output (`npm run pages:build`)
 _site/
 
+# Cypress / E2E CI artifacts
+test-results/
+cypress/videos/
+cypress/screenshots/
+
 # Packaged VS Code extension artifacts (scripts/install-extension.sh)
 packages/vscode/dist/*.vsix
 

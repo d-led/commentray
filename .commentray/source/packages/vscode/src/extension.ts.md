@@ -6,4 +6,4 @@ This is the **handheld camera** version of Commentray: open beside, start a bloc
 
 **Add block** — Appends marker + heading + placeholder, then **`addBlockToIndex`**. Release tooling (`tag-version.sh`, publish) stays deliberately separate from day-to-day commentary edits.
 
-**Packaging** — `esbuild` inlines `@commentray/core` before `vsce`. A `.vsix` built without that step is the usual “command not found” ghost; root **`npm run extension:install`** is the fix we tell people first.
+**Packaging** — `esbuild` inlines `@commentray/core` into the extension bundle before `vsce` packages the `.vsix`.

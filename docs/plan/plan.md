@@ -186,7 +186,7 @@ The plan doc, the specs under `docs/spec/`, and README/CONTRIBUTING cover engine
    - `docs/user/quickstart.md` — `commentray init`, write first `.commentray/source/<file>.md`, run `commentray validate`, open pairing in the editor.
    - `docs/user/cli.md` — condensed reference for `init`, `init config`, `init scm`, `validate`, `doctor`, `migrate`, `render`, `paths`; exit codes; env vars (`COMMENTRAY_EDITOR`, `COMMENTRAY_SEA_NODE`).
    - `docs/user/config.md` — every `.commentray.toml` key with a one-line explanation and the default.
-   - `docs/user/troubleshooting.md` — common failure modes (missing `.git`, Homebrew Node + SEA, quarantine, stale metadata after rebase).
+   - `docs/user/troubleshooting.md` — short FAQ (operational notes; link from README when added).
    - README links into this tree; each page stays short enough to read in one screen.
 
 2. **Detection matrix doc**: `docs/user/detection.md` — what is caught **where**, and where the gaps are. Outline:

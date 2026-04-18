@@ -13,7 +13,7 @@ We like the lightweight spirit described in the Collective Code Construction Con
 - Open an issue before very large changes unless you have maintainer alignment.
 - Keep pull requests focused; prefer several small PRs over one sweeping refactor.
 - Before asking for review, follow the **Keeping quality high** section below.
-- For extension-specific debugging (Output channels, Extension Host logs, common "command not found" failures), see [`docs/development.md`](docs/development.md).
+- For extension-specific debugging (Output channels, Extension Host logs), see [`docs/development.md`](docs/development.md).
 - **CLI init:** `npm run commentray -- init` is idempotent (storage dirs, seed `index.json` and `.commentray.toml` if missing). Use `npm run commentray -- init config` to ensure TOML defaults, or `init config --force` to replace. `npm run commentray -- init scm` installs or refreshes a marked block in `.git/hooks/pre-commit` that runs `commentray validate` when `node_modules/.bin/commentray` exists at the repo root.
 - **Standalone CLI binaries:** `npm run binary:build` then `npm run binary:smoke` (see README **Standalone CLI binaries**). CI builds Linux x64/arm64, macOS x64/arm64, and Windows x64 via [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml). Workflow **artifacts expire** (14-day retention); **`v*`** tags attach the same files to a **[GitHub Release](https://github.com/d-led/commentray/releases)** as the durable download location (GitHub’s native release asset store—no separate artifact registry). On macOS with Homebrew Node, use `COMMENTRAY_SEA_NODE` pointing at an official `node` binary when building locally.
 - **GitHub Pages:** configure `[static_site]` in `.commentray.toml` (title, intro Markdown, `github_url`, `source_file`, optional `commentray_markdown`). Run `npm run pages:build` to emit `_site/index.html`. The `pages.yml` workflow deploys on `main` once **Settings → Pages → Build: GitHub Actions** is enabled.
@@ -62,22 +62,20 @@ This repository is developed with **npm** (`package-lock.json` is committed).
 
 Dogfood runs the **same** steps as `bash scripts/install-extension.sh` (build `@commentray/core`,
 esbuild the extension, `vsce package`, uninstall any old `d-led.commentray-vscode`,
-`--force` install the new `.vsix`), then opens a **new** editor window on a folder so you
-get a working extension — no fragile `--extensionDevelopmentPath` dev host.
+`--force` install the new `.vsix`), then opens a **new** editor window on a folder.
 
 From the repo root:
 
 ```bash
 npm run extension:dogfood              # install + open packages/vscode/fixtures/dogfood
-npm run extension:dogfood:repo         # install + open this repo (`.` without npm’s `--`)
-npm run extension:dogfood -- .         # install + open this repo (use `--` so `.` is passed)
+npm run extension:dogfood:repo           # install + open this repo (repo root)
+npm run extension:dogfood -- .           # install + open this repo (`--` forwards `.` to npm scripts)
 npm run extension:dogfood -- /path/to/project
 ```
 
 Override the editor CLI with `COMMENTRAY_EDITOR` (same as the install script).
 
-If a window was already open on that folder, run **Developer: Reload Window** so it picks
-up the new install.
+Reload the editor window if that workspace was already open so it picks up the new install.
 
 ### `npm run extension:install` (install only, no folder launch)
 
@@ -88,7 +86,7 @@ npm run extension:install       # build, bundle, package, install the .vsix
 npm run extension:uninstall     # remove it
 ```
 
-After install, reload the target window (Command Palette → _Developer: Reload Window_) and the `Commentray:` commands appear there.
+After install, reload the target window so `Commentray:` commands are registered.
 
 ## Expensive CI
 
