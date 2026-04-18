@@ -114,3 +114,7 @@ Commentray does **not** silently rewrite your primary source to match stale `lin
 - [blocks.md](../spec/blocks.md) — block model, Markdown markers, markers, drift, staleness.
 - [anchors.md](../spec/anchors.md) — `lines:`, `marker:`, `symbol:` grammar and validation rules.
 - [storage.md](../spec/storage.md) — paths, Angles, where files live.
+
+## See also (user guides)
+
+- [Install](install.md), [Quickstart](quickstart.md), [What Commentray detects](detection.md), [CLI reference](cli.md), [Configuration](config.md), [Troubleshooting](troubleshooting.md)

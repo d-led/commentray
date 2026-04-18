@@ -8,6 +8,18 @@ Inline comments are not always possible (generated files, tight formats, policy)
 
 The same split is useful when you want **rich context for a human or a chatbot**—runbooks, product rationale, incident notes, onboarding prose—that does not belong in the source file itself, yet stays **correlatable** with specific lines or regions through the metadata index and block anchors, so the assistant can reason about “this commentary goes with that code” without you pasting a wall of inline comments into the repo.
 
+## Using Commentray
+
+Short, command-first guides (install the CLI or extension, first `.commentray/` setup, validation, and what each layer catches):
+
+- [Install](docs/user/install.md) — binaries, `npm i -g @commentray/cli`, editor extension
+- [Quickstart](docs/user/quickstart.md) — `commentray init`, paired Markdown paths, validate
+- [Keeping blocks in sync](docs/user/keeping-blocks-in-sync.md) — index, markers, anchors
+- [What Commentray detects](docs/user/detection.md) — hook, CLI, editor, known gaps
+- [CLI reference](docs/user/cli.md) — commands, exit codes, env vars
+- [Configuration](docs/user/config.md) — `.commentray.toml` keys
+- [Troubleshooting](docs/user/troubleshooting.md) — common failures
+
 ## What’s in this repo
 
 - `@commentray/core`: models, TOML config, JSON metadata validation, Git SCM adapter, staleness helpers.
@@ -16,7 +28,9 @@ The same split is useful when you want **rich context for a human or a chatbot**
 - `@commentray/cli`: `commentray` command for `init` (idempotent workspace setup), `init config`, `init scm` (git pre-commit hook), validate/doctor/migrate/render. **Standalone executables** (Node SEA, no separate Node install) are built per OS/arch in [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml) and attached to GitHub Releases on version tags; see **Standalone CLI binaries** below.
 - `commentray-vscode`: VS Code / Cursor extension MVP (open a source file beside its **commentray** + basic scroll sync + workspace validation output; richer gutter UX is planned).
 
-## Quickstart
+## Quickstart (this repository)
+
+For **developing** Commentray itself (clone, install, build, local `doctor`):
 
 ```bash
 npm run setup       # install, build, init, doctor — idempotent
@@ -120,6 +134,7 @@ Release.
 - Config: [`.commentray.toml`](.commentray.toml)
 - Storage: [`.commentray/`](.commentray/)
 - Spec: [`docs/spec/storage.md`](docs/spec/storage.md), [`docs/spec/anchors.md`](docs/spec/anchors.md), [`docs/spec/blocks.md`](docs/spec/blocks.md)
+- User guides: [`docs/user/`](docs/user/) — [install](docs/user/install.md), [quickstart](docs/user/quickstart.md), [detection](docs/user/detection.md), [CLI](docs/user/cli.md), [config](docs/user/config.md), [troubleshooting](docs/user/troubleshooting.md)
 - Keeping metadata in sync: [`docs/user/keeping-blocks-in-sync.md`](docs/user/keeping-blocks-in-sync.md)
 - `commentray init` merges [`d-led.commentray-vscode`](https://marketplace.visualstudio.com/items?itemName=d-led.commentray-vscode) into [`.vscode/extensions.json`](.vscode/extensions.json) when the file is mergeable JSON
 - Plan: [`docs/plan/plan.md`](docs/plan/plan.md)

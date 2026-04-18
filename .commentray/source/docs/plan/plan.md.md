@@ -27,3 +27,5 @@ flowchart LR
 **Automation** — Hooks: `commentray init scm`. Local/CI gate: **`npm run quality:gate`** → `scripts/quality-gate.sh`.
 
 **Handoff** — The plan ends with **Next session (handoff)**: reading order, command table, suggested backlog bullets, parking lot. Start there after a break.
+
+**User-facing** — Short guides live in **`docs/user/`**; the README has **Using Commentray** with links (install, quickstart, detection, CLI, config, troubleshooting).
