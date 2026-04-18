@@ -208,7 +208,8 @@ program.name("commentray").description("Commentray CLI").version(cliPackage.vers
 const initCmd = program
   .command("init")
   .description(
-    "Idempotent workspace setup: storage dirs, index.json if missing, .commentray.toml if missing",
+    "Idempotent workspace setup: storage dirs, index.json if missing, .commentray.toml if missing; " +
+      "always refreshes index migrations and runs validate (exit 1 on validation errors)",
   );
 
 initCmd

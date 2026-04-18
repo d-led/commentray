@@ -15,7 +15,7 @@ Standalone, self-contained binaries (no Node install needed) for Linux x64/arm64
 ## Use
 
 ```bash
-commentray init            # storage dirs, index.json, .commentray.toml if missing
+commentray init            # dirs + index.toml if missing; migrate/normalize index; validate
 commentray init config     # ensure .commentray.toml exists (with --force to replace)
 commentray init scm        # install/refresh a marked block in .git/hooks/pre-commit
 commentray validate        # schema + anchor integrity + Git staleness evidence
