@@ -41,11 +41,15 @@ refuses that `index.json` shape (often: **Marketplace / old `.vsix` install** wh
 the repo’s CLI wrote a newer schema). **Fix:** from the Commentray repo run
 `bash scripts/install-extension.sh`, then **Developer: Reload Window**.
 
-**Dogfood** (`npm run extension:dogfood` / `bash scripts/editor-extension.sh dogfood …`)
-always **rebuilds** core + the extension, then opens an **Extension Development Host**
-window (`--extensionDevelopmentPath=…/packages/vscode`). That window uses **this
-workspace’s bundle**, not your separately installed Marketplace build. If you open
-the same folder in a **normal** editor window, the global install can still be stale.
+**Dogfood** (`npm run extension:dogfood`) is now the same **install path** as
+`bash scripts/install-extension.sh`: build → `.vsix` → uninstall old `d-led.commentray-vscode`
+→ `--force` install, then open a **new** editor window on the folder (`-n` / `--new-window`
+when supported). Use `npm run extension:dogfood:repo` to open this repo, or
+`npm run extension:dogfood -- .` (npm requires `--` before `.`). Reload any tab that was
+already on that folder.
+
+**Install from repo** (`bash scripts/install-extension.sh`) is the same packaging and
+install steps without opening a window afterward.
 
 When `index.json` has a **higher** `schemaVersion` than the bundled library, opening
 the repo now **writes a timestamped backup** next to `index.json`

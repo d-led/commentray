@@ -58,24 +58,30 @@ This repository is developed with **npm** (`package-lock.json` is committed).
 
 ## Dogfood the `commentray-vscode` extension
 
-There are two complementary workflows. Use the one that matches your goal.
+### `npm run extension:dogfood` (install from this repo + open a folder)
 
-### Extension development: `npm run extension:dogfood`
+Dogfood runs the **same** steps as `bash scripts/install-extension.sh` (build `@commentray/core`,
+esbuild the extension, `vsce package`, uninstall any old `d-led.commentray-vscode`,
+`--force` install the new `.vsix`), then opens a **new** editor window on a folder so you
+get a working extension — no fragile `--extensionDevelopmentPath` dev host.
 
 From the repo root:
 
 ```bash
-npm run extension:dogfood              # opens packages/vscode/fixtures/dogfood
-npm run extension:dogfood -- <path>    # or open a specific folder
+npm run extension:dogfood              # install + open packages/vscode/fixtures/dogfood
+npm run extension:dogfood:repo         # install + open this repo (`.` without npm’s `--`)
+npm run extension:dogfood -- .         # install + open this repo (use `--` so `.` is passed)
+npm run extension:dogfood -- /path/to/project
 ```
 
-This builds `@commentray/core` and the extension (the extension `build` script runs **esbuild** so `@commentray/core` is bundled into `dist/extension.js`, matching the packaged `.vsix`), then starts **Cursor** (if `cursor` is on `PATH`) or **VS Code** with `--extensionDevelopmentPath=packages/vscode`. Override the editor binary with `COMMENTRAY_EDITOR`.
+Override the editor CLI with `COMMENTRAY_EDITOR` (same as the install script).
 
-By default it opens [`packages/vscode/fixtures/dogfood`](packages/vscode/fixtures/dogfood) — a committed sample workspace — rather than the Commentray repository itself. This sidesteps VS Code / Cursor's _"one folder per profile"_ rule: if you try to open a folder that your main Cursor window already holds open, the editor focus-steals back to the main window and the dev host is effectively unusable. Using a dedicated fixture avoids the collision entirely and keeps the dev host in your normal (logged-in) Cursor profile.
+If a window was already open on that folder, run **Developer: Reload Window** so it picks
+up the new install.
 
-### Using Commentray in your own projects: `npm run extension:install`
+### `npm run extension:install` (install only, no folder launch)
 
-For actually using the extension against real codebases, don't use the dev host — build and install the packaged `.vsix` into your regular editor:
+Same build/package/install as dogfood, without opening a window afterward:
 
 ```bash
 npm run extension:install       # build, bundle, package, install the .vsix

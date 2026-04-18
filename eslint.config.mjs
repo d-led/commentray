@@ -12,6 +12,8 @@ export default tseslint.config(
       "**/*.mjs",
       "eslint.config.mjs",
       "packages/vscode/fixtures/**",
+      "cypress/**",
+      "cypress.config.ts",
     ],
   },
   {

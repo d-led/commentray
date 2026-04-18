@@ -45,6 +45,15 @@ npm run test:coverage
 npm run test:coverage:all
 ```
 
+**Static site E2E** (Cypress + Chrome, same task shape as [my-mvg-departures](https://github.com/d-led/my-mvg-departures)): builds `_site`, serves it on port **4173**, then runs Cypress. Requires **Google Chrome** installed.
+
+```bash
+npm run e2e    # headless: pages:build → serve → cypress run
+npm run cy     # interactive: pages:build → serve → cypress open
+```
+
+Specs live under `cypress/e2e/*.cy.ts`. Files matching `screenshot*.cy.ts` are excluded (optional local screenshot runs).
+
 ## Standalone CLI binaries
 
 The workflow [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml) produces one self-contained binary per row. Each run uploads **workflow artifacts** that **expire after 14 days** (by design—do not treat them as long-term storage). When you push a **`v*`** tag, the same workflow attaches those files to a **[GitHub Release](https://github.com/d-led/commentray/releases)**; **download binaries from the Release**, not from old workflow runs.
@@ -119,15 +128,15 @@ Packages in this monorepo are licensed under **MPL-2.0** (see `LICENSE` and per-
 
 ## Dogfood the editor extension (Cursor / VS Code)
 
-Build `@commentray/core` + the extension, then launch your editor with the extension loaded from `packages/vscode` (no `.vsix` required):
+**Dogfood** rebuilds the extension, produces a `.vsix`, uninstalls any old
+`d-led.commentray-vscode`, **installs** the new package (`--force`), then opens a **new**
+editor window on a folder (same install path as `npm run extension:install`, plus a
+launch so you are not debugging broken `--extensionDevelopmentPath` behavior).
 
 ```bash
-npm run extension:dogfood
-```
-
-Open another folder:
-
-```bash
+npm run extension:dogfood              # fixture folder + install + open
+npm run extension:dogfood:repo         # this repo (.) without needing npm’s `--`
+npm run extension:dogfood -- .         # this repo — `--` required so `.` reaches the script
 npm run extension:dogfood -- /path/to/project
 ```
 
@@ -137,10 +146,7 @@ If both `cursor` and `code` exist on `PATH`, **Cursor wins**; override with:
 COMMENTRAY_EDITOR=code npm run extension:dogfood
 ```
 
-**Dogfood** opens an **Extension Development Host** window: that build always embeds the
-workspace’s `@commentray/core`. A normal window on the same folder may still use an
-older **installed** extension — use `bash scripts/install-extension.sh` from this
-repo and reload when you want the packaged `.vsix` path instead.
+If a tab was already open on that folder, run **Developer: Reload Window** so it picks up the new install.
 
 ## On the Name
 

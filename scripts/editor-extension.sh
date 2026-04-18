@@ -1,28 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build and launch Cursor / VS Code with this repo's Commentray extension
-# loaded from packages/vscode (development install — no .vsix).
+# “Dogfood” = install the extension from **this repo** (same path as
+# `scripts/install-extension.sh`: build → .vsix → uninstall old id → install),
+# then open a **new** editor window on the chosen folder so you are not stuck on
+# a stale Extension Development Host / broken CLI flags.
 #
 # Usage:
-#   bash scripts/editor-extension.sh dogfood              # open the fixture folder
-#   bash scripts/editor-extension.sh dogfood <path>       # open a specific folder
+#   bash scripts/editor-extension.sh dogfood              # fixture + install + open fixture
+#   bash scripts/editor-extension.sh dogfood <path>       # install + open that folder
 #
-# By default this opens `packages/vscode/fixtures/dogfood`, a minimal
-# commentray-enabled workspace committed to this repo. That avoids VS Code /
-# Cursor's "one folder per profile" rule, which otherwise steals focus back to
-# your main window when you try to open a folder it already has open.
+# From npm, pass the folder **after** `--` (npm does not forward bare args reliably):
+#   npm run extension:dogfood -- .
+#   npm run extension:dogfood -- /path/to/project
 #
-# To actually USE the extension in your own projects, install the packaged
-# .vsix instead:
-#   npm run extension:install
+# Convenience (opens this repo without `--`):
+#   npm run extension:dogfood:repo
 #
-# `npm run build -w commentray-vscode` runs tsc then esbuild so `@commentray/core`
-# is inlined into dist/extension.js (same as packaged .vsix).
-#
-# Editor CLI:
-#   $COMMENTRAY_EDITOR (path or command) is honored first.
-#   Otherwise: prefer `cursor` if on PATH, else `code`.
+# Editor CLI: $COMMENTRAY_EDITOR, else `cursor`, else `code`.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -32,34 +27,31 @@ source "$REPO_ROOT/scripts/lib/pick-editor-cli.sh"
 
 DEFAULT_DOGFOOD_FOLDER="$REPO_ROOT/packages/vscode/fixtures/dogfood"
 
-build_extension() {
-  npm run build -w @commentray/core
-  npm run build -w commentray-vscode
-  bundled_schema="$(
-    node --input-type=module -e "import { CURRENT_SCHEMA_VERSION } from './packages/core/dist/model.js'; process.stdout.write(String(CURRENT_SCHEMA_VERSION))"
-  )"
-  echo "Built commentray-vscode (bundled @commentray/core index schemaVersion: ${bundled_schema})." >&2
-}
-
 warn_if_folder_collides_with_main() {
   local target_abs="$1"
-  # Heuristic: if the user points the dev host at this very repo, Cursor/VS
-  # Code will focus-steal to any existing window holding it. We can't detect
-  # "already open" reliably, so warn unconditionally for this one known case.
   if [[ "$target_abs" == "$REPO_ROOT" ]]; then
     cat >&2 <<EOF
-warning: opening the Commentray repository itself in the dev host.
-         If your regular Cursor window already has this folder open,
-         VS Code / Cursor will focus that window instead of the dev host.
-         Close the main window first, or use the default fixture:
-           bash scripts/editor-extension.sh dogfood
+warning: opening the Commentray repository itself after install.
+         If another window already has this folder open, use
+         Developer: Reload Window (or close it) so this workspace picks up the new .vsix.
 EOF
   fi
 }
 
-cmd_dogfood() {
-  build_extension
+# Open folder in a fresh window when the CLI supports it; otherwise open normally.
+commentray_editor_open_folder_new_window() {
+  local editor_cli="$1" target="$2"
+  shift 2
+  if "$editor_cli" -n "$target" "$@" 2>/dev/null; then
+    return 0
+  fi
+  if "$editor_cli" --new-window "$target" "$@" 2>/dev/null; then
+    return 0
+  fi
+  "$editor_cli" "$target" "$@" || true
+}
 
+cmd_dogfood() {
   local target
   if [[ "$#" -eq 0 ]]; then
     target="$DEFAULT_DOGFOOD_FOLDER"
@@ -70,18 +62,14 @@ cmd_dogfood() {
 
   warn_if_folder_collides_with_main "$target"
 
+  echo "Dogfood: building, packaging, and installing Commentray from this repo (same as install-extension.sh)..." >&2
+  bash "$REPO_ROOT/scripts/install-extension.sh"
+
   local editor_cli
   editor_cli="$(commentray_pick_editor_cli)"
-
-  # VS Code / Cursor expect the camelCase form `--extensionDevelopmentPath`.
-  # The kebab-case variant is parsed by Electron/Chromium, not VS Code's
-  # extension host, and the dev window never opens.
-  echo "Launching ${editor_cli} against ${target}" >&2
-  echo "Using --extensionDevelopmentPath (workspace extension). For the normal install path, run: bash scripts/install-extension.sh" >&2
-  exec "$editor_cli" \
-    --extensionDevelopmentPath="$REPO_ROOT/packages/vscode" \
-    "$target" \
-    "$@"
+  echo "Opening new editor window on: ${target}" >&2
+  commentray_editor_open_folder_new_window "$editor_cli" "$target" "$@"
+  echo "If Commentray commands are missing in an existing tab on this folder, run: Developer: Reload Window" >&2
 }
 
 case "${1:-}" in

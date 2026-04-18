@@ -2,7 +2,9 @@
 set -euo pipefail
 
 # Build, package, and install the Commentray extension into your regular
-# Cursor / VS Code (not the Extension Development Host).
+# Cursor / VS Code (not the Extension Development Host). Before install, any
+# existing `d-led.commentray-vscode` copy is uninstalled so Marketplace / old
+# .vsix builds cannot linger beside the new package.
 #
 # Usage:
 #   bash scripts/install-extension.sh                  # build + install
@@ -17,9 +19,11 @@ cd "$REPO_ROOT"
 
 # shellcheck source=lib/pick-editor-cli.sh
 source "$REPO_ROOT/scripts/lib/pick-editor-cli.sh"
+# shellcheck source=lib/commentray-vscode-ext.sh
+source "$REPO_ROOT/scripts/lib/commentray-vscode-ext.sh"
 
 EXT_DIR="$REPO_ROOT/packages/vscode"
-EXT_ID="d-led.commentray-vscode"
+EXT_ID="$COMMENTRAY_VSCODE_EXTENSION_ID"
 
 ext_version() {
   node -e "process.stdout.write(require('$EXT_DIR/package.json').version)"
@@ -37,7 +41,8 @@ esac
 if [[ "$mode" == "uninstall" ]]; then
   editor_cli="$(commentray_pick_editor_cli)"
   echo "Uninstalling $EXT_ID from $editor_cli..."
-  "$editor_cli" --uninstall-extension "$EXT_ID"
+  "$editor_cli" --uninstall-extension "$EXT_ID" >/dev/null 2>&1 || true
+  echo "Done (no error if it was already absent)." >&2
   exit 0
 fi
 
@@ -64,6 +69,7 @@ if [[ "$mode" == "publish" ]]; then
 fi
 
 editor_cli="$(commentray_pick_editor_cli)"
+commentray_uninstall_packaged_commentray_if_present "$editor_cli"
 echo "Installing into $editor_cli..."
 "$editor_cli" --install-extension "$vsix_path" --force
 echo "Installed. Reload your editor window (Cmd/Ctrl+Shift+P → 'Developer: Reload Window')."
