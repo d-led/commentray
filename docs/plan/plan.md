@@ -240,20 +240,20 @@ Use this section to resume work without re-deriving context.
 | Static browser E2E (Chrome installed)                            | `npm run e2e` or `npm run e2e:ci`                                                      |
 | Full workspace TypeScript build                                  | `npm run build`                                                                        |
 
-### Suggested backlog order (pick up tomorrow)
+### Suggested backlog (pick up tomorrow)
 
-Order balances **user-visible docs**, **low-risk dogfood**, and **larger product slices**. Reorder if a release or incident dictates.
+Balances **user-visible docs**, **low-risk dogfood**, and **larger product slices**. Order is a hint only—reorder when a release or incident dictates.
 
-1. **User docs (unblocks README links)** — Add `docs/user/install.md` and `docs/user/quickstart.md` per §Documentation roadmap; then add README links when those files exist.
-2. **Detection matrix** — Add `docs/user/detection.md` (lift the outline from §Documentation roadmap item 2); optionally shorten that outline here once the dedicated page is canonical.
-3. **Remaining user docs** — `docs/user/cli.md`, `docs/user/config.md`, `docs/user/troubleshooting.md` as short pages; keep each one screen where possible.
-4. **Dogfood `index.json` (optional, fast)** — Add at least one coherent **block** entry for the Pages pair (`README.md` ↔ `.commentray/source/README.md.md`) so **block stretch** and index-backed scroll run on the public site; validates `build-static-pages.mjs` wiring under real content.
-5. **Validate hook scope** — Design + implement staged-files-only (or similar) for `commentray validate` from pre-commit when the team wants faster commits on huge trees.
-6. **Angles on static** — Switcher + multi-body load in `build-static-pages.mjs` / client bundle (§Open technical choices item 3); **dogfood** this repo with `source/.default` + at least two angle files for one primary (e.g. README) once migration exists or paths are hand-migrated.
-7. **Angles migration + search** — CLI (or scripted) flat→angles migration; Pages `commentray-nav-search.json` includes every indexed angle and/or discovers `source/{P}/*.md` when index is empty.
-8. **VS Code synchronized scroll + extension E2E** — Polish bidirectional / block-aware scroll in `commentray-vscode`; add VS Code integration tests (not Cypress) for paired panes and scroll alignment; wire into CI when stable (see §Open technical choices item 2 and gaps table).
-9. **Editor / language depth** — Webview parity with `@commentray/render`; tree-sitter or LSP-backed resolvers (items 1 and 2c under §Open technical choices).
-10. **Local static dev loop** — `commentray serve` (or `npm run pages:dev`): watch inputs, rerun `pages:build`, optional livereload for `_site` (see gaps table **Local static preview + reload**).
+- **User docs (unblocks README links)** — Add `docs/user/install.md` and `docs/user/quickstart.md` per §Documentation roadmap; then add README links when those files exist.
+- **Detection matrix** — Add `docs/user/detection.md` (lift the outline from §Documentation roadmap); optionally shorten that outline here once the dedicated page is canonical.
+- **Remaining user docs** — `docs/user/cli.md`, `docs/user/config.md`, `docs/user/troubleshooting.md` as short pages; keep each one screen where possible.
+- **Dogfood `index.json` (optional, fast)** — Add at least one coherent **block** entry for the Pages pair (`README.md` ↔ `.commentray/source/README.md.md`) so **block stretch** and index-backed scroll run on the public site; validates `build-static-pages.mjs` wiring under real content.
+- **Validate hook scope** — Design + implement staged-files-only (or similar) for `commentray validate` from pre-commit when the team wants faster commits on huge trees.
+- **Angles on static** — Switcher + multi-body load in `build-static-pages.mjs` / client bundle (§Open technical choices item 3); **dogfood** this repo with `source/.default` + at least two angle files for one primary (e.g. README) once migration exists or paths are hand-migrated.
+- **Angles migration + search** — CLI (or scripted) flat→angles migration; Pages `commentray-nav-search.json` includes every indexed angle and/or discovers `source/{P}/*.md` when index is empty.
+- **VS Code synchronized scroll + extension E2E** — Polish bidirectional / block-aware scroll in `commentray-vscode`; add VS Code integration tests (not Cypress) for paired panes and scroll alignment; wire into CI when stable (see §Open technical choices item 2 and gaps table).
+- **Editor / language depth** — Webview parity with `@commentray/render`; tree-sitter or LSP-backed resolvers (items 1 and 2c under §Open technical choices).
+- **Local static dev loop** — `commentray serve` (or `npm run pages:dev`): watch inputs, rerun `pages:build`, optional livereload for `_site` (see gaps table **Local static preview + reload**).
 
 ### Parking lot (not scheduled in the list above)
 
