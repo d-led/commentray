@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
-import type { ScmProvider } from "./scm-provider.js";
+
+import { normalizeRepoRelativePath } from "../paths.js";
+import type { ScmPathRename, ScmProvider } from "./scm-provider.js";
 
 function runGit(
   repoRoot: string,
@@ -23,6 +25,31 @@ function runGit(
       resolve({ code: code ?? 1, stdout, stderr });
     });
   });
+}
+
+/**
+ * Parses `git diff --name-status` output for `R` (rename) lines. Tab-separated
+ * `R086\told/path\tnew/path` (score optional).
+ */
+export function parseGitRenameLines(stdout: string): ScmPathRename[] {
+  const out: ScmPathRename[] = [];
+  for (const line of stdout.split("\n")) {
+    const t = line.trim();
+    if (!t) continue;
+    const parts = t.split("\t");
+    if (parts.length < 3) continue;
+    const status = parts[0] ?? "";
+    if (!status.startsWith("R")) continue;
+    try {
+      out.push({
+        from: normalizeRepoRelativePath(parts[1] ?? ""),
+        to: normalizeRepoRelativePath(parts[2] ?? ""),
+      });
+    } catch {
+      continue;
+    }
+  }
+  return out;
 }
 
 export class GitScmProvider implements ScmProvider {
@@ -52,5 +79,23 @@ export class GitScmProvider implements ScmProvider {
     if (code === 0) return true;
     if (code === 1) return false;
     throw new Error(`git merge-base failed (${code}): ${stderr.trim()}`);
+  }
+
+  async listPathRenamesBetweenTreeishes(
+    repoRoot: string,
+    fromTreeish: string,
+    toTreeish: string,
+  ): Promise<ScmPathRename[]> {
+    const { code, stdout, stderr } = await runGit(repoRoot, [
+      "diff",
+      "--name-status",
+      "-M30%",
+      fromTreeish,
+      toTreeish,
+    ]);
+    if (code !== 0) {
+      throw new Error(`git diff --name-status failed (${code}): ${stderr.trim() || stdout.trim()}`);
+    }
+    return parseGitRenameLines(stdout);
   }
 }

@@ -1,3 +1,5 @@
+import { assertValidMarkerId, MARKER_ID_BODY } from "./marker-ids.js";
+
 export type LineRange = { start: number; end: number };
 
 export type ParsedAnchor =
@@ -15,9 +17,9 @@ export type ParsedAnchor =
  */
 export function parseAnchor(anchor: string): ParsedAnchor {
   const trimmed = anchor.trim();
-  const markerMatch = /^marker:([a-z0-9]{1,64})$/i.exec(trimmed);
+  const markerMatch = new RegExp(`^marker:(${MARKER_ID_BODY})$`, "i").exec(trimmed);
   if (markerMatch) {
-    const id = markerMatch[1].toLowerCase();
+    const id = assertValidMarkerId(markerMatch[1]);
     return { kind: "marker", id };
   }
   const linesMatch = /^lines:(\d+)-(\d+)$/.exec(trimmed);
@@ -43,9 +45,5 @@ export function formatLineRange(range: LineRange): string {
 }
 
 export function formatMarkerAnchor(markerId: string): string {
-  const trimmed = markerId.trim().toLowerCase();
-  if (!/^[a-z0-9]{1,64}$/.test(trimmed)) {
-    throw new Error(`Invalid marker id for anchor: ${markerId}`);
-  }
-  return `marker:${trimmed}`;
+  return `marker:${assertValidMarkerId(markerId)}`;
 }

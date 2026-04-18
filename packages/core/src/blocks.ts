@@ -1,5 +1,6 @@
 import { buildCommentraySnippetV1 } from "./block-snippet.js";
 import { formatMarkerAnchor } from "./anchors.js";
+import { assertValidMarkerId } from "./marker-ids.js";
 import type { CommentrayBlock, CommentrayIndex, SourceFileIndexEntry } from "./model.js";
 
 /** 1-based inclusive range of source lines a block points to. */
@@ -51,7 +52,7 @@ const CARET_PLACEHOLDER = "_(write commentary here)_";
  */
 export function createBlockForRange(input: CreateBlockForRangeInput): CreatedBlock {
   const range = clampRange(input.range, input.sourceText);
-  const id = input.id ?? generateBlockId(input.rng);
+  const id = input.id !== undefined ? assertValidMarkerId(input.id) : generateBlockId(input.rng);
   const anchor = formatMarkerAnchor(id);
   const snippet = snippetFromRange(input.sourceText, range);
   const block: CommentrayBlock = { id, anchor, markerId: id, snippet };

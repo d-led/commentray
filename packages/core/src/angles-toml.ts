@@ -3,8 +3,7 @@ import path from "node:path";
 import { parse as parseToml, stringify } from "@iarna/toml";
 
 import { assertValidAngleId } from "./angles.js";
-import type { CommentrayToml } from "./config.js";
-import { mergeCommentrayConfig } from "./config.js";
+import { type CommentrayToml, mergeCommentrayConfig } from "./config.js";
 import { commentrayAnglesSentinelPath } from "./paths.js";
 
 export type UpsertAngleDefinitionInput = {

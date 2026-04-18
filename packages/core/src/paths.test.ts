@@ -45,6 +45,12 @@ describe("commentrayMarkdownPath", () => {
   it("appends .md under .commentray/source", () => {
     expect(commentrayMarkdownPath("src/a.ts")).toBe(".commentray/source/src/a.ts.md");
   });
+
+  it("honours a custom storage dir", () => {
+    expect(commentrayMarkdownPath("src/a.ts", "var/commentray")).toBe(
+      "var/commentray/source/src/a.ts.md",
+    );
+  });
 });
 
 describe("Angles paths", () => {

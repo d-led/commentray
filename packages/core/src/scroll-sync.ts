@@ -1,4 +1,5 @@
 import { parseAnchor } from "./anchors.js";
+import { MARKER_ID_BODY } from "./marker-ids.js";
 import type { CommentrayIndex } from "./model.js";
 import { sourceLineRangeForMarkerId } from "./source-markers.js";
 
@@ -11,7 +12,7 @@ export type BlockScrollLink = {
   sourceEnd: number;
 };
 
-const BLOCK_MARKER_RE = /<!-- commentray:block id=([a-z0-9]+) -->/;
+const BLOCK_MARKER_RE = new RegExp(`<!-- commentray:block id=(${MARKER_ID_BODY}) -->`);
 
 function markerLineByIdFromMarkdown(markdown: string): Map<string, number> {
   const map = new Map<string, number>();

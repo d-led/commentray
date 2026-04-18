@@ -43,7 +43,7 @@ describe("assertValidIndex", () => {
     ).toThrow(/index key must equal entry\.commentrayPath/);
   });
 
-  it("accepts an optional snippet string and markerId on a block", () => {
+  it("accepts an optional snippet string and markerId on a block when id matches the marker anchor", () => {
     expect(() =>
       assertValidIndex(
         indexWithBlock({
@@ -54,6 +54,18 @@ describe("assertValidIndex", () => {
         }),
       ),
     ).not.toThrow();
+  });
+
+  it("rejects marker anchor when block id does not match", () => {
+    expect(() =>
+      assertValidIndex(
+        indexWithBlock({
+          id: "wrong",
+          anchor: "marker:b1",
+          markerId: "b1",
+        }),
+      ),
+    ).toThrow(/must match marker anchor id/);
   });
 
   it("rejects legacy fingerprint objects", () => {

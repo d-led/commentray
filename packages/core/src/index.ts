@@ -43,8 +43,13 @@ export { assertValidIndex, emptyIndex } from "./metadata.js";
 export { migrateIndex } from "./migrate.js";
 export type { ParsedAnchor } from "./anchors.js";
 export { formatLineRange, parseAnchor } from "./anchors.js";
-export type { ScmProvider } from "./scm/scm-provider.js";
-export { GitScmProvider } from "./scm/git-scm-provider.js";
+export type { ScmPathRename, ScmProvider } from "./scm/scm-provider.js";
+export { GitScmProvider, parseGitRenameLines } from "./scm/git-scm-provider.js";
+export {
+  applyPathRenamesToCommentrayIndex,
+  inferAngleIdFromCommentrayPath,
+} from "./commentray-index-renames.js";
+export type { PathRename } from "./commentray-index-renames.js";
 export type { BlockDiagnostic } from "./staleness.js";
 export { diagnoseBlock } from "./staleness.js";
 export type { ValidationIssue, ValidationResult } from "./validate-project.js";
@@ -68,3 +73,9 @@ export {
   findCommentrayMarkerPairs,
   leadingIndentOfLine,
 } from "./region-marker-convert.js";
+export { MARKER_ID_BODY, assertValidMarkerId, normaliseMarkerSlugOrThrow } from "./marker-ids.js";
+export type { MarkerValidationIssue } from "./marker-validation.js";
+export {
+  validateIndexMarkerSemantics,
+  validateMarkerBoundariesInSource,
+} from "./marker-validation.js";

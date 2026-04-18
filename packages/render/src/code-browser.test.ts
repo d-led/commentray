@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderCodeBrowserHtml } from "./code-browser.js";
 
-describe("renderCodeBrowserHtml", () => {
+describe("renderCodeBrowserHtml — layout and regions", () => {
   it("includes resizable gutter, wrap toggle, and rendered regions", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
@@ -59,7 +59,9 @@ describe("renderCodeBrowserHtml", () => {
     expect(html).toContain('<span class="ln" aria-hidden="true">3</span>');
     expect(html).toMatch(/\.code-line \.ln[\s\S]*?user-select: none/);
   });
+});
 
+describe("renderCodeBrowserHtml — file path display", () => {
   it("shows the repo-relative file path in the toolbar with the basename emphasized", async () => {
     const html = await renderCodeBrowserHtml({
       filePath: "packages/render/src/code-browser.ts",
@@ -93,7 +95,9 @@ describe("renderCodeBrowserHtml", () => {
     expect(html).not.toContain("<script>x</script>/evil.ts");
     expect(html).toContain("&lt;script&gt;x&lt;/script&gt;/");
   });
+});
 
+describe("renderCodeBrowserHtml — toolbar link policy", () => {
   it("adds an Octocat toolbar link and Commentray attribution for safe http(s) URLs", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",

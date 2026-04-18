@@ -29,9 +29,13 @@ export function normalizeRepoRelativePath(relativePath: string): string {
 }
 
 /** Commentray Markdown path for a repo-relative source file (implicit default angle, flat layout). */
-export function commentrayMarkdownPath(sourceRepoRelativePath: string): string {
+export function commentrayMarkdownPath(
+  sourceRepoRelativePath: string,
+  storageDir = ".commentray",
+): string {
   const normalized = normalizeRepoRelativePath(sourceRepoRelativePath);
-  return path.posix.join(".commentray", "source", `${normalized}.md`);
+  const root = normalizeRepoRelativePath(storageDir.replaceAll("\\", "/"));
+  return path.posix.join(root, "source", `${normalized}.md`);
 }
 
 /**

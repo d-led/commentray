@@ -31,4 +31,11 @@ describe("formatMarkerAnchor", () => {
     const id = "abc123";
     expect(parseAnchor(formatMarkerAnchor(id))).toEqual({ kind: "marker", id });
   });
+
+  it("accepts slug-style ids with hyphens", () => {
+    expect(parseAnchor(formatMarkerAnchor("My-Region"))).toEqual({
+      kind: "marker",
+      id: "my-region",
+    });
+  });
 });

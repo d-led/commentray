@@ -73,7 +73,9 @@ describe("mergeCommentrayConfig", () => {
     });
     expect(cfg.staticSite.relatedGithubNav).toEqual([]);
   });
+});
 
+describe("mergeCommentrayConfig — TOML edge cases and path safety", () => {
   it("accepts multiline basic strings and multiline arrays from real TOML", () => {
     const raw = parseToml(`
 [anchors]
@@ -150,7 +152,9 @@ commentray_markdown = """
       expect(() => mergeCommentrayConfig({ storage: { dir: ".commentray" } })).not.toThrow();
     });
   });
+});
 
+describe("mergeCommentrayConfig — angles", () => {
   describe("angles", () => {
     it("merges definitions and default_angle", () => {
       const cfg = mergeCommentrayConfig({

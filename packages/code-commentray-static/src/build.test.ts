@@ -7,7 +7,7 @@ import { buildCommentrayStatic } from "./build.js";
 
 const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-describe("buildCommentrayStatic", () => {
+describe("buildCommentrayStatic — HTML shell", () => {
   let outDir: string;
 
   afterEach(async () => {
@@ -70,6 +70,14 @@ describe("buildCommentrayStatic", () => {
     const html = await readFile(outHtml, "utf8");
     expect(html).toContain("file-path__dir--root");
     expect(html).toContain('<span class="file-path__base">sample.ts</span>');
+  });
+});
+
+describe("buildCommentrayStatic — URLs and toolbar chrome", () => {
+  let outDir: string;
+
+  afterEach(async () => {
+    if (outDir) await rm(outDir, { recursive: true, force: true });
   });
 
   it("forwards commentrayOutputUrls into rendered commentray links", async () => {

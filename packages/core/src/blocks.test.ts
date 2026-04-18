@@ -36,11 +36,7 @@ describe("createBlockForRange", () => {
       id: "fixed1",
     });
     expect(block.snippet).toBe(
-      buildCommentraySnippetV1([
-        "export function greet(name) {",
-        "return `Hello, ${name}!`;",
-        "}",
-      ]),
+      buildCommentraySnippetV1(["export function greet(name) {", "return `Hello, ${name}!`;", "}"]),
     );
   });
 
@@ -73,9 +69,7 @@ describe("createBlockForRange", () => {
       id: "fixed1",
     });
     expect(block.anchor).toBe("marker:fixed1");
-    expect(block.snippet).toBe(
-      buildCommentraySnippetV1(["return `Hello, ${name}!`;", "}"]),
-    );
+    expect(block.snippet).toBe(buildCommentraySnippetV1(["return `Hello, ${name}!`;", "}"]));
   });
 
   it("emits an invisible id marker that renders to nothing in HTML", () => {

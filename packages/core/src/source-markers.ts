@@ -1,3 +1,5 @@
+import { assertValidMarkerId, MARKER_ID_BODY } from "./marker-ids.js";
+
 /**
  * Source delimiters for block anchors:
  *
@@ -123,7 +125,7 @@ export function commentrayRegionInsertions(
   markerId: string,
   indent = "",
 ): { start: string; end: string } {
-  const id = markerId.trim().toLowerCase();
+  const id = assertValidMarkerId(markerId);
   const tag = COMMENTRAY_TAG(id);
   const ind = indent;
   const conv = regionConvention(languageId);
@@ -182,37 +184,52 @@ export function commentrayRegionInsertions(
 export type RegionBoundaryKind = "start" | "end";
 
 /** Detect a Commentray region, generic marker, or legacy marker line; id is lower-case. */
-export function parseCommentrayRegionBoundary(line: string): { kind: RegionBoundaryKind; id: string } | null {
+export function parseCommentrayRegionBoundary(
+  line: string,
+): { kind: RegionBoundaryKind; id: string } | null {
   const probe = line.trim();
+  const mid = MARKER_ID_BODY;
   const startPatterns: RegExp[] = [
-    /^\/\/#region\s+commentray:([a-z0-9]+)\s*$/i,
-    /^#region\s+commentray:([a-z0-9]+)\s*$/i,
-    /^#pragma\s+region\s+commentray:([a-z0-9]+)\s*$/i,
-    /^#Region\s+commentray:([a-z0-9]+)\s*$/i,
-    /^#\s*region\s+commentray:([a-z0-9]+)\s*$/i,
-    /^<!--\s*#region\s+commentray:([a-z0-9]+)\s*-->\s*$/i,
-    /^--#region\s+commentray:([a-z0-9]+)\s*$/i,
-    /^\/\*\s*commentray:start\s+id=([a-z0-9]+)\s*\*\/\s*$/i,
-    /commentray:start\s+id=([a-z0-9]+)\b/i,
+    new RegExp(`^//#region\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^#region\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^#pragma\\s+region\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^#Region\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^#\\s*region\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^<!--\\s*#region\\s+commentray:(${mid})\\s*-->\\s*$`, "i"),
+    new RegExp(`^--#region\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^/\\*\\s*commentray:start\\s+id=(${mid})\\s*\\*/\\s*$`, "i"),
+    new RegExp(`commentray:start\\s+id=(${mid})\\b`, "i"),
   ];
   const endPatterns: RegExp[] = [
-    /^\/\/#endregion\s+commentray:([a-z0-9]+)\s*$/i,
-    /^#endregion\s+commentray:([a-z0-9]+)\s*$/i,
-    /^#pragma\s+endregion\s+commentray:([a-z0-9]+)\s*$/i,
-    /^#End\s+Region\s+commentray:([a-z0-9]+)\s*$/i,
-    /^#\s*endregion\s+commentray:([a-z0-9]+)\s*$/i,
-    /^<!--\s*#endregion\s+commentray:([a-z0-9]+)\s*-->\s*$/i,
-    /^--#endregion\s+commentray:([a-z0-9]+)\s*$/i,
-    /^\/\*\s*commentray:end\s+id=([a-z0-9]+)\s*\*\/\s*$/i,
-    /commentray:end\s+id=([a-z0-9]+)\b/i,
+    new RegExp(`^//#endregion\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^#endregion\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^#pragma\\s+endregion\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^#End\\s+Region\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^#\\s*endregion\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^<!--\\s*#endregion\\s+commentray:(${mid})\\s*-->\\s*$`, "i"),
+    new RegExp(`^--#endregion\\s+commentray:(${mid})\\s*$`, "i"),
+    new RegExp(`^/\\*\\s*commentray:end\\s+id=(${mid})\\s*\\*/\\s*$`, "i"),
+    new RegExp(`commentray:end\\s+id=(${mid})\\b`, "i"),
   ];
   for (const re of startPatterns) {
     const m = re.exec(probe);
-    if (m) return { kind: "start", id: m[1].toLowerCase() };
+    if (m) {
+      try {
+        return { kind: "start", id: assertValidMarkerId(m[1]) };
+      } catch {
+        continue;
+      }
+    }
   }
   for (const re of endPatterns) {
     const m = re.exec(probe);
-    if (m) return { kind: "end", id: m[1].toLowerCase() };
+    if (m) {
+      try {
+        return { kind: "end", id: assertValidMarkerId(m[1]) };
+      } catch {
+        continue;
+      }
+    }
   }
   return null;
 }
@@ -220,11 +237,14 @@ export function parseCommentrayRegionBoundary(line: string): { kind: RegionBound
 /**
  * 1-based inclusive source lines **between** paired region / generic / legacy marker lines.
  */
-export function sourceLineRangeForMarkerId(sourceText: string, markerId: string): {
+export function sourceLineRangeForMarkerId(
+  sourceText: string,
+  markerId: string,
+): {
   start: number;
   end: number;
 } | null {
-  const id = markerId.trim().toLowerCase();
+  const id = assertValidMarkerId(markerId);
   const lines = sourceText.split("\n");
   let startIdx = -1;
   let endIdx = -1;

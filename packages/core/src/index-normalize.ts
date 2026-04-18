@@ -38,7 +38,10 @@ function snippetFromLegacyFingerprint(fp: LegacyFingerprint): string {
  * Drops legacy `fingerprint` objects from index.json into a single `snippet`
  * string (diff-style). Returns a fresh index when anything changed.
  */
-export function normalizeCommentrayIndex(index: CommentrayIndex): { index: CommentrayIndex; changed: boolean } {
+export function normalizeCommentrayIndex(index: CommentrayIndex): {
+  index: CommentrayIndex;
+  changed: boolean;
+} {
   let changed = false;
   const nextByPath: Record<string, SourceFileIndexEntry> = { ...index.byCommentrayPath };
   for (const [key, entry] of Object.entries(index.byCommentrayPath)) {
@@ -51,7 +54,10 @@ export function normalizeCommentrayIndex(index: CommentrayIndex): { index: Comme
     }
   }
   if (!changed) return { index, changed: false };
-  return { index: { schemaVersion: index.schemaVersion, byCommentrayPath: nextByPath }, changed: true };
+  return {
+    index: { schemaVersion: index.schemaVersion, byCommentrayPath: nextByPath },
+    changed: true,
+  };
 }
 
 function normalizeBlock(block: CommentrayBlock): CommentrayBlock {

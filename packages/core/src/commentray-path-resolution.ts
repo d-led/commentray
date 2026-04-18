@@ -40,7 +40,7 @@ export function resolveCommentrayMarkdownPath(
   const anglesLayout = commentrayAnglesLayoutEnabled(repoRoot, config.storageDir);
   if (!anglesLayout) {
     return {
-      commentrayPath: commentrayMarkdownPath(sourceRepoRelativePath),
+      commentrayPath: commentrayMarkdownPath(sourceRepoRelativePath, config.storageDir),
       angleId: null,
       anglesLayout: false,
     };

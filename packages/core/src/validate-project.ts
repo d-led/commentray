@@ -7,6 +7,10 @@ import { assertValidIndex } from "./metadata.js";
 import { migrateIndex } from "./migrate.js";
 import { defaultMetadataIndexPath } from "./paths.js";
 import type { CommentrayIndex } from "./model.js";
+import {
+  validateIndexMarkerSemantics,
+  validateMarkerBoundariesInSource,
+} from "./marker-validation.js";
 
 export type ValidationIssue = { level: "error" | "warn"; message: string };
 
@@ -40,9 +44,10 @@ export async function validateProject(repoRoot: string): Promise<ValidationResul
     }
   }
 
+  let index: CommentrayIndex | null = null;
   try {
-    const idx = await readIndex(repoRoot);
-    if (idx === null) {
+    index = await readIndex(repoRoot);
+    if (index === null) {
       issues.push({ level: "warn", message: `No metadata index at ${defaultMetadataIndexPath()}` });
     }
   } catch (err) {
@@ -50,6 +55,29 @@ export async function validateProject(repoRoot: string): Promise<ValidationResul
       level: "error",
       message: `Invalid metadata index: ${err instanceof Error ? err.message : String(err)}`,
     });
+  }
+
+  if (index) {
+    for (const issue of validateIndexMarkerSemantics(index)) {
+      issues.push({ level: issue.level, message: issue.message });
+    }
+    const seenSources = new Set<string>();
+    for (const entry of Object.values(index.byCommentrayPath)) {
+      if (seenSources.has(entry.sourcePath)) continue;
+      seenSources.add(entry.sourcePath);
+      const abs = path.join(repoRoot, ...entry.sourcePath.split("/"));
+      try {
+        const text = await fs.readFile(abs, "utf8");
+        for (const issue of validateMarkerBoundariesInSource(text, entry.sourcePath)) {
+          issues.push({ level: issue.level, message: issue.message });
+        }
+      } catch {
+        issues.push({
+          level: "warn",
+          message: `Could not read "${entry.sourcePath}" to validate Commentray source markers.`,
+        });
+      }
+    }
   }
 
   pushRelativeGithubLinkConfigWarnings(config, issues);

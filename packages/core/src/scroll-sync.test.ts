@@ -51,11 +51,9 @@ describe("buildBlockScrollLinks", () => {
         },
       },
     };
-    const source = [
-      "//#region commentray:b1",
-      "const x = 1;",
-      "//#endregion commentray:b1",
-    ].join("\n");
+    const source = ["//#region commentray:b1", "const x = 1;", "//#endregion commentray:b1"].join(
+      "\n",
+    );
     expect(buildBlockScrollLinks(idx, "src/a.ts", crPath, md, source)).toEqual([
       { commentrayLine: 0, sourceStart: 2, sourceEnd: 2 },
     ]);

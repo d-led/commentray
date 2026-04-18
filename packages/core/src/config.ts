@@ -208,12 +208,16 @@ function mergeRelatedGithubNav(
   return out;
 }
 
-function resolveStaticSite(parsed: CommentrayToml): ResolvedStaticSite {
-  const ss = parsed.static_site;
-  const mdFile =
+function resolvedStaticSiteMarkdownFile(ss: CommentrayToml["static_site"] | undefined): string {
+  return (
     ss?.commentray_markdown?.trim() ??
     ss?.commentary_markdown?.trim() ??
-    defaultStaticSite.commentrayMarkdownFile;
+    defaultStaticSite.commentrayMarkdownFile
+  );
+}
+
+function resolveStaticSite(parsed: CommentrayToml): ResolvedStaticSite {
+  const ss = parsed.static_site;
   const githubUrl = nonEmptyTrimmed(ss?.github_url);
   const githubBlobBranch =
     nonEmptyTrimmed(ss?.github_blob_branch) ?? defaultStaticSite.githubBlobBranch;
@@ -223,7 +227,7 @@ function resolveStaticSite(parsed: CommentrayToml): ResolvedStaticSite {
     githubUrl,
     githubBlobBranch,
     sourceFile: nonEmptyTrimmed(ss?.source_file) ?? defaultStaticSite.sourceFile,
-    commentrayMarkdownFile: mdFile,
+    commentrayMarkdownFile: resolvedStaticSiteMarkdownFile(ss),
     relatedGithubNav: mergeRelatedGithubNav(githubUrl, githubBlobBranch, ss?.related_github_files),
   };
 }

@@ -1,3 +1,5 @@
+import { parseAnchor, type ParsedAnchor } from "./anchors.js";
+import { assertValidMarkerId } from "./marker-ids.js";
 import { type CommentrayIndex, CURRENT_SCHEMA_VERSION } from "./model.js";
 
 export function emptyIndex(): CommentrayIndex {
@@ -45,17 +47,53 @@ function validateCommentrayEntry(commentrayPathKey: string, entry: unknown): voi
   for (const block of e.blocks) validateBlock(commentrayPathKey, block);
 }
 
-function validateBlock(commentrayPathKey: string, block: unknown): void {
-  if (typeof block !== "object" || block === null) {
-    throw new TypeError(`Invalid block under ${commentrayPathKey}`);
+function parseValidatedMarkerId(commentrayPathKey: string, raw: string): string {
+  try {
+    return assertValidMarkerId(raw);
+  } catch (e) {
+    throw new TypeError(
+      `block.id invalid under ${commentrayPathKey}: ${e instanceof Error ? e.message : String(e)}`,
+      { cause: e },
+    );
   }
-  const b = block as Record<string, unknown>;
-  if (typeof b.id !== "string") {
-    throw new TypeError(`block.id must be a string under ${commentrayPathKey}`);
+}
+
+function parseValidatedAnchor(commentrayPathKey: string, raw: string): ParsedAnchor {
+  try {
+    return parseAnchor(raw);
+  } catch (e) {
+    throw new TypeError(
+      `Invalid block.anchor under ${commentrayPathKey}: ${e instanceof Error ? e.message : String(e)}`,
+      { cause: e },
+    );
   }
-  if (typeof b.anchor !== "string") {
-    throw new TypeError(`block.anchor must be a string under ${commentrayPathKey}`);
+}
+
+function assertBlockMarkerAnchorConsistency(
+  commentrayPathKey: string,
+  b: Record<string, unknown>,
+  bid: string,
+  parsedAnchor: ParsedAnchor,
+): void {
+  if (parsedAnchor.kind === "marker" && parsedAnchor.id !== bid) {
+    throw new TypeError(
+      `block.id must match marker anchor id (got id=${b.id}, anchor=${b.anchor}) under ${commentrayPathKey}`,
+    );
   }
+  if (
+    parsedAnchor.kind === "marker" &&
+    b.markerId !== undefined &&
+    typeof b.markerId === "string" &&
+    b.markerId.trim() !== "" &&
+    assertValidMarkerId(b.markerId) !== parsedAnchor.id
+  ) {
+    throw new TypeError(
+      `block.markerId must match marker anchor id under ${commentrayPathKey} (block ${b.id})`,
+    );
+  }
+}
+
+function validateBlockOptionalFields(commentrayPathKey: string, b: Record<string, unknown>): void {
   if (b.lastVerifiedCommit !== undefined && typeof b.lastVerifiedCommit !== "string") {
     throw new TypeError(
       `block.lastVerifiedCommit must be a string when present under ${commentrayPathKey}`,
@@ -77,4 +115,21 @@ function validateBlock(commentrayPathKey: string, block: unknown): void {
       `block.fingerprint is no longer supported under ${commentrayPathKey}; re-open the repo to migrate index.json`,
     );
   }
+}
+
+function validateBlock(commentrayPathKey: string, block: unknown): void {
+  if (typeof block !== "object" || block === null) {
+    throw new TypeError(`Invalid block under ${commentrayPathKey}`);
+  }
+  const b = block as Record<string, unknown>;
+  if (typeof b.id !== "string") {
+    throw new TypeError(`block.id must be a string under ${commentrayPathKey}`);
+  }
+  const bid = parseValidatedMarkerId(commentrayPathKey, b.id);
+  if (typeof b.anchor !== "string") {
+    throw new TypeError(`block.anchor must be a string under ${commentrayPathKey}`);
+  }
+  const parsedAnchor = parseValidatedAnchor(commentrayPathKey, b.anchor);
+  assertBlockMarkerAnchorConsistency(commentrayPathKey, b, bid, parsedAnchor);
+  validateBlockOptionalFields(commentrayPathKey, b);
 }

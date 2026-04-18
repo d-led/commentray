@@ -5,16 +5,20 @@ import process from "node:process";
 
 import cliPackage from "../package.json" with { type: "json" };
 import {
+  applyPathRenamesToCommentrayIndex,
   commentrayMarkdownPath,
   convertCommentraySourceMarkersToLanguage,
   defaultMetadataIndexPath,
+  GitScmProvider,
   loadCommentrayConfig,
   migrateIndex,
   normalizeRepoRelativePath,
   parseGithubRepoWebUrl,
+  readIndex,
   runCommanderMain,
   type ValidationIssue,
   validateProject,
+  writeIndex,
 } from "@commentray/core";
 import { renderSideBySideHtml } from "@commentray/render";
 import { Command } from "commander";
@@ -71,7 +75,9 @@ async function cmdConvertSourceMarkers(opts: {
     opts.language,
   );
   if (!changed) {
-    console.log("No changes (no marker pairs, already target style, or only line-ending normalisation).");
+    console.log(
+      "No changes (no marker pairs, already target style, or only line-ending normalisation).",
+    );
     return 0;
   }
   if (opts.dryRun) {
@@ -80,6 +86,62 @@ async function cmdConvertSourceMarkers(opts: {
   }
   await fs.writeFile(abs, sourceText, "utf8");
   console.log(`Rewrote ${convertedPairs} marker pair(s) in ${rel}.`);
+  return 0;
+}
+
+async function cmdSyncMovedPaths(opts: {
+  fromRef: string;
+  toRef: string;
+  dryRun: boolean;
+}): Promise<number> {
+  const repoRoot = await repoRootFromCwd();
+  const scm = new GitScmProvider();
+  if (!scm.listPathRenamesBetweenTreeishes) {
+    console.error("SCM provider does not support rename listing.");
+    return 1;
+  }
+  let renames;
+  try {
+    renames = await scm.listPathRenamesBetweenTreeishes(repoRoot, opts.fromRef, opts.toRef);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`Could not list renames (${opts.fromRef} → ${opts.toRef}): ${msg}`);
+    console.error("Try explicit refs, e.g. --from abc123 --to def456 or --from HEAD~1 --to HEAD.");
+    return 1;
+  }
+  if (renames.length === 0) {
+    console.log("No Git-detected renames in that range.");
+    return 0;
+  }
+  const cfg = await loadCommentrayConfig(repoRoot);
+  const index = await readIndex(repoRoot);
+  if (index === null) {
+    console.error(`No index at ${defaultMetadataIndexPath()}. Run: commentray init`);
+    return 1;
+  }
+  let next;
+  try {
+    next = applyPathRenamesToCommentrayIndex(index, renames, repoRoot, cfg);
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : String(e));
+    return 1;
+  }
+  if (!next.changed) {
+    console.log("Index paths already match those renames (nothing to update).");
+    return 0;
+  }
+  if (opts.dryRun) {
+    console.log(`Would apply ${renames.length} rename(s) to index.json (dry run).`);
+    for (const r of renames) {
+      console.log(`  ${r.from} -> ${r.to}`);
+    }
+    return 0;
+  }
+  await writeIndex(repoRoot, next.index);
+  console.log(`Updated index.json for ${renames.length} path rename(s).`);
+  for (const r of renames) {
+    console.log(`  ${r.from} -> ${r.to}`);
+  }
   return 0;
 }
 
@@ -193,6 +255,22 @@ program
   .description("Migrate metadata JSON to the current schema")
   .action(async () => {
     process.exitCode = await cmdMigrate();
+  });
+
+program
+  .command("sync-moved-paths")
+  .description(
+    "Rewrite index.json paths using Git rename detection between two tree-ish refs (default HEAD~1 → HEAD)",
+  )
+  .option("--from <ref>", "Older tree-ish", "HEAD~1")
+  .option("--to <ref>", "Newer tree-ish", "HEAD")
+  .option("--dry-run", "List renames that would be applied without writing index.json", false)
+  .action(async (opts: { from?: string; to?: string; dryRun?: boolean }) => {
+    process.exitCode = await cmdSyncMovedPaths({
+      fromRef: (opts.from as string) || "HEAD~1",
+      toRef: (opts.to as string) || "HEAD",
+      dryRun: Boolean(opts.dryRun),
+    });
   });
 
 program

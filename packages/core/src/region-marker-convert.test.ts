@@ -46,7 +46,9 @@ describe("leadingIndentOfLine", () => {
 
 describe("convertCommentraySourceMarkersToLanguage", () => {
   it("rewrites generic markers to TypeScript #region style", () => {
-    const before = ["// commentray:start id=aa", "const n = 1;", "// commentray:end id=aa"].join("\n");
+    const before = ["// commentray:start id=aa", "const n = 1;", "// commentray:end id=aa"].join(
+      "\n",
+    );
     const { sourceText, changed, convertedPairs } = convertCommentraySourceMarkersToLanguage(
       before,
       "typescript",
@@ -59,7 +61,9 @@ describe("convertCommentraySourceMarkersToLanguage", () => {
   });
 
   it("preserves indentation from the opening line", () => {
-    const before = ["  // commentray:start id=bb", "  x();", "  // commentray:end id=bb"].join("\n");
+    const before = ["  // commentray:start id=bb", "  x();", "  // commentray:end id=bb"].join(
+      "\n",
+    );
     const { sourceText } = convertCommentraySourceMarkersToLanguage(before, "typescript");
     expect(sourceText).toBe(
       ["  //#region commentray:bb", "  x();", "  //#endregion commentray:bb"].join("\n"),
@@ -67,7 +71,9 @@ describe("convertCommentraySourceMarkersToLanguage", () => {
   });
 
   it("converts TypeScript regions to Rust-style generic comments", () => {
-    const before = ["//#region commentray:cc", "fn f() {}", "//#endregion commentray:cc"].join("\n");
+    const before = ["//#region commentray:cc", "fn f() {}", "//#endregion commentray:cc"].join(
+      "\n",
+    );
     const { sourceText, convertedPairs } = convertCommentraySourceMarkersToLanguage(before, "rust");
     expect(convertedPairs).toBe(1);
     expect(sourceText).toBe(

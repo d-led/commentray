@@ -50,9 +50,7 @@ function replaceOnePair(
   const innerLines = lines.slice(pair.startLine0 + 1, pair.endLine0);
   const inner = innerLines.join("\n");
   const combined =
-    innerLines.length === 0
-      ? `${start.replace(/\n$/, "")}${end}`
-      : `${start}${inner}${end}`;
+    innerLines.length === 0 ? `${start.replace(/\n$/, "")}${end}` : `${start}${inner}${end}`;
   const inserted = combined.split("\n");
   const before = lines.slice(0, pair.startLine0);
   const after = lines.slice(pair.endLine0 + 1);
