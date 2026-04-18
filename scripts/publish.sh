@@ -6,7 +6,7 @@ set -euo pipefail
 # Preconditions (checked):
 #   - clean working tree
 #   - HEAD is tagged v<version> where <version> matches packages/core/package.json
-#   - workspace dep pins are in lockstep (scripts/sync-workspace-deps.mjs --check)
+#   - workspace dep pins are in lockstep (bash scripts/sync-workspace-deps.sh --check)
 #
 # Does:
 #   - npm ci           (reproducible install)
@@ -73,7 +73,7 @@ if ! git describe --exact-match --tags HEAD 2>/dev/null | grep -qx "$expected_ta
 fi
 
 log_info "Checking intra-workspace dep pins..."
-node scripts/sync-workspace-deps.mjs --check
+bash scripts/sync-workspace-deps.sh --check
 
 log_info "Reproducible install (npm ci)..."
 npm ci --no-audit --no-fund

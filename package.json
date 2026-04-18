@@ -43,7 +43,7 @@
     "extension:uninstall": "bash scripts/install-extension.sh --uninstall",
     "version:bump": "bash scripts/bump-version.sh",
     "version:tag": "bash scripts/tag-version.sh",
-    "version:sync": "node scripts/sync-workspace-deps.mjs",
+    "version:sync": "bash scripts/sync-workspace-deps.sh",
     "deps:upgrade": "bash scripts/upgrade-deps.sh",
     "publish:all": "bash scripts/publish.sh",
     "release": "bash scripts/release.sh",
@@ -57,9 +57,9 @@
     "cy": "start-server-and-test e2e:server http://127.0.0.1:4173 \"cypress open --e2e --browser chrome\""
   },
   "devDependencies": {
-    "@commentray/code-commentray-static": "0.0.3",
-    "@commentray/core": "0.0.3",
-    "@commentray/render": "0.0.3",
+    "@commentray/code-commentray-static": "0.0.4",
+    "@commentray/core": "0.0.4",
+    "@commentray/render": "0.0.4",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",

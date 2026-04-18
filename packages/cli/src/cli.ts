@@ -25,26 +25,50 @@ import { Command } from "commander";
 
 import { runInitConfig, runInitFull, runInitScm } from "./init.js";
 import { findProjectRoot } from "./project-root.js";
+import { resolveRenderInputs, type RenderCliOptions } from "./render-inputs.js";
 
 async function repoRootFromCwd(): Promise<string> {
   const root = await findProjectRoot(process.cwd());
   return root.dir;
 }
 
+function summarizeValidation(issues: ValidationIssue[]): { errors: number; warnings: number } {
+  let errors = 0;
+  let warnings = 0;
+  for (const i of issues) {
+    if (i.level === "error") errors += 1;
+    else warnings += 1;
+  }
+  return { errors, warnings };
+}
+
+function pluralize(n: number, word: string): string {
+  return `${String(n)} ${word}${n === 1 ? "" : "s"}`;
+}
+
 async function cmdValidate(): Promise<number> {
   const repoRoot = await repoRootFromCwd();
   const result = await validateProject(repoRoot);
   for (const issue of result.issues) {
-    console.error(`[${issue.level}] ${issue.message}`);
+    const log = issue.level === "error" ? console.error : console.warn;
+    log(`[${issue.level}] ${issue.message}`);
   }
-  const hasError = result.issues.some((i: ValidationIssue) => i.level === "error");
-  return hasError ? 1 : 0;
+  const { errors, warnings } = summarizeValidation(result.issues);
+  const summary = `validate: ${pluralize(errors, "error")}, ${pluralize(warnings, "warning")}`;
+  if (errors === 0) {
+    console.log(`OK ${summary}`);
+    return 0;
+  }
+  console.error(`FAIL ${summary}`);
+  return 1;
 }
 
 async function cmdDoctor(): Promise<number> {
   const code = await cmdValidate();
+  const gitPath = path.join(process.cwd(), ".git");
   try {
-    await fs.access(path.join(process.cwd(), ".git"));
+    await fs.access(gitPath);
+    console.log(`OK doctor: Git checkout detected at ${gitPath}`);
   } catch {
     console.warn("[warn] No .git directory detected in cwd; SCM features require a Git checkout.");
   }
@@ -165,20 +189,16 @@ async function cmdMigrate(): Promise<number> {
   }
 }
 
-async function cmdRender(opts: {
-  source: string;
-  markdown: string;
-  out: string;
-  mermaid: boolean;
-}) {
+async function cmdRender(opts: RenderCliOptions & { mermaid: boolean }) {
   const repoRoot = await repoRootFromCwd();
-  const source = normalizeRepoRelativePath(opts.source);
-  const md = await fs.readFile(path.resolve(repoRoot, opts.markdown), "utf8");
+  const cfg = await loadCommentrayConfig(repoRoot);
+  const inputs = resolveRenderInputs(cfg, opts);
+  const source = normalizeRepoRelativePath(inputs.source);
+  const md = await fs.readFile(path.resolve(repoRoot, inputs.markdown), "utf8");
   const code = await fs.readFile(path.resolve(repoRoot, source), "utf8");
   const ext = path.extname(source).slice(1) || "txt";
-  const outPath = path.resolve(repoRoot, opts.out);
-  const cfg = await loadCommentrayConfig(repoRoot);
-  const mdAbs = path.resolve(repoRoot, opts.markdown);
+  const outPath = path.resolve(repoRoot, inputs.out);
+  const mdAbs = path.resolve(repoRoot, inputs.markdown);
   const ghParsed =
     cfg.render.relativeGithubBlobLinks && cfg.staticSite.githubUrl
       ? parseGithubRepoWebUrl(cfg.staticSite.githubUrl)
@@ -194,6 +214,7 @@ async function cmdRender(opts: {
     code,
     language: ext === "ts" ? "ts" : ext,
     commentrayMarkdown: md,
+    hljsTheme: cfg.render.syntaxTheme,
     includeMermaidRuntime: opts.mermaid,
     commentrayOutputUrls,
   });
@@ -298,15 +319,23 @@ program
 
 program
   .command("render")
-  .requiredOption("--source <path>", "Repo-relative source file")
-  .requiredOption("--markdown <path>", "Path to commentray markdown file")
-  .requiredOption("--out <path>", "Output HTML path")
+  .description(
+    "Render a side-by-side HTML view; missing flags fall back to .commentray.toml [static_site] " +
+      "(default --out: _site/index.html)",
+  )
+  .option("--source <path>", "Repo-relative source file (defaults to static_site.source_file)")
+  .option(
+    "--markdown <path>",
+    "Path to commentray markdown file (defaults to static_site.commentray_markdown, " +
+      "or the conventional .commentray/source/<src>.md)",
+  )
+  .option("--out <path>", "Output HTML path (defaults to _site/index.html)")
   .option("--mermaid", "Include Mermaid runtime in HTML output", false)
-  .action(async (opts) => {
+  .action(async (opts: RenderCliOptions & { mermaid?: boolean }) => {
     await cmdRender({
-      source: opts.source as string,
-      markdown: opts.markdown as string,
-      out: opts.out as string,
+      source: opts.source,
+      markdown: opts.markdown,
+      out: opts.out,
       mermaid: Boolean(opts.mermaid),
     });
   });

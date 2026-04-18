@@ -11,6 +11,7 @@ import {
 
 import { tryBuildBlockStretchTableHtml } from "./block-stretch-layout.js";
 import { escapeHtml } from "./html-utils.js";
+import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
 import {
   type CommentrayOutputUrlOptions,
   renderFencedCode,
@@ -720,15 +721,6 @@ async function buildCodeBrowserShell(
   }
 
   return { layout, shellInner, scrollBlockLinksB64 };
-}
-
-function mermaidRuntimeScriptHtml(include: boolean | undefined): string {
-  if (!include) return "";
-  return `<script type="module">
-import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-mermaid.initialize({ startOnLoad: true, securityLevel: "strict" });
-mermaid.run({ querySelector: ".mermaid" });
-</script>`;
 }
 
 function searchChromeFromOptions(opts: CodeBrowserPageOptions): {

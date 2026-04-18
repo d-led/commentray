@@ -4,6 +4,7 @@ import {
   renderFencedCode,
   renderMarkdownToHtml,
 } from "./markdown-pipeline.js";
+import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
 
 export type SideBySideOptions = {
   title?: string;
@@ -13,6 +14,8 @@ export type SideBySideOptions = {
   language: string;
   /** Commentray markdown body. */
   commentrayMarkdown: string;
+  /** Highlight.js theme base name (e.g. `github`, `github-dark`); matches static code browser. */
+  hljsTheme?: string;
   /** When true, include Mermaid runtime from CDN in the footer. */
   includeMermaidRuntime?: boolean;
   /** Optional static URL rewriting for the commentray pane (images, local links, GitHub blob). */
@@ -28,15 +31,12 @@ export async function renderSideBySideHtml(opts: SideBySideOptions): Promise<str
     }),
   ]);
 
-  const mermaidScript = opts.includeMermaidRuntime
-    ? `<script type="module">
-import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-mermaid.initialize({ startOnLoad: true, securityLevel: "strict" });
-mermaid.run({ querySelector: ".mermaid" });
-</script>`
-    : "";
+  const mermaidScript = mermaidRuntimeScriptHtml(opts.includeMermaidRuntime);
 
   const title = opts.title ?? "Commentray";
+  const hljs = opts.hljsTheme ?? "github";
+  const hljsDark = opts.hljsTheme?.includes("dark") ? opts.hljsTheme : "github-dark";
+  const hljsCdnBase = "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles";
 
   return `<!doctype html>
 <html lang="en">
@@ -44,6 +44,8 @@ mermaid.run({ querySelector: ".mermaid" });
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title)}</title>
+    <link rel="stylesheet" href="${hljsCdnBase}/${escapeHtml(hljs)}.min.css" media="(prefers-color-scheme: light)" />
+    <link rel="stylesheet" href="${hljsCdnBase}/${escapeHtml(hljsDark)}.min.css" media="(prefers-color-scheme: dark)" />
     <style>
       :root { color-scheme: light dark; }
       body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }

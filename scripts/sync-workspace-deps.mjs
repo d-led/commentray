@@ -9,8 +9,9 @@
 // Idempotent. No-op when everything is already aligned.
 //
 // Usage:
-//   node scripts/sync-workspace-deps.mjs
-//   node scripts/sync-workspace-deps.mjs --check     # exit 1 if a rewrite would be needed
+//   bash scripts/sync-workspace-deps.sh
+//   bash scripts/sync-workspace-deps.sh --check     # exit 1 if a rewrite would be needed
+//   (or: node scripts/sync-workspace-deps.mjs [--check])
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -81,7 +82,7 @@ if (check) {
   }
   console.error(`Workspace deps drifted from ${targetVersion}:`);
   for (const f of drifted) console.error(`  ${f}`);
-  console.error("Run: node scripts/sync-workspace-deps.mjs");
+  console.error("Run: bash scripts/sync-workspace-deps.sh");
   process.exit(1);
 }
 

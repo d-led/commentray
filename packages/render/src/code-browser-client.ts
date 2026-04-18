@@ -14,6 +14,7 @@ import {
 import { decodeBase64Utf8 } from "./code-browser-encoding.js";
 import { readEmbeddedRawB64Strings } from "./code-browser-embedded-payload.js";
 import { findOrderedTokenSpans, lineAtIndex, offsetToLineIndex } from "./code-browser-search.js";
+import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
 type HitKind = "code" | "md" | "path";
 
@@ -321,17 +322,17 @@ function wireWrapToggle(
   codePane: HTMLElement,
   wrapCb: HTMLInputElement,
 ): void {
-  const wrap = localStorage.getItem(storageWrap) === "1";
+  const wrap = readWebStorageItem(localStorage, storageWrap) === "1";
   wrapCb.checked = wrap;
   if (wrap) codePane.classList.add("wrap");
 
   wrapCb.addEventListener("change", () => {
     if (wrapCb.checked) {
       codePane.classList.add("wrap");
-      localStorage.setItem(storageWrap, "1");
+      writeWebStorageItem(localStorage, storageWrap, "1");
     } else {
       codePane.classList.remove("wrap");
-      localStorage.setItem(storageWrap, "0");
+      writeWebStorageItem(localStorage, storageWrap, "0");
     }
   });
 }
@@ -711,7 +712,7 @@ function wireSplitter(
     window.removeEventListener("mouseup", stop);
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
-    localStorage.setItem(storageSplit, String(lastPct));
+    writeWebStorageItem(localStorage, storageSplit, String(lastPct));
   }
   gutter.addEventListener("mousedown", (e) => {
     e.preventDefault();
@@ -776,7 +777,7 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     docPane,
   });
 
-  const pct0 = parseFloat(localStorage.getItem(STORAGE_SPLIT_PCT) || "50");
+  const pct0 = parseFloat(readWebStorageItem(localStorage, STORAGE_SPLIT_PCT) || "50");
   const pct = clamp(Number.isFinite(pct0) ? pct0 : 50, 15, 85);
   codePane.style.flex = `0 0 ${pct}%`;
 

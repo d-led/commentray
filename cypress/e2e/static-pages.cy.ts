@@ -12,6 +12,14 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.shouldExposeNavSearchArtifact();
     });
 
+    it("then commentray pane links to README stay on github.com blob URLs (not ../README.md on Pages)", () => {
+      cy.visitStaticSiteHome();
+      cy.get("#doc-pane")
+        .invoke("html")
+        .should("match", /https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/[^/]+\/README\.md/)
+        .and("not.match", /href="\.\.\/README\.md"/);
+    });
+
     it("then the hub exposes GitHub source links and a documented-files tree", () => {
       cy.visitStaticSiteHome();
       cy.contains("a", "Source on GitHub")

@@ -25,7 +25,9 @@ commentray doctor          # validate plus environment checks
 commentray migrate         # migrate metadata JSON to the current schema
 commentray sync-moved-paths # rewrite index paths after Git renames (uses git diff)
 commentray convert-source-markers --file PATH --language LANG  # rewrite region comment style (optional --dry-run)
-commentray render --source SRC --markdown MD --out OUT.html [--mermaid]
+commentray render [--source SRC] [--markdown MD] [--out OUT.html] [--mermaid]
+                            # missing flags fall back to .commentray.toml [static_site]
+                            # (--out defaults to _site/index.html)
 commentray paths SRC       # print the commentray Markdown path for a source file
 ```
 

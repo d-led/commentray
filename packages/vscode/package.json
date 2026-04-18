@@ -96,7 +96,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@commentray/core": "0.0.3"
+    "@commentray/core": "0.0.4"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",

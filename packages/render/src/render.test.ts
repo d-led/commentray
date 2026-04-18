@@ -67,6 +67,36 @@ describe("renderSideBySideHtml", () => {
     expect(html).toContain("Notes");
   });
 
+  it("loads highlight.js theme CSS so fenced code is not unstyled", async () => {
+    const html = await renderSideBySideHtml({
+      title: "Demo",
+      code: "x",
+      language: "txt",
+      commentrayMarkdown: "y",
+      includeMermaidRuntime: false,
+    });
+    expect(html).toContain(
+      "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css",
+    );
+    expect(html).toContain(
+      "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.min.css",
+    );
+  });
+
+  it("honours hljsTheme for the dark stylesheet when the theme name includes dark", async () => {
+    const html = await renderSideBySideHtml({
+      title: "Demo",
+      code: "x",
+      language: "txt",
+      commentrayMarkdown: "y",
+      hljsTheme: "github-dark",
+      includeMermaidRuntime: false,
+    });
+    expect(html).toContain(
+      "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.min.css",
+    );
+  });
+
   it("forwards commentrayOutputUrls into the commentray pane", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-sbs-"));
     const repoRoot = path.join(tmp, "repo");
@@ -90,7 +120,9 @@ describe("renderSideBySideHtml", () => {
     });
     expect(html).toContain('href="../a/b.md"');
   });
+});
 
+describe("renderMarkdownToHtml — static asset URLs", () => {
   it("resolves companion-relative and repo-root images for static HTML", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-img-"));
     const repoRoot = path.join(tmp, "repo");

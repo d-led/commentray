@@ -68,17 +68,18 @@ await writeFile(tmpMd, commentrayBody, "utf8");
 const outDir = path.join(repoRoot, "_site");
 const outHtml = path.join(outDir, "index.html");
 
-const ghParsed =
-  cfg.render.relativeGithubBlobLinks && ss.githubUrl ? parseGithubRepoWebUrl(ss.githubUrl) : null;
 const markdownUrlBaseDirAbs = ss.commentrayMarkdownFile
   ? path.join(repoRoot, path.dirname(ss.commentrayMarkdownFile))
   : repoRoot;
 
+// Do not pass `githubBlobRepo` here: `[render].relative_github_blob_links` turns matching
+// `https://github.com/<this-repo>/blob/…` links into `/path` then `../path` relative to
+// `_site/index.html`. GitHub Pages only serves `_site/` under `/commentray/`, so `../README.md`
+// wrongly resolves to `https://<user>.github.io/README.md`. Keep blob URLs absolute for Pages.
 const commentrayOutputUrls = {
   repoRootAbs: repoRoot,
   htmlOutputFileAbs: outHtml,
   markdownUrlBaseDirAbs,
-  ...(ghParsed ? { githubBlobRepo: { owner: ghParsed.owner, repo: ghParsed.repo } } : {}),
 };
 
 let blockStretchRows;

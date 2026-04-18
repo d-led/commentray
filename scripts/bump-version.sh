@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # Bump the version of every Commentray workspace package in lockstep,
-# sync intra-workspace @commentray/* dep pins, and update CHANGELOG.md if it
-# exists. Does not run git: no commit, no tag. Use when you want to edit
-# versions alongside other work, then commit when ready.
+# sync intra-workspace @commentray/* dep pins (via bash scripts/sync-workspace-deps.sh),
+# and update CHANGELOG.md if it exists. Does not run git: no commit, no tag.
+# Use when you want to edit versions alongside other work, then commit when ready.
 #
 # Tagging is separate: `bash scripts/tag-version.sh` after committing, or
 # `bash scripts/release.sh …` for bump + commit + tag + push + publish.
@@ -112,23 +112,34 @@ echo "New version:     $new_version"
 if [[ "$dry_run" == true ]]; then
   echo ""
   echo "=== DRY RUN ==="
-  echo "Would bump every workspace package.json ($current -> $new_version),"
-  echo "sync @commentray/* deps, update CHANGELOG.md if present, and refresh"
-  echo "package-lock.json. No git commit or tag."
+  echo "Would align @commentray/* pins to canonical (bash scripts/sync-workspace-deps.sh),"
+  if [[ "$new_version" != "$current" ]]; then
+    echo "set every packages/*/package.json version ($current -> $new_version) via"
+    echo "node scripts/set-workspace-versions.mjs, re-sync pins, update CHANGELOG.md if present,"
+  else
+    echo "skip version writes (already at $new_version), update CHANGELOG.md if present only on real bumps,"
+  fi
+  echo "and refresh package-lock.json. No git commit or tag."
   exit 0
 fi
 
-log_info "Bumping all workspace packages to $new_version..."
-npm version "$new_version" --workspaces --no-git-tag-version --include-workspace-root=false >/dev/null
+log_info "Aligning @commentray/* dependency pins to canonical $current..."
+bash scripts/sync-workspace-deps.sh
 
-log_info "Syncing intra-workspace @commentray/* pins..."
-node scripts/sync-workspace-deps.mjs
+if [[ "$new_version" != "$current" ]]; then
+  log_info "Setting every workspace package version to $new_version..."
+  node scripts/set-workspace-versions.mjs "$new_version"
+  log_info "Re-aligning @commentray/* dependency pins to $new_version..."
+  bash scripts/sync-workspace-deps.sh
+else
+  log_info "Canonical version already $new_version; skipping workspace version writes."
+fi
 
 log_info "Refreshing package-lock.json..."
 npm install --package-lock-only --no-audit --no-fund >/dev/null
 
 changelog="CHANGELOG.md"
-if [[ -f "$changelog" ]]; then
+if [[ "$new_version" != "$current" && -f "$changelog" ]]; then
   today="$(date +%Y-%m-%d)"
   if grep -q "^## \[Unreleased\]" "$changelog"; then
     log_info "Inserting $new_version header into $changelog..."
@@ -147,7 +158,11 @@ if [[ -f "$changelog" ]]; then
   fi
 fi
 
-log_ok "Version files updated: $current -> $new_version (uncommitted)"
+if [[ "$new_version" != "$current" ]]; then
+  log_ok "Version files updated: $current -> $new_version (uncommitted)"
+else
+  log_ok "Workspace versions unchanged at $new_version; pins and lockfile refreshed (uncommitted)"
+fi
 
 echo ""
 echo "Next steps:"
