@@ -100,17 +100,30 @@ function pushRelativeGithubLinkConfigWarnings(
   });
 }
 
-export async function readIndex(repoRoot: string): Promise<CommentrayIndex | null> {
+/**
+ * Reads `index.json`, applies schema migration and snippet/fingerprint normalization,
+ * and persists when anything changed. Throws if the file is missing or not valid JSON.
+ */
+export async function refreshIndexMigrationsOnDisk(
+  repoRoot: string,
+): Promise<{ index: CommentrayIndex; changed: boolean }> {
   const indexPath = path.join(repoRoot, defaultMetadataIndexPath());
+  const raw = await fs.readFile(indexPath, "utf8");
+  const parsed = JSON.parse(raw) as unknown;
+  const { index: migrated, changed: schemaChanged } = migrateIndex(parsed);
+  const { index: normalized, changed: snippetChanged } = normalizeCommentrayIndex(migrated);
+  const index = assertValidIndex(normalized as unknown);
+  const changed = schemaChanged || snippetChanged;
+  if (changed) {
+    await writeIndex(repoRoot, index);
+  }
+  return { index, changed };
+}
+
+export async function readIndex(repoRoot: string): Promise<CommentrayIndex | null> {
   try {
-    const raw = await fs.readFile(indexPath, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    const { index: migrated, changed: schemaChanged } = migrateIndex(parsed);
-    const { index: normalized, changed: snippetChanged } = normalizeCommentrayIndex(migrated);
-    if (schemaChanged || snippetChanged) {
-      await writeIndex(repoRoot, normalized);
-    }
-    return assertValidIndex(normalized as unknown);
+    const { index } = await refreshIndexMigrationsOnDisk(repoRoot);
+    return index;
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return null;

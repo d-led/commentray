@@ -11,7 +11,7 @@ import {
   defaultMetadataIndexPath,
   GitScmProvider,
   loadCommentrayConfig,
-  migrateIndex,
+  refreshIndexMigrationsOnDisk,
   normalizeRepoRelativePath,
   parseGithubRepoWebUrl,
   readIndex,
@@ -147,10 +147,14 @@ async function cmdSyncMovedPaths(opts: {
 
 async function cmdMigrate(): Promise<number> {
   const repoRoot = await repoRootFromCwd();
-  const indexPath = path.join(repoRoot, defaultMetadataIndexPath());
-  let raw: string;
   try {
-    raw = await fs.readFile(indexPath, "utf8");
+    const { changed } = await refreshIndexMigrationsOnDisk(repoRoot);
+    if (changed) {
+      console.log("Migrated metadata index (schema and/or snippet normalization).");
+    } else {
+      console.log("No metadata migration needed.");
+    }
+    return 0;
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT") {
@@ -159,14 +163,6 @@ async function cmdMigrate(): Promise<number> {
     }
     throw err;
   }
-  const { index, changed } = migrateIndex(JSON.parse(raw) as unknown);
-  if (changed) {
-    await fs.writeFile(indexPath, JSON.stringify(index, null, 2) + "\n", "utf8");
-    console.log("Migrated metadata index.");
-  } else {
-    console.log("No metadata migration needed.");
-  }
-  return 0;
 }
 
 async function cmdRender(opts: {
@@ -233,7 +229,7 @@ initCmd
   });
 
 initCmd.action(async () => {
-  await runInitFull(await repoRootFromCwd());
+  process.exitCode = await runInitFull(await repoRootFromCwd());
 });
 
 program

@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { migrateIndex } from "./migrate.js";
 import { CURRENT_SCHEMA_VERSION } from "./model.js";
-import { readIndex } from "./validate-project.js";
+import { readIndex, refreshIndexMigrationsOnDisk } from "./validate-project.js";
 
 describe("migrateIndex", () => {
   it("fills schemaVersion for legacy objects", () => {
@@ -66,6 +66,46 @@ describe("readIndex auto-migration", () => {
       byCommentrayPath?: unknown;
     };
     expect(round.byCommentrayPath).toBeDefined();
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("refreshIndexMigrationsOnDisk", () => {
+  it("persists snippet normalization for legacy fingerprint blocks", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "commentray-refresh-"));
+    const meta = path.join(dir, ".commentray", "metadata");
+    await fs.mkdir(meta, { recursive: true });
+    const indexPath = path.join(meta, "index.json");
+    const cp = ".commentray/source/x.ts.md";
+    const onDisk = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [cp]: {
+          sourcePath: "x.ts",
+          commentrayPath: cp,
+          blocks: [
+            {
+              id: "b1",
+              anchor: "lines:1-2",
+              fingerprint: { startLine: "a", endLine: "b", lineCount: 2 },
+            },
+          ],
+        },
+      },
+    };
+    await fs.writeFile(indexPath, JSON.stringify(onDisk, null, 2), "utf8");
+    const { changed, index } = await refreshIndexMigrationsOnDisk(dir);
+    expect(changed).toBe(true);
+    const b0 = index.byCommentrayPath[cp]?.blocks[0] as { snippet?: string; fingerprint?: unknown };
+    expect(b0.snippet).toBeDefined();
+    expect(b0.fingerprint).toBeUndefined();
+    const round = JSON.parse(await fs.readFile(indexPath, "utf8")) as typeof onDisk;
+    expect(round.byCommentrayPath[cp]?.blocks[0]).toEqual(
+      expect.objectContaining({ snippet: expect.any(String) }),
+    );
+    expect("fingerprint" in (round.byCommentrayPath[cp]?.blocks[0] as object)).toBe(false);
+    const { changed: again } = await refreshIndexMigrationsOnDisk(dir);
+    expect(again).toBe(false);
     await fs.rm(dir, { recursive: true, force: true });
   });
 });

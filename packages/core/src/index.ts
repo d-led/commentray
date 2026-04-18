@@ -53,7 +53,12 @@ export type { PathRename } from "./commentray-index-renames.js";
 export type { BlockDiagnostic } from "./staleness.js";
 export { diagnoseBlock } from "./staleness.js";
 export type { ValidationIssue, ValidationResult } from "./validate-project.js";
-export { readIndex, validateProject, writeIndex } from "./validate-project.js";
+export {
+  readIndex,
+  refreshIndexMigrationsOnDisk,
+  validateProject,
+  writeIndex,
+} from "./validate-project.js";
 export { runCommanderMain } from "./cli-bootstrap.js";
 export type { BlockScrollLink } from "./scroll-sync.js";
 export {

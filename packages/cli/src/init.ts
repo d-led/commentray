@@ -2,7 +2,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
-import { defaultMetadataIndexPath, emptyIndex, loadCommentrayConfig } from "@commentray/core";
+import {
+  defaultMetadataIndexPath,
+  emptyIndex,
+  loadCommentrayConfig,
+  refreshIndexMigrationsOnDisk,
+  validateProject,
+  writeIndex,
+  type ValidationIssue,
+} from "@commentray/core";
 
 import { mergeCommentrayPreCommitHook } from "./git-hooks.js";
 
@@ -66,18 +74,34 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
-/** Full idempotent init: storage dirs, index.json if missing, .commentray.toml if missing. */
-export async function runInitFull(repoRoot: string): Promise<void> {
+/**
+ * Full idempotent init: storage dirs, `index.json` if missing, `.commentray.toml` if missing;
+ * always runs index schema/snippet migrations and `validateProject` (non-zero exit on validation errors).
+ */
+export async function runInitFull(repoRoot: string): Promise<number> {
   const cfg = await loadCommentrayConfig(repoRoot);
   const storage = path.join(repoRoot, cfg.storageDir);
   await fs.mkdir(path.join(storage, "source"), { recursive: true });
   await fs.mkdir(path.join(storage, "metadata"), { recursive: true });
 
   const indexPath = path.join(repoRoot, defaultMetadataIndexPath());
+  if (!(await pathExists(indexPath))) {
+    await writeIndex(repoRoot, emptyIndex());
+    console.log(`Created ${defaultMetadataIndexPath()}.`);
+  }
+
   try {
-    await fs.stat(indexPath);
-  } catch {
-    await fs.writeFile(indexPath, JSON.stringify(emptyIndex(), null, 2) + "\n", "utf8");
+    const { changed } = await refreshIndexMigrationsOnDisk(repoRoot);
+    if (changed) {
+      console.log(
+        `Updated ${defaultMetadataIndexPath()} (schema migration and/or snippet normalization).`,
+      );
+    }
+  } catch (e) {
+    console.error(
+      `Could not load or migrate ${defaultMetadataIndexPath()}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+    return 1;
   }
 
   const tomlPath = path.join(repoRoot, ".commentray.toml");
@@ -92,7 +116,16 @@ export async function runInitFull(repoRoot: string): Promise<void> {
     console.log("Created .commentray.toml with commented defaults.");
   }
 
+  const validation = await validateProject(repoRoot);
+  for (const issue of validation.issues) {
+    const log: (typeof console)["log"] =
+      issue.level === "error" ? console.error.bind(console) : console.warn.bind(console);
+    log(`[${issue.level}] ${issue.message}`);
+  }
+  const hasError = validation.issues.some((i: ValidationIssue) => i.level === "error");
+
   console.log(`Initialized Commentray storage under ${cfg.storageDir}`);
+  return hasError ? 1 : 0;
 }
 
 /**
