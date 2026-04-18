@@ -1,9 +1,9 @@
 # `scroll-sync.ts` — commentray
 
-This file is the **math behind the sway**: no VS Code imports, just pure functions so the extension can stay thin.
+Pure functions only—no VS Code imports—so the extension stays a thin orchestrator.
 
-**`buildBlockScrollLinks`** stitches `index.json` to the `<!-- commentray:block id=… -->` markers in **commentray**—without that join, scroll sync is only proportional scrolling and nobody feels clever.
+**`buildBlockScrollLinks`** joins `index.json` to `<!-- commentray:block id=… -->` in the Markdown file. Without that join, scroll sync is only **proportional** mirroring between panes.
 
-When you scroll the source, we try to land the commentary on the **block that actually owns** the top visible line; if the index and markers disagree with reality, we degrade gracefully (nearest earlier block, then ratio). The **0-based** commentray lines versus **1-based** anchor lines in metadata look like a footgun on paper; in the editor it lines up with how `Range` and the anchor spec already think.
+When you scroll the source, the target commentray position prefers the **block whose anchor owns** the top visible line; if markers and index disagree with the buffer, behavior falls back to the nearest earlier block, then to ratio. **0-based** editor lines versus **1-based** anchor lines in metadata match how `Range` and the anchor spec are already defined.
 
 **Spec:** [`docs/spec/anchors.md`](https://github.com/d-led/commentray/blob/main/docs/spec/anchors.md) · [`docs/spec/blocks.md`](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md)

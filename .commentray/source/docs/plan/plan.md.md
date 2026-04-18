@@ -1,23 +1,25 @@
 # Plan — commentray
 
-The plan on the left is the **script**; this note is what we’d say in the booth while it plays—intent, boundaries, and where the camera will not go in v0.
+The plan on the left is the engineering checklist; this file is the short voice-over: intent, boundaries, and what v0 deliberately does not claim.
 
 ```mermaid
 flowchart LR
   A[edit source] --> B["Extension paired panes + scroll"]
   C[git commit] --> D["hook or CI validate"]
-  B -.->|narrative| E[".commentray/source"]
+  B -.->|writes| E[".commentray/source"]
   D --> F["schema + anchors"]
 ```
 
-**Product metaphor** — DVD-style commentary: voice-over without splicing new frames into the film.
+**Metaphor** — Commentary on a film: extra audio without splicing new frames into the picture.
 
-**Goals / non-goals** — v0 is deliberately small; the plan calls out what we deferred (LSP, every SCM, …) so “not yet” does not read as “forgotten.”
+**Goals / non-goals** — v0 stays small; deferred work (LSP, every SCM, …) is named so absence reads as policy, not neglect.
 
-**Data flow** — Mermaid in the plan’s source still renders on Pages when Mermaid is enabled; the diagram is the same idea as [`docs/spec/blocks.md`](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md) in a different costume.
+**Angles** — Core + VS Code handle multi-file Angles when `source/.default` exists. The static Pages build still uses one `commentray_markdown` path until a switcher ships.
 
-**Packages** — Read the table on the left as dependency pressure: core at the bottom, render above it, surfaces (CLI, VS Code, static generator) on top.
+**Block stretch** — Renderer uses **row-per-block** paired rows, not `rowspan`, when index and markers line up.
 
-**Anchors (v0 grammar)** — `lines:12-40` and `symbol:SomeExport` are the two dialects we committed to; blocks hang prose off those hooks.
+**Packages** — Read the table as a stack: core at the bottom, render above, CLI / VS Code / static sample on top.
 
-**Hook path** — `commentray init scm`. **Full gate** — root `npm run quality:gate` → `scripts/quality-gate.sh`.
+**Anchors (v0)** — `lines:…` and `symbol:…` are the committed dialects; blocks hang prose off those hooks (plus `marker:` where regions exist).
+
+**Automation** — Hooks: `commentray init scm`. Local/CI gate: **`npm run quality:gate`** → `scripts/quality-gate.sh`.

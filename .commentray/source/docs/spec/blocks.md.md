@@ -1,9 +1,9 @@
 # `blocks.md` — commentray
 
-The spec on the left is normative; here we only add **why the split exists**.
+The spec on the left is normative; this note is **why** the split between prose and metadata exists.
 
-Humans own the **commentray** prose—headings, tone, diagrams. The machine owns **`index.json`**: ids, **`lines:`** / **`symbol:`** anchors, optional **fingerprints** when we want drift to be diagnosable instead of silent. Keeping those walls up is what lets “validate in CI” mean something without a parser rewriting your prose.
+Humans own **commentray** copy—headings, tone, diagrams. The tool owns **`index.json`**: ids, **`lines:`** / **`symbol:`** / **`marker:`** anchors, optional verification fields. That wall is what makes `validate` in CI meaningful without a parser rewriting your Markdown.
 
-**Staleness (v0)** — Diagnostics only; the same file’s staleness section is the contract. We’re not auto-healing commentary on branch mismatch—that’s a product decision, not an oversight.
+**Staleness (v0)** — Diagnostics only; auto-healing on branch mismatch is out of scope until we decide otherwise.
 
-**Editor tie-in** — Markers exist so the extension has something grep-stable for **block-aware scroll**. Strip the markers or the index rows and you’re back to **proportional** sync: still usable, just less smug about it.
+**Editor** — Markers give a grep-stable hook for **block-aware scroll**. Remove markers or index rows and you fall back to **proportional** sync between panes.
