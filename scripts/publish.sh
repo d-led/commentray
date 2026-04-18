@@ -50,7 +50,7 @@ PUBLIC_WORKSPACES=(
   "@commentray/core"
   "@commentray/render"
   "@commentray/cli"
-  "code-commentray-static"
+  "@commentray/code-commentray-static"
 )
 
 version=$(node -e "process.stdout.write(require('./packages/core/package.json').version)")

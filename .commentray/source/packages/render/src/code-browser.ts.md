@@ -4,4 +4,4 @@ This is the **wide shot**: code pane, Markdown pane, draggable splitter, optiona
 
 **Security** — Markdown goes through **rehype-sanitize** with an explicit allow-list. Treat any change to fenced-code handling or class allow-lists as a security review, not a style pass.
 
-**Callers** — [`code-commentray-static`](https://github.com/d-led/commentray/tree/main/packages/code-commentray-static) and root **`npm run pages:build`** share the HTML contract; if you change the DOM shape, bump both consumers in the same breath.
+**Callers** — [`@commentray/code-commentray-static`](https://github.com/d-led/commentray/tree/main/packages/code-commentray-static) and root **`npm run pages:build`** share the HTML contract; if you change the DOM shape, bump both consumers in the same breath.

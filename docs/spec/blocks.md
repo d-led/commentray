@@ -13,14 +13,14 @@ Commentray is authored in **blocks**: segments of Markdown aligned to regions of
 Blocks are represented in two layers:
 
 1. **Markdown**: human text, diagrams, and narrative.
-2. **Metadata** (JSON index): machine-owned fields such as fingerprints, last verified commits, and diagnostics.
+2. **Metadata** (JSON index): machine-owned fields such as optional **snippets** of anchored source, last verified commits, and diagnostics.
 
 Each block has:
 
 - **`id`**: stable string within the commentray file.
 - **`anchor`**: string in the anchor grammar (see `anchors.md`).
-- **Optional `fingerprint`**: `{ startLine: string; endLine: string; lineCount: number }` capturing the trimmed content of the first and last source lines plus the original line count. Used for content-based drift resolution when source lines shift.
-- **Optional `markerId`**: when set, the block's source range is delimited by host-language comments of the form `commentray:start id=<markerId>` / `commentray:end`. Drift-proof but invasive (touches the source). When both `fingerprint` and `markerId` are present, marker resolution wins.
+- **Optional `snippet`**: a single self-contained string (v1 format, see [`block-snippet.ts`](../../packages/core/src/block-snippet.ts)) — header line `commentray-snippet/v1`, then one line per anchored source line in unified-diff **context** style (each body line is a leading space plus the **trimmed** source text). Used to record what the anchor pointed at and to support human or future tooling review when `lines:` ranges shift. **Not** the legacy nested `fingerprint` object (that shape is rejected; run `commentray migrate` to fold it into `snippet`).
+- **Optional `markerId`**: redundant echo of the id inside `marker:<id>` anchors; when the anchor is `marker:…`, the span is resolved from **paired region delimiters** in the source (see below). `markerId` must stay consistent with `marker:` in the anchor string.
 - **Optional verification**:
   - `lastVerifiedCommit`: full Git SHA when a human verified the block against the repo.
   - `lastVerifiedBlob`: Git blob id of the primary file at verification time (when known).
@@ -53,15 +53,12 @@ The workspace index groups blocks by **repo-relative commentray path** (`byComme
 
 Each entry still records both `sourcePath` and `commentrayPath`; the object key must equal `commentrayPath`. Older v1–v2 indexes keyed by `sourcePath` are migrated automatically when read (and rewritten on disk).
 
-## Drift resolution (informative)
+## Drift and snippets (informative)
 
-When a block's `anchor` is a `lines:<start>-<end>` range and a `fingerprint` is present, a drift resolver can re-sync the range after the source changes:
+- **`lines:` anchors:** the authoritative span is always the `start`–`end` range in `index.json`. Core **validation does not** silently rewrite those numbers when the file changes. An optional **`snippet`** records the trimmed source lines that the range covered when the block was authored or last normalized—reviewers and UIs can compare it to the current file at the same line numbers to spot stale commentary after edits.
+- **`marker:` anchors:** the span is derived from **region delimiters** in the primary file (see [Source markers](#source-markers-language-dependent)). Renumbering lines inside the region does not break the link; renaming the region id requires coordinated edits across index, Markdown marker, and source.
 
-1. Read the source file; compare `sourceLines[start-1].trim()` and `sourceLines[end-1].trim()` against the recorded `fingerprint`.
-2. If both still match at the recorded line numbers, the range is **unchanged**.
-3. Otherwise search a bounded neighbourhood (±N lines, with N typically proportional to `lineCount`) for the fingerprint pair; if found uniquely, update the anchor. If ambiguous or missing, emit a diagnostic and leave the stored anchor alone.
-
-When `markerId` is set, the resolver instead scans the source for the matching `commentray:start` / `commentray:end` comment pair and uses the lines between them. This mode is drift-proof at the cost of tolerating the marker comments in the source.
+Automated “search the neighbourhood and patch `lines:`” resolvers are intentionally **not** part of strict validation today; they remain a possible future extension on top of the same `snippet` v1 format.
 
 ## Staleness (v0 rules)
 
@@ -74,3 +71,7 @@ The core library computes lightweight diagnostics:
   - the primary file is not tracked at `HEAD` while verification metadata exists.
 
 These diagnostics are designed to be surfaced in editors and CI without silently rewriting commentray content.
+
+## See also
+
+- [Keeping blocks, regions, and metadata consistent](../user/keeping-blocks-in-sync.md) — checklists, CLI commands, and workflows after renames or refactors.

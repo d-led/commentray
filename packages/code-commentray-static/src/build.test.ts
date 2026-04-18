@@ -27,7 +27,7 @@ describe("buildCommentrayStatic — HTML shell", () => {
     expect(html).toContain("greet");
     expect(html).toContain("Resizable divider");
     expect(html).toContain('<meta name="generator" content="Commentray @commentray/render@');
-    expect(html).toContain("code-commentray-static@");
+    expect(html).toContain("@commentray/code-commentray-static@");
   });
 
   it("omits generator meta when generatorLabel is an empty string", async () => {

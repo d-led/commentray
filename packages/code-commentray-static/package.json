@@ -1,5 +1,5 @@
 {
-  "name": "code-commentray-static",
+  "name": "@commentray/code-commentray-static",
   "version": "0.0.3",
   "description": "Build static HTML pages for code + Commentray (resizable panes, wrap toggle)",
   "license": "MPL-2.0",

@@ -14,7 +14,7 @@ const defaultOut = path.join(pkgRoot, "site", "index.html");
 
 const program = new Command();
 program
-  .name("code-commentray-static")
+  .name("@commentray/code-commentray-static")
   .description("Emit a static HTML code + commentray browser page")
   .option("--source <path>", "Source file to display", defaultSource)
   .option("--markdown <path>", "Commentray Markdown file", defaultMarkdown)

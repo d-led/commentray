@@ -43,8 +43,10 @@ const staticPackageDir = path.join(path.dirname(fileURLToPath(import.meta.url)),
 
 function defaultGeneratorLabel(): string {
   const raw = readFileSync(path.join(staticPackageDir, "package.json"), "utf8");
-  const sv = (JSON.parse(raw) as { version?: string }).version ?? "0.0.0";
-  return `Commentray @commentray/render@${commentrayRenderVersion()}; code-commentray-static@${sv}`;
+  const pkg = JSON.parse(raw) as { version?: string; name?: string };
+  const name = pkg.name ?? "@commentray/code-commentray-static";
+  const sv = pkg.version ?? "0.0.0";
+  return `Commentray @commentray/render@${commentrayRenderVersion()}; ${name}@${sv}`;
 }
 
 function resolveGeneratorLabel(explicit: string | undefined): string | undefined {

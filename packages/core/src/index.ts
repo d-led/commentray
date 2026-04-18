@@ -65,12 +65,12 @@ export {
   buildBlockScrollLinks,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
-  sourceLineRangeForMarkerId,
 } from "./scroll-sync.js";
 export {
   commentrayRegionInsertions,
   lineCommentLeaderForLanguage,
   parseCommentrayRegionBoundary,
+  sourceLineRangeForMarkerId,
 } from "./source-markers.js";
 export type { CommentrayMarkerPair } from "./region-marker-convert.js";
 export {

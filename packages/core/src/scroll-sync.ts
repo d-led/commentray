@@ -3,10 +3,10 @@ import { MARKER_ID_BODY } from "./marker-ids.js";
 import type { CommentrayIndex } from "./model.js";
 import { sourceLineRangeForMarkerId } from "./source-markers.js";
 
-export { sourceLineRangeForMarkerId };
-
 /** One block as needed for scroll correlation (0-based commentray line, 1-based source range). */
 export type BlockScrollLink = {
+  /** Same id as `<!-- commentray:block id=… -->` and `index.json` blocks[]. */
+  id: string;
   commentrayLine: number;
   sourceStart: number;
   sourceEnd: number;
@@ -47,6 +47,7 @@ export function buildBlockScrollLinks(
     if (commentrayLine === undefined) continue;
     if (anchor.kind === "lines") {
       links.push({
+        id: block.id,
         commentrayLine,
         sourceStart: anchor.range.start,
         sourceEnd: anchor.range.end,
@@ -58,6 +59,7 @@ export function buildBlockScrollLinks(
       const range = sourceLineRangeForMarkerId(sourceText, anchor.id);
       if (range === null) continue;
       links.push({
+        id: block.id,
         commentrayLine,
         sourceStart: range.start,
         sourceEnd: range.end,

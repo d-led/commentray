@@ -2,6 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { CommentrayIndex } from "@commentray/core";
+
+import { tryBuildBlockStretchTableHtml } from "./block-stretch-layout.js";
 import { escapeHtml } from "./html-utils.js";
 import {
   type CommentrayOutputUrlOptions,
@@ -44,6 +47,17 @@ export type CodeBrowserPageOptions = {
    * Free-form label for `<meta name="generator">` (e.g. package versions). Omitted when unset.
    */
   generatorLabel?: string;
+  /**
+   * When set and index blocks align with `<!-- commentray:block id=… -->` markers,
+   * emits a two-column **block stretch** table: one row per source line and commentary
+   * cells use `rowspan` so prose stretches beside the full anchored range (aligned
+   * scrolling on the web instead of two independent panes).
+   */
+  blockStretchRows?: {
+    index: CommentrayIndex;
+    sourceRelative: string;
+    commentrayPathRel: string;
+  };
 };
 
 function renderGeneratorMetaHtml(label: string | undefined): string {
@@ -322,6 +336,88 @@ const CODE_BROWSER_STYLES = `
       .pane--doc img { max-width: 100%; height: auto; }
       .pane h2.pane-title { margin: 0 0 10px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
       .app { display: flex; flex-direction: column; height: 100vh; }
+      .shell--stretch-rows {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        display: block;
+        padding: 0 12px 20px;
+      }
+      .shell--stretch-rows .stretch-preamble {
+        padding: 8px 4px 16px;
+        margin-bottom: 8px;
+        border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+        font-size: 15px;
+        line-height: 1.45;
+      }
+      .shell--stretch-rows .stretch-preamble img { max-width: 100%; height: auto; }
+      .block-stretch {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+      .stretch-col-code { width: 50%; }
+      .stretch-col-doc { width: 50%; }
+      .block-stretch td.stretch-code {
+        vertical-align: top;
+        padding: 0 12px 0 0;
+        border-bottom: 1px solid color-mix(in oklab, CanvasText 8%, Canvas);
+      }
+      .block-stretch td.stretch-doc {
+        vertical-align: top;
+        padding: 0 0 0 12px;
+        border-bottom: 1px solid color-mix(in oklab, CanvasText 8%, Canvas);
+      }
+      .block-stretch td.stretch-doc .stretch-doc-inner {
+        font-size: 15px;
+        line-height: 1.45;
+      }
+      .block-stretch td.stretch-doc .stretch-doc-inner img { max-width: 100%; height: auto; }
+      .block-stretch td.stretch-doc--gap {
+        color: color-mix(in oklab, CanvasText 38%, Canvas);
+        font-size: 13px;
+        vertical-align: top;
+      }
+      .block-stretch .stretch-gap-mark { display: inline-block; padding-top: 2px; }
+      .block-stretch .code-line {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 12px;
+        align-items: baseline;
+      }
+      .block-stretch .code-line pre { margin: 0; min-width: 0; padding: 0; border: 0; background: transparent; }
+      .block-stretch .code-line pre code.hljs {
+        display: block;
+        margin: 0;
+        padding: 0;
+        font-size: var(--code-line-font-size, 13px);
+        line-height: var(--code-line-height, 1.5);
+      }
+      .block-stretch .code-line .ln {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        user-select: none;
+        -webkit-user-select: none;
+        color: color-mix(in oklab, CanvasText 45%, Canvas);
+        padding-right: 8px;
+        border-right: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+        min-width: 3ch;
+        font-size: var(--code-line-font-size, 13px);
+        line-height: var(--code-line-height, 1.5);
+      }
+      .block-stretch.wrap .code-line pre,
+      .block-stretch.wrap .code-line pre code { white-space: pre-wrap; word-break: break-word; }
+      .block-stretch:not(.wrap) .code-line pre,
+      .block-stretch:not(.wrap) .code-line pre code { white-space: pre; }
+      .block-stretch-headings {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 16px;
+        padding: 4px 12px 8px;
+        border-bottom: 1px solid color-mix(in oklab, CanvasText 10%, Canvas);
+      }
+      .block-stretch-headings .pane-title { margin: 0; }
 `;
 
 type CodeBrowserPageParts = {
@@ -330,8 +426,9 @@ type CodeBrowserPageParts = {
   filePathHtml: string;
   relatedNavHtml: string;
   toolbarEndHtml: string;
-  codeHtml: string;
-  commentrayHtml: string;
+  /** `dual`: resizable panes; `stretch`: rowspan table aligned to index blocks. */
+  layout: "dual" | "stretch";
+  shellInner: string;
   rawCodeB64: string;
   rawMdB64: string;
   hljs: string;
@@ -346,14 +443,15 @@ function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
     filePathHtml,
     relatedNavHtml,
     toolbarEndHtml,
-    codeHtml,
-    commentrayHtml,
+    layout,
+    shellInner,
     rawCodeB64,
     rawMdB64,
     hljs,
     hljsDark,
     mermaidScript,
   } = p;
+  const shellClass = layout === "stretch" ? "shell shell--stretch-rows" : "shell";
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -386,16 +484,8 @@ ${CODE_BROWSER_STYLES}
         ${toolbarEndHtml}
       </header>
       <div class="search-results" id="search-results" hidden aria-live="polite"></div>
-      <div class="shell" id="shell">
-        <section class="pane--code" id="code-pane" aria-label="Source code" data-raw-code-b64="${escapeHtml(rawCodeB64)}" data-raw-md-b64="${escapeHtml(rawMdB64)}">
-          <h2 class="pane-title">Code</h2>
-          ${codeHtml}
-        </section>
-        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>
-        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">
-          <h2 class="pane-title">Commentray</h2>
-          ${commentrayHtml}
-        </section>
+      <div class="${shellClass}" id="shell" data-layout="${layout}" data-raw-code-b64="${escapeHtml(rawCodeB64)}" data-raw-md-b64="${escapeHtml(rawMdB64)}">
+${shellInner}
       </div>
     </div>
     <script>
@@ -412,13 +502,6 @@ ${loadCodeBrowserClientBundle()}
  * token-in-line quick search (all non-whitespace tokens must appear on the same line).
  */
 export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promise<string> {
-  const [codeHtml, commentrayHtml] = await Promise.all([
-    renderCodeLineBlocks(opts.code, opts.language),
-    renderMarkdownToHtml(opts.commentrayMarkdown, {
-      commentrayOutputUrls: opts.commentrayOutputUrls,
-    }),
-  ]);
-
   const rawCodeB64 = Buffer.from(opts.code, "utf8").toString("base64");
   const rawMdB64 = Buffer.from(opts.commentrayMarkdown, "utf8").toString("base64");
 
@@ -439,14 +522,58 @@ mermaid.run({ querySelector: ".mermaid" });
   const relatedNavHtml = renderRelatedGithubNavHtml(opts.relatedGithubNav ?? []);
   const generatorMetaHtml = renderGeneratorMetaHtml(opts.generatorLabel);
 
+  let layout: "dual" | "stretch" = "dual";
+  let shellInner = "";
+
+  if (opts.blockStretchRows) {
+    const stretched = await tryBuildBlockStretchTableHtml({
+      code: opts.code,
+      language: opts.language,
+      commentrayMarkdown: opts.commentrayMarkdown,
+      index: opts.blockStretchRows.index,
+      sourceRelative: opts.blockStretchRows.sourceRelative,
+      commentrayPathRel: opts.blockStretchRows.commentrayPathRel,
+      commentrayOutputUrls: opts.commentrayOutputUrls,
+    });
+    if (stretched) {
+      layout = "stretch";
+      shellInner =
+        `        <div class="block-stretch-headings">` +
+        `<h2 class="pane-title">Code</h2>` +
+        `<h2 class="pane-title">Commentray</h2>` +
+        `</div>\n` +
+        `        ${stretched.preambleHtml}\n` +
+        `        ${stretched.tableInnerHtml}\n`;
+    }
+  }
+
+  if (layout === "dual") {
+    const [codeHtml, commentrayHtml] = await Promise.all([
+      renderCodeLineBlocks(opts.code, opts.language),
+      renderMarkdownToHtml(opts.commentrayMarkdown, {
+        commentrayOutputUrls: opts.commentrayOutputUrls,
+      }),
+    ]);
+    shellInner =
+      `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
+      `<h2 class="pane-title">Code</h2>\n` +
+      `          ${codeHtml}\n` +
+      `        </section>\n` +
+      `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
+      `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
+      `          <h2 class="pane-title">Commentray</h2>\n` +
+      `          ${commentrayHtml}\n` +
+      `        </section>\n`;
+  }
+
   return buildCodeBrowserPageHtml({
     title,
     generatorMetaHtml,
     filePathHtml,
     relatedNavHtml,
     toolbarEndHtml,
-    codeHtml,
-    commentrayHtml,
+    layout,
+    shellInner,
     rawCodeB64,
     rawMdB64,
     hljs,

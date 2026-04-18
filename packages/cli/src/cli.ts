@@ -209,6 +209,7 @@ const initCmd = program
   .command("init")
   .description(
     "Idempotent workspace setup: storage dirs, index.json if missing, .commentray.toml if missing; " +
+      "merges d-led.commentray-vscode into .vscode/extensions.json when mergeable; " +
       "always refreshes index migrations and runs validate (exit 1 on validation errors)",
   );
 

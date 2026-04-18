@@ -77,7 +77,7 @@ The Pages build emits **one** HTML file: one **code** pane (`static_site.source_
 
 - **`[[static_site.related_github_files]]`** — optional rows with repo-relative `path` and optional `label` (defaults to the file’s basename). When `static_site.github_url` is a GitHub **repository home** URL (`https://github.com/owner/repo`), the toolbar gains **Also on GitHub** links to `…/blob/<branch>/path` so readers can jump to other Markdown or code on GitHub. Set **`static_site.github_blob_branch`** when your default branch is not `main`.
 - **Search** — **Escape** clears the query and hides hit results (same as the **Clear** control).
-- **Generator** — emitted HTML includes `<meta name="generator" content="Commentray @commentray/render@…; code-commentray-static@…">` so the toolchain version is visible in page metadata (omit by passing an empty `generatorLabel` from the static builder API).
+- **Generator** — emitted HTML includes `<meta name="generator" content="Commentray @commentray/render@…; @commentray/code-commentray-static@…">` so the toolchain version is visible in page metadata (omit by passing an empty `generatorLabel` from the static builder API).
 
 ## Images and other local assets (static HTML)
 

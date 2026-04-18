@@ -12,7 +12,7 @@ install Commentray to use it, see the top-level `README.md`.
   the static site.
 - `packages/cli` — the `commentray` CLI (also packaged as a standalone
   Node SEA binary).
-- `packages/code-commentray-static` — static-site generator for the
+- `packages/code-commentray-static` (`@commentray/code-commentray-static` on npm) — static-site generator for the
   rendered commentary pages.
 - `packages/vscode` — VS Code / Cursor extension.
 

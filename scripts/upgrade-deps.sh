@@ -46,7 +46,7 @@ log_step "Running taze (${mode}, recursive) across all workspaces"
 # Exclude intra-monorepo packages: taze would try to fetch them from the
 # public npm registry and emit spurious 404s. sync-workspace-deps.mjs
 # owns those pins.
-taze_exclude="@commentray/*,code-commentray-static,commentray-vscode"
+taze_exclude="@commentray/*,commentray-vscode"
 taze_args=("$mode" --recursive --include-locked --force --exclude "$taze_exclude")
 if [[ "$check" == true ]]; then
   echo "(check mode — no files will be modified)"

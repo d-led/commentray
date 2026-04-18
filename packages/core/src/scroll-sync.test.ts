@@ -35,8 +35,8 @@ describe("buildBlockScrollLinks", () => {
 
   it("pairs markers in the markdown with line anchors from the index", () => {
     expect(buildBlockScrollLinks(index, "src/a.ts", crPath, md)).toEqual([
-      { commentrayLine: 0, sourceStart: 1, sourceEnd: 5 },
-      { commentrayLine: 5, sourceStart: 20, sourceEnd: 25 },
+      { id: "b1", commentrayLine: 0, sourceStart: 1, sourceEnd: 5 },
+      { id: "b2", commentrayLine: 5, sourceStart: 20, sourceEnd: 25 },
     ]);
   });
 
@@ -55,7 +55,7 @@ describe("buildBlockScrollLinks", () => {
       "\n",
     );
     expect(buildBlockScrollLinks(idx, "src/a.ts", crPath, md, source)).toEqual([
-      { commentrayLine: 0, sourceStart: 2, sourceEnd: 2 },
+      { id: "b1", commentrayLine: 0, sourceStart: 2, sourceEnd: 2 },
     ]);
   });
 });

@@ -2,7 +2,7 @@
 // Keep intra-monorepo dependency pins in lockstep with the current Commentray
 // version (as recorded in packages/core/package.json).
 //
-// Rewrites every `@commentray/*` or `code-commentray-static` entry found in
+// Rewrites every `@commentray/*` workspace package entry found in
 // `dependencies`, `devDependencies`, `peerDependencies`, or `optionalDependencies`
 // across all workspace packages (and the monorepo root) to that version.
 //
@@ -23,7 +23,7 @@ const WORKSPACE_NAMES = new Set([
   "@commentray/core",
   "@commentray/render",
   "@commentray/cli",
-  "code-commentray-static",
+  "@commentray/code-commentray-static",
 ]);
 
 const DEP_FIELDS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];

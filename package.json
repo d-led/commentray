@@ -12,7 +12,7 @@
   "scripts": {
     "bootstrap": "npm install",
     "setup": "bash scripts/setup.sh",
-    "build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w code-commentray-static && npm run build -w @commentray/cli && npm run build -w commentray-vscode",
+    "build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w @commentray/code-commentray-static && npm run build -w @commentray/cli && npm run build -w commentray-vscode",
     "clean": "npm run -ws --if-present clean",
     "format": "bash scripts/format.sh",
     "format:check": "bash scripts/format-check.sh",
@@ -46,15 +46,15 @@
     "deps:upgrade": "bash scripts/upgrade-deps.sh",
     "publish:all": "bash scripts/publish.sh",
     "release": "bash scripts/release.sh",
-    "code-commentray-static:build": "npm run build -w @commentray/render && npm run build -w code-commentray-static && npm run site -w code-commentray-static",
-    "pages:build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w code-commentray-static && node scripts/build-static-pages.mjs"
+    "code-commentray-static:build": "npm run build -w @commentray/render && npm run build -w @commentray/code-commentray-static && npm run site -w @commentray/code-commentray-static",
+    "pages:build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w @commentray/code-commentray-static && node scripts/build-static-pages.mjs"
   },
   "devDependencies": {
     "@commentray/core": "0.0.3",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
-    "code-commentray-static": "0.0.3",
+    "@commentray/code-commentray-static": "0.0.3",
     "eslint": "^10.2.1",
     "jscpd": "^4.0.9",
     "prettier": "^3.8.3",

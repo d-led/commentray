@@ -24,7 +24,7 @@ Clone and `npm run setup` (left pane has the exact line). After that, pick your 
 
 ## About this HTML
 
-You may be reading a **generated** page: `code-commentray-static` plus [`build-static-pages.mjs`](https://github.com/d-led/commentray/blob/main/scripts/build-static-pages.mjs) and [`pages.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/pages.yml) are the assembly line. Point `[static_site]` at another source file and you get the same split-pane treatment—configuration is the cameo, not a fork of the product.
+You may be reading a **generated** page: `@commentray/code-commentray-static` plus [`build-static-pages.mjs`](https://github.com/d-led/commentray/blob/main/scripts/build-static-pages.mjs) and [`pages.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/pages.yml) are the assembly line. Point `[static_site]` at another source file and you get the same split-pane treatment—configuration is the cameo, not a fork of the product.
 
 ## Cookbook (tone, not a second README)
 
@@ -36,7 +36,7 @@ You may be reading a **generated** page: `code-commentray-static` plus [`build-s
 
 ## Architecture (who talks to whom)
 
-Treat the left README’s bullet list as the roster. In practice: **`@commentray/core`** owns truth (paths, index schema, staleness); **`@commentray/render`** owns “safe enough HTML”; **`@commentray/cli`** is the automation face; **`commentray-vscode`** is the human face; **`code-commentray-static`** is the smallest interesting consumer of the renderer. If you change the HTML contract, walk that chain backward before you tag.
+Treat the left README’s bullet list as the roster. In practice: **`@commentray/core`** owns truth (paths, index schema, staleness); **`@commentray/render`** owns “safe enough HTML”; **`@commentray/cli`** is the automation face; **`commentray-vscode`** is the human face; **`@commentray/code-commentray-static`** is the smallest interesting consumer of the renderer. If you change the HTML contract, walk that chain backward before you tag.
 
 ## Reference (jump off points)
 

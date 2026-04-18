@@ -52,3 +52,5 @@ Cross references are authored in Markdown using normal links and conventions:
 - Stable public URLs for external dependencies.
 
 Higher-level “xref” syntax may be introduced later as an optional Markdown extension, backed by the same anchor model.
+
+**Operational guide:** [Keeping blocks, regions, and metadata consistent](../user/keeping-blocks-in-sync.md) — how index entries, Markdown `<!-- commentray:block … -->` markers, and source `lines:` / `marker:` anchors stay aligned (CI, hooks, `sync-moved-paths`, etc.).

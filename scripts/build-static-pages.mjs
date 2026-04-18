@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Build `_site/index.html` for GitHub Pages from `.commentray.toml` `[static_site]` and
- * `code-commentray-static` / `renderCodeBrowserHtml`.
+ * `@commentray/code-commentray-static` / `renderCodeBrowserHtml`.
  */
 import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
@@ -11,7 +11,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { loadCommentrayConfig, parseGithubRepoWebUrl } from "@commentray/core";
-import { buildCommentrayStatic } from "code-commentray-static";
+import { buildCommentrayStatic } from "@commentray/code-commentray-static";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 

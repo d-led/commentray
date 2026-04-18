@@ -1,10 +1,14 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CURRENT_SCHEMA_VERSION } from "@commentray/core";
 
-import { runInitFull } from "./init.js";
+import {
+  COMMENTRAY_VSCODE_EXTENSION_ID,
+  mergeCommentrayVscodeExtensionRecommendation,
+  runInitFull,
+} from "./init.js";
 
 describe("runInitFull", () => {
   it("creates storage, index, and config on a fresh directory", async () => {
@@ -19,6 +23,9 @@ describe("runInitFull", () => {
       const index = JSON.parse(indexRaw) as { schemaVersion: number };
       expect(index.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
       await readFile(path.join(dir, ".commentray.toml"), "utf8");
+      const extRaw = await readFile(path.join(dir, ".vscode", "extensions.json"), "utf8");
+      const ext = JSON.parse(extRaw) as { recommendations: string[] };
+      expect(ext.recommendations).toContain(COMMENTRAY_VSCODE_EXTENSION_ID);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -76,6 +83,56 @@ describe("runInitFull", () => {
         "utf8",
       );
       expect(await runInitFull(dir)).toBe(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("mergeCommentrayVscodeExtensionRecommendation", () => {
+  it("creates .vscode/extensions.json when absent", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "commentray-ext-"));
+    try {
+      expect(await mergeCommentrayVscodeExtensionRecommendation(dir)).toBe("wrote");
+      const ext = JSON.parse(
+        await readFile(path.join(dir, ".vscode", "extensions.json"), "utf8"),
+      ) as { recommendations: string[] };
+      expect(ext.recommendations).toEqual([COMMENTRAY_VSCODE_EXTENSION_ID]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("appends Commentray without removing other recommendations", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "commentray-ext-2-"));
+    try {
+      await mkdir(path.join(dir, ".vscode"), { recursive: true });
+      await writeFile(
+        path.join(dir, ".vscode", "extensions.json"),
+        JSON.stringify({ recommendations: ["ms-python.python"] }, null, 2) + "\n",
+        "utf8",
+      );
+      expect(await mergeCommentrayVscodeExtensionRecommendation(dir)).toBe("wrote");
+      const ext = JSON.parse(
+        await readFile(path.join(dir, ".vscode", "extensions.json"), "utf8"),
+      ) as { recommendations: string[] };
+      expect(ext.recommendations).toEqual(["ms-python.python", COMMENTRAY_VSCODE_EXTENSION_ID]);
+      expect(await mergeCommentrayVscodeExtensionRecommendation(dir)).toBe("unchanged");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves invalid JSON untouched and returns skipped", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "commentray-ext-bad-"));
+    try {
+      await mkdir(path.join(dir, ".vscode"), { recursive: true });
+      const bad = "{ not json\n";
+      await writeFile(path.join(dir, ".vscode", "extensions.json"), bad, "utf8");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      expect(await mergeCommentrayVscodeExtensionRecommendation(dir)).toBe("skipped");
+      expect(await readFile(path.join(dir, ".vscode", "extensions.json"), "utf8")).toBe(bad);
+      warn.mockRestore();
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

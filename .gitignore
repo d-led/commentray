@@ -248,7 +248,7 @@ fabric.properties
 !.idea/codeStyles
 !.idea/runConfigurations
 
-# Commentray generated static site (code-commentray-static)
+# Commentray generated static site (@commentray/code-commentray-static)
 packages/code-commentray-static/site/
 
 # GitHub Pages output (`npm run pages:build`)

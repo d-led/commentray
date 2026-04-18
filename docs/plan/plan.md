@@ -14,13 +14,13 @@ The user-facing README should remain **terse and skimmable**, in the spirit of [
 
 - **Out-of-file docs** under `.commentray/` with transparent paths: `.commentray/source/<repo-relative-path>.md` (append `.md` to the original path; normalize separators; reject `..`).
 - **Angles** (named perspectives): optional `[angles]` in `.commentray.toml` (`default_angle`, `[[angles.definitions]]`); on disk, multi-angle layout when `{storage}/source/.default` exists → per-source `source/{P}/{angleId}.md` (see `docs/spec/storage.md`). Static viewer and editor should expose an Angle switcher; core exposes path helpers and config merge validation today.
-- **Block model**: commentray segments align to code ranges; UI layout is **code left, commentray right** (GitHub blame–style columns) with **scroll sync** while editing and viewing.
+- **Block model**: commentray segments align to code ranges; UI layout is **code left, commentray right** with **scroll sync** while editing and viewing; on the web, optional **block stretch rows** (`rowspan` commentary beside anchored source lines) keep the two columns vertically aligned like paired gutter rows, not attribution metadata.
 - **Anchoring & drift**: metadata records evidence (symbol names when available, line ranges, Git blob SHA, commits, timestamps). **Git is the default SCM** behind a pluggable `ScmProvider` interface (`git` CLI first).
 - **Staleness**: non-blocking diagnostics for humans and automation (including LLM agents).
 - **IDE**: default integration is **VS Code** (extension MVP ships in this repo).
 - **Language plugins**: pluggable resolvers per language; v0 focuses on core anchor parsing + TypeScript-friendly workflows, expanding later.
 - **Rendering**: `@commentray/render` provides Markdown → HTML with sanitization, highlighting, Mermaid containers, and HTML shells (simple side-by-side plus an interactive **static code browser** page).
-- **Static code browser sample**: the `code-commentray-static` package emits a self-contained HTML file: highlighted code, rendered Markdown commentray, a **draggable vertical splitter**, and a **line-wrap toggle** for the code pane (client-side persistence via `localStorage`).
+- **Static code browser sample**: the `@commentray/code-commentray-static` package emits a self-contained HTML file: highlighted code, rendered Markdown commentray, a **draggable vertical splitter**, and a **line-wrap toggle** for the code pane (client-side persistence via `localStorage`).
 - **Manipulation library**: `@commentray/core` owns models, validation, migrations, and staleness helpers.
 - **CLI**: `@commentray/cli` provides `init` (full idempotent setup), `init config`, `init scm` (git hooks), `validate`, `doctor`, `migrate`, `render`, and `paths`; **standalone SEA binaries** for Linux (x64, arm64), macOS (x64, arm64), and Windows (x64) are built in [`.github/workflows/binaries.yml`](../../.github/workflows/binaries.yml). CI workflow **artifacts expire** (14-day retention); **`v*`** tags attach binaries to **GitHub Releases** as the long-lived distribution surface (GitHub’s release asset store).
 - **Monorepo**: TypeScript, semantic versioning, packages start at **0.0.1**, **MPL-2.0** per published package.
@@ -97,13 +97,13 @@ This repository keeps **terse** commentray beside selected sources under [`.comm
 
 ## Packages
 
-| Package                  | Responsibility                                                                                       |
-| ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `@commentray/core`       | Types, JSON validation, migrations, Git SCM adapter, anchor parsing, staleness                       |
-| `@commentray/render`     | remark/rehype pipeline, sanitize, highlight, Mermaid, HTML shells (incl. interactive static browser) |
-| `code-commentray-static` | Sample static site generator: one HTML file, resizable panes, code wrap toggle                       |
-| `@commentray/cli`        | CLI commands and CI-friendly exit codes                                                              |
-| `commentray-vscode`      | Editor UX: paired panes, scroll sync prototype, workspace validation output channel                  |
+| Package                              | Responsibility                                                                                                                    |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `@commentray/core`                   | Types, JSON validation, migrations, Git SCM adapter, anchor parsing, staleness                                                    |
+| `@commentray/render`                 | remark/rehype pipeline, sanitize, highlight, Mermaid, HTML shells (incl. interactive static browser)                              |
+| `@commentray/code-commentray-static` | Sample static site generator: one HTML file, resizable panes, code wrap toggle (sources under `packages/code-commentray-static/`) |
+| `@commentray/cli`                    | CLI commands and CI-friendly exit codes                                                                                           |
+| `commentray-vscode`                  | Editor UX: paired panes, scroll sync prototype, workspace validation output channel                                               |
 
 ## Configuration (`.commentray.toml`)
 
@@ -126,12 +126,12 @@ Defaults (illustrative):
 
 Implementation note: configuration parsing uses `@iarna/toml` today; dependency choices should be revisited periodically for maintenance and security posture.
 
-## Static code browser (`code-commentray-static`)
+## Static code browser (`@commentray/code-commentray-static`)
 
 - **Purpose**: dogfood and demo a file-plus-commentray reading experience without a server.
-- **Implementation**: `renderCodeBrowserHtml` lives in `@commentray/render`; `code-commentray-static` wires fixtures + CLI (`npm run site -w code-commentray-static`) and writes to `packages/code-commentray-static/site/` (gitignored).
+- **Implementation**: `renderCodeBrowserHtml` lives in `@commentray/render`; `@commentray/code-commentray-static` wires fixtures + CLI (`npm run site -w @commentray/code-commentray-static`) and writes to `packages/code-commentray-static/site/` (gitignored).
 - **GitHub Pages**: root script `npm run pages:build` reads `.commentray.toml` `[static_site]`, composes commentray content (intro + GitHub link + optional file), and emits `_site/index.html` via `scripts/build-static-pages.mjs`. Workflow `.github/workflows/pages.yml` runs on `main` + `workflow_dispatch` using `actions/upload-pages-artifact` + `actions/deploy-pages` (repository **Settings → Pages → Build: GitHub Actions**).
-- **UX**: movable vertical bar (mouse drag), “Wrap code lines” checkbox, proportional **code ↔ commentray scroll sync** on the static page, Highlight.js themes via CDN, Markdown + Mermaid (optional); `<meta name="generator">` records `@commentray/render` + `code-commentray-static` versions (override via `buildCommentrayStatic({ generatorLabel })`).
+- **UX**: movable vertical bar (mouse drag), “Wrap code lines” checkbox, proportional **code ↔ commentray scroll sync** on the static page, Highlight.js themes via CDN, Markdown + Mermaid (optional); `<meta name="generator">` records `@commentray/render` + `@commentray/code-commentray-static` versions (override via `buildCommentrayStatic({ generatorLabel })`).
 - **Quick search**: client-side whole-source ordered tokens plus per-line fuzzy ranking (bundled client); **Escape** clears search; see `packages/render` implementation.
 
 ## Markdown rendering stack
@@ -201,6 +201,6 @@ Both pieces are documentation-only and can land incrementally (install + quickst
 
 ## Implementation status (living)
 
-This repository contains an initial vertical slice: monorepo scaffolding, core library, renderer, static code browser sample (`code-commentray-static`), CLI, VS Code MVP, tiered Vitest configs, and baseline GitHub Actions.
+This repository contains an initial vertical slice: monorepo scaffolding, core library, renderer, static code browser sample (`@commentray/code-commentray-static`), CLI, VS Code MVP, tiered Vitest configs, and baseline GitHub Actions.
 
 Next steps are intentionally incremental: expand metadata richness, improve anchor resolution plugins, tighten editor diagnostics, and add more integration coverage as real repositories adopt Commentray.
