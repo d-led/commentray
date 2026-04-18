@@ -27,6 +27,7 @@ import { runInitConfig, runInitFull, runInitScm } from "./init.js";
 import { runMigrateAnglesFromCwd } from "./migrate-angles-cmd.js";
 import { findProjectRoot } from "./project-root.js";
 import { resolveRenderInputs, type RenderCliOptions } from "./render-inputs.js";
+import { runServeStaticPages } from "./serve.js";
 
 async function repoRootFromCwd(): Promise<string> {
   const root = await findProjectRoot(process.cwd());
@@ -334,6 +335,29 @@ program
     const normalized = normalizeRepoRelativePath(file);
     const resolved = resolveCommentrayMarkdownPath(repoRoot, normalized, cfg);
     console.log(resolved.commentrayPath);
+  });
+
+program
+  .command("serve")
+  .description(
+    "Watch `.commentray.toml`, `[static_site].source_file`, `.commentray/metadata/index.json`, " +
+      "and Markdown under the configured storage `source/` tree; rebuild `_site` on change, " +
+      "and serve it over HTTP (same output as `pages:build`)",
+  )
+  .option("-p, --port <n>", "HTTP port", "4173")
+  .action(async (opts: { port?: string }) => {
+    const port = parseInt(String(opts.port ?? "4173"), 10);
+    if (!Number.isFinite(port) || port < 1 || port > 65535) {
+      console.error("serve: --port must be a number from 1 to 65535");
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      await runServeStaticPages(await repoRootFromCwd(), { port });
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+      process.exitCode = 1;
+    }
   });
 
 program

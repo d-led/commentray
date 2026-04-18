@@ -26,6 +26,7 @@ commentray migrate         # migrate metadata JSON to the current schema
 commentray migrate-angles    # flat .commentray/source/*.md → Angles folders + [angles] + index keys (see --dry-run)
 commentray sync-moved-paths # rewrite index paths after Git renames (uses git diff)
 commentray convert-source-markers --file PATH --language LANG  # rewrite region comment style (optional --dry-run)
+commentray serve [--port 4173]     # watch config, source, storage companions, index; rebuild _site; HTTP serve
 commentray render [--source SRC] [--markdown MD] [--out OUT.html] [--mermaid]
                             # missing flags fall back to .commentray.toml [static_site]
                             # (--out defaults to _site/index.html)

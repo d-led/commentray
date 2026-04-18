@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/build.d.ts",
       "import": "./dist/build.js"
+    },
+    "./github-pages-site": {
+      "types": "./dist/github-pages-site.d.ts",
+      "import": "./dist/github-pages-site.js"
     }
   },
   "files": [
