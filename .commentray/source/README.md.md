@@ -1,12 +1,20 @@
 # Commentray — quick-start
 
+<!-- commentray:block id=readme-lede -->
+
 _You have the main [`README.md`](https://github.com/d-led/commentray/blob/main/README.md) in the left column: packages, scripts, release flow. This file **is** commentray for that README—the voice-over beside the facts, not a second brochure._
+
+<!-- commentray:block id=readme-why -->
 
 The README’s _Why_ section names the product (**Commentray**) and the prose you write (**commentray**). Same checkout, two panes: the left states what exists; this column states why it is shaped that way and where the edges are.
 
+<!-- commentray:block id=readme-user-guides -->
+
+The README’s **Using Commentray** section links short guides under `docs/user/`—install, quickstart, detection, CLI reference, configuration, troubleshooting—without walking the whole monorepo first.
+
 ## Try scroll sync (why the editor extension exists)
 
-On **[GitHub Pages](https://d-led.github.io/commentray/)** the split is live: **Code** is this repo’s `README.md`; **Commentray** is this file, rendered as HTML. Scroll either pane—the other follows in **lockstep** (proportional sync when the public index has no block rows for this pair). That is the DVD-style commentary metaphor without installing anything.
+On **[GitHub Pages](https://d-led.github.io/commentray/)** the split is live: **Code** is this repo’s `README.md`; **Commentray** is this file, rendered as HTML. Scroll either pane—the other follows in **lockstep** (**block stretch** when this repo’s `index.json` lists blocks for this pair with matching `<!-- commentray:block … -->` markers; otherwise **proportional** sync). That is the DVD-style commentary metaphor without installing anything.
 
 The deploy is a **single** HTML file, so in-commentray Markdown links rewritten to repo-relative paths can **404** on Pages; use full `https://github.com/…/blob/…` URLs when the link must work from the static site.
 
