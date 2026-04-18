@@ -1,4 +1,5 @@
 import { parseAnchor, type ParsedAnchor } from "./anchors.js";
+import { describeIndexSchemaRemediation } from "./index-schema-messages.js";
 import { assertValidMarkerId } from "./marker-ids.js";
 import { type CommentrayIndex, coerceIndexSchemaVersion, CURRENT_SCHEMA_VERSION } from "./model.js";
 
@@ -19,9 +20,7 @@ export function assertValidIndex(value: unknown): CommentrayIndex {
   }
   if (schemaVersion !== CURRENT_SCHEMA_VERSION) {
     throw new Error(
-      `Unsupported schemaVersion: ${String(obj.schemaVersion)} (this build expects ${String(CURRENT_SCHEMA_VERSION)}). ` +
-        "If the CLI just migrated your index, reload the editor window and ensure the Commentray extension was built " +
-        "from the same revision (dogfood: bash scripts/editor-extension.sh dogfood …; installed: bash scripts/install-extension.sh).",
+      `index.json schemaVersion mismatch. ${describeIndexSchemaRemediation(obj.schemaVersion)}`,
     );
   }
   const byCommentrayPath = obj.byCommentrayPath;

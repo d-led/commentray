@@ -1,7 +1,26 @@
+import { Buffer } from "node:buffer";
+
+import { CURRENT_SCHEMA_VERSION } from "@commentray/core";
 import { describe, expect, it } from "vitest";
+
 import { renderCodeBrowserHtml } from "./code-browser.js";
 
 describe("renderCodeBrowserHtml — layout and regions", () => {
+  it("puts search payload base64 on #shell so the client can read it (not only on #code-pane)", async () => {
+    const html = await renderCodeBrowserHtml({
+      code: "x",
+      language: "txt",
+      commentrayMarkdown: "body",
+    });
+    const m = /<div class="shell" id="shell"[^>]*>/.exec(html);
+    expect(m).not.toBeNull();
+    if (m === null) {
+      throw new Error("expected shell opening tag");
+    }
+    expect(m[0]).toContain("data-raw-code-b64=");
+    expect(m[0]).toContain("data-raw-md-b64=");
+  });
+
   it("includes resizable gutter, wrap toggle, and rendered regions", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
@@ -128,5 +147,52 @@ describe("renderCodeBrowserHtml — toolbar link policy", () => {
     expect(html).not.toContain('<span class="toolbar-attribution"');
     expect(html).not.toContain("javascript:");
     expect(html).not.toContain('href="data:');
+  });
+});
+
+describe("renderCodeBrowserHtml — block markers and scroll link payload", () => {
+  it("injects separator anchors after each commentray:block marker line", async () => {
+    const html = await renderCodeBrowserHtml({
+      code: "x",
+      language: "txt",
+      commentrayMarkdown: "<!-- commentray:block id=myblock -->\n\n## Title\n",
+    });
+    expect(html).toContain('class="commentray-block-anchor"');
+    expect(html).toContain('id="commentray-block-myblock"');
+  });
+
+  it("embeds base64 block scroll links on the shell when dual layout aligns with the index", async () => {
+    const crPath = ".commentray/source/pkg/x.txt.md";
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [crPath]: {
+          sourcePath: "pkg/x.txt",
+          commentrayPath: crPath,
+          blocks: [{ id: "b1", anchor: "lines:1-2" }],
+        },
+      },
+    };
+    const md = "<!-- commentray:block id=b1 -->\n\n## Hi\n";
+    const html = await renderCodeBrowserHtml({
+      code: "a\nb",
+      language: "txt",
+      commentrayMarkdown: md,
+      codeBrowserLayout: "dual",
+      blockStretchRows: {
+        index,
+        sourceRelative: "pkg/x.txt",
+        commentrayPathRel: crPath,
+      },
+    });
+    expect(html).toContain('data-commentray-line="0"');
+    expect(html).toContain('data-source-start="1"');
+    const m = /data-scroll-block-links-b64="([^"]*)"/.exec(html);
+    expect(m).not.toBeNull();
+    if (m === null || m[1] === undefined) {
+      throw new Error("expected data-scroll-block-links-b64 attribute with a value");
+    }
+    const links = JSON.parse(Buffer.from(m[1], "base64").toString("utf8")) as unknown[];
+    expect(links).toEqual([{ id: "b1", commentrayLine: 0, sourceStart: 1, sourceEnd: 2 }]);
   });
 });

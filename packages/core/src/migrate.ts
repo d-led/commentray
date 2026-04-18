@@ -1,3 +1,4 @@
+import { describeIndexSchemaRemediation } from "./index-schema-messages.js";
 import {
   type CommentrayIndex,
   type SourceFileIndexEntry,
@@ -47,7 +48,22 @@ export function migrateIndex(raw: unknown): { index: CommentrayIndex; changed: b
     return { index: next, changed };
   }
 
-  throw new Error(`Cannot migrate from schemaVersion ${String(obj.schemaVersion)}`);
+  if (typeof version === "number" && version > CURRENT_SCHEMA_VERSION) {
+    /**
+     * Future CLI may bump `schemaVersion` before every consumer updates. Prefer opening
+     * the repo over hard failure: keep `byCommentrayPath` as parsed, stamp this build’s
+     * schema, and let `assertValidIndex` reject only truly incompatible shapes.
+     */
+    const byCommentrayPath = toByCommentrayPath(obj);
+    return {
+      index: { schemaVersion: CURRENT_SCHEMA_VERSION, byCommentrayPath },
+      changed: true,
+    };
+  }
+
+  throw new Error(
+    `Cannot migrate index.json from schemaVersion ${String(obj.schemaVersion)}. ${describeIndexSchemaRemediation(obj.schemaVersion)}`,
+  );
 }
 
 function toByCommentrayPath(obj: Record<string, unknown>): Record<string, SourceFileIndexEntry> {

@@ -35,6 +35,10 @@ DEFAULT_DOGFOOD_FOLDER="$REPO_ROOT/packages/vscode/fixtures/dogfood"
 build_extension() {
   npm run build -w @commentray/core
   npm run build -w commentray-vscode
+  bundled_schema="$(
+    node --input-type=module -e "import { CURRENT_SCHEMA_VERSION } from './packages/core/dist/model.js'; process.stdout.write(String(CURRENT_SCHEMA_VERSION))"
+  )"
+  echo "Built commentray-vscode (bundled @commentray/core index schemaVersion: ${bundled_schema})." >&2
 }
 
 warn_if_folder_collides_with_main() {
@@ -73,6 +77,7 @@ cmd_dogfood() {
   # The kebab-case variant is parsed by Electron/Chromium, not VS Code's
   # extension host, and the dev window never opens.
   echo "Launching ${editor_cli} against ${target}" >&2
+  echo "Using --extensionDevelopmentPath (workspace extension). For the normal install path, run: bash scripts/install-extension.sh" >&2
   exec "$editor_cli" \
     --extensionDevelopmentPath="$REPO_ROOT/packages/vscode" \
     "$target" \

@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Code, Definition, Html, Image, Link, Root as MdastRoot } from "mdast";
 import type { Element, Root as HastRoot } from "hast";
 import rehypeHighlight from "rehype-highlight";
+import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
 import remarkGfm from "remark-gfm";
@@ -165,12 +166,23 @@ function remarkMermaidPlaceholders() {
 
 const sanitizeSchema = structuredClone(defaultSchema);
 
+/** Companion Markdown is repo-controlled; keep `id` unprefixed so `commentray-block-*` anchors are stable. */
+sanitizeSchema.clobber = ["ariaDescribedBy", "ariaLabelledBy", "name"];
+
 sanitizeSchema.attributes = {
   ...sanitizeSchema.attributes,
   code: [...(sanitizeSchema.attributes?.code ?? []), "className"],
   pre: [...(sanitizeSchema.attributes?.pre ?? []), "className"],
   span: [...(sanitizeSchema.attributes?.span ?? []), "className"],
-  div: ["className"],
+  div: [
+    ...(sanitizeSchema.attributes?.div ?? []),
+    "className",
+    "id",
+    "ariaHidden",
+    /** Block scroll sync markers from `injectCommentrayBlockAnchors` (hast property names). */
+    "dataSourceStart",
+    "dataCommentrayLine",
+  ],
 };
 
 export async function renderMarkdownToHtml(
@@ -190,6 +202,7 @@ export async function renderMarkdownToHtml(
     })
     .use(remarkMermaidPlaceholders)
     .use(remarkRehype, { allowDangerousHtml: true })
+    .use(rehypeRaw)
     .use(rehypeSanitize, sanitizeSchema)
     .use(function rehypeOutputUrlsMaybe() {
       return (tree: HastRoot) => {

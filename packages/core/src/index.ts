@@ -40,6 +40,7 @@ export type {
 export { loadCommentrayConfig, mergeCommentrayConfig } from "./config.js";
 export { githubRepoBlobFileUrl, parseGithubRepoWebUrl } from "./github-url.js";
 export { assertValidIndex, emptyIndex } from "./metadata.js";
+export { describeIndexSchemaRemediation } from "./index-schema-messages.js";
 export { migrateIndex } from "./migrate.js";
 export type { ParsedAnchor } from "./anchors.js";
 export { formatLineRange, parseAnchor } from "./anchors.js";

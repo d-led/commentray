@@ -137,7 +137,10 @@ If both `cursor` and `code` exist on `PATH`, **Cursor wins**; override with:
 COMMENTRAY_EDITOR=code npm run extension:dogfood
 ```
 
-Packaging a self-contained `.vsix` from this monorepo needs a small bundling step (so `@commentray/core` ships inside the extension). Until that exists, **dogfood mode is the supported workflow**.
+**Dogfood** opens an **Extension Development Host** window: that build always embeds the
+workspace’s `@commentray/core`. A normal window on the same folder may still use an
+older **installed** extension — use `bash scripts/install-extension.sh` from this
+repo and reload when you want the packaged `.vsix` path instead.
 
 ## On the Name
 

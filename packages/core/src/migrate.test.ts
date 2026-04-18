@@ -22,6 +22,23 @@ describe("migrateIndex", () => {
     expect(index).toEqual(input);
   });
 
+  it("downgrades index versions newer than this library to the bundled schema", () => {
+    const cp = ".commentray/source/x.ts.md";
+    const { index, changed } = migrateIndex({
+      schemaVersion: CURRENT_SCHEMA_VERSION + 10,
+      byCommentrayPath: {
+        [cp]: {
+          sourcePath: "x.ts",
+          commentrayPath: cp,
+          blocks: [{ id: "b1", anchor: "lines:1-2" }],
+        },
+      },
+    });
+    expect(changed).toBe(true);
+    expect(index.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(index.byCommentrayPath[cp]?.blocks[0]?.id).toBe("b1");
+  });
+
   it("renames commentaryPath to commentrayPath and keys by commentrayPath when migrating from v1", () => {
     const { index, changed } = migrateIndex({
       schemaVersion: 1,
@@ -71,6 +88,41 @@ describe("readIndex auto-migration", () => {
 });
 
 describe("refreshIndexMigrationsOnDisk", () => {
+  it("writes a JSON backup before downgrading a newer on-disk schemaVersion", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "commentray-idx-newer-"));
+    const meta = path.join(dir, ".commentray", "metadata");
+    await fs.mkdir(meta, { recursive: true });
+    const indexPath = path.join(meta, "index.json");
+    const cp = ".commentray/source/z.ts.md";
+    const futureVersion = CURRENT_SCHEMA_VERSION + 7;
+    const onDisk = {
+      schemaVersion: futureVersion,
+      byCommentrayPath: {
+        [cp]: {
+          sourcePath: "z.ts",
+          commentrayPath: cp,
+          blocks: [{ id: "z1", anchor: "lines:1-1" }],
+        },
+      },
+    };
+    const rawBefore = `${JSON.stringify(onDisk, null, 2)}\n`;
+    await fs.writeFile(indexPath, rawBefore, "utf8");
+    const { changed, index } = await refreshIndexMigrationsOnDisk(dir);
+    expect(changed).toBe(true);
+    expect(index.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    const names = await fs.readdir(meta);
+    const backup = names.find((n) => n.startsWith(`index.schema-${String(futureVersion)}-backup-`));
+    expect(backup).toBeDefined();
+    if (backup === undefined) {
+      throw new Error("expected backup file in metadata directory");
+    }
+    const backupRaw = await fs.readFile(path.join(meta, backup), "utf8");
+    expect(backupRaw).toContain(`"schemaVersion": ${String(futureVersion)}`);
+    const round = JSON.parse(await fs.readFile(indexPath, "utf8")) as { schemaVersion: number };
+    expect(round.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
   it("persists snippet normalization for legacy fingerprint blocks", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "commentray-refresh-"));
     const meta = path.join(dir, ".commentray", "metadata");

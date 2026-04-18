@@ -5,8 +5,8 @@ import { parseGithubRepoWebUrl } from "./github-url.js";
 import { normalizeCommentrayIndex } from "./index-normalize.js";
 import { assertValidIndex } from "./metadata.js";
 import { migrateIndex } from "./migrate.js";
+import { coerceIndexSchemaVersion, CURRENT_SCHEMA_VERSION, type CommentrayIndex } from "./model.js";
 import { defaultMetadataIndexPath } from "./paths.js";
-import type { CommentrayIndex } from "./model.js";
 import {
   validateIndexMarkerSemantics,
   validateMarkerBoundariesInSource,
@@ -110,6 +110,15 @@ export async function refreshIndexMigrationsOnDisk(
   const indexPath = path.join(repoRoot, defaultMetadataIndexPath());
   const raw = await fs.readFile(indexPath, "utf8");
   const parsed = JSON.parse(raw) as unknown;
+  const priorSchema =
+    typeof parsed === "object" && parsed !== null
+      ? coerceIndexSchemaVersion((parsed as Record<string, unknown>).schemaVersion)
+      : null;
+  if (typeof priorSchema === "number" && priorSchema > CURRENT_SCHEMA_VERSION) {
+    const metaDir = path.dirname(indexPath);
+    const backupName = `index.schema-${String(priorSchema)}-backup-${String(Date.now())}.json`;
+    await fs.writeFile(path.join(metaDir, backupName), raw, "utf8");
+  }
   const { index: migrated, changed: schemaChanged } = migrateIndex(parsed);
   const { index: normalized, changed: snippetChanged } = normalizeCommentrayIndex(migrated);
   const index = assertValidIndex(normalized as unknown);

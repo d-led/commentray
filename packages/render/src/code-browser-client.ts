@@ -5,7 +5,14 @@ import {
   SearcherFactory,
   SubstringSearcher,
 } from "@m31coding/fuzzy-search";
-import { mirroredScrollTop } from "./code-browser-scroll-sync.js";
+import {
+  type BlockScrollLink,
+  mirroredScrollTop,
+  pickCommentrayLineForSourceScroll,
+  pickSourceLine0ForCommentrayScroll,
+} from "./code-browser-scroll-sync.js";
+import { decodeBase64Utf8 } from "./code-browser-encoding.js";
+import { readEmbeddedRawB64Strings } from "./code-browser-embedded-payload.js";
 import { findOrderedTokenSpans, lineAtIndex, offsetToLineIndex } from "./code-browser-search.js";
 
 type HitKind = "code" | "md";
@@ -26,18 +33,6 @@ function tokenizeQuery(q: string): string[] {
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
-}
-
-function decodeB64(b64: string): string {
-  try {
-    return decodeURIComponent(escape(atob(b64)));
-  } catch {
-    try {
-      return atob(b64);
-    } catch {
-      return "";
-    }
-  }
 }
 
 function escapeHtmlText(s: string): string {
@@ -231,7 +226,150 @@ function wireWrapToggle(
   });
 }
 
-/** Proportional scroll sync between README (code) and commentray panes — try it on GitHub Pages. */
+function parseScrollBlockLinksFromShell(b64: string): BlockScrollLink[] {
+  const t = b64.trim();
+  if (!t) return [];
+  try {
+    const raw = JSON.parse(decodeBase64Utf8(t)) as unknown;
+    if (!Array.isArray(raw)) return [];
+    const out: BlockScrollLink[] = [];
+    for (const x of raw) {
+      if (typeof x !== "object" || x === null) continue;
+      const o = x as Record<string, unknown>;
+      if (
+        typeof o.id === "string" &&
+        typeof o.commentrayLine === "number" &&
+        typeof o.sourceStart === "number" &&
+        typeof o.sourceEnd === "number"
+      ) {
+        out.push({
+          id: o.id,
+          commentrayLine: o.commentrayLine,
+          sourceStart: o.sourceStart,
+          sourceEnd: o.sourceEnd,
+        });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function probeCodeLine1FromViewport(codePane: HTMLElement): number {
+  const y = codePane.getBoundingClientRect().top + 2;
+  const rows = codePane.querySelectorAll<HTMLElement>('[id^="code-line-"]');
+  for (const el of rows) {
+    const r = el.getBoundingClientRect();
+    if (r.bottom > y) {
+      const m = /^code-line-(\d+)$/.exec(el.id);
+      if (m) return Number(m[1]) + 1;
+      return 1;
+    }
+  }
+  return rows.length > 0 ? rows.length : 1;
+}
+
+function probeCommentrayLine0FromDoc(docPane: HTMLElement): number {
+  const y = docPane.getBoundingClientRect().top + 2;
+  const anchors = docPane.querySelectorAll<HTMLElement>(".commentray-block-anchor");
+  let best = 0;
+  for (const a of anchors) {
+    const lineAttr = a.getAttribute("data-commentray-line");
+    if (lineAttr === null || lineAttr === "") continue;
+    if (a.getBoundingClientRect().top <= y + 1) best = Number(lineAttr);
+    else break;
+  }
+  return best;
+}
+
+/** Index-backed scroll sync when `data-scroll-block-links-b64` is present; else see proportional fallback. */
+function wireBlockAwareScrollSync(
+  codePane: HTMLElement,
+  docPane: HTMLElement,
+  links: BlockScrollLink[],
+): void {
+  type Syncing = "none" | "code" | "doc";
+  let syncing: Syncing = "none";
+
+  codePane.addEventListener(
+    "scroll",
+    () => {
+      if (syncing === "doc") return;
+      syncing = "code";
+      const line1 = probeCodeLine1FromViewport(codePane);
+      const mdLine0 = pickCommentrayLineForSourceScroll(links, line1);
+      if (mdLine0 === null) {
+        docPane.scrollTop = mirroredScrollTop(
+          codePane.scrollTop,
+          codePane.scrollHeight,
+          codePane.clientHeight,
+          docPane.scrollHeight,
+          docPane.clientHeight,
+        );
+      } else {
+        const anchor = docPane.querySelector(`[data-commentray-line="${String(mdLine0)}"]`);
+        if (anchor instanceof HTMLElement) {
+          const top =
+            anchor.getBoundingClientRect().top -
+            docPane.getBoundingClientRect().top +
+            docPane.scrollTop;
+          docPane.scrollTop = Math.max(0, top - 2);
+        } else {
+          docPane.scrollTop = mirroredScrollTop(
+            codePane.scrollTop,
+            codePane.scrollHeight,
+            codePane.clientHeight,
+            docPane.scrollHeight,
+            docPane.clientHeight,
+          );
+        }
+      }
+      syncing = "none";
+    },
+    { passive: true },
+  );
+
+  docPane.addEventListener(
+    "scroll",
+    () => {
+      if (syncing === "code") return;
+      syncing = "doc";
+      const mdLine0 = probeCommentrayLine0FromDoc(docPane);
+      const src0 = pickSourceLine0ForCommentrayScroll(links, mdLine0);
+      if (src0 === null) {
+        codePane.scrollTop = mirroredScrollTop(
+          docPane.scrollTop,
+          docPane.scrollHeight,
+          docPane.clientHeight,
+          codePane.scrollHeight,
+          codePane.clientHeight,
+        );
+      } else {
+        const el = document.getElementById(`code-line-${String(src0)}`);
+        if (el) {
+          const top =
+            el.getBoundingClientRect().top -
+            codePane.getBoundingClientRect().top +
+            codePane.scrollTop;
+          codePane.scrollTop = Math.max(0, top - 2);
+        } else {
+          codePane.scrollTop = mirroredScrollTop(
+            docPane.scrollTop,
+            docPane.scrollHeight,
+            docPane.clientHeight,
+            codePane.scrollHeight,
+            codePane.clientHeight,
+          );
+        }
+      }
+      syncing = "none";
+    },
+    { passive: true },
+  );
+}
+
+/** Proportional scroll sync when there is no index-backed block map (GitHub Pages default). */
 function wireProportionalScrollSync(codePane: HTMLElement, docPane: HTMLElement): void {
   type Syncing = "none" | "code" | "doc";
   let syncing: Syncing = "none";
@@ -331,8 +469,12 @@ function main(): void {
     return;
   }
 
-  const rawCode = decodeB64(codePane.getAttribute("data-raw-code-b64") || "");
-  const rawMd = decodeB64(codePane.getAttribute("data-raw-md-b64") || "");
+  const { rawCodeB64, rawMdB64 } = readEmbeddedRawB64Strings(shell, codePane);
+  const rawCode = decodeBase64Utf8(rawCodeB64);
+  const rawMd = decodeBase64Utf8(rawMdB64);
+  const scrollLinks = parseScrollBlockLinksFromShell(
+    shell.getAttribute("data-scroll-block-links-b64") || "",
+  );
   const mdLines = rawMd.split("\n");
   const codeLines = rawCode.split("\n");
 
@@ -364,7 +506,11 @@ function main(): void {
 
   wireWrapToggle(storageWrap, codePane, wrapCb);
   wireSplitter(storageSplit, shell, codePane, gutter, pct);
-  wireProportionalScrollSync(codePane, docPane);
+  if (scrollLinks.length > 0) {
+    wireBlockAwareScrollSync(codePane, docPane, scrollLinks);
+  } else {
+    wireProportionalScrollSync(codePane, docPane);
+  }
 }
 
 if (document.readyState === "loading") {

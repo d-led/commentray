@@ -2,7 +2,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { CommentrayIndex } from "@commentray/core";
+import {
+  MARKER_ID_BODY,
+  buildBlockScrollLinks,
+  type BlockScrollLink,
+  type CommentrayIndex,
+} from "@commentray/core";
 
 import { tryBuildBlockStretchTableHtml } from "./block-stretch-layout.js";
 import { escapeHtml } from "./html-utils.js";
@@ -58,6 +63,13 @@ export type CodeBrowserPageOptions = {
     sourceRelative: string;
     commentrayPathRel: string;
   };
+  /**
+   * `auto` (default): when `blockStretchRows` is set and a block-stretch table can be built,
+   * use the stretch layout; otherwise dual panes.
+   * `dual`: always use side-by-side panes (skips stretch), so block markers + index can drive
+   * **block-aware** scroll sync and separator lines in the commentray pane.
+   */
+  codeBrowserLayout?: "auto" | "dual";
 };
 
 function renderGeneratorMetaHtml(label: string | undefined): string {
@@ -69,6 +81,31 @@ function renderGeneratorMetaHtml(label: string | undefined): string {
 function extractPreCodeInner(html: string): string {
   const m = /<pre(?:\s[^>]*)?>\s*<code(?:\s[^>]*)?>([\s\S]*?)<\/code>\s*<\/pre>/i.exec(html.trim());
   return m ? m[1] : escapeHtml(html);
+}
+
+/** Single capture: marker id (avoid a wrapping group around the whole comment — that shifted indices). */
+const BLOCK_MARKER_HTML_LINE = new RegExp(
+  `^<!--\\s*commentray:block\\s+id=(${MARKER_ID_BODY})\\s*-->$`,
+  "i",
+);
+
+/** Inserts thin separator anchors after each `<!-- commentray:block … -->` line (optional index attrs for scroll sync). */
+function injectCommentrayBlockAnchors(markdown: string, links?: BlockScrollLink[]): string {
+  const byId = links ? new Map(links.map((l) => [l.id, l])) : undefined;
+  return markdown
+    .split("\n")
+    .map((line) => {
+      const m = BLOCK_MARKER_HTML_LINE.exec(line);
+      if (!m?.[1]) return line;
+      const id = m[1];
+      const link = byId?.get(id);
+      const attrs =
+        link !== undefined
+          ? ` data-source-start="${String(link.sourceStart)}" data-commentray-line="${String(link.commentrayLine)}"`
+          : "";
+      return `${line}\n\n<div id="commentray-block-${escapeHtml(id)}" class="commentray-block-anchor" aria-hidden="true"${attrs}></div>`;
+    })
+    .join("\n");
 }
 
 /** One highlighted row per source line so in-page search can scroll to a line. */
@@ -282,7 +319,8 @@ const CODE_BROWSER_STYLES = `
       }
       .pane--code .code-line {
         display: grid;
-        grid-template-columns: auto 1fr;
+        /* max-content: column wide enough for the longest line number (avoids 100+ bleeding into code). */
+        grid-template-columns: max-content 1fr;
         column-gap: 12px;
         align-items: baseline;
       }
@@ -307,7 +345,7 @@ const CODE_BROWSER_STYLES = `
         color: color-mix(in oklab, CanvasText 45%, Canvas);
         padding-right: 8px;
         border-right: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
-        min-width: 3ch;
+        white-space: nowrap;
         font-size: var(--code-line-font-size);
         line-height: var(--code-line-height);
       }
@@ -334,6 +372,14 @@ const CODE_BROWSER_STYLES = `
       }
       .pane--doc { font-size: 15px; line-height: 1.45; }
       .pane--doc img { max-width: 100%; height: auto; }
+      .pane--doc .commentray-block-anchor {
+        display: block;
+        height: 0;
+        margin: 14px 0 0;
+        border: 0;
+        border-top: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+        pointer-events: none;
+      }
       .pane h2.pane-title { margin: 0 0 10px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
       .app { display: flex; flex-direction: column; height: 100vh; }
       .shell--stretch-rows {
@@ -381,7 +427,7 @@ const CODE_BROWSER_STYLES = `
       .block-stretch .stretch-gap-mark { display: inline-block; padding-top: 2px; }
       .block-stretch .code-line {
         display: grid;
-        grid-template-columns: auto 1fr;
+        grid-template-columns: max-content 1fr;
         column-gap: 12px;
         align-items: baseline;
       }
@@ -402,7 +448,7 @@ const CODE_BROWSER_STYLES = `
         color: color-mix(in oklab, CanvasText 45%, Canvas);
         padding-right: 8px;
         border-right: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
-        min-width: 3ch;
+        white-space: nowrap;
         font-size: var(--code-line-font-size, 13px);
         line-height: var(--code-line-height, 1.5);
       }
@@ -431,6 +477,8 @@ type CodeBrowserPageParts = {
   shellInner: string;
   rawCodeB64: string;
   rawMdB64: string;
+  /** Base64 JSON of `BlockScrollLink[]` when dual pane uses index-backed scroll sync; empty otherwise. */
+  scrollBlockLinksB64: string;
   hljs: string;
   hljsDark: string;
   mermaidScript: string;
@@ -447,6 +495,7 @@ function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
     shellInner,
     rawCodeB64,
     rawMdB64,
+    scrollBlockLinksB64,
     hljs,
     hljsDark,
     mermaidScript,
@@ -484,7 +533,7 @@ ${CODE_BROWSER_STYLES}
         ${toolbarEndHtml}
       </header>
       <div class="search-results" id="search-results" hidden aria-live="polite"></div>
-      <div class="${shellClass}" id="shell" data-layout="${layout}" data-raw-code-b64="${escapeHtml(rawCodeB64)}" data-raw-md-b64="${escapeHtml(rawMdB64)}">
+      <div class="${shellClass}" id="shell" data-layout="${layout}" data-raw-code-b64="${escapeHtml(rawCodeB64)}" data-raw-md-b64="${escapeHtml(rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(scrollBlockLinksB64)}">
 ${shellInner}
       </div>
     </div>
@@ -494,6 +543,81 @@ ${loadCodeBrowserClientBundle()}
     ${mermaidScript}
   </body>
 </html>`;
+}
+
+type CodeBrowserShell = {
+  layout: "dual" | "stretch";
+  shellInner: string;
+  scrollBlockLinksB64: string;
+};
+
+async function buildCodeBrowserShell(
+  opts: CodeBrowserPageOptions,
+  layoutPref: "auto" | "dual",
+): Promise<CodeBrowserShell> {
+  let layout: "dual" | "stretch" = "dual";
+  let shellInner = "";
+  let scrollBlockLinksB64 = "";
+
+  if (opts.blockStretchRows && layoutPref !== "dual") {
+    const stretched = await tryBuildBlockStretchTableHtml({
+      code: opts.code,
+      language: opts.language,
+      commentrayMarkdown: opts.commentrayMarkdown,
+      index: opts.blockStretchRows.index,
+      sourceRelative: opts.blockStretchRows.sourceRelative,
+      commentrayPathRel: opts.blockStretchRows.commentrayPathRel,
+      commentrayOutputUrls: opts.commentrayOutputUrls,
+    });
+    if (stretched) {
+      layout = "stretch";
+      shellInner =
+        `        <div class="block-stretch-headings">` +
+        `<h2 class="pane-title">Code</h2>` +
+        `<h2 class="pane-title">Commentray</h2>` +
+        `</div>\n` +
+        `        ${stretched.preambleHtml}\n` +
+        `        ${stretched.tableInnerHtml}\n`;
+    }
+  }
+
+  if (layout === "dual") {
+    const links: BlockScrollLink[] =
+      opts.blockStretchRows !== undefined
+        ? buildBlockScrollLinks(
+            opts.blockStretchRows.index,
+            opts.blockStretchRows.sourceRelative,
+            opts.blockStretchRows.commentrayPathRel,
+            opts.commentrayMarkdown,
+            opts.code,
+          )
+        : [];
+    const mdForDoc = injectCommentrayBlockAnchors(
+      opts.commentrayMarkdown,
+      links.length > 0 ? links : undefined,
+    );
+    if (links.length > 0) {
+      scrollBlockLinksB64 = Buffer.from(JSON.stringify(links), "utf8").toString("base64");
+    }
+    const [codeHtml, commentrayHtml] = await Promise.all([
+      renderCodeLineBlocks(opts.code, opts.language),
+      renderMarkdownToHtml(mdForDoc, {
+        commentrayOutputUrls: opts.commentrayOutputUrls,
+      }),
+    ]);
+    shellInner =
+      `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
+      `<h2 class="pane-title">Code</h2>\n` +
+      `          ${codeHtml}\n` +
+      `        </section>\n` +
+      `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
+      `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
+      `          <h2 class="pane-title">Commentray</h2>\n` +
+      `          ${commentrayHtml}\n` +
+      `        </section>\n`;
+  }
+
+  return { layout, shellInner, scrollBlockLinksB64 };
 }
 
 /**
@@ -522,49 +646,8 @@ mermaid.run({ querySelector: ".mermaid" });
   const relatedNavHtml = renderRelatedGithubNavHtml(opts.relatedGithubNav ?? []);
   const generatorMetaHtml = renderGeneratorMetaHtml(opts.generatorLabel);
 
-  let layout: "dual" | "stretch" = "dual";
-  let shellInner = "";
-
-  if (opts.blockStretchRows) {
-    const stretched = await tryBuildBlockStretchTableHtml({
-      code: opts.code,
-      language: opts.language,
-      commentrayMarkdown: opts.commentrayMarkdown,
-      index: opts.blockStretchRows.index,
-      sourceRelative: opts.blockStretchRows.sourceRelative,
-      commentrayPathRel: opts.blockStretchRows.commentrayPathRel,
-      commentrayOutputUrls: opts.commentrayOutputUrls,
-    });
-    if (stretched) {
-      layout = "stretch";
-      shellInner =
-        `        <div class="block-stretch-headings">` +
-        `<h2 class="pane-title">Code</h2>` +
-        `<h2 class="pane-title">Commentray</h2>` +
-        `</div>\n` +
-        `        ${stretched.preambleHtml}\n` +
-        `        ${stretched.tableInnerHtml}\n`;
-    }
-  }
-
-  if (layout === "dual") {
-    const [codeHtml, commentrayHtml] = await Promise.all([
-      renderCodeLineBlocks(opts.code, opts.language),
-      renderMarkdownToHtml(opts.commentrayMarkdown, {
-        commentrayOutputUrls: opts.commentrayOutputUrls,
-      }),
-    ]);
-    shellInner =
-      `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
-      `<h2 class="pane-title">Code</h2>\n` +
-      `          ${codeHtml}\n` +
-      `        </section>\n` +
-      `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
-      `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
-      `          <h2 class="pane-title">Commentray</h2>\n` +
-      `          ${commentrayHtml}\n` +
-      `        </section>\n`;
-  }
+  const layoutPref = opts.codeBrowserLayout ?? "auto";
+  const { layout, shellInner, scrollBlockLinksB64 } = await buildCodeBrowserShell(opts, layoutPref);
 
   return buildCodeBrowserPageHtml({
     title,
@@ -576,6 +659,7 @@ mermaid.run({ querySelector: ".mermaid" });
     shellInner,
     rawCodeB64,
     rawMdB64,
+    scrollBlockLinksB64,
     hljs,
     hljsDark,
     mermaidScript,

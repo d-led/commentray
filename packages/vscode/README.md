@@ -36,13 +36,22 @@ block list out of the index.
 
 ## Troubleshooting
 
-If you see **`Unsupported schemaVersion: …`** after the CLI migrated `index.json`,
-the extension host is still running an **older `@commentray/core`** than the CLI.
-**Dogfood:** run `bash scripts/editor-extension.sh dogfood <folder>` again (it bundles
-core into `dist/extension.js`), then **Developer: Reload Window** in that dev
-window. **Installed extension:** run `bash scripts/install-extension.sh` from the
-same repo revision and reload. Disable any older Commentray `.vsix` if both are
-present.
+**`Unsupported schemaVersion: …`** means the extension’s bundled `@commentray/core`
+refuses that `index.json` shape (often: **Marketplace / old `.vsix` install** while
+the repo’s CLI wrote a newer schema). **Fix:** from the Commentray repo run
+`bash scripts/install-extension.sh`, then **Developer: Reload Window**.
+
+**Dogfood** (`npm run extension:dogfood` / `bash scripts/editor-extension.sh dogfood …`)
+always **rebuilds** core + the extension, then opens an **Extension Development Host**
+window (`--extensionDevelopmentPath=…/packages/vscode`). That window uses **this
+workspace’s bundle**, not your separately installed Marketplace build. If you open
+the same folder in a **normal** editor window, the global install can still be stale.
+
+When `index.json` has a **higher** `schemaVersion` than the bundled library, opening
+the repo now **writes a timestamped backup** next to `index.json`
+(`index.schema-<N>-backup-<ms>.json`) and **rewrites** `index.json` to the schema this
+build understands (best-effort). Prefer reinstalling from the same git revision so
+you do not rely on downgrade.
 
 ## Pairing convention
 

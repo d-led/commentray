@@ -26,6 +26,11 @@ describe("findOrderedTokenSpans", () => {
   it("ignores empty tokens", () => {
     expect(findOrderedTokenSpans("ab", ["  ", "a", ""])).toEqual([{ start: 0, end: 1 }]);
   });
+
+  it("matches ASCII query case-insensitively against mixed-case source", () => {
+    const spans = findOrderedTokenSpans("# Commentray quick-start\n", ["commentray"]);
+    expect(spans.length).toBeGreaterThan(0);
+  });
 });
 
 describe("offsetToLineIndex", () => {
