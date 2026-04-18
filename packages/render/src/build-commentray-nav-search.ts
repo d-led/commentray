@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { githubRepoBlobFileUrl, readIndex } from "@commentray/core";
+import { discoverCommentrayPairsOnDisk, githubRepoBlobFileUrl, readIndex } from "@commentray/core";
 
 export const COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION = 1 as const;
 
@@ -70,6 +70,45 @@ function buildDocumentedPairs(
   );
 }
 
+function mergeNavSearchPairs(
+  indexPairs: { commentrayPath: string; sourcePath: string }[],
+  diskPairs: { commentrayPath: string; sourcePath: string }[],
+  fallback?: BuildCommentrayNavSearchFallback,
+): { sourcePath: string; commentrayPath: string }[] {
+  const byCr = new Map<string, { sourcePath: string; commentrayPath: string }>();
+  for (const p of diskPairs) {
+    byCr.set(p.commentrayPath, { sourcePath: p.sourcePath, commentrayPath: p.commentrayPath });
+  }
+  for (const e of indexPairs) {
+    byCr.set(e.commentrayPath, { sourcePath: e.sourcePath, commentrayPath: e.commentrayPath });
+  }
+  if (fallback !== undefined) {
+    const fp = {
+      sourcePath: fallback.sourcePath,
+      commentrayPath: fallback.commentrayPath,
+    };
+    if (!byCr.has(fp.commentrayPath)) {
+      byCr.set(fp.commentrayPath, fp);
+    }
+  }
+  return [...byCr.values()].sort((a, b) => a.commentrayPath.localeCompare(b.commentrayPath));
+}
+
+function markdownAbsForMergedPair(
+  repoRoot: string,
+  pair: { sourcePath: string; commentrayPath: string },
+  fallback?: BuildCommentrayNavSearchFallback,
+): string {
+  if (
+    fallback !== undefined &&
+    pair.commentrayPath === fallback.commentrayPath &&
+    pair.sourcePath === fallback.sourcePath
+  ) {
+    return fallback.markdownAbs;
+  }
+  return path.join(repoRoot, pair.commentrayPath);
+}
+
 async function appendPairRowsSync(
   rows: CommentrayNavSearchRow[],
   sourcePath: string,
@@ -95,53 +134,45 @@ async function appendPairRowsSync(
  *
  * When `githubBlobBase` is set, `documentedPairs` lists every pair with GitHub **blob** URLs for
  * the static hub tree and outbound links.
+ *
+ * Pairs are merged from the metadata index, a walk of the configured storage `source` tree for
+ * every `*.md` companion (flat or Angles layout), and an optional single-page `fallback`. For the
+ * same `commentrayPath`, the index wins over disk-inferred paths.
  */
 export async function buildCommentrayNavSearchDocument(
   repoRoot: string,
   fallback?: BuildCommentrayNavSearchFallback,
   githubBlobBase?: BuildCommentrayNavSearchGithubBlobBase,
+  storageDir = ".commentray",
 ): Promise<CommentrayNavSearchDocument> {
   const rows: CommentrayNavSearchRow[] = [];
   const idx = await readIndex(repoRoot);
-  const fromIndex =
+  const indexPairs =
     idx !== null && Object.keys(idx.byCommentrayPath).length > 0
-      ? Object.entries(idx.byCommentrayPath).sort(([a], [b]) => a.localeCompare(b))
+      ? Object.entries(idx.byCommentrayPath).map(([crPath, e]) => ({
+          commentrayPath: crPath,
+          sourcePath: e.sourcePath,
+        }))
       : [];
 
-  if (fromIndex.length > 0) {
-    for (const [crPath, entry] of fromIndex) {
-      await appendPairRowsSync(rows, entry.sourcePath, crPath, path.join(repoRoot, crPath));
-    }
-    const pairInputs = fromIndex.map(([, e]) => ({
-      sourcePath: e.sourcePath,
-      commentrayPath: e.commentrayPath,
-    }));
-    const documentedPairs = githubBlobBase
-      ? buildDocumentedPairs(pairInputs, githubBlobBase)
-      : undefined;
-    return {
-      schemaVersion: COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION,
-      rows,
-      ...(documentedPairs ? { documentedPairs } : {}),
-    };
+  const diskPairs = await discoverCommentrayPairsOnDisk(repoRoot, storageDir);
+  const merged = mergeNavSearchPairs(indexPairs, diskPairs, fallback);
+
+  if (merged.length === 0) {
+    return { schemaVersion: COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION, rows };
   }
 
-  if (fallback !== undefined) {
+  for (const p of merged) {
     await appendPairRowsSync(
       rows,
-      fallback.sourcePath,
-      fallback.commentrayPath,
-      fallback.markdownAbs,
+      p.sourcePath,
+      p.commentrayPath,
+      markdownAbsForMergedPair(repoRoot, p, fallback),
     );
   }
 
   const documentedPairs =
-    githubBlobBase && fallback !== undefined
-      ? buildDocumentedPairs(
-          [{ sourcePath: fallback.sourcePath, commentrayPath: fallback.commentrayPath }],
-          githubBlobBase,
-        )
-      : undefined;
+    githubBlobBase !== undefined ? buildDocumentedPairs(merged, githubBlobBase) : undefined;
 
   return {
     schemaVersion: COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION,

@@ -1,5 +1,3 @@
-# Commentray defaults live here. Most keys are optional.
-
 [storage]
 dir = ".commentray"
 
@@ -9,36 +7,26 @@ provider = "git"
 [render]
 mermaid = true
 syntaxTheme = "github-dark"
-# Companion links like https://github.com/…/blob/main/docs/… → ../docs/… in static HTML.
 relative_github_blob_links = true
 
 [anchors]
-defaultStrategy = [
-  "symbol",
-  "lines",
-]
+defaultStrategy = [ "symbol", "lines" ]
 
-# Optional: named Angles (multiple commentrays per source). Uncomment when you add
-# `{storage.dir}/source/.default` and per-source folders — see docs/spec/storage.md.
-# [angles]
-# default_angle = "introduction"
-# [[angles.definitions]]
-# id = "introduction"
-# title = "Introduction"
-# [[angles.definitions]]
-# id = "architecture"
-# title = "Architecture"
-
-# GitHub Pages: `npm run pages:build` → `_site/index.html` (see `.github/workflows/pages.yml`).
-# The commentary on the right comes from `commentray_markdown` (repo-relative).
-# Per Commentray’s convention, source path `<p>` pairs with `.commentray/source/<p>.md`.
 [static_site]
 title = "Commentray"
-# Optional longer welcome copy above the panes can use the same """ … """ form as `github_url`.
-# `github_url` becomes the Octocat toolbar link on static Pages (http/https only).
-github_url = """
-https://github.com/d-led/commentray"""
+github_url = "https://github.com/d-led/commentray"
 source_file = "README.md"
-commentray_markdown = """
-.commentray/source/README.md.md"""
+commentray_markdown = ".commentray/source/README.md/main.md"
 github_blob_branch = "main"
+
+[angles]
+default_angle = "main"
+
+  [[angles.definitions]]
+  id = "main"
+  title = "Main"
+
+  [[angles.definitions]]
+  id = "architecture"
+  title = "Architecture"
+

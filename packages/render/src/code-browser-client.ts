@@ -13,7 +13,12 @@ import {
 } from "./code-browser-scroll-sync.js";
 import { decodeBase64Utf8 } from "./code-browser-encoding.js";
 import { readEmbeddedRawB64Strings } from "./code-browser-embedded-payload.js";
-import { findOrderedTokenSpans, lineAtIndex, offsetToLineIndex } from "./code-browser-search.js";
+import {
+  escapeHtmlHighlightingSearchTokens,
+  findOrderedTokenSpans,
+  lineAtIndex,
+  offsetToLineIndex,
+} from "./code-browser-search.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
 type HitKind = "code" | "md" | "path";
@@ -138,7 +143,7 @@ function computeMergedSearchHits(input: MergedSearchHitInput): Hit[] {
   return mergeHits([...orderedCode, ...orderedPath, ...orderedMd, ...fuzzyHits], 80);
 }
 
-function searchResultsInnerHtml(scope: SearchScope, combined: Hit[]): string {
+function searchResultsInnerHtml(scope: SearchScope, combined: Hit[], tokens: string[]): string {
   if (combined.length === 0) {
     return '<div class="hint">No matches. Try fewer tokens or looser spelling (fuzzy matches per line).</div>';
   }
@@ -156,10 +161,11 @@ function searchResultsInnerHtml(scope: SearchScope, combined: Hit[]): string {
           ? `Path L${h.line + 1}`
           : `Commentray L${h.line + 1}`;
     const tag = h.source === "ordered" ? "ordered" : "fuzzy";
+    const snippetHtml = escapeHtmlHighlightingSearchTokens(snippet(h.text, 320), tokens);
     buf.push(
       `<button type="button" class="hit" data-kind="${h.kind}" data-line="${String(h.line)}">` +
         `<span class="meta">${label} <span class="src-tag">(${tag})</span></span>` +
-        `<div class="snippet">${escapeHtmlText(snippet(h.text, 200))}</div></button>`,
+        `<div class="snippet">${snippetHtml}</div></button>`,
     );
   }
   return buf.join("");
@@ -217,33 +223,34 @@ function indexSearchLineRows(
   return searcher;
 }
 
+type MutableSearchFields = {
+  rawMd: string;
+  mdLines: string[];
+  commentrayPathLabel: string;
+  searcher: ReturnType<typeof SearcherFactory.createDefaultSearcher<Row, string>>;
+};
+
 type SearchUiContext = {
   scope: SearchScope;
   filePathLabel: string;
-  commentrayPathLabel: string;
+  mutable: MutableSearchFields;
   rawCode: string;
-  rawMd: string;
-  mdLines: string[];
-  searcher: ReturnType<typeof SearcherFactory.createDefaultSearcher<Row, string>>;
   searchInput: HTMLInputElement;
   searchClear: HTMLElement;
   searchResults: HTMLElement;
-  docPane: HTMLElement;
+  docScrollEl: HTMLElement;
 };
 
 function wireSearchUi(ctx: SearchUiContext): void {
   const {
     scope,
     filePathLabel,
-    commentrayPathLabel,
+    mutable,
     rawCode,
-    rawMd,
-    mdLines,
-    searcher,
     searchInput,
     searchClear,
     searchResults,
-    docPane,
+    docScrollEl,
   } = ctx;
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -266,15 +273,15 @@ function wireSearchUi(ctx: SearchUiContext): void {
     const combined = computeMergedSearchHits({
       scope,
       filePathLabel,
-      commentrayPathLabel,
+      commentrayPathLabel: mutable.commentrayPathLabel,
       rawCode,
-      rawMd,
-      searcher,
+      rawMd: mutable.rawMd,
+      searcher: mutable.searcher,
       queryRaw: searchInput.value,
       tokens,
     });
     searchResults.hidden = false;
-    searchResults.innerHTML = searchResultsInnerHtml(scope, combined);
+    searchResults.innerHTML = searchResultsInnerHtml(scope, combined, tokens);
   }
 
   searchResults.addEventListener("click", (ev: MouseEvent) => {
@@ -289,13 +296,13 @@ function wireSearchUi(ctx: SearchUiContext): void {
       const el = document.getElementById(`code-line-${String(line)}`);
       if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
     } else if (kind === "path") {
-      docPane.scrollTo({ top: 0, behavior: "smooth" });
+      docScrollEl.scrollTo({ top: 0, behavior: "smooth" });
     } else {
-      const total = mdLines.length;
+      const total = mutable.mdLines.length;
       if (total <= 0) return;
       const ratio = line / Math.max(1, total - 1);
-      const maxScroll = docPane.scrollHeight - docPane.clientHeight;
-      docPane.scrollTo({ top: ratio * Math.max(0, maxScroll), behavior: "smooth" });
+      const maxScroll = docScrollEl.scrollHeight - docScrollEl.clientHeight;
+      docScrollEl.scrollTo({ top: ratio * Math.max(0, maxScroll), behavior: "smooth" });
     }
   });
 
@@ -431,12 +438,13 @@ function wireBidirectionalScroll(
 function wireBlockAwareScrollSync(
   codePane: HTMLElement,
   docPane: HTMLElement,
-  links: BlockScrollLink[],
+  getLinks: () => BlockScrollLink[],
 ): void {
   wireBidirectionalScroll(
     codePane,
     docPane,
     () => {
+      const links = getLinks();
       const line1 = probeCodeLine1FromViewport(codePane);
       const mdLine0 = pickCommentrayLineForSourceScroll(links, line1);
       if (mdLine0 === null) {
@@ -467,6 +475,7 @@ function wireBlockAwareScrollSync(
       }
     },
     () => {
+      const links = getLinks();
       const mdLine0 = probeCommentrayLine0FromDoc(docPane);
       const src0 = pickSourceLine0ForCommentrayScroll(links, mdLine0);
       if (src0 === null) {
@@ -665,7 +674,16 @@ function wireDocumentedFilesTree(): void {
   const panel = document.getElementById("documented-files-panel");
   const treeHost = document.getElementById("documented-files-tree");
   const shell = document.getElementById("shell");
-  if (!(btn instanceof HTMLButtonElement) || !panel || !treeHost) return;
+  if (
+    !(btn instanceof HTMLButtonElement) ||
+    !(panel instanceof HTMLElement) ||
+    !(treeHost instanceof HTMLElement)
+  ) {
+    return;
+  }
+
+  const panelEl: HTMLElement = panel;
+  const treeMount: HTMLElement = treeHost;
 
   const jsonUrl = btn.getAttribute("data-nav-json-url")?.trim() ?? "";
   const embeddedB64 = shell?.getAttribute("data-documented-pairs-b64")?.trim() ?? "";
@@ -673,19 +691,24 @@ function wireDocumentedFilesTree(): void {
 
   const ensureLoaded = loadDocumentedPairs(jsonUrl, embeddedB64);
 
+  async function hydrateTree(): Promise<void> {
+    try {
+      const pairs = await ensureLoaded();
+      renderDocumentedPairsIntoHost(treeMount, pairs);
+    } catch {
+      treeMount.innerHTML =
+        '<p class="documented-files-panel__hint">Could not load the file list. Check the browser network tab.</p>';
+    }
+  }
+
+  setDocumentedPanelOpen(btn, panelEl, true);
+  void hydrateTree();
+
   btn.addEventListener("click", () => {
-    const next = panel.hidden !== false;
-    setDocumentedPanelOpen(btn, panel, next);
+    const next = panelEl.hidden !== false;
+    setDocumentedPanelOpen(btn, panelEl, next);
     if (!next) return;
-    void (async () => {
-      try {
-        const pairs = await ensureLoaded();
-        renderDocumentedPairsIntoHost(treeHost, pairs);
-      } catch {
-        treeHost.innerHTML =
-          '<p class="documented-files-panel__hint">Could not load the file list. Check the browser network tab.</p>';
-      }
-    })();
+    void hydrateTree();
   });
 }
 
@@ -734,6 +757,34 @@ function wireStretchLayoutChrome(codePane: HTMLElement): void {
   }
 }
 
+type MultiAngleClientPayload = {
+  defaultAngleId: string;
+  angles: {
+    id: string;
+    title: string;
+    docInnerHtmlB64: string;
+    rawMdB64: string;
+    scrollBlockLinksB64: string;
+    commentrayPathForSearch: string;
+    commentrayOnGithubUrl?: string;
+  }[];
+};
+
+function parseMultiAnglePayload(script: HTMLElement | null): MultiAngleClientPayload | null {
+  const t = script?.textContent?.trim() ?? "";
+  if (!t) return null;
+  try {
+    const raw = JSON.parse(decodeBase64Utf8(t)) as MultiAngleClientPayload;
+    if (!raw || !Array.isArray(raw.angles) || raw.angles.length < 2) return null;
+    for (const a of raw.angles) {
+      if (typeof a.id !== "string" || typeof a.docInnerHtmlB64 !== "string") return null;
+    }
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
 function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): void {
   const docPane = document.getElementById("doc-pane");
   const gutter = document.getElementById("gutter");
@@ -746,6 +797,9 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     return;
   }
 
+  const docBody = document.getElementById("doc-pane-body");
+  const docScrollEl = docBody instanceof HTMLElement ? docBody : docPane;
+
   const { rawCodeB64, rawMdB64 } = readEmbeddedRawB64Strings(shell, codePane);
   const rawCode = decodeBase64Utf8(rawCodeB64);
   const rawMd = decodeBase64Utf8(rawMdB64);
@@ -753,7 +807,6 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     shell.getAttribute("data-scroll-block-links-b64") || "",
   );
   const { scope, filePathLabel, commentrayPathLabel } = readSearchScopeFromShell(shell);
-  const mdLines = rawMd.split("\n");
   const lineRows = buildIndexedSearchRows(
     scope,
     rawCode,
@@ -761,20 +814,22 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     filePathLabel,
     commentrayPathLabel,
   );
-  const searcher = indexSearchLineRows(lineRows);
+  const mutable: MutableSearchFields = {
+    rawMd,
+    mdLines: rawMd.split("\n"),
+    commentrayPathLabel,
+    searcher: indexSearchLineRows(lineRows),
+  };
 
   wireSearchUi({
     scope,
     filePathLabel,
-    commentrayPathLabel,
+    mutable,
     rawCode,
-    rawMd,
-    mdLines,
-    searcher,
     searchInput,
     searchClear,
     searchResults,
-    docPane,
+    docScrollEl,
   });
 
   const pct0 = parseFloat(readWebStorageItem(localStorage, STORAGE_SPLIT_PCT) || "50");
@@ -783,10 +838,47 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
 
   wireWrapToggle(STORAGE_WRAP_LINES, codePane, wrapCb);
   wireSplitter(STORAGE_SPLIT_PCT, shell, codePane, gutter, pct);
-  if (scrollLinks.length > 0) {
-    wireBlockAwareScrollSync(codePane, docPane, scrollLinks);
+
+  const multiScript = document.getElementById("commentray-multi-angle-b64");
+  const multiPayload = parseMultiAnglePayload(multiScript);
+  let activeLinks: BlockScrollLink[] = scrollLinks;
+
+  if (multiPayload) {
+    wireBlockAwareScrollSync(codePane, docScrollEl, () => activeLinks);
+    const angleSel = document.getElementById("angle-select") as HTMLSelectElement | null;
+    if (angleSel && docBody) {
+      angleSel.addEventListener("change", () => {
+        const a = multiPayload.angles.find((x) => x.id === angleSel.value);
+        if (!a) return;
+        docBody.innerHTML = decodeBase64Utf8(a.docInnerHtmlB64);
+        mutable.rawMd = decodeBase64Utf8(a.rawMdB64);
+        mutable.mdLines = mutable.rawMd.split("\n");
+        mutable.commentrayPathLabel = a.commentrayPathForSearch;
+        mutable.searcher = indexSearchLineRows(
+          buildIndexedSearchRows(
+            scope,
+            rawCode,
+            mutable.rawMd,
+            filePathLabel,
+            mutable.commentrayPathLabel,
+          ),
+        );
+        activeLinks = parseScrollBlockLinksFromShell(a.scrollBlockLinksB64);
+        shell.setAttribute("data-scroll-block-links-b64", a.scrollBlockLinksB64);
+        shell.setAttribute("data-search-commentray-path", a.commentrayPathForSearch);
+        const gh = document.getElementById("toolbar-commentray-github");
+        if (gh instanceof HTMLAnchorElement && a.commentrayOnGithubUrl?.trim()) {
+          gh.href = a.commentrayOnGithubUrl.trim();
+        }
+        searchInput.value = "";
+        searchResults.innerHTML = "";
+        searchResults.hidden = true;
+      });
+    }
+  } else if (scrollLinks.length > 0) {
+    wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinks);
   } else {
-    wireProportionalScrollSync(codePane, docPane);
+    wireProportionalScrollSync(codePane, docScrollEl);
   }
 }
 

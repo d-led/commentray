@@ -1,13 +1,22 @@
 {
   "schemaVersion": 3,
   "byCommentrayPath": {
-    ".commentray/source/README.md.md": {
+    ".commentray/source/README.md/main.md": {
       "sourcePath": "README.md",
-      "commentrayPath": ".commentray/source/README.md.md",
+      "commentrayPath": ".commentray/source/README.md/main.md",
       "blocks": [
-        { "id": "readme-lede", "anchor": "lines:1-4" },
-        { "id": "readme-why", "anchor": "lines:5-9" },
-        { "id": "readme-user-guides", "anchor": "lines:11-21" }
+        {
+          "id": "readme-lede",
+          "anchor": "lines:1-4"
+        },
+        {
+          "id": "readme-why",
+          "anchor": "lines:5-9"
+        },
+        {
+          "id": "readme-user-guides",
+          "anchor": "lines:11-21"
+        }
       ]
     }
   }

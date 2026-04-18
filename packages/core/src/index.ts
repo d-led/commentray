@@ -13,8 +13,15 @@ export {
   generateBlockId,
 } from "./blocks.js";
 export { assertValidAngleId } from "./angles.js";
-export { ensureAnglesSentinelFile, upsertAngleDefinitionInCommentrayToml } from "./angles-toml.js";
-export type { UpsertAngleDefinitionInput } from "./angles-toml.js";
+export {
+  applyAnglesFlatMigrationToCommentrayToml,
+  ensureAnglesSentinelFile,
+  upsertAngleDefinitionInCommentrayToml,
+} from "./angles-toml.js";
+export type {
+  ApplyAnglesFlatMigrationTomlInput,
+  UpsertAngleDefinitionInput,
+} from "./angles-toml.js";
 export {
   defaultAngleIdForOpen,
   FALLBACK_DEFAULT_ANGLE_ID,
@@ -29,6 +36,11 @@ export {
   defaultMetadataIndexPath,
   normalizeRepoRelativePath,
 } from "./paths.js";
+export {
+  discoverCommentrayPairsOnDisk,
+  pairFromCommentraySourceRel,
+} from "./commentray-disk-pairs.js";
+export type { DiskCommentrayPair } from "./commentray-disk-pairs.js";
 export type {
   CommentrayToml,
   ResolvedAngleDefinition,
@@ -42,6 +54,17 @@ export { githubRepoBlobFileUrl, parseGithubRepoWebUrl } from "./github-url.js";
 export { assertValidIndex, emptyIndex } from "./metadata.js";
 export { describeIndexSchemaRemediation } from "./index-schema-messages.js";
 export { migrateIndex } from "./migrate.js";
+export {
+  discoverFlatCompanionMarkdownFiles,
+  flatRelToSourcePath,
+  planAnglesMigrationFromCompanions,
+  rewriteIndexKeysForAnglesMigration,
+} from "./migrate-angles-layout.js";
+export type {
+  AnglesMigrationMove,
+  AnglesMigrationPlan,
+  FlatCompanionEntry,
+} from "./migrate-angles-layout.js";
 export type { ParsedAnchor } from "./anchors.js";
 export { formatLineRange, parseAnchor } from "./anchors.js";
 export type { ScmPathRename, ScmProvider } from "./scm/scm-provider.js";

@@ -83,3 +83,76 @@ export async function upsertAngleDefinitionInCommentrayToml(
   const body = raw.trim() ? serialized : `${MINIMAL_NEW_TOML.trim()}\n\n${serialized}`;
   await fs.writeFile(configPath, `${body}\n`, "utf8");
 }
+
+export type ApplyAnglesFlatMigrationTomlInput = {
+  angleId: string;
+  /** Optional label for the single migrated angle (defaults to title-cased id). */
+  angleTitle?: string;
+  /** When both set, replace `[static_site].commentray_markdown` if it equals `from`. */
+  staticCommentrayMarkdownFrom?: string;
+  staticCommentrayMarkdownTo?: string;
+};
+
+function defaultTitleForAngleId(angleId: string): string {
+  return angleId
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function maybeRewriteStaticCommentrayMarkdown(
+  ss: NonNullable<CommentrayToml["static_site"]>,
+  from: string | undefined,
+  to: string | undefined,
+): void {
+  if (!from || !to) return;
+  const cur = (ss.commentray_markdown ?? ss.commentary_markdown ?? "").trim();
+  if (cur !== from) return;
+  ss.commentray_markdown = to;
+  delete ss.commentary_markdown;
+}
+
+/**
+ * After flat → Angles filesystem moves, stamp `[angles]` and optionally rewrite
+ * `[static_site].commentray_markdown` to the new companion path. Refuses when
+ * `[angles].definitions` is already non-empty (avoid clobbering a configured project).
+ */
+export async function applyAnglesFlatMigrationToCommentrayToml(
+  repoRoot: string,
+  input: ApplyAnglesFlatMigrationTomlInput,
+): Promise<void> {
+  const id = assertValidAngleId(input.angleId);
+  const configPath = path.join(repoRoot, ".commentray.toml");
+  let raw: string;
+  try {
+    raw = await fs.readFile(configPath, "utf8");
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      throw new Error("Missing .commentray.toml (run: commentray init config)", { cause: err });
+    }
+    throw err;
+  }
+  const parsed: CommentrayToml = raw.trim() ? parseToml(raw) : {};
+  const existingDefs = parsed.angles?.definitions ?? [];
+  if (existingDefs.length > 0) {
+    throw new Error(
+      "Refusing to migrate: [angles].definitions is already set. Remove or merge angles manually, then retry.",
+    );
+  }
+  const title = input.angleTitle?.trim() || defaultTitleForAngleId(id) || id;
+  parsed.angles = {
+    default_angle: id,
+    definitions: [{ id, title }],
+  };
+  const ss = parsed.static_site ?? {};
+  maybeRewriteStaticCommentrayMarkdown(
+    ss,
+    input.staticCommentrayMarkdownFrom?.trim(),
+    input.staticCommentrayMarkdownTo?.trim(),
+  );
+  parsed.static_site = ss;
+  mergeCommentrayConfig(parsed);
+  await fs.writeFile(configPath, `${stringify(parsed as never)}\n`, "utf8");
+}

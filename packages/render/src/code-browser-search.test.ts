@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { findOrderedTokenSpans, lineAtIndex, offsetToLineIndex } from "./code-browser-search.js";
+import {
+  escapeHtmlHighlightingSearchTokens,
+  findOrderedTokenSpans,
+  lineAtIndex,
+  offsetToLineIndex,
+} from "./code-browser-search.js";
 
 describe("findOrderedTokenSpans", () => {
   it("finds tokens on one line", () => {
@@ -45,5 +50,23 @@ describe("offsetToLineIndex", () => {
 describe("lineAtIndex", () => {
   it("returns the requested line", () => {
     expect(lineAtIndex("x\nyz", 1)).toBe("yz");
+  });
+});
+
+describe("escapeHtmlHighlightingSearchTokens", () => {
+  it("escapes HTML in the snippet and wraps matched tokens in mark.search-hit", () => {
+    const html = escapeHtmlHighlightingSearchTokens('Say <script> & "hi"', ["hi"]);
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain('<mark class="search-hit">hi</mark>');
+  });
+
+  it("matches query tokens case-insensitively", () => {
+    const html = escapeHtmlHighlightingSearchTokens("Commentray on GitHub", ["commentray"]);
+    expect(html).toMatch(/<mark class="search-hit">Commentray<\/mark>/i);
+  });
+
+  it("given no tokens, then returns fully escaped text with no marks", () => {
+    expect(escapeHtmlHighlightingSearchTokens("<x>", [])).toBe("&lt;x&gt;");
+    expect(escapeHtmlHighlightingSearchTokens("<x>", ["  ", ""])).toBe("&lt;x&gt;");
   });
 });

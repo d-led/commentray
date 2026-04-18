@@ -23,6 +23,7 @@ commentray init scm        # install/refresh a marked block in .git/hooks/pre-co
 commentray validate        # schema + anchor integrity + Git staleness evidence
 commentray doctor          # validate plus environment checks
 commentray migrate         # migrate metadata JSON to the current schema
+commentray migrate-angles    # flat .commentray/source/*.md → Angles folders + [angles] + index keys (see --dry-run)
 commentray sync-moved-paths # rewrite index paths after Git renames (uses git diff)
 commentray convert-source-markers --file PATH --language LANG  # rewrite region comment style (optional --dry-run)
 commentray render [--source SRC] [--markdown MD] [--out OUT.html] [--mermaid]

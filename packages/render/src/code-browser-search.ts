@@ -5,6 +5,36 @@
 
 const MAX_ORDERED_SPANS = 400;
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * HTML-safe snippet for search hit lists: escapes `display`, wrapping each case-insensitive
+ * occurrence of any `tokens` substring in `<mark class="search-hit">…</mark>`.
+ */
+export function escapeHtmlHighlightingSearchTokens(display: string, tokens: string[]): string {
+  const parts = tokens.map((t) => t.trim()).filter(Boolean);
+  if (parts.length === 0) return escapeHtml(display);
+  try {
+    const escaped = parts.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const re = new RegExp(`(${escaped.join("|")})`, "gi");
+    const bits = display.split(re);
+    return bits
+      .map((bit, i) =>
+        i % 2 === 1 ? `<mark class="search-hit">${escapeHtml(bit)}</mark>` : escapeHtml(bit),
+      )
+      .join("");
+  } catch {
+    return escapeHtml(display);
+  }
+}
+
 /**
  * Returns every minimal span [start, end) where each non-empty token appears in order
  * in `text` (case-insensitive). Spans may overlap; iteration advances by one code unit

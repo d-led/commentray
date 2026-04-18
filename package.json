@@ -9,6 +9,9 @@
   "workspaces": [
     "packages/*"
   ],
+  "overrides": {
+    "serialize-javascript": "7.0.3"
+  },
   "scripts": {
     "bootstrap": "npm install",
     "setup": "bash scripts/setup.sh",

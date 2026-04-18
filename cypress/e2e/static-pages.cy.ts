@@ -20,7 +20,7 @@ describe("Commentray static site (GitHub Pages build)", () => {
         .and("not.match", /href="\.\.\/README\.md"/);
     });
 
-    it("then the hub exposes GitHub source links and a documented-files tree", () => {
+    it("then the hub exposes GitHub source links and an all-commentray-files tree", () => {
       cy.visitStaticSiteHome();
       cy.contains("a", "Source on GitHub")
         .should("have.attr", "href")
@@ -28,8 +28,8 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.contains("a", "Commentray on GitHub")
         .should("have.attr", "href")
         .and("match", /github\.com/);
-      cy.get("#documented-files-toggle").click();
       cy.get("#documented-files-panel").should("be.visible");
+      cy.contains("button", "All commentray files").should("have.attr", "aria-expanded", "true");
       cy.get("#documented-files-tree ul", { timeout: 10000 }).should("exist");
     });
 
@@ -48,7 +48,6 @@ describe("Commentray static site (GitHub Pages build)", () => {
         req.reply({ statusCode: 503, body: "{}" });
       }).as("navJsonFail");
       cy.visitStaticSiteHome();
-      cy.get("#documented-files-toggle").click();
       cy.get("#documented-files-panel").should("be.visible");
       cy.get("#documented-files-tree").contains("README.md");
       cy.then(() => {
@@ -64,6 +63,24 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.get("body").type("{esc}");
       cy.get("#search-q").should("have.value", "");
       cy.get("#search-results").should("have.attr", "hidden");
+    });
+
+    it("then search hit snippets highlight matched query tokens", () => {
+      cy.visitStaticSiteHome();
+      cy.get("#search-q").type("commentray");
+      cy.get("#search-results").should("not.have.attr", "hidden");
+      cy.get("#search-results mark.search-hit").should("have.length.at.least", 1);
+    });
+
+    it("then the Angle selector swaps commentray bodies for multi-angle Pages builds", () => {
+      cy.visitStaticSiteHome();
+      cy.get("#angle-select").should("exist");
+      cy.get("#doc-pane-body")
+        .invoke("text")
+        .then((mainText) => {
+          cy.get("#angle-select").select("architecture");
+          cy.get("#doc-pane-body").invoke("text").should("not.eq", mainText);
+        });
     });
   });
 });

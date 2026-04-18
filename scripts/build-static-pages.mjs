@@ -11,6 +11,9 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+  commentrayAnglesLayoutEnabled,
+  commentrayMarkdownPathForAngle,
+  defaultAngleIdForOpen,
   githubRepoBlobFileUrl,
   loadCommentrayConfig,
   parseGithubRepoWebUrl,
@@ -51,8 +54,56 @@ if (!(await pathExists(sourceAbs))) {
   process.exit(1);
 }
 
+const projectIndex = await readIndex(repoRoot);
+const ghWeb = ss.githubUrl ? parseGithubRepoWebUrl(ss.githubUrl) : null;
+const ghNavBase = ghWeb
+  ? { owner: ghWeb.owner, repo: ghWeb.repo, branch: ss.githubBlobBranch || "main" }
+  : null;
+
+const anglesOn = commentrayAnglesLayoutEnabled(repoRoot, cfg.storageDir);
+const angleDefs = cfg.angles?.definitions ?? [];
+
+/** @type {import("@commentray/render").CodeBrowserMultiAngleBrowsing | undefined} */
+let multiAngleBrowsing;
+if (anglesOn && angleDefs.length >= 2) {
+  const angles = [];
+  for (const def of angleDefs) {
+    const rel = commentrayMarkdownPathForAngle(ss.sourceFile, def.id, cfg.storageDir);
+    const abs = path.join(repoRoot, rel);
+    if (!(await pathExists(abs))) continue;
+    const rawFile = await readFile(abs, "utf8");
+    const composed = composeCommentrayMarkdown(ss.introMarkdown, rawFile);
+    let blockStretchRows;
+    if (projectIndex) {
+      const entry = projectIndex.byCommentrayPath[rel];
+      if (entry && entry.blocks.length > 0 && entry.sourcePath === ss.sourceFile) {
+        blockStretchRows = {
+          index: projectIndex,
+          sourceRelative: entry.sourcePath,
+          commentrayPathRel: rel,
+        };
+      }
+    }
+    const commentrayOnGithubUrl =
+      ghNavBase !== null
+        ? githubRepoBlobFileUrl(ghNavBase.owner, ghNavBase.repo, ghNavBase.branch, rel)
+        : undefined;
+    angles.push({
+      id: def.id,
+      title: def.title,
+      markdown: composed,
+      commentrayPathRel: rel,
+      commentrayOnGithubUrl,
+      ...(blockStretchRows ? { blockStretchRows } : {}),
+    });
+  }
+  if (angles.length >= 2) {
+    multiAngleBrowsing = { defaultAngleId: defaultAngleIdForOpen(cfg), angles };
+  }
+}
+
 let fileMarkdown = "";
-if (ss.commentrayMarkdownFile) {
+if (!multiAngleBrowsing && ss.commentrayMarkdownFile) {
   const mdAbs = path.join(repoRoot, ss.commentrayMarkdownFile);
   if (!(await pathExists(mdAbs))) {
     console.error(`static_site.commentray_markdown not found: ${ss.commentrayMarkdownFile}`);
@@ -61,15 +112,27 @@ if (ss.commentrayMarkdownFile) {
   fileMarkdown = await readFile(mdAbs, "utf8");
 }
 
-const commentrayBody = composeCommentrayMarkdown(ss.introMarkdown, fileMarkdown);
+const commentrayBody = multiAngleBrowsing
+  ? ((
+      multiAngleBrowsing.angles.find((a) => a.id === multiAngleBrowsing.defaultAngleId) ??
+      multiAngleBrowsing.angles[0]
+    )?.markdown ?? "_No commentray content configured._\n")
+  : composeCommentrayMarkdown(ss.introMarkdown, fileMarkdown);
 const tmpMd = path.join(tmpdir(), `commentray-pages-${process.pid}.md`);
 await writeFile(tmpMd, commentrayBody, "utf8");
 
 const outDir = path.join(repoRoot, "_site");
 const outHtml = path.join(outDir, "index.html");
 
-const markdownUrlBaseDirAbs = ss.commentrayMarkdownFile
-  ? path.join(repoRoot, path.dirname(ss.commentrayMarkdownFile))
+const defaultCommentrayRel = multiAngleBrowsing
+  ? ((
+      multiAngleBrowsing.angles.find((a) => a.id === multiAngleBrowsing.defaultAngleId) ??
+      multiAngleBrowsing.angles[0]
+    )?.commentrayPathRel ?? "")
+  : (ss.commentrayMarkdownFile ?? "");
+
+const markdownUrlBaseDirAbs = defaultCommentrayRel
+  ? path.join(repoRoot, path.dirname(defaultCommentrayRel))
   : repoRoot;
 
 // Do not pass `githubBlobRepo` here: `[render].relative_github_blob_links` turns matching
@@ -83,8 +146,7 @@ const commentrayOutputUrls = {
 };
 
 let blockStretchRows;
-const projectIndex = await readIndex(repoRoot);
-if (projectIndex && ss.commentrayMarkdownFile) {
+if (!multiAngleBrowsing && projectIndex && ss.commentrayMarkdownFile) {
   const entry = projectIndex.byCommentrayPath[ss.commentrayMarkdownFile];
   if (entry && entry.blocks.length > 0 && entry.sourcePath === ss.sourceFile) {
     blockStretchRows = {
@@ -95,37 +157,28 @@ if (projectIndex && ss.commentrayMarkdownFile) {
   }
 }
 
-const ghWeb = ss.githubUrl ? parseGithubRepoWebUrl(ss.githubUrl) : null;
-const ghNavBase = ghWeb
-  ? { owner: ghWeb.owner, repo: ghWeb.repo, branch: ss.githubBlobBranch || "main" }
-  : null;
-
 const sourceOnGithubUrl =
   ghNavBase !== null
     ? githubRepoBlobFileUrl(ghNavBase.owner, ghNavBase.repo, ghNavBase.branch, ss.sourceFile)
     : undefined;
 const commentrayOnGithubUrl =
-  ghNavBase !== null && ss.commentrayMarkdownFile
-    ? githubRepoBlobFileUrl(
-        ghNavBase.owner,
-        ghNavBase.repo,
-        ghNavBase.branch,
-        ss.commentrayMarkdownFile,
-      )
+  ghNavBase !== null && defaultCommentrayRel
+    ? githubRepoBlobFileUrl(ghNavBase.owner, ghNavBase.repo, ghNavBase.branch, defaultCommentrayRel)
     : undefined;
 const documentedNavJsonUrl = ghNavBase !== null ? "./commentray-nav-search.json" : undefined;
 
 const navSearchPath = path.join(outDir, "commentray-nav-search.json");
 const navDoc = await buildCommentrayNavSearchDocument(
   repoRoot,
-  ss.commentrayMarkdownFile
+  defaultCommentrayRel
     ? {
         sourcePath: ss.sourceFile,
-        commentrayPath: ss.commentrayMarkdownFile,
-        markdownAbs: path.join(repoRoot, ss.commentrayMarkdownFile),
+        commentrayPath: defaultCommentrayRel,
+        markdownAbs: path.join(repoRoot, defaultCommentrayRel),
       }
     : undefined,
   ghNavBase ?? undefined,
+  cfg.storageDir,
 );
 const documentedPairsEmbeddedB64 =
   ghNavBase !== null && Array.isArray(navDoc.documentedPairs) && navDoc.documentedPairs.length > 0
@@ -147,8 +200,9 @@ try {
     commentrayOutputUrls,
     relatedGithubNav: ss.relatedGithubNav.length > 0 ? ss.relatedGithubNav : undefined,
     staticSearchScope: "commentray-and-paths",
-    commentrayPathForSearch: ss.commentrayMarkdownFile ?? "",
+    commentrayPathForSearch: defaultCommentrayRel,
     ...(blockStretchRows ? { blockStretchRows } : {}),
+    ...(multiAngleBrowsing ? { multiAngleBrowsing } : {}),
     ...(sourceOnGithubUrl ? { sourceOnGithubUrl } : {}),
     ...(commentrayOnGithubUrl ? { commentrayOnGithubUrl } : {}),
     ...(documentedNavJsonUrl ? { documentedNavJsonUrl } : {}),

@@ -25,10 +25,12 @@ commentray init scm
 
 ## 2. Open the paired commentray path for a source file
 
-Convention: repo-relative primary path `P` → **`.commentray/source/{P}.md`** (append `.md` to `P`; POSIX slashes; no `..`). Examples:
+Convention: **flat** layout (no `{storage}/source/.default`): repo-relative primary path `P` → **`.commentray/source/{P}.md`** (append `.md` to `P`; POSIX slashes; no `..`). **Angles** layout (sentinel present): **`.commentray/source/{P}/{angle}.md`**. Examples (flat):
 
 - `README.md` → `.commentray/source/README.md.md`
 - `src/app.ts` → `.commentray/source/src/app.ts.md`
+
+To move an existing flat tree to Angles folders and `[angles]` in one step: **`commentray migrate-angles`** (use `--dry-run` first; see [storage spec](../spec/storage.md)).
 
 Print the path for any file:
 

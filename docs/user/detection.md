@@ -25,7 +25,12 @@ Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. E
 ## CLI `commentray migrate`
 
 - **When:** After upgrades when the index **schema** or snippet normalization changes; also applied on many read paths automatically.
-- **What:** **Offline** rewrite of **`.commentray/metadata/index.json`** only (for example legacy field renames). Does **not** touch Git state, source files, or **Angles** filesystem layout (flat → per-angle folders remains manual today—see [`docs/spec/storage.md`](../spec/storage.md)).
+- **What:** **Offline** rewrite of **`.commentray/metadata/index.json`** only (for example legacy field renames). Does **not** touch Git state, source files, or **Angles** filesystem layout.
+
+## CLI `commentray migrate-angles`
+
+- **When:** You want to opt into **Angles** on disk from an existing **flat** `.commentray/source/{P}.md` tree.
+- **What:** Moves companions to `{storage}/source/{P}/{angle}.md`, writes the **`.default`** sentinel, merges **`[angles]`** into `.commentray.toml`, rewrites **`[static_site].commentray_markdown`** when it pointed at a moved file, and updates **`index.json`** keys. Use **`--dry-run`** first. Normative detail: [`docs/spec/storage.md`](../spec/storage.md).
 
 ## Editor extension (`commentray-vscode`)
 

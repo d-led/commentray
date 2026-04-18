@@ -18,6 +18,25 @@ import {
   renderMarkdownToHtml,
 } from "./markdown-pipeline.js";
 
+/** One angle tab for {@link CodeBrowserPageOptions.multiAngleBrowsing}. */
+export type CodeBrowserMultiAngleSpec = {
+  id: string;
+  title?: string;
+  markdown: string;
+  commentrayPathRel: string;
+  commentrayOnGithubUrl?: string;
+  blockStretchRows?: {
+    index: CommentrayIndex;
+    sourceRelative: string;
+    commentrayPathRel: string;
+  };
+};
+
+export type CodeBrowserMultiAngleBrowsing = {
+  defaultAngleId: string;
+  angles: CodeBrowserMultiAngleSpec[];
+};
+
 export type CodeBrowserPageOptions = {
   title?: string;
   /** Repo-relative (or otherwise meaningful) path to display prominently in the toolbar. */
@@ -90,7 +109,7 @@ export type CodeBrowserPageOptions = {
   commentrayOnGithubUrl?: string;
   /**
    * Relative URL to a nav JSON document (e.g. `./commentray-nav-search.json`) that includes
-   * `documentedPairs` — enables the **Documented files** tree in the toolbar.
+   * `documentedPairs` — enables the **All commentray files** tree in the toolbar.
    */
   documentedNavJsonUrl?: string;
   /**
@@ -99,6 +118,11 @@ export type CodeBrowserPageOptions = {
    * and with `file://` where `fetch` to a sidecar JSON is unavailable.
    */
   documentedPairsEmbeddedB64?: string;
+  /**
+   * When **two or more** angles are listed for the same static browse session, the shell renders
+   * an Angle selector, embeds each rendered Markdown body, and disables stretch layout.
+   */
+  multiAngleBrowsing?: CodeBrowserMultiAngleBrowsing;
 };
 
 function renderGeneratorMetaHtml(label: string | undefined): string {
@@ -247,18 +271,18 @@ function renderToolbarDocHubHtml(opts: {
   const showDocumentedTree = Boolean(nav) || hasEmbed;
   if (src) {
     parts.push(
-      `<a class="toolbar-blob-link" href="${escapeHtml(src)}" target="_blank" rel="noopener noreferrer">Source on GitHub</a>`,
+      `<a class="toolbar-blob-link" id="toolbar-source-github" href="${escapeHtml(src)}" target="_blank" rel="noopener noreferrer">Source on GitHub</a>`,
     );
   }
   if (cr) {
     parts.push(
-      `<a class="toolbar-blob-link" href="${escapeHtml(cr)}" target="_blank" rel="noopener noreferrer">Commentray on GitHub</a>`,
+      `<a class="toolbar-blob-link" id="toolbar-commentray-github" href="${escapeHtml(cr)}" target="_blank" rel="noopener noreferrer">Commentray on GitHub</a>`,
     );
   }
   if (showDocumentedTree) {
     const navAttr = nav ? escapeHtml(nav) : "";
     parts.push(
-      `<button type="button" class="toolbar-tree-toggle" id="documented-files-toggle" aria-expanded="false" aria-controls="documented-files-panel" data-nav-json-url="${navAttr}">Documented files</button>`,
+      `<button type="button" class="toolbar-tree-toggle" id="documented-files-toggle" aria-expanded="true" aria-controls="documented-files-panel" data-nav-json-url="${navAttr}">All commentray files</button>`,
     );
   }
   const toolbarDocHubHtml =
@@ -266,9 +290,9 @@ function renderToolbarDocHubHtml(opts: {
       ? `<div class="toolbar-doc-hub">${parts.join('<span class="toolbar-doc-hub__sep" aria-hidden="true"> · </span>')}</div>`
       : "";
   const documentedPanelHtml = showDocumentedTree
-    ? `<div id="documented-files-panel" class="documented-files-panel" hidden>
+    ? `<div id="documented-files-panel" class="documented-files-panel">
         <div class="documented-files-panel__inner">
-          <p class="documented-files-panel__hint">Indexed source ↔ commentray pairs (embedded for offline when available). Links open on GitHub.</p>
+          <p class="documented-files-panel__hint">Companion Markdown under the storage <code class="documented-files-panel__code">source</code> tree (merged with <code class="documented-files-panel__code">index.json</code> when present). Embedded when the build provides it; otherwise loaded from the nav JSON. Links open on GitHub.</p>
           <div id="documented-files-tree" class="documented-files-tree" role="tree"></div>
         </div>
       </div>`
@@ -368,7 +392,7 @@ const CODE_BROWSER_STYLES = `
       }
       .toolbar-tree-toggle:hover { background: color-mix(in oklab, CanvasText 11%, Canvas); }
       .documented-files-panel {
-        flex: 0 0 auto; max-height: min(42vh, 360px); overflow: auto;
+        flex: 0 0 auto; max-height: min(52vh, 480px); overflow: auto;
         border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
         background: color-mix(in oklab, CanvasText 4%, Canvas);
       }
@@ -397,22 +421,37 @@ const CODE_BROWSER_STYLES = `
         color: CanvasText;
       }
       .search-results {
-        flex: 0 0 auto; max-height: 160px; overflow: auto; padding: 6px 12px 8px;
+        flex: 0 0 auto; max-height: min(42vh, 420px); overflow: auto; padding: 8px 14px 10px;
         border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
-        font-size: 12px;
+        font-size: 13px;
       }
       .search-results[hidden] { display: none !important; }
-      .search-results .hint { opacity: 0.75; margin-bottom: 6px; }
+      .search-results .hint { opacity: 0.75; margin-bottom: 8px; line-height: 1.45; }
       .search-results button.hit {
-        display: block; width: 100%; text-align: left; margin: 2px 0; padding: 6px 8px;
+        display: block; width: 100%; text-align: left; margin: 4px 0; padding: 8px 10px;
         border-radius: 6px; border: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
         background: color-mix(in oklab, CanvasText 5%, Canvas); color: CanvasText; cursor: pointer;
         font: inherit;
       }
       .search-results button.hit:hover { background: color-mix(in oklab, CanvasText 10%, Canvas); }
-      .search-results button.hit .meta { opacity: 0.8; font-size: 11px; }
-      .search-results button.hit .src-tag { opacity: 0.75; font-weight: 500; font-size: 10px; }
-      .search-results button.hit .snippet { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 11px; white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
+      .search-results button.hit .meta { opacity: 0.8; font-size: 12px; }
+      .search-results button.hit .src-tag { opacity: 0.75; font-weight: 500; font-size: 11px; }
+      .search-results button.hit .snippet {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 13px;
+        line-height: 1.45; white-space: pre-wrap; word-break: break-word; margin-top: 4px;
+      }
+      .search-results mark.search-hit {
+        padding: 0 2px; border-radius: 3px; font: inherit;
+        background: color-mix(in oklab, #f5a623 70%, Canvas);
+        color: CanvasText;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+      }
+      @media (prefers-color-scheme: dark) {
+        .search-results mark.search-hit {
+          background: color-mix(in oklab, #c9a227 55%, Canvas);
+        }
+      }
       .shell { display: flex; flex-direction: row; flex: 1; min-height: 0; }
       .pane--code {
         flex: 0 0 50%;
@@ -472,7 +511,19 @@ const CODE_BROWSER_STYLES = `
         content: ""; position: absolute; top: 0; bottom: 0; left: -4px; right: -4px;
       }
       .pane--doc {
-        flex: 1 1 auto; min-width: 120px; overflow: auto; padding: 12px 16px;
+        flex: 1 1 auto; min-width: 0; min-height: 0;
+        display: flex; flex-direction: column; overflow: hidden; padding: 12px 16px;
+      }
+      .doc-pane-body {
+        flex: 1 1 auto; min-height: 0; overflow: auto;
+      }
+      .toolbar-angle-picker {
+        display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
+        font-size: 12px; color: color-mix(in oklab, CanvasText 88%, Canvas);
+      }
+      .toolbar-angle-picker select {
+        font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 6px;
+        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas); background: Canvas; color: CanvasText;
       }
       .pane--doc { font-size: 15px; line-height: 1.45; }
       .pane--doc img { max-width: 100%; height: auto; }
@@ -580,6 +631,7 @@ type CodeBrowserPageParts = {
   title: string;
   generatorMetaHtml: string;
   filePathHtml: string;
+  angleSelectHtml: string;
   toolbarDocHubHtml: string;
   documentedPanelHtml: string;
   relatedNavHtml: string;
@@ -598,6 +650,8 @@ type CodeBrowserPageParts = {
   mermaidScript: string;
   searchPlaceholder: string;
   shellSearchAttrs: string;
+  /** Base64 JSON payload for multi-angle static browsing (see `code-browser-client.ts`). */
+  multiAngleScriptBlock: string;
 };
 
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
@@ -623,6 +677,7 @@ ${CODE_BROWSER_STYLES}
       <header class="toolbar" aria-label="View options">
         <div class="toolbar__main">
           ${p.filePathHtml}
+          ${p.angleSelectHtml}
           ${p.toolbarDocHubHtml}
           <span class="search-field">
             <label for="search-q">Search</label>
@@ -640,6 +695,7 @@ ${CODE_BROWSER_STYLES}
 ${p.shellInner}
       </div>
     </div>
+    <script type="text/plain" id="commentray-multi-angle-b64">${p.multiAngleScriptBlock}</script>
     <script>
 ${loadCodeBrowserClientBundle()}
     </script>
@@ -652,7 +708,123 @@ type CodeBrowserShell = {
   layout: "dual" | "stretch";
   shellInner: string;
   scrollBlockLinksB64: string;
+  angleSelectHtml: string;
+  multiAnglePayloadB64: string;
+  /** When multi-angle browsing is active, overrides shell `data-raw-md-b64` / search path / GitHub link. */
+  multiShell?: {
+    rawMdB64: string;
+    scrollBlockLinksB64: string;
+    commentrayPathForSearch: string;
+    commentrayOnGithubUrl?: string;
+  };
 };
+
+type MultiAngleJsonRow = {
+  id: string;
+  title: string;
+  docInnerHtmlB64: string;
+  rawMdB64: string;
+  scrollBlockLinksB64: string;
+  commentrayPathForSearch: string;
+  commentrayOnGithubUrl?: string;
+};
+
+async function buildMultiAngleDualPaneShell(
+  opts: CodeBrowserPageOptions,
+  multi: CodeBrowserMultiAngleBrowsing,
+): Promise<{
+  shellInner: string;
+  multiShell: NonNullable<CodeBrowserShell["multiShell"]>;
+  angleSelectHtml: string;
+  multiAnglePayloadB64: string;
+}> {
+  const defaultId = multi.angles.some((a) => a.id === multi.defaultAngleId)
+    ? multi.defaultAngleId
+    : (multi.angles[0]?.id ?? "main");
+  const jsonAngles: MultiAngleJsonRow[] = [];
+  let defaultMarkdown = opts.commentrayMarkdown;
+  let defaultScrollB64 = "";
+  let defaultPathSearch = (opts.commentrayPathForSearch ?? "").trim();
+  let defaultGh = opts.commentrayOnGithubUrl;
+  let defaultPaneHtml = "";
+
+  const codeHtml = await renderCodeLineBlocks(opts.code, opts.language);
+
+  for (const spec of multi.angles) {
+    const rows = spec.blockStretchRows;
+    const links =
+      rows !== undefined
+        ? buildBlockScrollLinks(
+            rows.index,
+            rows.sourceRelative,
+            rows.commentrayPathRel,
+            spec.markdown,
+            opts.code,
+          )
+        : [];
+    const mdForDoc = injectCommentrayBlockAnchors(
+      spec.markdown,
+      links.length > 0 ? links : undefined,
+    );
+    const scrollB64 =
+      links.length > 0 ? Buffer.from(JSON.stringify(links), "utf8").toString("base64") : "";
+    const commentrayHtml = await renderMarkdownToHtml(mdForDoc, {
+      commentrayOutputUrls: opts.commentrayOutputUrls,
+    });
+    if (spec.id === defaultId) {
+      defaultMarkdown = spec.markdown;
+      defaultScrollB64 = scrollB64;
+      defaultPathSearch = spec.commentrayPathRel.trim();
+      defaultGh = spec.commentrayOnGithubUrl;
+      defaultPaneHtml = commentrayHtml;
+    }
+    jsonAngles.push({
+      id: spec.id,
+      title: spec.title?.trim() || spec.id,
+      docInnerHtmlB64: Buffer.from(commentrayHtml, "utf8").toString("base64"),
+      rawMdB64: Buffer.from(spec.markdown, "utf8").toString("base64"),
+      scrollBlockLinksB64: scrollB64,
+      commentrayPathForSearch: spec.commentrayPathRel.trim(),
+      commentrayOnGithubUrl: spec.commentrayOnGithubUrl,
+    });
+  }
+
+  const selOpts = multi.angles
+    .map((a) => {
+      const lab = escapeHtml(a.title?.trim() || a.id);
+      return `<option value="${escapeHtml(a.id)}"${a.id === defaultId ? " selected" : ""}>${lab}</option>`;
+    })
+    .join("");
+  const angleSelectHtml = `<span class="toolbar-angle-picker"><label for="angle-select">Angle</label><select id="angle-select" aria-label="Commentray angle">${selOpts}</select></span>`;
+
+  const shellInner =
+    `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
+    `<h2 class="pane-title">Code</h2>\n` +
+    `          ${codeHtml}\n` +
+    `        </section>\n` +
+    `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
+    `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
+    `          <h2 class="pane-title">Commentray</h2>\n` +
+    `          <div id="doc-pane-body" class="doc-pane-body">\n` +
+    `          ${defaultPaneHtml}\n` +
+    `          </div>\n` +
+    `        </section>\n`;
+
+  const payloadObj = { defaultAngleId: defaultId, angles: jsonAngles };
+  const multiAnglePayloadB64 = Buffer.from(JSON.stringify(payloadObj), "utf8").toString("base64");
+
+  return {
+    shellInner,
+    multiShell: {
+      rawMdB64: Buffer.from(defaultMarkdown, "utf8").toString("base64"),
+      scrollBlockLinksB64: defaultScrollB64,
+      commentrayPathForSearch: defaultPathSearch,
+      commentrayOnGithubUrl: defaultGh,
+    },
+    angleSelectHtml,
+    multiAnglePayloadB64,
+  };
+}
 
 async function buildCodeBrowserShell(
   opts: CodeBrowserPageOptions,
@@ -661,6 +833,22 @@ async function buildCodeBrowserShell(
   let layout: "dual" | "stretch" = "dual";
   let shellInner = "";
   let scrollBlockLinksB64 = "";
+
+  const multi = opts.multiAngleBrowsing;
+  const multiActive = Boolean(multi && multi.angles.length >= 2);
+
+  if (multiActive && multi) {
+    const built = await buildMultiAngleDualPaneShell(opts, multi);
+    const ms = built.multiShell;
+    return {
+      layout: "dual",
+      shellInner: built.shellInner,
+      scrollBlockLinksB64: ms.scrollBlockLinksB64,
+      angleSelectHtml: built.angleSelectHtml,
+      multiAnglePayloadB64: built.multiAnglePayloadB64,
+      multiShell: ms,
+    };
+  }
 
   if (opts.blockStretchRows && layoutPref !== "dual") {
     const stretched = await tryBuildBlockStretchTableHtml({
@@ -716,23 +904,35 @@ async function buildCodeBrowserShell(
       `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
       `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
       `          <h2 class="pane-title">Commentray</h2>\n` +
+      `          <div id="doc-pane-body" class="doc-pane-body">\n` +
       `          ${commentrayHtml}\n` +
+      `          </div>\n` +
       `        </section>\n`;
   }
 
-  return { layout, shellInner, scrollBlockLinksB64 };
+  return {
+    layout,
+    shellInner,
+    scrollBlockLinksB64,
+    angleSelectHtml: "",
+    multiAnglePayloadB64: "",
+  };
 }
 
-function searchChromeFromOptions(opts: CodeBrowserPageOptions): {
+function searchChromeFromOptions(
+  opts: CodeBrowserPageOptions,
+  commentrayPathOverride?: string,
+): {
   searchPlaceholder: string;
   shellSearchAttrs: string;
 } {
+  const crPath = (commentrayPathOverride ?? opts.commentrayPathForSearch ?? "").trim();
   if (opts.staticSearchScope === "commentray-and-paths") {
     return {
       searchPlaceholder: "Commentray + file paths (ordered tokens + fuzzy lines)…",
       shellSearchAttrs: ` data-search-scope="commentray-and-paths" data-search-file-path="${escapeHtml(
         opts.filePath ?? "",
-      )}" data-search-commentray-path="${escapeHtml((opts.commentrayPathForSearch ?? "").trim())}"`,
+      )}" data-search-commentray-path="${escapeHtml(crPath)}"`,
     };
   }
   return {
@@ -754,7 +954,6 @@ function shellDocumentedPairsAttrFromOptions(opts: CodeBrowserPageOptions): stri
  */
 export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promise<string> {
   const rawCodeB64 = Buffer.from(opts.code, "utf8").toString("base64");
-  const rawMdB64 = Buffer.from(opts.commentrayMarkdown, "utf8").toString("base64");
 
   const title = opts.title ?? opts.filePath ?? "Commentray";
   const filePathHtml = renderFilePathLabel(opts.filePath, title);
@@ -766,29 +965,40 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
 
   const relatedNavHtml = renderRelatedGithubNavHtml(opts.relatedGithubNav ?? []);
   const generatorMetaHtml = renderGeneratorMetaHtml(opts.generatorLabel);
+
+  const layoutPref = opts.codeBrowserLayout ?? "auto";
+  const shell = await buildCodeBrowserShell(opts, layoutPref);
+
+  const commentrayBlobForToolbar =
+    shell.multiShell?.commentrayOnGithubUrl ?? opts.commentrayOnGithubUrl;
   const { toolbarDocHubHtml, documentedPanelHtml } = renderToolbarDocHubHtml({
     sourceOnGithubUrl: opts.sourceOnGithubUrl,
-    commentrayOnGithubUrl: opts.commentrayOnGithubUrl,
+    commentrayOnGithubUrl: commentrayBlobForToolbar,
     documentedNavJsonUrl: opts.documentedNavJsonUrl,
     documentedPairsEmbeddedB64: opts.documentedPairsEmbeddedB64,
   });
 
-  const layoutPref = opts.codeBrowserLayout ?? "auto";
-  const { layout, shellInner, scrollBlockLinksB64 } = await buildCodeBrowserShell(opts, layoutPref);
+  const rawMdB64 =
+    shell.multiShell?.rawMdB64 ?? Buffer.from(opts.commentrayMarkdown, "utf8").toString("base64");
+  const scrollBlockLinksB64 = shell.scrollBlockLinksB64;
 
-  const { searchPlaceholder, shellSearchAttrs } = searchChromeFromOptions(opts);
+  const { searchPlaceholder, shellSearchAttrs } = searchChromeFromOptions(
+    opts,
+    shell.multiShell?.commentrayPathForSearch,
+  );
   const shellDocumentedPairsAttr = shellDocumentedPairsAttrFromOptions(opts);
 
   return buildCodeBrowserPageHtml({
     title,
     generatorMetaHtml,
     filePathHtml,
+    angleSelectHtml: shell.angleSelectHtml,
     toolbarDocHubHtml,
     documentedPanelHtml,
     relatedNavHtml,
     toolbarEndHtml,
-    layout,
-    shellInner,
+    layout: shell.layout,
+    shellInner: shell.shellInner,
     rawCodeB64,
     rawMdB64,
     scrollBlockLinksB64,
@@ -798,5 +1008,6 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     mermaidScript,
     searchPlaceholder,
     shellSearchAttrs,
+    multiAngleScriptBlock: shell.multiAnglePayloadB64,
   });
 }

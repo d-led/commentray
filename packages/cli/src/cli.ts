@@ -6,7 +6,6 @@ import process from "node:process";
 import cliPackage from "../package.json" with { type: "json" };
 import {
   applyPathRenamesToCommentrayIndex,
-  commentrayMarkdownPath,
   convertCommentraySourceMarkersToLanguage,
   defaultMetadataIndexPath,
   GitScmProvider,
@@ -15,6 +14,7 @@ import {
   normalizeRepoRelativePath,
   parseGithubRepoWebUrl,
   readIndex,
+  resolveCommentrayMarkdownPath,
   runCommanderMain,
   type ValidationIssue,
   validateProject,
@@ -24,6 +24,7 @@ import { renderSideBySideHtml } from "@commentray/render";
 import { Command } from "commander";
 
 import { runInitConfig, runInitFull, runInitScm } from "./init.js";
+import { runMigrateAnglesFromCwd } from "./migrate-angles-cmd.js";
 import { findProjectRoot } from "./project-root.js";
 import { resolveRenderInputs, type RenderCliOptions } from "./render-inputs.js";
 
@@ -192,7 +193,7 @@ async function cmdMigrate(): Promise<number> {
 async function cmdRender(opts: RenderCliOptions & { mermaid: boolean }) {
   const repoRoot = await repoRootFromCwd();
   const cfg = await loadCommentrayConfig(repoRoot);
-  const inputs = resolveRenderInputs(cfg, opts);
+  const inputs = resolveRenderInputs(cfg, opts, repoRoot);
   const source = normalizeRepoRelativePath(inputs.source);
   const md = await fs.readFile(path.resolve(repoRoot, inputs.markdown), "utf8");
   const code = await fs.readFile(path.resolve(repoRoot, source), "utf8");
@@ -277,6 +278,21 @@ program
   });
 
 program
+  .command("migrate-angles")
+  .description(
+    "Convert flat .commentray/source companions (*.md beside path) to Angles layout (per-source folders + [angles])",
+  )
+  .option("--angle-id <id>", "Angle id for migrated files", "main")
+  .option("--dry-run", "Print planned moves without writing files", false)
+  .action(async (opts: { angleId?: string; dryRun?: boolean }) => {
+    process.exitCode = await runMigrateAnglesFromCwd({
+      angleId:
+        typeof opts.angleId === "string" && opts.angleId.trim() ? opts.angleId.trim() : "main",
+      dryRun: Boolean(opts.dryRun),
+    });
+  });
+
+program
   .command("sync-moved-paths")
   .description(
     "Rewrite index.json paths using Git rename detection between two tree-ish refs (default HEAD~1 → HEAD)",
@@ -313,8 +329,11 @@ program
   .argument("<file>", "Repo-relative source file path")
   .description("Print the commentray Markdown path for a source file")
   .action(async (file: string) => {
+    const repoRoot = await repoRootFromCwd();
+    const cfg = await loadCommentrayConfig(repoRoot);
     const normalized = normalizeRepoRelativePath(file);
-    console.log(commentrayMarkdownPath(normalized));
+    const resolved = resolveCommentrayMarkdownPath(repoRoot, normalized, cfg);
+    console.log(resolved.commentrayPath);
   });
 
 program

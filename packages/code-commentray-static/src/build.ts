@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CommentrayIndex } from "@commentray/core";
 import {
+  type CodeBrowserMultiAngleBrowsing,
   type CommentrayOutputUrlOptions,
   commentrayRenderVersion,
   renderCodeBrowserHtml,
@@ -59,6 +60,8 @@ export type BuildCommentrayStaticOptions = {
   documentedNavJsonUrl?: string;
   /** Base64 UTF-8 JSON of `documentedPairs` embedded on `#shell` for offline tree hydration. */
   documentedPairsEmbeddedB64?: string;
+  /** When set with two or more angles, renders an Angle switcher (GitHub Pages static hub). */
+  multiAngleBrowsing?: CodeBrowserMultiAngleBrowsing;
 };
 
 const staticPackageDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -85,7 +88,12 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
   const outPath = path.resolve(opts.outHtml);
 
   const code = await readFile(sourcePath, "utf8");
-  const commentrayMarkdown = await readFile(mdPath, "utf8");
+  const multi = opts.multiAngleBrowsing;
+  const commentrayMarkdown =
+    multi && multi.angles.length >= 2
+      ? ((multi.angles.find((a) => a.id === multi.defaultAngleId) ?? multi.angles[0])?.markdown ??
+        (await readFile(mdPath, "utf8")))
+      : await readFile(mdPath, "utf8");
   const ext = path.extname(sourcePath).slice(1) || "txt";
   const language = ext === "ts" ? "ts" : ext === "tsx" ? "tsx" : ext;
 
@@ -110,6 +118,7 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     commentrayOnGithubUrl: opts.commentrayOnGithubUrl,
     documentedNavJsonUrl: opts.documentedNavJsonUrl,
     documentedPairsEmbeddedB64: opts.documentedPairsEmbeddedB64,
+    multiAngleBrowsing: opts.multiAngleBrowsing,
   });
 
   await mkdir(path.dirname(outPath), { recursive: true });

@@ -1,6 +1,11 @@
 import path from "node:path";
 
-import { commentrayMarkdownPath, type ResolvedCommentrayConfig } from "@commentray/core";
+import {
+  commentrayMarkdownPath,
+  normalizeRepoRelativePath,
+  resolveCommentrayMarkdownPath,
+  type ResolvedCommentrayConfig,
+} from "@commentray/core";
 
 /** Raw `commentray render` flags as parsed by Commander; all three may be omitted. */
 export type RenderCliOptions = {
@@ -28,13 +33,19 @@ export const DEFAULT_RENDER_OUT = path.posix.join("_site", "index.html");
 export function resolveRenderInputs(
   cfg: ResolvedCommentrayConfig,
   opts: RenderCliOptions,
+  repoRoot?: string,
 ): ResolvedRenderInputs {
   const source = opts.source ?? cfg.staticSite.sourceFile;
   const staticSiteMarkdown = cfg.staticSite.commentrayMarkdownFile.trim();
   const useStaticSiteMarkdown = opts.source === undefined && staticSiteMarkdown.length > 0;
+  const normalizedSource = normalizeRepoRelativePath(source);
   const markdown =
     opts.markdown ??
-    (useStaticSiteMarkdown ? staticSiteMarkdown : commentrayMarkdownPath(source, cfg.storageDir));
+    (useStaticSiteMarkdown
+      ? staticSiteMarkdown
+      : repoRoot
+        ? resolveCommentrayMarkdownPath(repoRoot, normalizedSource, cfg).commentrayPath
+        : commentrayMarkdownPath(source, cfg.storageDir));
   const out = opts.out ?? DEFAULT_RENDER_OUT;
   return { source, markdown, out };
 }

@@ -33,7 +33,7 @@ async function setupRepoWithIndexedPair(opts: {
   return dir;
 }
 
-describe("buildCommentrayNavSearchDocument", () => {
+describe("buildCommentrayNavSearchDocument — index and fallback", () => {
   it("indexes paths and commentray lines from metadata, not primary source", async () => {
     const cr = ".commentray/source/src/a.ts.md";
     const dir = await setupRepoWithIndexedPair({
@@ -119,5 +119,54 @@ describe("buildCommentrayNavSearchDocument", () => {
           "https://github.com/acme/demo/blob/develop/.commentray/source/lib/x.ts.md",
       },
     ]);
+  });
+});
+
+describe("buildCommentrayNavSearchDocument — disk merge", () => {
+  it("merges disk-only companions with index pairs for search rows and documentedPairs", async () => {
+    const cr = ".commentray/source/src/a.ts.md";
+    const dir = await setupRepoWithIndexedPair({
+      sourcePath: "src/a.ts",
+      commentrayPath: cr,
+      commentrayBody: "# A\n",
+    });
+    await writeFile(
+      path.join(dir, ".commentray/source/README.md.md"),
+      "# Readme companion\n",
+      "utf8",
+    );
+
+    const doc = await buildCommentrayNavSearchDocument(dir, undefined, {
+      owner: "acme",
+      repo: "demo",
+      branch: "main",
+    });
+
+    expect(doc.documentedPairs).toEqual(
+      expect.arrayContaining([
+        {
+          sourcePath: "README.md",
+          commentrayPath: ".commentray/source/README.md.md",
+          sourceOnGithub: "https://github.com/acme/demo/blob/main/README.md",
+          commentrayOnGithub:
+            "https://github.com/acme/demo/blob/main/.commentray/source/README.md.md",
+        },
+        {
+          sourcePath: "src/a.ts",
+          commentrayPath: cr,
+          sourceOnGithub: "https://github.com/acme/demo/blob/main/src/a.ts",
+          commentrayOnGithub:
+            "https://github.com/acme/demo/blob/main/.commentray/source/src/a.ts.md",
+        },
+      ]),
+    );
+    expect(doc.documentedPairs).toHaveLength(2);
+    expect(doc.rows.some((r) => r.kind === "sourcePath" && r.sourcePath === "README.md")).toBe(
+      true,
+    );
+    const readmeLines = doc.rows.filter(
+      (r) => r.kind === "commentrayLine" && r.commentrayPath === ".commentray/source/README.md.md",
+    );
+    expect(readmeLines.map((r) => r.text)).toEqual(["# Readme companion", ""]);
   });
 });
