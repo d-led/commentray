@@ -11,6 +11,8 @@ export {
 } from "./build-commentray-nav-search.js";
 export type {
   BuildCommentrayNavSearchFallback,
+  BuildCommentrayNavSearchGithubBlobBase,
   CommentrayNavSearchDocument,
   CommentrayNavSearchRow,
+  DocumentedPairNav,
 } from "./build-commentray-nav-search.js";

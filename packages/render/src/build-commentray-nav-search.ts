@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { readIndex } from "@commentray/core";
+import { githubRepoBlobFileUrl, readIndex } from "@commentray/core";
 
 export const COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION = 1 as const;
 
@@ -17,9 +17,19 @@ export type CommentrayNavSearchRow =
       text: string;
     };
 
+/** One indexed source ↔ commentray pair with absolute GitHub blob links for static hub pages. */
+export type DocumentedPairNav = {
+  sourcePath: string;
+  commentrayPath: string;
+  sourceOnGithub: string;
+  commentrayOnGithub: string;
+};
+
 export type CommentrayNavSearchDocument = {
   schemaVersion: typeof COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION;
   rows: CommentrayNavSearchRow[];
+  /** Present when `githubBlobBase` was passed to the builder — drives the documented-files tree. */
+  documentedPairs?: DocumentedPairNav[];
 };
 
 export type BuildCommentrayNavSearchFallback = {
@@ -30,6 +40,35 @@ export type BuildCommentrayNavSearchFallback = {
   /** Absolute path to that Markdown file on disk. */
   markdownAbs: string;
 };
+
+export type BuildCommentrayNavSearchGithubBlobBase = {
+  owner: string;
+  repo: string;
+  branch: string;
+};
+
+function buildDocumentedPairs(
+  pairs: { sourcePath: string; commentrayPath: string }[],
+  gh: BuildCommentrayNavSearchGithubBlobBase,
+): DocumentedPairNav[] {
+  const { owner, repo, branch } = gh;
+  const uniq = new Map<string, DocumentedPairNav>();
+  for (const { sourcePath, commentrayPath } of pairs) {
+    const key = `${sourcePath}\0${commentrayPath}`;
+    if (uniq.has(key)) continue;
+    uniq.set(key, {
+      sourcePath,
+      commentrayPath,
+      sourceOnGithub: githubRepoBlobFileUrl(owner, repo, branch, sourcePath),
+      commentrayOnGithub: githubRepoBlobFileUrl(owner, repo, branch, commentrayPath),
+    });
+  }
+  return [...uniq.values()].sort((a, b) =>
+    a.sourcePath === b.sourcePath
+      ? a.commentrayPath.localeCompare(b.commentrayPath)
+      : a.sourcePath.localeCompare(b.sourcePath),
+  );
+}
 
 async function appendPairRowsSync(
   rows: CommentrayNavSearchRow[],
@@ -53,10 +92,14 @@ async function appendPairRowsSync(
 /**
  * Builds a JSON-serialisable search corpus: **filenames / paths** plus **commentray Markdown lines**
  * for each indexed pair. Primary source file contents are intentionally omitted.
+ *
+ * When `githubBlobBase` is set, `documentedPairs` lists every pair with GitHub **blob** URLs for
+ * the static hub tree and outbound links.
  */
 export async function buildCommentrayNavSearchDocument(
   repoRoot: string,
   fallback?: BuildCommentrayNavSearchFallback,
+  githubBlobBase?: BuildCommentrayNavSearchGithubBlobBase,
 ): Promise<CommentrayNavSearchDocument> {
   const rows: CommentrayNavSearchRow[] = [];
   const idx = await readIndex(repoRoot);
@@ -69,7 +112,18 @@ export async function buildCommentrayNavSearchDocument(
     for (const [crPath, entry] of fromIndex) {
       await appendPairRowsSync(rows, entry.sourcePath, crPath, path.join(repoRoot, crPath));
     }
-    return { schemaVersion: COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION, rows };
+    const pairInputs = fromIndex.map(([, e]) => ({
+      sourcePath: e.sourcePath,
+      commentrayPath: e.commentrayPath,
+    }));
+    const documentedPairs = githubBlobBase
+      ? buildDocumentedPairs(pairInputs, githubBlobBase)
+      : undefined;
+    return {
+      schemaVersion: COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION,
+      rows,
+      ...(documentedPairs ? { documentedPairs } : {}),
+    };
   }
 
   if (fallback !== undefined) {
@@ -81,5 +135,17 @@ export async function buildCommentrayNavSearchDocument(
     );
   }
 
-  return { schemaVersion: COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION, rows };
+  const documentedPairs =
+    githubBlobBase && fallback !== undefined
+      ? buildDocumentedPairs(
+          [{ sourcePath: fallback.sourcePath, commentrayPath: fallback.commentrayPath }],
+          githubBlobBase,
+        )
+      : undefined;
+
+  return {
+    schemaVersion: COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION,
+    rows,
+    ...(documentedPairs ? { documentedPairs } : {}),
+  };
 }

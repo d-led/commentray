@@ -1,6 +1,6 @@
 # Commentray monorepo — implementation plan
 
-This document is the canonical engineering plan for the Commentray ecosystem. It is intentionally detailed: it captures product intent, storage conventions, package boundaries, testing tiers, CI posture, and security/publishing expectations.
+This document is the engineering plan for the Commentray ecosystem: product intent, component boundaries, backlog, and CI/testing posture. **Authoritative package names, scripts, and defaults** live in the repo tree and [`README.md`](../../README.md); see §Documentation hierarchy.
 
 ## Product metaphor (README opening)
 
@@ -10,11 +10,17 @@ Commentray applies that metaphor to software and texts: the **primary artifact s
 
 The user-facing README should remain **terse and skimmable**, in the spirit of [chumak’s README](https://raw.githubusercontent.com/zeromq/chumak/refs/heads/master/README.md).
 
+## Documentation hierarchy (avoid duplication)
+
+- **Canonical truth** lives in the **source tree** (`packages/`, `scripts/`, `.github/workflows/`, root `package.json`, extension `package.json`, `.commentray.toml`) and in **normative specs** under [`docs/spec/`](../spec/) plus [`README.md`](../../README.md) and [`CONTRIBUTING.md`](../../CONTRIBUTING.md). When facts disagree, fix those places—not a narrative file.
+- **This plan** carries **intent**, boundaries, backlog, and high-level CI/testing posture. It should **link** to README, specs, and workflows instead of growing a second package inventory, command cheat sheet, or full default-config dump.
+- **Commentray** under [`.commentray/source/`](../../.commentray/source/) is **optional narrative** beside a primary file: rationale, mental models, pointers. It must **not** restate authoritative lists (workspaces, CI matrix, every `npm run`). Prefer one sentence plus a link to the file on the left or to specs.
+
 ## Goals (v0)
 
 - **Out-of-file docs** under `.commentray/` with transparent paths: `.commentray/source/<repo-relative-path>.md` (append `.md` to the original path; normalize separators; reject `..`).
-- **Angles** (named perspectives): optional `[angles]` in `.commentray.toml` (`default_angle`, `[[angles.definitions]]`); on disk, multi-angle layout when `{storage}/source/.default` exists → per-source `source/{P}/{angleId}.md` (see `docs/spec/storage.md`). Static viewer and editor should expose an Angle switcher; core exposes path helpers and config merge validation today.
-- **Block model**: commentray segments align to code ranges; UI layout is **code left, commentray right** with **scroll sync** while editing and viewing; on the web, optional **block stretch rows** (`rowspan` commentary beside anchored source lines) keep the two columns vertically aligned like paired gutter rows, not attribution metadata.
+- **Angles** (named perspectives): optional `[angles]` in `.commentray.toml` (`default_angle`, `[[angles.definitions]]`); on disk, multi-angle layout when `{storage}/source/.default` exists → per-source `source/{P}/{angleId}.md` (see [`docs/spec/storage.md`](../spec/storage.md)). **Shipped:** `@commentray/core` path resolution + TOML validation; **VS Code** — **Commentray: Add angle to project (updates .commentray.toml)** (`commentray.addAngleDefinition`) enables layout and registers an angle in TOML; **Commentray: Open commentray beside source (pick angle)** (`commentray.openCommentrayAngle`) opens `source/{P}/{angle}.md` (command titles in [`packages/vscode/package.json`](../../packages/vscode/package.json)). **`@commentray/render` / static HTML:** no Angle switcher and no multi-angle bundle; `[static_site].commentray_markdown` is a single file path until the static viewer ships a switcher.
+- **Block model**: commentray segments align to code ranges; UI layout is **code left, commentray right** with **scroll sync** while editing and viewing; on the web, optional **block stretch layout** uses a two-column table with **one paired row per block** (blame-style row height; no `rowspan`) so code and commentary stay vertically aligned; when stretch is off or blocks are missing, **block-aware scroll sync** still uses index + `<!-- commentray:block id=… -->` markers in the Markdown pane.
 - **Anchoring & drift**: metadata records evidence (symbol names when available, line ranges, Git blob SHA, commits, timestamps). **Git is the default SCM** behind a pluggable `ScmProvider` interface (`git` CLI first).
 - **Staleness**: non-blocking diagnostics for humans and automation (including LLM agents).
 - **IDE**: default integration is **VS Code** (extension MVP ships in this repo).
@@ -61,9 +67,20 @@ docs/
   plan/plan.md
   spec/
 .github/workflows/
+  binaries.yml
   ci.yml
   ci-expensive.yml
+  e2e.yml
   pages.yml
+.gitlab-ci.yml
+cypress/
+  e2e/
+  support/
+vitest.config.ts
+vitest.integration.config.ts
+vitest.expensive.config.ts
+vitest.coverage.config.ts
+vitest.shared.ts
 ```
 
 ## Data flow (high level)
@@ -93,45 +110,20 @@ flowchart LR
 
 ## Dogfood commentray
 
-This repository keeps **terse** commentray beside selected sources under [`.commentray/source/`](../../.commentray/source/) (path = repo-relative primary + `.md`, e.g. this file → [`plan.md.md`](../../.commentray/source/docs/plan/plan.md.md)). Those notes are for contributors skimming the tree in an editor or on GitHub; they intentionally overlap only lightly with this plan and link out to specs and workflows.
+This repository keeps **terse** commentray beside selected sources under [`.commentray/source/`](../../.commentray/source/) (path = repo-relative primary + `.md`, e.g. this file → [`plan.md.md`](../../.commentray/source/docs/plan/plan.md.md)). Per §Documentation hierarchy, those files add **narrative only**—they do not replace [`README.md`](../../README.md), specs, or workflow YAML; they link out instead of copying inventories.
 
-## Packages
+## Packages and configuration
 
-| Package                              | Responsibility                                                                                                                    |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `@commentray/core`                   | Types, JSON validation, migrations, Git SCM adapter, anchor parsing, staleness                                                    |
-| `@commentray/render`                 | remark/rehype pipeline, sanitize, highlight, Mermaid, HTML shells (incl. interactive static browser)                              |
-| `@commentray/code-commentray-static` | Sample static site generator: one HTML file, resizable panes, code wrap toggle (sources under `packages/code-commentray-static/`) |
-| `@commentray/cli`                    | CLI commands and CI-friendly exit codes                                                                                           |
-| `commentray-vscode`                  | Editor UX: paired panes, scroll sync prototype, workspace validation output channel                                               |
-
-## Configuration (`.commentray.toml`)
-
-Defaults (illustrative):
-
-- `storage.dir = ".commentray"`
-- `scm.provider = "git"`
-- `render.mermaid = true`
-- `render.syntaxTheme = "github-dark"`
-- `anchors.defaultStrategy = ["symbol", "lines"]`
-- **`[angles]`** (optional): `default_angle`, `[[angles.definitions]]` with `id` / `title` for UI; ids validated; duplicate ids and default not in definitions are errors when definitions is non-empty.
-- **`[static_site]`** (optional): drives the GitHub Pages build (`npm run pages:build` → `_site/index.html`):
-  - `title` — browser / toolbar title for the static code browser page
-  - `intro` — Markdown prepended in the commentray pane (before the GitHub link and optional file body)
-  - `github_url` — URL for a “View repository on GitHub” link
-  - `source_file` — repo-relative path whose contents fill the **code** pane (default `README.md`)
-  - `commentray_markdown` — optional repo-relative path to extra Markdown appended in the commentray pane
-  - `github_blob_branch` — branch segment for toolbar “Also on GitHub” blob links (default `main`)
-  - `[[static_site.related_github_files]]` — optional `path` / `label` rows; toolbar links to other repo files on GitHub (single-page deploy cannot serve arbitrary siblings on Pages)
-
-Implementation note: configuration parsing uses `@iarna/toml` today; dependency choices should be revisited periodically for maintenance and security posture.
+- **Packages / workspaces** — See [`README.md` → What’s in this repo](../../README.md#whats-in-this-repo) and root [`package.json`](../../package.json) `workspaces`. Implementation lives under `packages/*/`.
+- **`.commentray.toml`** — Key semantics, Angles, and `[static_site]` fields are specified in [`docs/spec/storage.md`](../spec/storage.md) (and related specs). Defaults and comments live in the repo’s [`.commentray.toml`](../../.commentray.toml); parsing and merge rules in [`packages/core/src/config.ts`](../../packages/core/src/config.ts). Dependency: `@iarna/toml` (revisit periodically for maintenance and security).
 
 ## Static code browser (`@commentray/code-commentray-static`)
 
 - **Purpose**: dogfood and demo a file-plus-commentray reading experience without a server.
 - **Implementation**: `renderCodeBrowserHtml` lives in `@commentray/render`; `@commentray/code-commentray-static` wires fixtures + CLI (`npm run site -w @commentray/code-commentray-static`) and writes to `packages/code-commentray-static/site/` (gitignored).
 - **GitHub Pages**: root script `npm run pages:build` reads `.commentray.toml` `[static_site]`, composes commentray content (intro + GitHub link + optional file), and emits `_site/index.html` via `scripts/build-static-pages.mjs`. Workflow `.github/workflows/pages.yml` runs on `main` + `workflow_dispatch` using `actions/upload-pages-artifact` + `actions/deploy-pages` (repository **Settings → Pages → Build: GitHub Actions**).
-- **UX**: movable vertical bar (mouse drag), “Wrap code lines” checkbox, proportional **code ↔ commentray scroll sync** on the static page, Highlight.js themes via CDN, Markdown + Mermaid (optional); `<meta name="generator">` records `@commentray/render` + `@commentray/code-commentray-static` versions (override via `buildCommentrayStatic({ generatorLabel })`).
+- **UX**: movable vertical bar (mouse drag), “Wrap code lines” checkbox, **scroll sync**: when `pages:build` finds `index.json` blocks for the configured `(source_file, commentray_markdown)` pair and Markdown has matching `<!-- commentray:block id=… -->` markers, the page can use **block stretch** (single-scroll blame-style table) plus index-backed block scroll links; otherwise panes use **proportional** sync. Highlight.js themes via CDN, Markdown + Mermaid (optional); `<meta name="generator">` records `@commentray/render` + `@commentray/code-commentray-static` versions (override via `buildCommentrayStatic({ generatorLabel })`).
+- **Code pane line numbers:** Each **logical** source line is one `.code-line` row: a grid with `.ln` (the number) and a per-line highlighted `<pre><code>` from Highlight.js. **Done (v0):** wrapped rows use **`align-items: start`** (not `baseline`) in [`packages/render/src/code-browser.ts`](../../packages/render/src/code-browser.ts) so numbers stay top-aligned with each row. **Model limit:** one number per **logical** line, not per wrapped visual sub-line; a per-screen-line gutter would need a different layout.
 - **Quick search**: client-side whole-source ordered tokens plus per-line fuzzy ranking (bundled client); **Escape** clears search; see `packages/render` implementation.
 
 ## Markdown rendering stack
@@ -157,9 +149,14 @@ Every recurring workflow exists as:
 
 ## GitHub Actions
 
-- `ci.yml`: `npm ci`, optional `npm audit` (informational), `bash scripts/quality-gate.sh`, `npm run test:integration`.
-- `ci-expensive.yml`: `workflow_dispatch` and PR label `run-expensive-ci`, runs `npm run test:expensive`.
-- `pages.yml`: `npm run pages:build` then deploy `_site/` to **GitHub Pages** (on `main` and manual dispatch).
+- `ci.yml` (push + PR): `npm ci`, optional `npm audit` (informational), `bash scripts/quality-gate.sh`, `npm run test:integration`. Matrix: Node **20.x** and **22.x**.
+- `ci-expensive.yml`: manual **`workflow_dispatch`** or PR labeled **`run-expensive-ci`** → `npm run build` then `npm run test:expensive`.
+- `pages.yml`: `npm run pages:build` then deploy `_site/` to **GitHub Pages** (push to `main` or **`workflow_dispatch`**). Repo **Settings → Pages → Build: GitHub Actions**. Includes a step to delete stale `github-pages` artifacts when re-runs collide with `deploy-pages`.
+- `binaries.yml`: **`workflow_dispatch`** or push of tag **`v*`** → builds Node **SEA** CLI artifacts per OS/arch; workflow artifacts use short retention; **Release** assets on tags are the durable download surface (see README).
+
+**Browser E2E (Cypress):** **not** part of `ci.yml`. Run locally with **`npm run e2e`** (requires Chrome; see README). **`e2e.yml`** runs after a successful **`ci`** workflow (see [`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml)): `cypress/included`, JUnit under `test-results/`, artifacts, and optional Checks reporting—so quick CI stays Node-only while browser coverage still gates merges.
+
+**Local “full” CI (no e2e):** `npm run ci:full` → `scripts/ci-full.sh` runs `quality-gate.sh`, then integration tests, then expensive tests—handy before a large merge; still does not run Cypress.
 
 Maintainers can tighten expensive jobs later using GitHub Environments and required reviewers.
 
@@ -175,13 +172,13 @@ Root `LICENSE` is MPL-2.0 (Mozilla template). Each publishable package includes 
 
 1. **Language intelligence**: expand beyond minimal anchors using tree-sitter and/or LSP-backed resolvers.
 2. **VS Code**: evolve toward webview preview parity with `@commentray/render` output and richer block gutter UX.
-3. **Angles rollout**: static code browser (`build-static-pages.mjs`, client bundle) loads multiple Angle bodies and adds a switcher; VS Code opens/picks the correct `source/{P}/{angle}.md`; `index.json` / scroll-sync may key blocks by `(sourcePath, angleId)` in a forward-compatible migration.
+3. **Angles rollout (remaining)**: static code browser (`build-static-pages.mjs`, client bundle) should load multiple Angle bodies and add a switcher; VS Code already opens the correct `source/{P}/{angle}.md` when Angles layout is on. **Tooling:** add a **flat → Angles** migrator (move/rename Markdown, rewrite `index.json` keys, optional TOML)—today manual only. **Search:** extend Pages nav JSON (and any hub UI) so all angle files for the visible `source_file` are included—today requires **non-empty index** listing each `commentrayPath`, or new on-disk discovery. Forward-looking: `index.json` / scroll-sync keyed by `(sourcePath, angleId)` if metadata needs first-class support beyond separate files.
 
 ## Documentation roadmap (pending)
 
 The plan doc, the specs under `docs/spec/`, and README/CONTRIBUTING cover engineering. Two user-facing pieces are still missing and are tracked here:
 
-1. **User docs — terse but usable**: a `docs/user/` tree, each page short and runnable-command-first, in the spirit of the README.
+1. **User docs — terse but usable**: a `docs/user/` tree, each page short and runnable-command-first, in the spirit of the README. **Started:** [`docs/user/keeping-blocks-in-sync.md`](../user/keeping-blocks-in-sync.md) (index, markers, anchors—operational contract).
    - `docs/user/install.md` — install a release binary (macOS quarantine note), or `npm i -g @commentray/cli`, or build from source.
    - `docs/user/quickstart.md` — `commentray init`, write first `.commentray/source/<file>.md`, run `commentray validate`, open pairing in the editor.
    - `docs/user/cli.md` — condensed reference for `init`, `init config`, `init scm`, `validate`, `doctor`, `migrate`, `render`, `paths`; exit codes; env vars (`COMMENTRAY_EDITOR`, `COMMENTRAY_SEA_NODE`).
@@ -201,6 +198,68 @@ Both pieces are documentation-only and can land incrementally (install + quickst
 
 ## Implementation status (living)
 
-This repository contains an initial vertical slice: monorepo scaffolding, core library, renderer, static code browser sample (`@commentray/code-commentray-static`), CLI, VS Code MVP, tiered Vitest configs, and baseline GitHub Actions.
+**In place today:** monorepo scaffolding; `@commentray/core` (paths, index schema, migrations, Git SCM, anchors, staleness, scroll/block helpers, Angles resolution); `@commentray/render` (sanitize, highlight, Mermaid, static code browser HTML + client search/sync, line-gutter alignment fix for wrapped rows); `@commentray/code-commentray-static`; `@commentray/cli` (init family, validate, doctor, migrate, render, paths, SEA binaries workflow); `commentray-vscode` (paired panes, block-from-selection, validation channel, block-aware scroll when index + markers agree, Angles commands); tiered Vitest; `quality-gate.sh` on every push/PR; optional expensive CI; GitHub Pages via `pages.yml`; **Cypress on GitHub** — [`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml) runs after a successful [`ci.yml`](../../.github/workflows/ci.yml) `ci` workflow (`pages:build` + Cypress in `cypress/included`); locally **`npm run e2e`** / **`npm run cy`** (see README). **GitLab** still runs `npm run e2e` in [`.gitlab-ci.yml`](../../.gitlab-ci.yml) for teams using that mirror.
 
-Next steps are intentionally incremental: expand metadata richness, improve anchor resolution plugins, tighten editor diagnostics, and add more integration coverage as real repositories adopt Commentray.
+**Gaps and follow-ups (engineering, not duplicate of Open technical choices):**
+
+| Area                                | Gap                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dogfood `index.json`**            | This repo’s `.commentray/metadata/index.json` is intentionally minimal (`byCommentrayPath` empty). The live Pages build only enables **block stretch** when the static pair (`source_file`, `commentray_markdown`) has matching `index.json` blocks—today the site relies on **proportional** scroll sync. Populating the index for the README pair would dogfood stretch + index-backed sync on the public demo without changing product code.                                                                      |
+| **Static site + Angles**            | [Pages](https://d-led.github.io/commentray/) ships one HTML file: one `commentray_markdown` body, **no** in-page Angle switcher (see Goals).                                                                                                                                                                                                                                                                                                                                                                         |
+| **Dogfood Angles**                  | This repo has **no** `source/.default` and no per-source angle folders—nothing exercises multi-angle layout or the VS Code picker against real content in-tree.                                                                                                                                                                                                                                                                                                                                                      |
+| **Flat → Angles migration tooling** | **None.** `commentray migrate` is **index JSON schema** only (`packages/core/src/migrate.ts`), not filesystem layout. Flat → `source/{P}/{angle}.md` + index key updates are manual per [`docs/spec/storage.md`](../spec/storage.md) **Migration**. A future **`commentray migrate angles`** (or similar) would automate move + optional default angle id + `index.json` key rewrites.                                                                                                                               |
+| **Hub search and Angles on Pages**  | `buildCommentrayNavSearchDocument` indexes **all** `byCommentrayPath` entries (multiple `commentrayPath` values for one `sourcePath` is fine). **Gap:** if `index.json` is empty, `build-static-pages.mjs` only passes the **`[static_site]`** fallback pair—**no** scan of per-angle paths under `.commentray/source/<primary>/`—so extra angle Markdown files on disk are **not** in `commentray-nav-search.json` until indexed or the builder learns discovery. Pair with static Angle switcher when implemented. |
+| **User docs**                       | Most of `docs/user/` from the Documentation roadmap is still missing; only `keeping-blocks-in-sync.md` exists.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Detection matrix**                | `docs/user/detection.md` not written; content is outlined in this plan under Documentation roadmap.                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Validate scope**                  | Pre-commit / `validate` still scan the full repo (staged-only hook scope remains a later optimization).                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Local static preview + reload**   | No **`commentray serve`** (or equivalent root script) that rebuilds **`pages:build`** on file change and reloads the browser. Today: **`npm run pages:build`**, then **`npm run e2e:server`** (`serve -s _site`, no auto-rebuild). Optional follow-up: watch `.commentray/` + `[static_site]` inputs + `packages/render` and rerun build; pair with **browser-sync** or Vite middleware if we want livereload without pulling a heavy dev server into the default install.                                           |
+
+## Next session (handoff)
+
+Use this section to resume work without re-deriving context.
+
+### Read first (~15 minutes)
+
+1. **This doc** — §Goals, §Implementation status, §Gaps, §Open technical choices.
+2. **Normative contracts** — [`docs/spec/storage.md`](../spec/storage.md), [`anchors.md`](../spec/anchors.md), [`blocks.md`](../spec/blocks.md).
+3. **Contributor flow** — [`CONTRIBUTING.md`](../../CONTRIBUTING.md) (quality gate, scripts policy).
+4. **Product voice beside code** — [`.commentray/source/README.md.md`](../../.commentray/source/README.md.md) (skim; overlaps lightly with the plan on purpose).
+
+### Commands (repo root)
+
+| Intent                                                           | Command                                                                                |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Same checks as GitHub `ci.yml` test lane (unit gate)             | `bash scripts/quality-gate.sh` or `npm run quality:gate`                               |
+| Unit tests only (after core/render build)                        | `COMMENTRAY_TEST_MODE=unit bash scripts/test.sh`                                       |
+| Integration tests                                                | `npm run test:integration`                                                             |
+| Expensive tests                                                  | `npm run test:expensive` (or trigger `ci-expensive.yml` / PR label `run-expensive-ci`) |
+| Quality gate + integration + expensive (no Cypress)              | `npm run ci:full`                                                                      |
+| Regenerate GitHub Pages artifact locally                         | `npm run pages:build` → `_site/index.html`                                             |
+| Serve `_site` only (static, no rebuild; use after `pages:build`) | `npm run e2e:server` (port **4173**)                                                   |
+| Static browser E2E (Chrome installed)                            | `npm run e2e` or `npm run e2e:ci`                                                      |
+| Full workspace TypeScript build                                  | `npm run build`                                                                        |
+
+### Suggested backlog order (pick up tomorrow)
+
+Order balances **user-visible docs**, **low-risk dogfood**, and **larger product slices**. Reorder if a release or incident dictates.
+
+1. **User docs (unblocks README links)** — Add `docs/user/install.md` and `docs/user/quickstart.md` per §Documentation roadmap; then add README links when those files exist.
+2. **Detection matrix** — Add `docs/user/detection.md` (lift the outline from §Documentation roadmap item 2); optionally shorten that outline here once the dedicated page is canonical.
+3. **Remaining user docs** — `docs/user/cli.md`, `docs/user/config.md`, `docs/user/troubleshooting.md` as short pages; keep each one screen where possible.
+4. **Dogfood `index.json` (optional, fast)** — Add at least one coherent **block** entry for the Pages pair (`README.md` ↔ `.commentray/source/README.md.md`) so **block stretch** and index-backed scroll run on the public site; validates `build-static-pages.mjs` wiring under real content.
+5. **Validate hook scope** — Design + implement staged-files-only (or similar) for `commentray validate` from pre-commit when the team wants faster commits on huge trees.
+6. **Angles on static** — Switcher + multi-body load in `build-static-pages.mjs` / client bundle (§Open technical choices item 3); **dogfood** this repo with `source/.default` + at least two angle files for one primary (e.g. README) once migration exists or paths are hand-migrated.
+7. **Angles migration + search** — CLI (or scripted) flat→angles migration; Pages `commentray-nav-search.json` includes every indexed angle and/or discovers `source/{P}/*.md` when index is empty.
+8. **Editor / language depth** — Webview parity with `@commentray/render`; tree-sitter or LSP-backed resolvers (items 1–2 under §Open technical choices).
+9. **Local static dev loop** — `commentray serve` (or `npm run pages:dev`): watch inputs, rerun `pages:build`, optional livereload for `_site` (see gaps table **Local static preview + reload**).
+
+### Parking lot (not scheduled in the list above)
+
+- Metadata richness beyond v0 fields; richer gutter diagnostics in VS Code.
+- More integration fixtures as external repos adopt Commentray.
+- npm publish automation (OIDC + provenance) if policy changes from manual 2FA publishes.
+- Tuning **`e2e.yml`** path filters or required checks if we want stricter merge gating (browser job is already wired).
+
+---
+
+Incremental work continues after the backlog items: anchor plugins, editor diagnostics, and integration coverage grow with adoption.

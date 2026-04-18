@@ -78,6 +78,26 @@ export type CodeBrowserPageOptions = {
   staticSearchScope?: "full" | "commentray-and-paths";
   /** Repo-relative companion Markdown path; used with `staticSearchScope: "commentray-and-paths"` for path labels. */
   commentrayPathForSearch?: string;
+  /**
+   * GitHub **blob** URL for the primary `filePath` (static hub). Shown in the toolbar when set
+   * (`http`/`https` only).
+   */
+  sourceOnGithubUrl?: string;
+  /**
+   * GitHub **blob** URL for the companion commentray Markdown (same constraints as `sourceOnGithubUrl`).
+   */
+  commentrayOnGithubUrl?: string;
+  /**
+   * Relative URL to a nav JSON document (e.g. `./commentray-nav-search.json`) that includes
+   * `documentedPairs` — enables the **Documented files** tree in the toolbar.
+   */
+  documentedNavJsonUrl?: string;
+  /**
+   * Base64 UTF-8 JSON array of documented pairs (same shape as `documentedPairs` in the nav JSON).
+   * When set on `#shell`, the tree loads **without** fetching `documentedNavJsonUrl` — works offline
+   * and with `file://` where `fetch` to a sidecar JSON is unavailable.
+   */
+  documentedPairsEmbeddedB64?: string;
 };
 
 function renderGeneratorMetaHtml(label: string | undefined): string {
@@ -212,6 +232,49 @@ function renderRelatedGithubNavHtml(links: { label: string; href: string }[]): s
   );
 }
 
+function renderToolbarDocHubHtml(opts: {
+  sourceOnGithubUrl?: string;
+  commentrayOnGithubUrl?: string;
+  documentedNavJsonUrl?: string;
+  documentedPairsEmbeddedB64?: string;
+}): { toolbarDocHubHtml: string; documentedPanelHtml: string } {
+  const parts: string[] = [];
+  const src = safeExternalHttpUrl(opts.sourceOnGithubUrl);
+  const cr = safeExternalHttpUrl(opts.commentrayOnGithubUrl);
+  const nav = opts.documentedNavJsonUrl?.trim();
+  const hasEmbed = (opts.documentedPairsEmbeddedB64?.trim() ?? "").length > 0;
+  const showDocumentedTree = Boolean(nav) || hasEmbed;
+  if (src) {
+    parts.push(
+      `<a class="toolbar-blob-link" href="${escapeHtml(src)}" target="_blank" rel="noopener noreferrer">Source on GitHub</a>`,
+    );
+  }
+  if (cr) {
+    parts.push(
+      `<a class="toolbar-blob-link" href="${escapeHtml(cr)}" target="_blank" rel="noopener noreferrer">Commentray on GitHub</a>`,
+    );
+  }
+  if (showDocumentedTree) {
+    const navAttr = nav ? escapeHtml(nav) : "";
+    parts.push(
+      `<button type="button" class="toolbar-tree-toggle" id="documented-files-toggle" aria-expanded="false" aria-controls="documented-files-panel" data-nav-json-url="${navAttr}">Documented files</button>`,
+    );
+  }
+  const toolbarDocHubHtml =
+    parts.length > 0
+      ? `<div class="toolbar-doc-hub">${parts.join('<span class="toolbar-doc-hub__sep" aria-hidden="true"> · </span>')}</div>`
+      : "";
+  const documentedPanelHtml = showDocumentedTree
+    ? `<div id="documented-files-panel" class="documented-files-panel" hidden>
+        <div class="documented-files-panel__inner">
+          <p class="documented-files-panel__hint">Indexed source ↔ commentray pairs (embedded for offline when available). Links open on GitHub.</p>
+          <div id="documented-files-tree" class="documented-files-tree" role="tree"></div>
+        </div>
+      </div>`
+    : "";
+  return { toolbarDocHubHtml, documentedPanelHtml };
+}
+
 /** IIFE produced by `npm run build -w @commentray/render` (esbuild of `code-browser-client.ts`). */
 function loadCodeBrowserClientBundle(): string {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -287,6 +350,38 @@ const CODE_BROWSER_STYLES = `
         word-break: break-word;
       }
       .toolbar-related__sep { opacity: 0.55; user-select: none; }
+      .toolbar-doc-hub {
+        display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+        font-size: 12px; line-height: 1.35;
+        color: color-mix(in oklab, CanvasText 88%, Canvas);
+      }
+      .toolbar-doc-hub__sep { opacity: 0.45; user-select: none; }
+      .toolbar-blob-link {
+        color: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 2px;
+        white-space: nowrap;
+      }
+      .toolbar-tree-toggle {
+        font: inherit; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; cursor: pointer;
+        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+        background: color-mix(in oklab, CanvasText 6%, Canvas); color: CanvasText;
+      }
+      .toolbar-tree-toggle:hover { background: color-mix(in oklab, CanvasText 11%, Canvas); }
+      .documented-files-panel {
+        flex: 0 0 auto; max-height: min(42vh, 360px); overflow: auto;
+        border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+        background: color-mix(in oklab, CanvasText 4%, Canvas);
+      }
+      .documented-files-panel__inner { padding: 10px 14px 14px; font-size: 13px; }
+      .documented-files-panel__hint { margin: 0 0 10px; opacity: 0.82; line-height: 1.4; }
+      .documented-files-panel__code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 12px; }
+      .documented-files-tree ul { list-style: none; margin: 0; padding-left: 14px; }
+      .documented-files-tree > ul { padding-left: 0; }
+      .documented-files-tree li { margin: 2px 0; line-height: 1.4; }
+      .documented-files-tree .tree-dir { font-weight: 600; margin-top: 6px; }
+      .documented-files-tree .tree-file { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin: 4px 0; }
+      .documented-files-tree .tree-file-name { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 12px; }
+      .documented-files-tree .tree-file-links { display: inline-flex; flex-wrap: wrap; gap: 6px 10px; font-size: 11px; }
+      .documented-files-tree .tree-file-links a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
       .toolbar .search-field {
         display: inline-flex; align-items: center; gap: 6px; flex: 1 1 220px; min-width: 160px;
       }
@@ -443,7 +538,7 @@ const CODE_BROWSER_STYLES = `
         display: grid;
         grid-template-columns: max-content 1fr;
         column-gap: 12px;
-        align-items: baseline;
+        align-items: start;
       }
       .block-stretch .code-line pre { margin: 0; min-width: 0; padding: 0; border: 0; background: transparent; }
       .block-stretch .code-line pre code.hljs {
@@ -484,6 +579,8 @@ type CodeBrowserPageParts = {
   title: string;
   generatorMetaHtml: string;
   filePathHtml: string;
+  toolbarDocHubHtml: string;
+  documentedPanelHtml: string;
   relatedNavHtml: string;
   toolbarEndHtml: string;
   /** `dual`: resizable panes; `stretch`: rowspan table aligned to index blocks. */
@@ -493,6 +590,8 @@ type CodeBrowserPageParts = {
   rawMdB64: string;
   /** Base64 JSON of `BlockScrollLink[]` when dual pane uses index-backed scroll sync; empty otherwise. */
   scrollBlockLinksB64: string;
+  /** When non-empty, ` data-documented-pairs-b64="…"` on `#shell` for offline tree hydration. */
+  shellDocumentedPairsAttr: string;
   hljs: string;
   hljsDark: string;
   mermaidScript: string;
@@ -501,35 +600,18 @@ type CodeBrowserPageParts = {
 };
 
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
-  const {
-    title,
-    generatorMetaHtml,
-    filePathHtml,
-    relatedNavHtml,
-    toolbarEndHtml,
-    layout,
-    shellInner,
-    rawCodeB64,
-    rawMdB64,
-    scrollBlockLinksB64,
-    hljs,
-    hljsDark,
-    mermaidScript,
-    searchPlaceholder,
-    shellSearchAttrs,
-  } = p;
-  const shellClass = layout === "stretch" ? "shell shell--stretch-rows" : "shell";
+  const shellClass = p.layout === "stretch" ? "shell shell--stretch-rows" : "shell";
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    ${generatorMetaHtml}<title>${escapeHtml(title)}</title>
+    ${p.generatorMetaHtml}<title>${escapeHtml(p.title)}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/${escapeHtml(
-      hljs,
+      p.hljs,
     )}.min.css" media="(prefers-color-scheme: light)" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/${escapeHtml(
-      hljsDark,
+      p.hljsDark,
     )}.min.css" media="(prefers-color-scheme: dark)" />
     <style>
 ${CODE_BROWSER_STYLES}
@@ -539,26 +621,28 @@ ${CODE_BROWSER_STYLES}
     <div class="app">
       <header class="toolbar" aria-label="View options">
         <div class="toolbar__main">
-          ${filePathHtml}
+          ${p.filePathHtml}
+          ${p.toolbarDocHubHtml}
           <span class="search-field">
             <label for="search-q">Search</label>
-            <input type="search" id="search-q" placeholder="${escapeHtml(searchPlaceholder)}" autocomplete="off" spellcheck="false" />
+            <input type="search" id="search-q" placeholder="${escapeHtml(p.searchPlaceholder)}" autocomplete="off" spellcheck="false" />
             <button type="button" id="search-clear" title="Clear search">Clear</button>
           </span>
-          ${relatedNavHtml}
+          ${p.relatedNavHtml}
           <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
         </div>
-        ${toolbarEndHtml}
+        ${p.toolbarEndHtml}
       </header>
+      ${p.documentedPanelHtml}
       <div class="search-results" id="search-results" hidden aria-live="polite"></div>
-      <div class="${shellClass}" id="shell" data-layout="${layout}" data-raw-code-b64="${escapeHtml(rawCodeB64)}" data-raw-md-b64="${escapeHtml(rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(scrollBlockLinksB64)}"${shellSearchAttrs}>
-${shellInner}
+      <div class="${shellClass}" id="shell" data-layout="${p.layout}" data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}>
+${p.shellInner}
       </div>
     </div>
     <script>
 ${loadCodeBrowserClientBundle()}
     </script>
-    ${mermaidScript}
+    ${p.mermaidScript}
   </body>
 </html>`;
 }
@@ -638,6 +722,39 @@ async function buildCodeBrowserShell(
   return { layout, shellInner, scrollBlockLinksB64 };
 }
 
+function mermaidRuntimeScriptHtml(include: boolean | undefined): string {
+  if (!include) return "";
+  return `<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+mermaid.initialize({ startOnLoad: true, securityLevel: "strict" });
+mermaid.run({ querySelector: ".mermaid" });
+</script>`;
+}
+
+function searchChromeFromOptions(opts: CodeBrowserPageOptions): {
+  searchPlaceholder: string;
+  shellSearchAttrs: string;
+} {
+  if (opts.staticSearchScope === "commentray-and-paths") {
+    return {
+      searchPlaceholder: "Commentray + file paths (ordered tokens + fuzzy lines)…",
+      shellSearchAttrs: ` data-search-scope="commentray-and-paths" data-search-file-path="${escapeHtml(
+        opts.filePath ?? "",
+      )}" data-search-commentray-path="${escapeHtml((opts.commentrayPathForSearch ?? "").trim())}"`,
+    };
+  }
+  return {
+    searchPlaceholder: "Whole source (ordered tokens + fuzzy lines)…",
+    shellSearchAttrs: "",
+  };
+}
+
+function shellDocumentedPairsAttrFromOptions(opts: CodeBrowserPageOptions): string {
+  const emb = opts.documentedPairsEmbeddedB64?.trim() ?? "";
+  if (emb.length === 0) return "";
+  return ` data-documented-pairs-b64="${escapeHtml(emb)}"`;
+}
+
 /**
  * Static HTML shell for a minimal “code browser”: code + rendered commentray,
  * draggable vertical splitter, togglable line wrap for the code pane, and
@@ -653,35 +770,29 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const hljs = opts.hljsTheme ?? "github";
   const hljsDark = opts.hljsTheme?.includes("dark") ? opts.hljsTheme : "github-dark";
 
-  const mermaidScript = opts.includeMermaidRuntime
-    ? `<script type="module">
-import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-mermaid.initialize({ startOnLoad: true, securityLevel: "strict" });
-mermaid.run({ querySelector: ".mermaid" });
-</script>`
-    : "";
+  const mermaidScript = mermaidRuntimeScriptHtml(opts.includeMermaidRuntime);
 
   const relatedNavHtml = renderRelatedGithubNavHtml(opts.relatedGithubNav ?? []);
   const generatorMetaHtml = renderGeneratorMetaHtml(opts.generatorLabel);
+  const { toolbarDocHubHtml, documentedPanelHtml } = renderToolbarDocHubHtml({
+    sourceOnGithubUrl: opts.sourceOnGithubUrl,
+    commentrayOnGithubUrl: opts.commentrayOnGithubUrl,
+    documentedNavJsonUrl: opts.documentedNavJsonUrl,
+    documentedPairsEmbeddedB64: opts.documentedPairsEmbeddedB64,
+  });
 
   const layoutPref = opts.codeBrowserLayout ?? "auto";
   const { layout, shellInner, scrollBlockLinksB64 } = await buildCodeBrowserShell(opts, layoutPref);
 
-  const searchPlaceholder =
-    opts.staticSearchScope === "commentray-and-paths"
-      ? "Commentray + file paths (ordered tokens + fuzzy lines)…"
-      : "Whole source (ordered tokens + fuzzy lines)…";
-  const shellSearchAttrs =
-    opts.staticSearchScope === "commentray-and-paths"
-      ? ` data-search-scope="commentray-and-paths" data-search-file-path="${escapeHtml(
-          opts.filePath ?? "",
-        )}" data-search-commentray-path="${escapeHtml((opts.commentrayPathForSearch ?? "").trim())}"`
-      : "";
+  const { searchPlaceholder, shellSearchAttrs } = searchChromeFromOptions(opts);
+  const shellDocumentedPairsAttr = shellDocumentedPairsAttrFromOptions(opts);
 
   return buildCodeBrowserPageHtml({
     title,
     generatorMetaHtml,
     filePathHtml,
+    toolbarDocHubHtml,
+    documentedPanelHtml,
     relatedNavHtml,
     toolbarEndHtml,
     layout,
@@ -689,6 +800,7 @@ mermaid.run({ querySelector: ".mermaid" });
     rawCodeB64,
     rawMdB64,
     scrollBlockLinksB64,
+    shellDocumentedPairsAttr,
     hljs,
     hljsDark,
     mermaidScript,

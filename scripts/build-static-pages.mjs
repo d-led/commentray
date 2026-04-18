@@ -10,7 +10,12 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { loadCommentrayConfig, parseGithubRepoWebUrl, readIndex } from "@commentray/core";
+import {
+  githubRepoBlobFileUrl,
+  loadCommentrayConfig,
+  parseGithubRepoWebUrl,
+  readIndex,
+} from "@commentray/core";
 import { buildCommentrayStatic } from "@commentray/code-commentray-static";
 import { buildCommentrayNavSearchDocument } from "@commentray/render";
 
@@ -89,6 +94,43 @@ if (projectIndex && ss.commentrayMarkdownFile) {
   }
 }
 
+const ghWeb = ss.githubUrl ? parseGithubRepoWebUrl(ss.githubUrl) : null;
+const ghNavBase = ghWeb
+  ? { owner: ghWeb.owner, repo: ghWeb.repo, branch: ss.githubBlobBranch || "main" }
+  : null;
+
+const sourceOnGithubUrl =
+  ghNavBase !== null
+    ? githubRepoBlobFileUrl(ghNavBase.owner, ghNavBase.repo, ghNavBase.branch, ss.sourceFile)
+    : undefined;
+const commentrayOnGithubUrl =
+  ghNavBase !== null && ss.commentrayMarkdownFile
+    ? githubRepoBlobFileUrl(
+        ghNavBase.owner,
+        ghNavBase.repo,
+        ghNavBase.branch,
+        ss.commentrayMarkdownFile,
+      )
+    : undefined;
+const documentedNavJsonUrl = ghNavBase !== null ? "./commentray-nav-search.json" : undefined;
+
+const navSearchPath = path.join(outDir, "commentray-nav-search.json");
+const navDoc = await buildCommentrayNavSearchDocument(
+  repoRoot,
+  ss.commentrayMarkdownFile
+    ? {
+        sourcePath: ss.sourceFile,
+        commentrayPath: ss.commentrayMarkdownFile,
+        markdownAbs: path.join(repoRoot, ss.commentrayMarkdownFile),
+      }
+    : undefined,
+  ghNavBase ?? undefined,
+);
+const documentedPairsEmbeddedB64 =
+  ghNavBase !== null && Array.isArray(navDoc.documentedPairs) && navDoc.documentedPairs.length > 0
+    ? Buffer.from(JSON.stringify(navDoc.documentedPairs), "utf8").toString("base64")
+    : undefined;
+
 try {
   await mkdir(outDir, { recursive: true });
   await buildCommentrayStatic({
@@ -106,23 +148,15 @@ try {
     staticSearchScope: "commentray-and-paths",
     commentrayPathForSearch: ss.commentrayMarkdownFile ?? "",
     ...(blockStretchRows ? { blockStretchRows } : {}),
+    ...(sourceOnGithubUrl ? { sourceOnGithubUrl } : {}),
+    ...(commentrayOnGithubUrl ? { commentrayOnGithubUrl } : {}),
+    ...(documentedNavJsonUrl ? { documentedNavJsonUrl } : {}),
+    ...(documentedPairsEmbeddedB64 ? { documentedPairsEmbeddedB64 } : {}),
   });
+  await writeFile(navSearchPath, `${JSON.stringify(navDoc, null, 2)}\n`, "utf8");
 } finally {
   await unlink(tmpMd).catch(() => {});
 }
-
-const navSearchPath = path.join(outDir, "commentray-nav-search.json");
-const navDoc = await buildCommentrayNavSearchDocument(
-  repoRoot,
-  ss.commentrayMarkdownFile
-    ? {
-        sourcePath: ss.sourceFile,
-        commentrayPath: ss.commentrayMarkdownFile,
-        markdownAbs: path.join(repoRoot, ss.commentrayMarkdownFile),
-      }
-    : undefined,
-);
-await writeFile(navSearchPath, `${JSON.stringify(navDoc, null, 2)}\n`, "utf8");
 
 console.log(`Wrote ${outHtml}`);
 console.log(`Wrote ${navSearchPath}`);

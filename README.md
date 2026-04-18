@@ -49,13 +49,13 @@ npm run test:coverage:all
 
 ```bash
 npm run e2e       # headless
-npm run e2e:ci    # same with CYPRESS_CI=true (matches GitLab / typical CI)
+npm run e2e:ci    # same with CYPRESS_CI=true (matches GitHub `e2e` workflow / typical CI)
 npm run cy        # interactive
 ```
 
-Tests live under `cypress/e2e/`. Custom assertions live in [`cypress/support/commands.ts`](cypress/support/commands.ts). JUnit output is written to `test-results/` (same reporter setup as [my-mvg-departures](https://github.com/d-led/my-mvg-departures)).
+Tests live under `cypress/e2e/`. Custom assertions live in [`cypress/support/commands.ts`](cypress/support/commands.ts). JUnit output is written to `test-results/`.
 
-**GitLab CI:** [`.gitlab-ci.yml`](.gitlab-ci.yml) runs `npm run e2e` in a [`cypress/browsers`](https://hub.docker.com/r/cypress/browsers/tags) image and publishes JUnit plus Cypress videos/screenshots as job artifacts.
+**GitHub Actions:** [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) runs Cypress after a successful [`ci`](.github/workflows/ci.yml) run (and on `workflow_dispatch`), using the `cypress/included` image; uploads JUnit plus Cypress videos/screenshots as workflow artifacts.
 
 ## Standalone CLI binaries
 

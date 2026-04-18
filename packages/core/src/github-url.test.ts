@@ -21,7 +21,7 @@ describe("parseGithubRepoWebUrl", () => {
     expect(parseGithubRepoWebUrl("https://github.com/d-led/commentray/blob/main/README.md")).toBe(
       null,
     );
-    expect(parseGithubRepoWebUrl("https://gitlab.com/a/b")).toBe(null);
+    expect(parseGithubRepoWebUrl("https://example.com/acme/demo")).toBe(null);
     expect(parseGithubRepoWebUrl("not a url")).toBe(null);
   });
 });

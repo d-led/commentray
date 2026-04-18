@@ -46,6 +46,9 @@ if [[ "$mode" == "uninstall" ]]; then
   exit 0
 fi
 
+echo "Rendering Marketplace icon from canonical SVG..."
+bash "$REPO_ROOT/scripts/build-vscode-icon.sh"
+
 echo "Building @commentray/core and bundling the extension..."
 npm run build -w @commentray/core
 npm run build -w commentray-vscode

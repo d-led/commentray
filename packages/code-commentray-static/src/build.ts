@@ -51,6 +51,14 @@ export type BuildCommentrayStaticOptions = {
     sourceRelative: string;
     commentrayPathRel: string;
   };
+  /** GitHub blob URL for the primary `filePath` (static hub toolbar). */
+  sourceOnGithubUrl?: string;
+  /** GitHub blob URL for the companion commentray Markdown file. */
+  commentrayOnGithubUrl?: string;
+  /** Relative URL to `commentray-nav-search.json` for the documented-files tree. */
+  documentedNavJsonUrl?: string;
+  /** Base64 UTF-8 JSON of `documentedPairs` embedded on `#shell` for offline tree hydration. */
+  documentedPairsEmbeddedB64?: string;
 };
 
 const staticPackageDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -98,6 +106,10 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     staticSearchScope: opts.staticSearchScope,
     commentrayPathForSearch: opts.commentrayPathForSearch,
     blockStretchRows: opts.blockStretchRows,
+    sourceOnGithubUrl: opts.sourceOnGithubUrl,
+    commentrayOnGithubUrl: opts.commentrayOnGithubUrl,
+    documentedNavJsonUrl: opts.documentedNavJsonUrl,
+    documentedPairsEmbeddedB64: opts.documentedPairsEmbeddedB64,
   });
 
   await mkdir(path.dirname(outPath), { recursive: true });

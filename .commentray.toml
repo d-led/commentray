@@ -41,13 +41,4 @@ https://github.com/d-led/commentray"""
 source_file = "README.md"
 commentray_markdown = """
 .commentray/source/README.md.md"""
-# Toolbar shortcuts on GitHub Pages (single HTML file — open other paths on github.com).
 github_blob_branch = "main"
-[[static_site.related_github_files]]
-path = "CONTRIBUTING.md"
-[[static_site.related_github_files]]
-label = "Storage spec"
-path = "docs/spec/storage.md"
-[[static_site.related_github_files]]
-label = "Plan"
-path = "docs/plan/plan.md"

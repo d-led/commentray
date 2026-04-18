@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { renderCodeBrowserHtml } from "./code-browser.js";
 
-describe("renderCodeBrowserHtml — layout and regions", () => {
+describe("renderCodeBrowserHtml — layout shell and search", () => {
   it("puts search payload base64 on #shell so the client can read it (not only on #code-pane)", async () => {
     const html = await renderCodeBrowserHtml({
       code: "x",
@@ -66,7 +66,9 @@ describe("renderCodeBrowserHtml — layout and regions", () => {
       '<meta name="generator" content="Commentray @commentray/render@9.9.9-test" />',
     );
   });
+});
 
+describe("renderCodeBrowserHtml — toolbar chrome in layout", () => {
   it("renders optional related GitHub file links in the toolbar", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
@@ -82,6 +84,67 @@ describe("renderCodeBrowserHtml — layout and regions", () => {
     expect(html).toContain('href="https://github.com/acme/demo/blob/main/CONTRIBUTING.md"');
   });
 
+  it("renders optional GitHub blob links, documented-files toggle, and panel", async () => {
+    const pairsB64 = Buffer.from(
+      JSON.stringify([
+        {
+          sourcePath: "README.md",
+          commentrayPath: ".commentray/source/README.md.md",
+          sourceOnGithub: "https://github.com/acme/demo/blob/main/README.md",
+          commentrayOnGithub:
+            "https://github.com/acme/demo/blob/main/.commentray/source/README.md.md",
+        },
+      ]),
+      "utf8",
+    ).toString("base64");
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      filePath: "README.md",
+      sourceOnGithubUrl: "https://github.com/acme/demo/blob/main/README.md",
+      commentrayOnGithubUrl:
+        "https://github.com/acme/demo/blob/main/.commentray/source/README.md.md",
+      documentedNavJsonUrl: "./commentray-nav-search.json",
+      documentedPairsEmbeddedB64: pairsB64,
+    });
+    expect(html).toContain('class="toolbar-doc-hub"');
+    expect(html).toContain("Source on GitHub");
+    expect(html).toContain("Commentray on GitHub");
+    expect(html).toContain('href="https://github.com/acme/demo/blob/main/README.md"');
+    expect(html).toContain('id="documented-files-toggle"');
+    expect(html).toContain('data-nav-json-url="./commentray-nav-search.json"');
+    expect(html).toContain('id="documented-files-panel"');
+    expect(html).toContain('data-documented-pairs-b64="');
+  });
+
+  it("shows the documented-files tree when only embedded pairs are set (no nav JSON URL)", async () => {
+    const pairsB64 = Buffer.from(
+      JSON.stringify([
+        {
+          sourcePath: "src/a.ts",
+          commentrayPath: ".commentray/source/src/a.ts.md",
+          sourceOnGithub: "https://github.com/acme/w/blob/main/src/a.ts",
+          commentrayOnGithub: "https://github.com/acme/w/blob/main/.commentray/source/src/a.ts.md",
+        },
+      ]),
+      "utf8",
+    ).toString("base64");
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      documentedPairsEmbeddedB64: pairsB64,
+    });
+    expect(html).toContain('id="documented-files-toggle"');
+    expect(html).toContain('data-nav-json-url=""');
+    expect(html).toContain('data-documented-pairs-b64="');
+  });
+});
+
+describe("renderCodeBrowserHtml — source line chrome", () => {
   it("renders a 1-based, non-selectable line number for every source line", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",

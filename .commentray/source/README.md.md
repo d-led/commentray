@@ -36,7 +36,7 @@ You may be reading a **generated** page: `@commentray/code-commentray-static`, [
 
 ## Architecture (who talks to whom)
 
-Treat the README bullet list as the roster. **`@commentray/core`** owns paths, index schema, staleness; **`@commentray/render`** owns safe HTML; **`@commentray/cli`** is automation; **`commentray-vscode`** is the human surface; **`@commentray/code-commentray-static`** is the smallest consumer of the renderer. Change the HTML contract, then walk that chain backward before you tag.
+Do not duplicate the README’s package list here—that list is canonical. In one line: **core** holds paths and index truth; **render** holds safe HTML; **cli** and **vscode** are surfaces; **code-commentray-static** is the smallest renderer consumer. Change the HTML contract, then walk that chain backward before you tag.
 
 ## Reference (jump off points)
 

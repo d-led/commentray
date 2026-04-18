@@ -524,6 +524,170 @@ function wireProportionalScrollSync(codePane: HTMLElement, docPane: HTMLElement)
   );
 }
 
+type DocumentedPairNav = {
+  sourcePath: string;
+  commentrayPath: string;
+  sourceOnGithub: string;
+  commentrayOnGithub: string;
+};
+
+type NavJsonDoc = {
+  documentedPairs?: unknown;
+};
+
+type TrieNode = {
+  children: Map<string, TrieNode>;
+  pairs: DocumentedPairNav[];
+};
+
+function isDocumentedPairNav(x: unknown): x is DocumentedPairNav {
+  if (typeof x !== "object" || x === null) return false;
+  const o = x as Record<string, unknown>;
+  return (
+    typeof o.sourcePath === "string" &&
+    typeof o.commentrayPath === "string" &&
+    typeof o.sourceOnGithub === "string" &&
+    typeof o.commentrayOnGithub === "string"
+  );
+}
+
+function pairsFromJsonArray(raw: unknown): DocumentedPairNav[] {
+  const pairs: DocumentedPairNav[] = [];
+  if (!Array.isArray(raw)) return pairs;
+  for (const x of raw) {
+    if (isDocumentedPairNav(x)) pairs.push(x);
+  }
+  return pairs;
+}
+
+/** Offline-first: UTF-8 base64 JSON array produced by the static Pages build. */
+function parseDocumentedPairsFromEmbeddedB64(b64: string): DocumentedPairNav[] {
+  const t = b64.trim();
+  if (t === "") return [];
+  try {
+    const raw = JSON.parse(decodeBase64Utf8(t)) as unknown;
+    return pairsFromJsonArray(raw);
+  } catch {
+    return [];
+  }
+}
+
+function insertSourcePathTrie(root: TrieNode, pair: DocumentedPairNav): void {
+  const segments = pair.sourcePath.split("/").filter(Boolean);
+  if (segments.length === 0) return;
+  let n = root;
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (seg === undefined) continue;
+    if (!n.children.has(seg)) n.children.set(seg, { children: new Map(), pairs: [] });
+    const next = n.children.get(seg);
+    if (next === undefined) return;
+    if (i === segments.length - 1) next.pairs.push(pair);
+    n = next;
+  }
+}
+
+function renderDocumentedTreeHtml(node: TrieNode): string {
+  const keys = [...node.children.keys()].sort((a, b) => a.localeCompare(b));
+  if (keys.length === 0) return "";
+  const lis: string[] = [];
+  for (const name of keys) {
+    const ch = node.children.get(name);
+    if (ch === undefined) continue;
+    if (ch.children.size > 0) {
+      const inner = renderDocumentedTreeHtml(ch);
+      lis.push(`<li><div class="tree-dir">${escapeHtmlText(name)}</div>${inner}</li>`);
+    }
+    if (ch.pairs.length > 0) {
+      for (const pr of ch.pairs) {
+        lis.push(
+          `<li><div class="tree-file">` +
+            `<span class="tree-file-name">${escapeHtmlText(pr.sourcePath)}</span>` +
+            `<span class="tree-file-links">` +
+            `<a href="${escapeHtmlText(pr.sourceOnGithub)}" target="_blank" rel="noopener noreferrer">source</a>` +
+            `<a href="${escapeHtmlText(pr.commentrayOnGithub)}" target="_blank" rel="noopener noreferrer">commentray</a>` +
+            `</span></div></li>`,
+        );
+      }
+    }
+  }
+  return `<ul>${lis.join("")}</ul>`;
+}
+
+function setDocumentedPanelOpen(btn: HTMLButtonElement, panel: HTMLElement, open: boolean): void {
+  panel.hidden = !open;
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function renderDocumentedPairsIntoHost(treeHost: HTMLElement, pairs: DocumentedPairNav[]): void {
+  if (pairs.length === 0) {
+    treeHost.innerHTML =
+      '<p class="documented-files-panel__hint">No <code class="documented-files-panel__code">documentedPairs</code> in this export (build with a GitHub repo URL).</p>';
+    return;
+  }
+  const root: TrieNode = { children: new Map(), pairs: [] };
+  for (const p of pairs) insertSourcePathTrie(root, p);
+  treeHost.innerHTML = renderDocumentedTreeHtml(root);
+}
+
+function loadDocumentedPairs(
+  jsonUrl: string,
+  embeddedB64: string,
+): () => Promise<DocumentedPairNav[]> {
+  let loaded: DocumentedPairNav[] | null = null;
+  let loadPromise: Promise<void> | null = null;
+  return async () => {
+    if (loaded !== null) return loaded;
+    if (loadPromise === null) {
+      loadPromise = (async () => {
+        if (embeddedB64.length > 0) {
+          loaded = parseDocumentedPairsFromEmbeddedB64(embeddedB64);
+          if (loaded.length > 0) return;
+        }
+        if (jsonUrl.length === 0) {
+          loaded = [];
+          return;
+        }
+        const res = await fetch(jsonUrl, { credentials: "same-origin" });
+        if (!res.ok) throw new Error(`nav json ${String(res.status)}`);
+        const body = (await res.json()) as NavJsonDoc;
+        loaded = pairsFromJsonArray(body.documentedPairs);
+      })();
+    }
+    await loadPromise;
+    return loaded ?? [];
+  };
+}
+
+function wireDocumentedFilesTree(): void {
+  const btn = document.getElementById("documented-files-toggle");
+  const panel = document.getElementById("documented-files-panel");
+  const treeHost = document.getElementById("documented-files-tree");
+  const shell = document.getElementById("shell");
+  if (!(btn instanceof HTMLButtonElement) || !panel || !treeHost) return;
+
+  const jsonUrl = btn.getAttribute("data-nav-json-url")?.trim() ?? "";
+  const embeddedB64 = shell?.getAttribute("data-documented-pairs-b64")?.trim() ?? "";
+  if (jsonUrl.length === 0 && embeddedB64.length === 0) return;
+
+  const ensureLoaded = loadDocumentedPairs(jsonUrl, embeddedB64);
+
+  btn.addEventListener("click", () => {
+    const next = panel.hidden !== false;
+    setDocumentedPanelOpen(btn, panel, next);
+    if (!next) return;
+    void (async () => {
+      try {
+        const pairs = await ensureLoaded();
+        renderDocumentedPairsIntoHost(treeHost, pairs);
+      } catch {
+        treeHost.innerHTML =
+          '<p class="documented-files-panel__hint">Could not load the file list. Check the browser network tab.</p>';
+      }
+    })();
+  });
+}
+
 function wireSplitter(
   storageSplit: string,
   shell: HTMLElement,
@@ -559,11 +723,17 @@ function wireSplitter(
   });
 }
 
-function main(): void {
-  const storageSplit = "commentray.codeCommentrayStatic.splitPct";
-  const storageWrap = "commentray.codeCommentrayStatic.wrap";
-  const shell = document.getElementById("shell");
-  const codePane = document.getElementById("code-pane");
+const STORAGE_SPLIT_PCT = "commentray.codeCommentrayStatic.splitPct";
+const STORAGE_WRAP_LINES = "commentray.codeCommentrayStatic.wrap";
+
+function wireStretchLayoutChrome(codePane: HTMLElement): void {
+  const wrapCb = document.getElementById("wrap-lines") as HTMLInputElement | null;
+  if (wrapCb) {
+    wireWrapToggle(STORAGE_WRAP_LINES, codePane, wrapCb);
+  }
+}
+
+function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): void {
   const docPane = document.getElementById("doc-pane");
   const gutter = document.getElementById("gutter");
   const wrapCb = document.getElementById("wrap-lines") as HTMLInputElement | null;
@@ -571,16 +741,7 @@ function main(): void {
   const searchClear = document.getElementById("search-clear");
   const searchResults = document.getElementById("search-results");
 
-  if (
-    !shell ||
-    !codePane ||
-    !docPane ||
-    !gutter ||
-    !wrapCb ||
-    !searchInput ||
-    !searchClear ||
-    !searchResults
-  ) {
+  if (!docPane || !gutter || !wrapCb || !searchInput || !searchClear || !searchResults) {
     return;
   }
 
@@ -615,17 +776,35 @@ function main(): void {
     docPane,
   });
 
-  const pct0 = parseFloat(localStorage.getItem(storageSplit) || "50");
+  const pct0 = parseFloat(localStorage.getItem(STORAGE_SPLIT_PCT) || "50");
   const pct = clamp(Number.isFinite(pct0) ? pct0 : 50, 15, 85);
   codePane.style.flex = `0 0 ${pct}%`;
 
-  wireWrapToggle(storageWrap, codePane, wrapCb);
-  wireSplitter(storageSplit, shell, codePane, gutter, pct);
+  wireWrapToggle(STORAGE_WRAP_LINES, codePane, wrapCb);
+  wireSplitter(STORAGE_SPLIT_PCT, shell, codePane, gutter, pct);
   if (scrollLinks.length > 0) {
     wireBlockAwareScrollSync(codePane, docPane, scrollLinks);
   } else {
     wireProportionalScrollSync(codePane, docPane);
   }
+}
+
+function main(): void {
+  wireDocumentedFilesTree();
+
+  const shell = document.getElementById("shell");
+  const codePane = document.getElementById("code-pane");
+  if (!shell || !codePane) {
+    return;
+  }
+
+  const layout = shell.getAttribute("data-layout") || "dual";
+  if (layout === "stretch") {
+    wireStretchLayoutChrome(codePane);
+    return;
+  }
+
+  wireDualPaneCodeBrowser(shell, codePane);
 }
 
 if (document.readyState === "loading") {

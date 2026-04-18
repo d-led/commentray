@@ -1,0 +1,80 @@
+# Static site E2E
+# (Cypress in `cypress/included`, JUnit, artifacts, Checks) but **one** Cypress invocation per CI completion:
+# no `pull_request` trigger here (that duplicated `workflow_run` after `ci` for PRs into `main`).
+name: e2e
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    container:
+      image: cypress/included:latest
+      options: --ipc=host
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run && github.event.workflow_run.head_sha || github.ref }}
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --progress=false
+
+      - name: Build static site
+        run: npm run pages:build
+
+      - name: Start static server
+        run: |
+          mkdir -p test-results
+          nohup npm run e2e:server > /tmp/e2e-serve.log 2>&1 &
+          echo $! > /tmp/e2e-serve.pid
+
+      - name: Wait for server
+        run: |
+          n=0
+          until node -e "require('http').get('http://127.0.0.1:4173/', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"; do
+            n=$((n+1))
+            [ "$n" -ge 60 ] && exit 1
+            sleep 1
+          done
+
+      - name: Run E2E tests (with JUnit reporter)
+        run: |
+          npx cypress run --e2e --browser electron --config-file cypress.config.ts --config baseUrl=http://127.0.0.1:4173
+        env:
+          CYPRESS_CI: true
+          NODE_OPTIONS: --dns-result-order=ipv4first
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results
+            cypress/videos
+            cypress/screenshots
+
+      - name: Publish JUnit to GitHub Checks
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: Test reports
+          path: test-results/*.xml
+          reporter: java-junit

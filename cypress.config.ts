@@ -18,7 +18,7 @@ export default defineConfig({
     screenshotOnRunFailure: true,
     setupNodeEvents(on, config) {
       on("before:browser:launch", (browser, launchOptions) => {
-        // Chrome on Linux (GitLab, GitHub runners): typical CI flags. Omit on macOS/Windows
+        // Chrome on Linux (GitHub Actions / typical CI): typical CI flags. Omit on macOS/Windows
         // where they can break Cypress’s own launch / smoke-test flow.
         if (
           process.platform === "linux" &&
