@@ -51,6 +51,7 @@
   },
   "devDependencies": {
     "@commentray/core": "0.0.3",
+    "@commentray/render": "0.0.3",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",

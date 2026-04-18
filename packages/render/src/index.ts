@@ -5,3 +5,12 @@ export type { CommentrayOutputUrlOptions, MarkdownPipelineOptions } from "./mark
 export { renderFencedCode, renderMarkdownToHtml } from "./markdown-pipeline.js";
 export { renderSideBySideHtml } from "./side-by-side.js";
 export type { SideBySideOptions } from "./side-by-side.js";
+export {
+  buildCommentrayNavSearchDocument,
+  COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION,
+} from "./build-commentray-nav-search.js";
+export type {
+  BuildCommentrayNavSearchFallback,
+  CommentrayNavSearchDocument,
+  CommentrayNavSearchRow,
+} from "./build-commentray-nav-search.js";

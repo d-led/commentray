@@ -14,6 +14,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./block-scroll-pickers": {
+      "types": "./dist/block-scroll-pickers.d.ts",
+      "import": "./dist/block-scroll-pickers.js"
     }
   },
   "files": [

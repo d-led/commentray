@@ -15,7 +15,7 @@ import { decodeBase64Utf8 } from "./code-browser-encoding.js";
 import { readEmbeddedRawB64Strings } from "./code-browser-embedded-payload.js";
 import { findOrderedTokenSpans, lineAtIndex, offsetToLineIndex } from "./code-browser-search.js";
 
-type HitKind = "code" | "md";
+type HitKind = "code" | "md" | "path";
 
 type Row = { kind: HitKind; line: number; text: string };
 
@@ -53,7 +53,8 @@ function snippet(s: string, maxLen: number): string {
 function mergeHits(rows: Hit[], max: number): Hit[] {
   const byKey = new Map<string, Hit>();
   for (const r of rows) {
-    const key = `${r.kind}:${r.line}`;
+    const key =
+      r.kind === "path" ? `path:${String(r.line)}:${r.text.slice(0, 64)}` : `${r.kind}:${r.line}`;
     const prev = byKey.get(key);
     if (!prev || r.score > prev.score) {
       byKey.set(key, r);
@@ -108,7 +109,117 @@ function buildFuzzyHits(
   return out;
 }
 
+type SearchScope = "full" | "commentray-and-paths";
+
+type MergedSearchHitInput = {
+  scope: SearchScope;
+  filePathLabel: string;
+  commentrayPathLabel: string;
+  rawCode: string;
+  rawMd: string;
+  searcher: ReturnType<typeof SearcherFactory.createDefaultSearcher<Row, string>>;
+  queryRaw: string;
+  tokens: string[];
+};
+
+function computeMergedSearchHits(input: MergedSearchHitInput): Hit[] {
+  const { scope, filePathLabel, commentrayPathLabel, rawCode, rawMd, searcher, queryRaw, tokens } =
+    input;
+  const pathBlob = [filePathLabel, commentrayPathLabel]
+    .filter((s) => s.trim().length > 0)
+    .join("\n");
+  const orderedCode =
+    scope === "commentray-and-paths" ? [] : buildOrderedHits(rawCode, "code", tokens);
+  const orderedPath =
+    scope === "commentray-and-paths" && pathBlob ? buildOrderedHits(pathBlob, "path", tokens) : [];
+  const orderedMd = buildOrderedHits(rawMd, "md", tokens);
+  const fuzzyHits = buildFuzzyHits(searcher, queryRaw, 60);
+  return mergeHits([...orderedCode, ...orderedPath, ...orderedMd, ...fuzzyHits], 80);
+}
+
+function searchResultsInnerHtml(scope: SearchScope, combined: Hit[]): string {
+  if (combined.length === 0) {
+    return '<div class="hint">No matches. Try fewer tokens or looser spelling (fuzzy matches per line).</div>';
+  }
+  const hintIntro =
+    scope === "commentray-and-paths"
+      ? "Paths + commentray only (no code-body indexing): ordered tokens and per-line fuzzy ranking."
+      : "Whole source: whitespace tokens in order (may span lines). Per-line fuzzy ranking for typos.";
+  const buf: string[] = [];
+  buf.push(`<div class="hint">${hintIntro} ${combined.length} hit(s).</div>`);
+  for (const h of combined) {
+    const label =
+      h.kind === "code"
+        ? `Code L${h.line + 1}`
+        : h.kind === "path"
+          ? `Path L${h.line + 1}`
+          : `Commentray L${h.line + 1}`;
+    const tag = h.source === "ordered" ? "ordered" : "fuzzy";
+    buf.push(
+      `<button type="button" class="hit" data-kind="${h.kind}" data-line="${String(h.line)}">` +
+        `<span class="meta">${label} <span class="src-tag">(${tag})</span></span>` +
+        `<div class="snippet">${escapeHtmlText(snippet(h.text, 200))}</div></button>`,
+    );
+  }
+  return buf.join("");
+}
+
+function readSearchScopeFromShell(shell: HTMLElement): {
+  scope: SearchScope;
+  filePathLabel: string;
+  commentrayPathLabel: string;
+} {
+  const scopeAttr = shell.getAttribute("data-search-scope") || "";
+  return {
+    scope: scopeAttr === "commentray-and-paths" ? "commentray-and-paths" : "full",
+    filePathLabel: shell.getAttribute("data-search-file-path") || "",
+    commentrayPathLabel: shell.getAttribute("data-search-commentray-path") || "",
+  };
+}
+
+function buildIndexedSearchRows(
+  scope: SearchScope,
+  rawCode: string,
+  rawMd: string,
+  filePathLabel: string,
+  commentrayPathLabel: string,
+): Row[] {
+  const mdLines = rawMd.split("\n");
+  const codeLines = rawCode.split("\n");
+  const pathRows: Row[] = [];
+  if (scope === "commentray-and-paths") {
+    if (filePathLabel.trim()) {
+      pathRows.push({ kind: "path", line: pathRows.length, text: filePathLabel });
+    }
+    if (commentrayPathLabel.trim()) {
+      pathRows.push({ kind: "path", line: pathRows.length, text: commentrayPathLabel });
+    }
+  }
+  return [
+    ...(scope === "full"
+      ? codeLines.map((text, line) => ({ kind: "code" as const, line, text }))
+      : []),
+    ...pathRows,
+    ...mdLines.map((text, line) => ({ kind: "md" as const, line, text })),
+  ];
+}
+
+function indexSearchLineRows(
+  rows: Row[],
+): ReturnType<typeof SearcherFactory.createDefaultSearcher<Row, string>> {
+  const searcher = SearcherFactory.createDefaultSearcher<Row, string>();
+  searcher.indexEntities(
+    rows,
+    (e) => `${e.kind}:${e.kind === "path" ? e.text : e.line}`,
+    (e) => [e.text],
+  );
+  return searcher;
+}
+
 type SearchUiContext = {
+  scope: SearchScope;
+  filePathLabel: string;
+  commentrayPathLabel: string;
   rawCode: string;
   rawMd: string;
   mdLines: string[];
@@ -120,8 +231,19 @@ type SearchUiContext = {
 };
 
 function wireSearchUi(ctx: SearchUiContext): void {
-  const { rawCode, rawMd, mdLines, searcher, searchInput, searchClear, searchResults, docPane } =
-    ctx;
+  const {
+    scope,
+    filePathLabel,
+    commentrayPathLabel,
+    rawCode,
+    rawMd,
+    mdLines,
+    searcher,
+    searchInput,
+    searchClear,
+    searchResults,
+    docPane,
+  } = ctx;
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -140,32 +262,18 @@ function wireSearchUi(ctx: SearchUiContext): void {
       searchResults.innerHTML = "";
       return;
     }
-
-    const orderedCode = buildOrderedHits(rawCode, "code", tokens);
-    const orderedMd = buildOrderedHits(rawMd, "md", tokens);
-    const fuzzyHits = buildFuzzyHits(searcher, searchInput.value, 60);
-    const combined = mergeHits([...orderedCode, ...orderedMd, ...fuzzyHits], 80);
-
+    const combined = computeMergedSearchHits({
+      scope,
+      filePathLabel,
+      commentrayPathLabel,
+      rawCode,
+      rawMd,
+      searcher,
+      queryRaw: searchInput.value,
+      tokens,
+    });
     searchResults.hidden = false;
-    if (combined.length === 0) {
-      searchResults.innerHTML =
-        '<div class="hint">No matches. Try fewer tokens or looser spelling (fuzzy matches per line).</div>';
-      return;
-    }
-    const buf: string[] = [];
-    buf.push(
-      `<div class="hint">Whole source: whitespace tokens in order (may span lines). Per-line fuzzy ranking for typos. ${combined.length} hit(s).</div>`,
-    );
-    for (const h of combined) {
-      const label = h.kind === "code" ? `Code L${h.line + 1}` : `Commentray L${h.line + 1}`;
-      const tag = h.source === "ordered" ? "ordered" : "fuzzy";
-      buf.push(
-        `<button type="button" class="hit" data-kind="${h.kind}" data-line="${String(h.line)}">` +
-          `<span class="meta">${label} <span class="src-tag">(${tag})</span></span>` +
-          `<div class="snippet">${escapeHtmlText(snippet(h.text, 200))}</div></button>`,
-      );
-    }
-    searchResults.innerHTML = buf.join("");
+    searchResults.innerHTML = searchResultsInnerHtml(scope, combined);
   }
 
   searchResults.addEventListener("click", (ev: MouseEvent) => {
@@ -179,6 +287,8 @@ function wireSearchUi(ctx: SearchUiContext): void {
     if (kind === "code") {
       const el = document.getElementById(`code-line-${String(line)}`);
       if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    } else if (kind === "path") {
+      docPane.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       const total = mdLines.length;
       if (total <= 0) return;
@@ -283,20 +393,49 @@ function probeCommentrayLine0FromDoc(docPane: HTMLElement): number {
   return best;
 }
 
-/** Index-backed scroll sync when `data-scroll-block-links-b64` is present; else see proportional fallback. */
-function wireBlockAwareScrollSync(
+type SyncPane = "none" | "code" | "doc";
+
+function wireBidirectionalScroll(
   codePane: HTMLElement,
   docPane: HTMLElement,
-  links: BlockScrollLink[],
+  syncFromCode: () => void,
+  syncFromDoc: () => void,
 ): void {
-  type Syncing = "none" | "code" | "doc";
-  let syncing: Syncing = "none";
+  let syncing: SyncPane = "none";
 
   codePane.addEventListener(
     "scroll",
     () => {
       if (syncing === "doc") return;
       syncing = "code";
+      syncFromCode();
+      syncing = "none";
+    },
+    { passive: true },
+  );
+
+  docPane.addEventListener(
+    "scroll",
+    () => {
+      if (syncing === "code") return;
+      syncing = "doc";
+      syncFromDoc();
+      syncing = "none";
+    },
+    { passive: true },
+  );
+}
+
+/** Index-backed scroll sync when `data-scroll-block-links-b64` is present; else see proportional fallback. */
+function wireBlockAwareScrollSync(
+  codePane: HTMLElement,
+  docPane: HTMLElement,
+  links: BlockScrollLink[],
+): void {
+  wireBidirectionalScroll(
+    codePane,
+    docPane,
+    () => {
       const line1 = probeCodeLine1FromViewport(codePane);
       const mdLine0 = pickCommentrayLineForSourceScroll(links, line1);
       if (mdLine0 === null) {
@@ -325,16 +464,8 @@ function wireBlockAwareScrollSync(
           );
         }
       }
-      syncing = "none";
     },
-    { passive: true },
-  );
-
-  docPane.addEventListener(
-    "scroll",
     () => {
-      if (syncing === "code") return;
-      syncing = "doc";
       const mdLine0 = probeCommentrayLine0FromDoc(docPane);
       const src0 = pickSourceLine0ForCommentrayScroll(links, mdLine0);
       if (src0 === null) {
@@ -363,22 +494,16 @@ function wireBlockAwareScrollSync(
           );
         }
       }
-      syncing = "none";
     },
-    { passive: true },
   );
 }
 
 /** Proportional scroll sync when there is no index-backed block map (GitHub Pages default). */
 function wireProportionalScrollSync(codePane: HTMLElement, docPane: HTMLElement): void {
-  type Syncing = "none" | "code" | "doc";
-  let syncing: Syncing = "none";
-
-  codePane.addEventListener(
-    "scroll",
+  wireBidirectionalScroll(
+    codePane,
+    docPane,
     () => {
-      if (syncing === "doc") return;
-      syncing = "code";
       docPane.scrollTop = mirroredScrollTop(
         codePane.scrollTop,
         codePane.scrollHeight,
@@ -386,16 +511,8 @@ function wireProportionalScrollSync(codePane: HTMLElement, docPane: HTMLElement)
         docPane.scrollHeight,
         docPane.clientHeight,
       );
-      syncing = "none";
     },
-    { passive: true },
-  );
-
-  docPane.addEventListener(
-    "scroll",
     () => {
-      if (syncing === "code") return;
-      syncing = "doc";
       codePane.scrollTop = mirroredScrollTop(
         docPane.scrollTop,
         docPane.scrollHeight,
@@ -403,9 +520,7 @@ function wireProportionalScrollSync(codePane: HTMLElement, docPane: HTMLElement)
         codePane.scrollHeight,
         codePane.clientHeight,
       );
-      syncing = "none";
     },
-    { passive: true },
   );
 }
 
@@ -475,21 +590,21 @@ function main(): void {
   const scrollLinks = parseScrollBlockLinksFromShell(
     shell.getAttribute("data-scroll-block-links-b64") || "",
   );
+  const { scope, filePathLabel, commentrayPathLabel } = readSearchScopeFromShell(shell);
   const mdLines = rawMd.split("\n");
-  const codeLines = rawCode.split("\n");
-
-  const lineRows: Row[] = [
-    ...codeLines.map((text, line) => ({ kind: "code" as const, line, text })),
-    ...mdLines.map((text, line) => ({ kind: "md" as const, line, text })),
-  ];
-  const searcher = SearcherFactory.createDefaultSearcher<Row, string>();
-  searcher.indexEntities(
-    lineRows,
-    (e) => `${e.kind}:${e.line}`,
-    (e) => [e.text],
+  const lineRows = buildIndexedSearchRows(
+    scope,
+    rawCode,
+    rawMd,
+    filePathLabel,
+    commentrayPathLabel,
   );
+  const searcher = indexSearchLineRows(lineRows);
 
   wireSearchUi({
+    scope,
+    filePathLabel,
+    commentrayPathLabel,
     rawCode,
     rawMd,
     mdLines,

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { CommentrayIndex } from "@commentray/core";
 import {
   type CommentrayOutputUrlOptions,
   commentrayRenderVersion,
@@ -37,6 +38,19 @@ export type BuildCommentrayStaticOptions = {
    * this package’s versions. Pass an empty string to omit the meta tag.
    */
   generatorLabel?: string;
+  /** Forwarded to `renderCodeBrowserHtml` — narrows in-page search away from raw code lines. */
+  staticSearchScope?: "full" | "commentray-and-paths";
+  /** Repo-relative companion Markdown path (with `staticSearchScope: "commentray-and-paths"`). */
+  commentrayPathForSearch?: string;
+  /**
+   * When markers + index blocks align, `renderCodeBrowserHtml` may emit one scrollable
+   * blame-style table (`codeBrowserLayout: "auto"`, default).
+   */
+  blockStretchRows?: {
+    index: CommentrayIndex;
+    sourceRelative: string;
+    commentrayPathRel: string;
+  };
 };
 
 const staticPackageDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -81,6 +95,9 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     commentrayOutputUrls: opts.commentrayOutputUrls,
     relatedGithubNav: opts.relatedGithubNav,
     generatorLabel: resolveGeneratorLabel(opts.generatorLabel),
+    staticSearchScope: opts.staticSearchScope,
+    commentrayPathForSearch: opts.commentrayPathForSearch,
+    blockStretchRows: opts.blockStretchRows,
   });
 
   await mkdir(path.dirname(outPath), { recursive: true });

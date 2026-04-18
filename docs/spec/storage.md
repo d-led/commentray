@@ -73,10 +73,10 @@ The sentinel `.default` does not by itself pick which Angle is “default” for
 
 ## GitHub Pages static browser (single `index.html`)
 
-The Pages build emits **one** HTML file: one **code** pane (`static_site.source_file`) and one rendered **commentray** pane (intro + `static_site.commentray_markdown`). There is no built-in router for other source/commentray pairs on the same origin.
+The Pages build emits **one** HTML file: one **code** pane (`static_site.source_file`) and one rendered **commentray** pane (intro + `static_site.commentray_markdown`). There is no built-in router for other source/commentray pairs on the same origin. When `.commentray/metadata/index.json` lists **blocks** for that pair and the Markdown has matching `<!-- commentray:block id=… -->` markers, the build can switch to a **single-scroll, blame-style table** (one row per block: code and commentary cells share the **same row height**, like GitHub blame) instead of two independently scrolled panes.
 
 - **`[[static_site.related_github_files]]`** — optional rows with repo-relative `path` and optional `label` (defaults to the file’s basename). When `static_site.github_url` is a GitHub **repository home** URL (`https://github.com/owner/repo`), the toolbar gains **Also on GitHub** links to `…/blob/<branch>/path` so readers can jump to other Markdown or code on GitHub. Set **`static_site.github_blob_branch`** when your default branch is not `main`.
-- **Search** — **Escape** clears the query and hides hit results (same as the **Clear** control).
+- **Search** — **Escape** clears the query and hides hit results (same as the **Clear** control). The Pages build uses **scoped search**: only **commentray Markdown** (and path labels), not every line of the primary source file, plus a sidecar **`commentray-nav-search.json`** for repo-wide / hub-style search built the same way (indexed pairs from `.commentray/metadata/index.json`, or a single fallback pair from `[static_site]` when the index is empty).
 - **Generator** — emitted HTML includes `<meta name="generator" content="Commentray @commentray/render@…; @commentray/code-commentray-static@…">` so the toolchain version is visible in page metadata (omit by passing an empty `generatorLabel` from the static builder API).
 
 ## Images and other local assets (static HTML)

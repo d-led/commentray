@@ -19,6 +19,22 @@ describe("renderCodeBrowserHtml — layout and regions", () => {
     }
     expect(m[0]).toContain("data-raw-code-b64=");
     expect(m[0]).toContain("data-raw-md-b64=");
+    expect(m[0]).not.toContain("data-search-scope=");
+  });
+
+  it("emits scoped search attributes when staticSearchScope is commentray-and-paths", async () => {
+    const html = await renderCodeBrowserHtml({
+      code: "const secret = 1;",
+      language: "ts",
+      commentrayMarkdown: "## Notes\n",
+      filePath: "src/a.ts",
+      commentrayPathForSearch: ".commentray/source/src/a.ts.md",
+      staticSearchScope: "commentray-and-paths",
+    });
+    expect(html).toContain('data-search-scope="commentray-and-paths"');
+    expect(html).toContain('data-search-file-path="src/a.ts"');
+    expect(html).toContain('data-search-commentray-path=".commentray/source/src/a.ts.md"');
+    expect(html).toContain("Commentray + file paths (ordered tokens + fuzzy lines)");
   });
 
   it("includes resizable gutter, wrap toggle, and rendered regions", async () => {
@@ -194,5 +210,34 @@ describe("renderCodeBrowserHtml — block markers and scroll link payload", () =
     }
     const links = JSON.parse(Buffer.from(m[1], "base64").toString("utf8")) as unknown[];
     expect(links).toEqual([{ id: "b1", commentrayLine: 0, sourceStart: 1, sourceEnd: 2 }]);
+  });
+
+  it("uses stretch layout for one shared scroll when the blame-style table builds", async () => {
+    const crPath = ".commentray/source/pkg/readme.md.md";
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [crPath]: {
+          sourcePath: "pkg/readme.md",
+          commentrayPath: crPath,
+          blocks: [{ id: "b1", anchor: "lines:1-2" }],
+        },
+      },
+    };
+    const md = "<!-- commentray:block id=b1 -->\n\n## Sync\n";
+    const html = await renderCodeBrowserHtml({
+      code: "one\ntwo",
+      language: "txt",
+      commentrayMarkdown: md,
+      blockStretchRows: {
+        index,
+        sourceRelative: "pkg/readme.md",
+        commentrayPathRel: crPath,
+      },
+    });
+    expect(html).toContain('data-layout="stretch"');
+    expect(html).toContain('class="stretch-code-stack"');
+    expect(html).not.toContain("rowspan");
+    expect(html).not.toContain('id="doc-pane"');
   });
 });

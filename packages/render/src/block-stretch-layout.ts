@@ -85,11 +85,26 @@ async function renderSingleCodeLine(
   );
 }
 
+/** Renders a contiguous 0-based inclusive range of source lines into one stacked column. */
+async function renderCodeLineStack(
+  lines: string[],
+  startLine0: number,
+  endLine0: number,
+  language: string,
+): Promise<string> {
+  const parts: string[] = [];
+  for (let j = startLine0; j <= endLine0; j++) {
+    parts.push(await renderSingleCodeLine(lines[j] ?? "", j, language));
+  }
+  return `<div class="stretch-code-stack">${parts.join("\n")}</div>`;
+}
+
 /**
- * When index blocks + markdown markers align, builds a two-column table: one row
- * per source line; the commentary cell uses `rowspan` so rendered prose **stretches**
- * vertically beside the full anchored source range (scroll-sync–friendly alignment
- * on the web, not two independently scrolled panes).
+ * When index blocks + markdown markers align, builds a two-column table in the spirit of
+ * GitHub **blame**: **one row per block** (plus one row per unmapped source line). The code
+ * and commentary cells share the **same row height** — whichever side is taller sets the
+ * row; the shorter side is top-aligned with natural empty space below inside its cell.
+ * A single outer scroll (`shell--stretch-rows`) keeps both columns in lockstep.
  */
 export async function tryBuildBlockStretchTableHtml(
   opts: BlockStretchTableOptions,
@@ -122,33 +137,38 @@ export async function tryBuildBlockStretchTableHtml(
   }
 
   const rows: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
+  let i = 0;
+  while (i < lines.length) {
     const L = i + 1;
-    const codeLineHtml = await renderSingleCodeLine(lines[i] ?? "", i, opts.language);
     const b = lineToBlock.get(L);
 
     if (!b) {
+      const codeLineHtml = await renderSingleCodeLine(lines[i] ?? "", i, opts.language);
       rows.push(
         `<tr class="stretch-row stretch-row--gap"><td class="stretch-code">${codeLineHtml}</td>` +
           `<td class="stretch-doc stretch-doc--gap"><span class="stretch-gap-mark" aria-hidden="true">—</span></td></tr>`,
       );
+      i += 1;
       continue;
     }
 
-    if (L === b.sourceStart) {
-      const rowspan = b.sourceEnd - b.sourceStart + 1;
-      const docInner =
-        renderedById.get(b.id) ??
-        `<p class="stretch-doc-missing"><em>No commentary segment for block <code>${escapeHtml(b.id)}</code>.</em></p>`;
-      rows.push(
-        `<tr class="stretch-row stretch-row--block"><td class="stretch-code">${codeLineHtml}</td>` +
-          `<td class="stretch-doc" rowspan="${rowspan}"><div class="stretch-doc-inner">${docInner}</div></td></tr>`,
-      );
-    } else {
-      rows.push(
-        `<tr class="stretch-row stretch-row--block-cont"><td class="stretch-code">${codeLineHtml}</td></tr>`,
+    if (i !== b.sourceStart - 1) {
+      throw new Error(
+        `block-stretch desync at 0-based index ${String(i)} (block ${b.id} should start at index ${String(b.sourceStart - 1)})`,
       );
     }
+
+    const start0 = b.sourceStart - 1;
+    const end0 = b.sourceEnd - 1;
+    const stackHtml = await renderCodeLineStack(lines, start0, end0, opts.language);
+    const docInner =
+      renderedById.get(b.id) ??
+      `<p class="stretch-doc-missing"><em>No commentary segment for block <code>${escapeHtml(b.id)}</code>.</em></p>`;
+    rows.push(
+      `<tr class="stretch-row stretch-row--block"><td class="stretch-code">${stackHtml}</td>` +
+        `<td class="stretch-doc"><div class="stretch-doc-inner">${docInner}</div></td></tr>`,
+    );
+    i = end0 + 1;
   }
 
   const preambleHtml =

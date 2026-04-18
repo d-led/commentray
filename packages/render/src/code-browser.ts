@@ -54,9 +54,10 @@ export type CodeBrowserPageOptions = {
   generatorLabel?: string;
   /**
    * When set and index blocks align with `<!-- commentray:block id=… -->` markers,
-   * emits a two-column **block stretch** table: one row per source line and commentary
-   * cells use `rowspan` so prose stretches beside the full anchored range (aligned
-   * scrolling on the web instead of two independent panes).
+   * emits a two-column **blame-style** table: **one row per block** (plus gap rows for
+   * unmapped lines). Code and commentary cells share the **same row height** (the taller
+   * side wins; the shorter side is top-aligned with natural padding below). One shell
+   * scroll keeps both columns aligned.
    */
   blockStretchRows?: {
     index: CommentrayIndex;
@@ -70,6 +71,13 @@ export type CodeBrowserPageOptions = {
    * **block-aware** scroll sync and separator lines in the commentray pane.
    */
   codeBrowserLayout?: "auto" | "dual";
+  /**
+   * `full` (default): in-page search indexes every source line and every commentray line.
+   * `commentray-and-paths`: search only **toolbar path labels** plus commentray Markdown (no code-body line corpus).
+   */
+  staticSearchScope?: "full" | "commentray-and-paths";
+  /** Repo-relative companion Markdown path; used with `staticSearchScope: "commentray-and-paths"` for path labels. */
+  commentrayPathForSearch?: string;
 };
 
 function renderGeneratorMetaHtml(label: string | undefined): string {
@@ -425,6 +433,12 @@ const CODE_BROWSER_STYLES = `
         vertical-align: top;
       }
       .block-stretch .stretch-gap-mark { display: inline-block; padding-top: 2px; }
+      .block-stretch .stretch-code-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        min-width: 0;
+      }
       .block-stretch .code-line {
         display: grid;
         grid-template-columns: max-content 1fr;
@@ -482,6 +496,8 @@ type CodeBrowserPageParts = {
   hljs: string;
   hljsDark: string;
   mermaidScript: string;
+  searchPlaceholder: string;
+  shellSearchAttrs: string;
 };
 
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
@@ -499,6 +515,8 @@ function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
     hljs,
     hljsDark,
     mermaidScript,
+    searchPlaceholder,
+    shellSearchAttrs,
   } = p;
   const shellClass = layout === "stretch" ? "shell shell--stretch-rows" : "shell";
   return `<!doctype html>
@@ -524,7 +542,7 @@ ${CODE_BROWSER_STYLES}
           ${filePathHtml}
           <span class="search-field">
             <label for="search-q">Search</label>
-            <input type="search" id="search-q" placeholder="Whole source (ordered tokens + fuzzy lines)…" autocomplete="off" spellcheck="false" />
+            <input type="search" id="search-q" placeholder="${escapeHtml(searchPlaceholder)}" autocomplete="off" spellcheck="false" />
             <button type="button" id="search-clear" title="Clear search">Clear</button>
           </span>
           ${relatedNavHtml}
@@ -533,7 +551,7 @@ ${CODE_BROWSER_STYLES}
         ${toolbarEndHtml}
       </header>
       <div class="search-results" id="search-results" hidden aria-live="polite"></div>
-      <div class="${shellClass}" id="shell" data-layout="${layout}" data-raw-code-b64="${escapeHtml(rawCodeB64)}" data-raw-md-b64="${escapeHtml(rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(scrollBlockLinksB64)}">
+      <div class="${shellClass}" id="shell" data-layout="${layout}" data-raw-code-b64="${escapeHtml(rawCodeB64)}" data-raw-md-b64="${escapeHtml(rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(scrollBlockLinksB64)}"${shellSearchAttrs}>
 ${shellInner}
       </div>
     </div>
@@ -649,6 +667,17 @@ mermaid.run({ querySelector: ".mermaid" });
   const layoutPref = opts.codeBrowserLayout ?? "auto";
   const { layout, shellInner, scrollBlockLinksB64 } = await buildCodeBrowserShell(opts, layoutPref);
 
+  const searchPlaceholder =
+    opts.staticSearchScope === "commentray-and-paths"
+      ? "Commentray + file paths (ordered tokens + fuzzy lines)…"
+      : "Whole source (ordered tokens + fuzzy lines)…";
+  const shellSearchAttrs =
+    opts.staticSearchScope === "commentray-and-paths"
+      ? ` data-search-scope="commentray-and-paths" data-search-file-path="${escapeHtml(
+          opts.filePath ?? "",
+        )}" data-search-commentray-path="${escapeHtml((opts.commentrayPathForSearch ?? "").trim())}"`
+      : "";
+
   return buildCodeBrowserPageHtml({
     title,
     generatorMetaHtml,
@@ -663,5 +692,7 @@ mermaid.run({ querySelector: ".mermaid" });
     hljs,
     hljsDark,
     mermaidScript,
+    searchPlaceholder,
+    shellSearchAttrs,
   });
 }

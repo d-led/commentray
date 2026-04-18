@@ -10,8 +10,9 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { loadCommentrayConfig, parseGithubRepoWebUrl } from "@commentray/core";
+import { loadCommentrayConfig, parseGithubRepoWebUrl, readIndex } from "@commentray/core";
 import { buildCommentrayStatic } from "@commentray/code-commentray-static";
+import { buildCommentrayNavSearchDocument } from "@commentray/render";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -75,6 +76,19 @@ const commentrayOutputUrls = {
   ...(ghParsed ? { githubBlobRepo: { owner: ghParsed.owner, repo: ghParsed.repo } } : {}),
 };
 
+let blockStretchRows;
+const projectIndex = await readIndex(repoRoot);
+if (projectIndex && ss.commentrayMarkdownFile) {
+  const entry = projectIndex.byCommentrayPath[ss.commentrayMarkdownFile];
+  if (entry && entry.blocks.length > 0 && entry.sourcePath === ss.sourceFile) {
+    blockStretchRows = {
+      index: projectIndex,
+      sourceRelative: entry.sourcePath,
+      commentrayPathRel: ss.commentrayMarkdownFile,
+    };
+  }
+}
+
 try {
   await mkdir(outDir, { recursive: true });
   await buildCommentrayStatic({
@@ -89,9 +103,26 @@ try {
     toolHomeUrl: COMMENTRAY_TOOL_HOME,
     commentrayOutputUrls,
     relatedGithubNav: ss.relatedGithubNav.length > 0 ? ss.relatedGithubNav : undefined,
+    staticSearchScope: "commentray-and-paths",
+    commentrayPathForSearch: ss.commentrayMarkdownFile ?? "",
+    ...(blockStretchRows ? { blockStretchRows } : {}),
   });
 } finally {
   await unlink(tmpMd).catch(() => {});
 }
 
+const navSearchPath = path.join(outDir, "commentray-nav-search.json");
+const navDoc = await buildCommentrayNavSearchDocument(
+  repoRoot,
+  ss.commentrayMarkdownFile
+    ? {
+        sourcePath: ss.sourceFile,
+        commentrayPath: ss.commentrayMarkdownFile,
+        markdownAbs: path.join(repoRoot, ss.commentrayMarkdownFile),
+      }
+    : undefined,
+);
+await writeFile(navSearchPath, `${JSON.stringify(navDoc, null, 2)}\n`, "utf8");
+
 console.log(`Wrote ${outHtml}`);
+console.log(`Wrote ${navSearchPath}`);
