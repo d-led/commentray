@@ -6,6 +6,8 @@ Have you ever wished a “commentary track” for code the way DVD extras let fi
 
 Inline comments are not always possible (generated files, tight formats, policy). Commentray keeps the primary artifact clean while storing rationale, warnings, and diagrams in **commentray**—Markdown that lives under `.commentray/source/` beside the code it explains. In a meeting you might hear: _“We have to document our architecture **in commentray** so that newcomers can have an effective source code onboarding experience.”_ Same word names the tool and the practice; context disambiguates.
 
+The same split is useful when you want **rich context for a human or a chatbot**—runbooks, product rationale, incident notes, onboarding prose—that does not belong in the source file itself, yet stays **correlatable** with specific lines or regions through the metadata index and block anchors, so the assistant can reason about “this commentary goes with that code” without you pasting a wall of inline comments into the repo.
+
 ## What’s in this repo
 
 - `@commentray/core`: models, TOML config, JSON metadata validation, Git SCM adapter, staleness helpers.
