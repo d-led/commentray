@@ -17,6 +17,9 @@ set -euo pipefail
 # .vsix instead:
 #   npm run extension:install
 #
+# `npm run build -w commentray-vscode` runs tsc then esbuild so `@commentray/core`
+# is inlined into dist/extension.js (same as packaged .vsix).
+#
 # Editor CLI:
 #   $COMMENTRAY_EDITOR (path or command) is honored first.
 #   Otherwise: prefer `cursor` if on PATH, else `code`.

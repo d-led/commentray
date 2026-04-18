@@ -23,6 +23,15 @@ describe("assertValidIndex", () => {
     expect(idx.byCommentrayPath[cp]?.blocks[0]?.id).toBe("b1");
   });
 
+  it("accepts schemaVersion as an integer string and canonicalizes to a number", () => {
+    const base = indexWithBlock({ id: "b1", anchor: "lines:1-2" });
+    const idx = assertValidIndex({
+      ...base,
+      schemaVersion: String(CURRENT_SCHEMA_VERSION),
+    });
+    expect(idx.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+  });
+
   it("rejects invalid shapes", () => {
     expect(() => assertValidIndex(null)).toThrow();
     expect(() => assertValidIndex({ schemaVersion: 999, byCommentrayPath: {} })).toThrow();

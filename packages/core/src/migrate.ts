@@ -1,6 +1,7 @@
 import {
   type CommentrayIndex,
   type SourceFileIndexEntry,
+  coerceIndexSchemaVersion,
   CURRENT_SCHEMA_VERSION,
 } from "./model.js";
 
@@ -15,7 +16,10 @@ export function migrateIndex(raw: unknown): { index: CommentrayIndex; changed: b
     };
   }
   const obj = raw as Record<string, unknown>;
-  const version = obj.schemaVersion;
+  const version = coerceIndexSchemaVersion(obj.schemaVersion);
+  if (version === null && obj.schemaVersion !== undefined) {
+    throw new TypeError(`Invalid index schemaVersion: ${String(obj.schemaVersion)}`);
+  }
 
   if (version === CURRENT_SCHEMA_VERSION) {
     const index = obj as CommentrayIndex;
@@ -34,7 +38,7 @@ export function migrateIndex(raw: unknown): { index: CommentrayIndex; changed: b
       byCommentrayPath,
     };
     const before = JSON.stringify({
-      schemaVersion: version ?? 0,
+      schemaVersion: version === undefined ? 0 : version,
       bySourceFile: obj.bySourceFile ?? {},
       byCommentrayPath: obj.byCommentrayPath ?? {},
     });
@@ -43,7 +47,7 @@ export function migrateIndex(raw: unknown): { index: CommentrayIndex; changed: b
     return { index: next, changed };
   }
 
-  throw new Error(`Cannot migrate from schemaVersion ${String(version)}`);
+  throw new Error(`Cannot migrate from schemaVersion ${String(obj.schemaVersion)}`);
 }
 
 function toByCommentrayPath(obj: Record<string, unknown>): Record<string, SourceFileIndexEntry> {

@@ -1,5 +1,5 @@
 export type { CommentrayBlock, CommentrayIndex, SourceFileIndexEntry } from "./model.js";
-export { CURRENT_SCHEMA_VERSION } from "./model.js";
+export { coerceIndexSchemaVersion, CURRENT_SCHEMA_VERSION } from "./model.js";
 export type {
   AddBlockToIndexInput,
   BlockRange,

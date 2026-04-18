@@ -69,7 +69,7 @@ npm run extension:dogfood              # opens packages/vscode/fixtures/dogfood
 npm run extension:dogfood -- <path>    # or open a specific folder
 ```
 
-This builds `@commentray/core` and the extension, then starts **Cursor** (if `cursor` is on `PATH`) or **VS Code** with `--extensionDevelopmentPath=packages/vscode`. Override the editor binary with `COMMENTRAY_EDITOR`.
+This builds `@commentray/core` and the extension (the extension `build` script runs **esbuild** so `@commentray/core` is bundled into `dist/extension.js`, matching the packaged `.vsix`), then starts **Cursor** (if `cursor` is on `PATH`) or **VS Code** with `--extensionDevelopmentPath=packages/vscode`. Override the editor binary with `COMMENTRAY_EDITOR`.
 
 By default it opens [`packages/vscode/fixtures/dogfood`](packages/vscode/fixtures/dogfood) — a committed sample workspace — rather than the Commentray repository itself. This sidesteps VS Code / Cursor's _"one folder per profile"_ rule: if you try to open a folder that your main Cursor window already holds open, the editor focus-steals back to the main window and the dev host is effectively unusable. Using a dedicated fixture avoids the collision entirely and keeps the dev host in your normal (logged-in) Cursor profile.
 

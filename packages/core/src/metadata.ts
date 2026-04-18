@@ -1,6 +1,6 @@
 import { parseAnchor, type ParsedAnchor } from "./anchors.js";
 import { assertValidMarkerId } from "./marker-ids.js";
-import { type CommentrayIndex, CURRENT_SCHEMA_VERSION } from "./model.js";
+import { type CommentrayIndex, coerceIndexSchemaVersion, CURRENT_SCHEMA_VERSION } from "./model.js";
 
 export function emptyIndex(): CommentrayIndex {
   return { schemaVersion: CURRENT_SCHEMA_VERSION, byCommentrayPath: {} };
@@ -11,9 +11,18 @@ export function assertValidIndex(value: unknown): CommentrayIndex {
     throw new TypeError("index.json must be a JSON object");
   }
   const obj = value as Record<string, unknown>;
-  const schemaVersion = obj.schemaVersion;
+  const schemaVersion = coerceIndexSchemaVersion(obj.schemaVersion);
+  if (schemaVersion === null) {
+    throw new TypeError(
+      `index.json schemaVersion must be an integer (got ${String(obj.schemaVersion)})`,
+    );
+  }
   if (schemaVersion !== CURRENT_SCHEMA_VERSION) {
-    throw new Error(`Unsupported schemaVersion: ${String(schemaVersion)}`);
+    throw new Error(
+      `Unsupported schemaVersion: ${String(obj.schemaVersion)} (this build expects ${String(CURRENT_SCHEMA_VERSION)}). ` +
+        "If the CLI just migrated your index, reload the editor window and ensure the Commentray extension was built " +
+        "from the same revision (dogfood: bash scripts/editor-extension.sh dogfood …; installed: bash scripts/install-extension.sh).",
+    );
   }
   const byCommentrayPath = obj.byCommentrayPath;
   if (typeof byCommentrayPath !== "object" || byCommentrayPath === null) {
@@ -22,7 +31,7 @@ export function assertValidIndex(value: unknown): CommentrayIndex {
   for (const [key, entry] of Object.entries(byCommentrayPath)) {
     validateCommentrayEntry(key, entry);
   }
-  return obj as CommentrayIndex;
+  return { ...obj, schemaVersion: CURRENT_SCHEMA_VERSION } as CommentrayIndex;
 }
 
 function validateCommentrayEntry(commentrayPathKey: string, entry: unknown): void {

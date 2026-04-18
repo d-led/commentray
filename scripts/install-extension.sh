@@ -43,9 +43,7 @@ fi
 
 echo "Building @commentray/core and bundling the extension..."
 npm run build -w @commentray/core
-# Typecheck via tsc (no emit needed — esbuild produces the final artifact).
 npm run build -w commentray-vscode
-node "$EXT_DIR/esbuild.extension.mjs"
 
 # `--no-dependencies` skips vsce's node_modules traversal: the bundle has
 # no runtime deps, so the symlinked workspace package shouldn't be inspected.

@@ -44,3 +44,17 @@ export type CommentrayIndex = {
 };
 
 export const CURRENT_SCHEMA_VERSION = 3 as const;
+
+/**
+ * Normalizes `index.json` `schemaVersion` after `JSON.parse` (integer, or
+ * rare string forms like `"3"`).
+ */
+export function coerceIndexSchemaVersion(raw: unknown): number | undefined | null {
+  if (raw === undefined) return undefined;
+  if (typeof raw === "number" && Number.isInteger(raw)) return raw;
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (/^\d+$/.test(t)) return Number.parseInt(t, 10);
+  }
+  return null;
+}

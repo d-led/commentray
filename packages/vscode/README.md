@@ -25,6 +25,25 @@ workspace.
 - `Commentray: Validate workspace metadata` — runs the same validation as
   `commentray validate` and prints issues to the _Commentray_ output channel.
 
+## Metadata vs Markdown
+
+Commentray keeps **block records** (anchor, optional snippet, verification fields) in
+`.commentray/metadata/index.json` under each companion file path. The Markdown
+track holds **`<!-- commentray:block id=… -->`** markers so tools know **where**
+each block’s prose lives and can scroll-sync; `commentray init` / `migrate` update
+**shape** (e.g. legacy fingerprint → snippet), they do **not** move the canonical
+block list out of the index.
+
+## Troubleshooting
+
+If you see **`Unsupported schemaVersion: …`** after the CLI migrated `index.json`,
+the extension host is still running an **older `@commentray/core`** than the CLI.
+**Dogfood:** run `bash scripts/editor-extension.sh dogfood <folder>` again (it bundles
+core into `dist/extension.js`), then **Developer: Reload Window** in that dev
+window. **Installed extension:** run `bash scripts/install-extension.sh` from the
+same repo revision and reload. Disable any older Commentray `.vsix` if both are
+present.
+
 ## Pairing convention
 
 For a source file at repo-relative path `src/foo.ts`, the paired commentray
