@@ -20,8 +20,8 @@ describe("Commentray static view — accessibility", () => {
   describe("landmarks and heading", () => {
     it("provides a banner, primary main region, and a single screen-reader page heading", () => {
       cy.get('[role="banner"][aria-label="View options"]').should("be.visible");
+      cy.get('header[role="banner"] h1.sr-only').should("contain", "Commentray");
       cy.get("main#main-content.app__main").should("exist");
-      cy.get("main#main-content h1.sr-only").should("contain", "Commentray");
       cy.get('[role="contentinfo"]').should("exist");
     });
 

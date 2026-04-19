@@ -319,6 +319,13 @@ function safeToolbarNavigationHref(url: string | undefined): string | null {
   return t;
 }
 
+function buildToolbarSiteHubHtml(siteHubUrl: string | undefined): string {
+  const site = safeToolbarNavigationHref(siteHubUrl);
+  if (!site) return "";
+  const se = escapeHtml(site);
+  return `<a class="toolbar-github" href="${se}" aria-label="Documentation home" title="Back to this site (hub)">${SITE_HOME_SVG}</a>`;
+}
+
 function buildToolbarEndHtml(
   githubRepoUrl: string | undefined,
   toolHomeUrl: string | undefined,
@@ -329,12 +336,7 @@ function buildToolbarEndHtml(
   const gh = safeExternalHttpUrl(githubRepoUrl);
   const tool = safeExternalHttpUrl(toolHomeUrl);
   const bits: string[] = [];
-  if (site) {
-    const se = escapeHtml(site);
-    bits.push(
-      `<a class="toolbar-github" href="${se}" aria-label="Documentation home" title="Back to this site (hub)">${SITE_HOME_SVG}</a>`,
-    );
-  } else if (gh) {
+  if (!site && gh) {
     const he = escapeHtml(gh);
     bits.push(
       `<a class="toolbar-github" href="${he}" target="_blank" rel="noopener noreferrer" aria-label="View repository on GitHub" title="View repository on GitHub">${GITHUB_MARK_SVG}</a>`,
@@ -772,6 +774,7 @@ const CODE_BROWSER_STYLES = `
       .app__footer-line { margin: 0; }
       .app__footer time { font-variant-numeric: tabular-nums; }
       .toolbar {
+        position: relative;
         display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 8px 12px;
         border-bottom: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
         font-size: var(--cr-ui-fs);
@@ -1158,6 +1161,8 @@ type CodeBrowserPageParts = {
   title: string;
   metaDescriptionHtml: string;
   generatorMetaHtml: string;
+  /** Same-site hub control; first in `toolbar__main` when present. */
+  toolbarSiteHubHtml: string;
   navRailContextHtml: string;
   angleSelectHtml: string;
   toolbarDocHubHtml: string;
@@ -1205,7 +1210,9 @@ ${CODE_BROWSER_STYLES}
     <a class="skip-link" href="#main-content">Skip to main content</a>
     <div class="app">
       <header class="toolbar" role="banner" aria-label="View options">
+        <h1 class="sr-only">${escapeHtml(p.title)}</h1>
         <div class="toolbar__main">
+          ${p.toolbarSiteHubHtml}
           ${p.navRailContextHtml}
           ${p.navRailDocumentedHtml}
           ${p.angleSelectHtml}
@@ -1225,7 +1232,6 @@ ${CODE_BROWSER_STYLES}
         <p class="nav-rail__search-hint chrome__search-hint">This pair + merged <code class="nav-rail__code">commentray-nav-search.json</code> when the export ships it.</p>
       </header>
       <main id="main-content" class="app__main" tabindex="-1">
-        <h1 class="sr-only">${escapeHtml(p.title)}</h1>
         <div class="${shellClass}" id="shell" data-layout="${p.layout}" data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}>
 ${p.shellInner}
         </div>
@@ -1560,6 +1566,7 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const metaDescriptionHtml = renderMetaDescriptionHtml(opts, title);
   const builtAt = opts.builtAt ?? new Date();
   const renderSemver = commentrayRenderVersion();
+  const toolbarSiteHubHtml = buildToolbarSiteHubHtml(opts.siteHubUrl);
   const toolbarEndHtml = buildToolbarEndHtml(
     opts.githubRepoUrl,
     opts.toolHomeUrl,
@@ -1608,6 +1615,7 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     title,
     metaDescriptionHtml,
     generatorMetaHtml,
+    toolbarSiteHubHtml,
     navRailContextHtml,
     angleSelectHtml: shell.angleSelectHtml,
     toolbarDocHubHtml,

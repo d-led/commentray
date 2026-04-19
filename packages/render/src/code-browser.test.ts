@@ -66,6 +66,7 @@ describe("Code browser page — layout shell and search", () => {
       '<meta name="description" content="Demo — Side-by-side source and commentray documentation." />',
     );
     expect(html).toContain('<main id="main-content" class="app__main" tabindex="-1">');
+    expect(html).toContain('<header class="toolbar" role="banner" aria-label="View options">');
     expect(html).toContain('<h1 class="sr-only">Demo</h1>');
     expect(html).toContain('class="skip-link" href="#main-content"');
     expect(html).toContain('role="banner"');
