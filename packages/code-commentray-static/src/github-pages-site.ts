@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
+  type CommentrayIndex,
   type ResolvedCommentrayConfig,
   type ResolvedStaticSite,
   loadCommentrayConfig,
@@ -19,6 +20,7 @@ import {
 import { type BuildCommentrayStaticOptions, buildCommentrayStatic } from "./build.js";
 import {
   flatBlockStretchRows,
+  type GithubNavBase,
   loadMultiAngleBrowsingIfEnabled,
   pickCommentrayBody,
   pickDefaultCommentrayRel,
@@ -29,6 +31,31 @@ import {
 import { pathExists } from "./github-pages-site-shared.js";
 
 const DEFAULT_TOOL_HOME = "https://github.com/d-led/commentray";
+
+async function multiAngleBrowsingForBrowsePair(
+  repoRoot: string,
+  cfg: ResolvedCommentrayConfig,
+  ss: ResolvedStaticSite,
+  projectIndex: CommentrayIndex | null,
+  ghNavBase: GithubNavBase | null,
+  pair: { sourcePath: string; commentrayPath: string },
+): Promise<CodeBrowserMultiAngleBrowsing | undefined> {
+  const multiForSource = await loadMultiAngleBrowsingIfEnabled(
+    repoRoot,
+    cfg,
+    { ...ss, sourceFile: pair.sourcePath },
+    projectIndex,
+    ghNavBase,
+  );
+  if (!multiForSource) return undefined;
+  const angleForPair = multiForSource.angles.find(
+    (a) => a.commentrayPathRel === pair.commentrayPath,
+  );
+  return {
+    ...multiForSource,
+    defaultAngleId: angleForPair?.id ?? multiForSource.defaultAngleId,
+  };
+}
 
 /**
  * Emits one static code browser HTML per documented pair under `_site/browse/*.html` and adds
@@ -42,6 +69,8 @@ async function writePerPairBrowseHtmlPages(input: {
   ss: ResolvedStaticSite;
   toolHomeUrl: string;
   builtAt: Date;
+  projectIndex: CommentrayIndex | null;
+  ghNavBase: GithubNavBase | null;
 }): Promise<CommentrayNavSearchDocument> {
   const pairs = input.navDoc.documentedPairs;
   if (!pairs?.length) return input.navDoc;
@@ -70,6 +99,16 @@ async function writePerPairBrowseHtmlPages(input: {
       markdownUrlBaseDirAbs,
     };
 
+    const multiAngleBrowsing = await multiAngleBrowsingForBrowsePair(
+      input.repoRoot,
+      input.cfg,
+      input.ss,
+      input.projectIndex,
+      input.ghNavBase,
+      p,
+    );
+    const commentrayPathForSearch = pickDefaultCommentrayRel(multiAngleBrowsing, p.commentrayPath);
+
     await buildCommentrayStatic({
       sourceFile: sourceAbs,
       markdownFile: mdAbs,
@@ -84,7 +123,8 @@ async function writePerPairBrowseHtmlPages(input: {
       relatedGithubNav:
         input.ss.relatedGithubNav.length > 0 ? input.ss.relatedGithubNav : undefined,
       staticSearchScope: "commentray-and-paths",
-      commentrayPathForSearch: p.commentrayPath,
+      commentrayPathForSearch,
+      ...(multiAngleBrowsing ? { multiAngleBrowsing } : {}),
       ...(p.sourceOnGithub ? { sourceOnGithubUrl: p.sourceOnGithub } : {}),
       ...(p.commentrayOnGithub ? { commentrayOnGithubUrl: p.commentrayOnGithub } : {}),
       documentedNavJsonUrl: "../commentray-nav-search.json",
@@ -251,6 +291,8 @@ export async function buildGithubPagesStaticSite(
         ss,
         toolHomeUrl,
         builtAt,
+        projectIndex,
+        ghNavBase,
       });
     }
     const documentedPairsEmbeddedB64 = documentedPairsEmbeddedB64FromNav(navDoc);

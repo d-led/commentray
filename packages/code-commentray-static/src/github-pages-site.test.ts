@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ensureAnglesSentinelFile } from "@commentray/core";
+
 import { buildGithubPagesStaticSite } from "./github-pages-site.js";
 
 async function writeMinimalPagesFixture(
@@ -67,6 +69,60 @@ describe("GitHub Pages static site output", () => {
     const browseHtml = await readFile(path.join(repo, "_site", "browse", browseName), "utf8");
     expect(browseHtml).toContain('href="../index.html"');
     expect(browseHtml).toContain('aria-label="Documentation home"');
+  });
+
+  it("includes the angle selector on browse permalinks when multi-angle is enabled", async () => {
+    repo = await mkdtemp(path.join(tmpdir(), "cr-pages-ang-"));
+    const storage = ".commentray";
+    await ensureAnglesSentinelFile(repo, storage);
+    await writeFile(
+      path.join(repo, ".commentray.toml"),
+      [
+        "[static_site]",
+        'title = "Angles"',
+        'source_file = "README.md"',
+        'commentray_markdown = ".commentray/source/README.md/main.md"',
+        "",
+        "[angles]",
+        'default_angle = "main"',
+        "",
+        "[[angles.definitions]]",
+        'id = "main"',
+        'title = "Main"',
+        "",
+        "[[angles.definitions]]",
+        'id = "architecture"',
+        'title = "Architecture"',
+        "",
+        "[render]",
+        "mermaid = false",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await writeFile(path.join(repo, "README.md"), "# App\n", "utf8");
+    await mkdir(path.join(repo, ".commentray", "source", "README.md"), { recursive: true });
+    await writeFile(
+      path.join(repo, ".commentray", "source", "README.md", "main.md"),
+      "# Main angle\n",
+      "utf8",
+    );
+    await writeFile(
+      path.join(repo, ".commentray", "source", "README.md", "architecture.md"),
+      "# Architecture angle\n",
+      "utf8",
+    );
+
+    await buildGithubPagesStaticSite({ repoRoot: repo });
+
+    const browseDir = path.join(repo, "_site", "browse");
+    const browseFiles = (await readdir(browseDir)).filter((f) => f.endsWith(".html"));
+    expect(browseFiles.length).toBeGreaterThanOrEqual(2);
+    for (const name of browseFiles) {
+      const browseHtml = await readFile(path.join(browseDir, name), "utf8");
+      expect(browseHtml).toContain('aria-label="Commentray angle"');
+      expect(browseHtml).toContain('id="commentray-multi-angle-b64"');
+    }
   });
 
   it("writes browse pages and hub nav without static_site.github_url (same-site navigation only)", async () => {
