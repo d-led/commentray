@@ -8,7 +8,7 @@ export function mermaidRuntimeScriptHtml(include: boolean | undefined): string {
   const cdn = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
   const moduleSource = [
     `import mermaid from "${cdn}";`,
-    `mermaid.initialize({ startOnLoad: true, securityLevel: "strict" });`,
+    `mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });`,
     `mermaid.run({ querySelector: ".mermaid" });`,
   ].join("");
   const asTextContent = JSON.stringify(moduleSource);

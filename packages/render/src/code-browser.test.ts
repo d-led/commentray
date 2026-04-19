@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { renderCodeBrowserHtml } from "./code-browser.js";
 
 describe("Code browser page — layout shell and search", () => {
-  it("should attach raw code and Markdown payloads to #shell for the client bundle", async () => {
+  it("should embed raw payloads on the shell element for the client bundle", async () => {
     const html = await renderCodeBrowserHtml({
       code: "x",
       language: "txt",
@@ -31,26 +31,26 @@ describe("Code browser page — layout shell and search", () => {
       commentrayPathForSearch: ".commentray/source/src/a.ts.md",
       staticSearchScope: "commentray-and-paths",
     });
+    expect(html).toContain('placeholder="Filename, path, or keywords…"');
+    expect(html).toContain("This pair + merged");
+    expect(html).toContain("commentray-nav-search.json");
     expect(html).toContain('data-search-scope="commentray-and-paths"');
     expect(html).toContain('data-search-file-path="src/a.ts"');
     expect(html).toContain('data-search-commentray-path=".commentray/source/src/a.ts.md"');
-    expect(html).toContain("nav-rail__search-hint");
-    expect(html).toContain("commentray-nav-search.json");
   });
 
-  it("should ship gutter, wrap toggle, search field, highlighted source, and rendered Markdown", async () => {
+  it("should ship resizable panes, wrap toggle, search, highlighted source, and rendered Markdown", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
       code: "const x = 1;",
       language: "ts",
       commentrayMarkdown: "## Notes\n\nHello.",
     });
-    expect(html).toContain('id="gutter"');
-    expect(html).toContain('id="wrap-lines"');
-    expect(html).toContain('id="search-q"');
-    expect(html).toContain("nav-rail__search-hint");
-    expect(html).toContain('id="code-line-0"');
+    expect(html).toContain('aria-label="Resize panes"');
+    expect(html).toContain('role="region" aria-label="Search"');
+    expect(html).toContain('for="search-q"');
     expect(html).toContain("Wrap code lines");
+    expect(html.replaceAll(/<[^>]*>/g, "")).toContain("const x = 1;");
     expect(html).toMatch(/hljs|language-ts/);
     expect(html).toContain("Notes");
   });
@@ -98,7 +98,7 @@ describe("Code browser page — toolbar chrome", () => {
     expect(html).toContain('href="https://github.com/acme/demo/blob/main/CONTRIBUTING.md"');
   });
 
-  it("should expose GitHub blob links and the documented-files hub with nav JSON hooks", async () => {
+  it("should expose GitHub blob links and the Comment-rayed files hub with nav JSON hooks", async () => {
     const pairsB64 = Buffer.from(
       JSON.stringify([
         {
@@ -123,18 +123,18 @@ describe("Code browser page — toolbar chrome", () => {
       documentedNavJsonUrl: "./commentray-nav-search.json",
       documentedPairsEmbeddedB64: pairsB64,
     });
-    expect(html).toContain('id="toolbar-source-github"');
-    expect(html).toContain('id="toolbar-commentray-github"');
-    expect(html).toContain('class="nav-rail__pair-gh"');
+    expect(html).toContain('aria-label="Source file on GitHub"');
+    expect(html).toContain('aria-label="Companion commentray on GitHub"');
     expect(html).toContain('href="https://github.com/acme/demo/blob/main/README.md"');
-    expect(html).toContain('id="documented-files-hub"');
-    expect(html).toContain('id="documented-files-filter"');
+    expect(html).toContain("Comment-rayed files");
+    expect(html).toContain('placeholder="Filter by path…"');
+    expect(html).toContain('role="tree"');
     expect(html).toContain('data-nav-json-url="./commentray-nav-search.json"');
     expect(html).toContain('data-nav-search-json-url="./commentray-nav-search.json"');
     expect(html).toContain('data-documented-pairs-b64="');
   });
 
-  it("should hydrate the documented-files tree from embedded pairs alone", async () => {
+  it("should hydrate the Comment-rayed files tree from embedded pairs alone", async () => {
     const pairsB64 = Buffer.from(
       JSON.stringify([
         {
@@ -153,24 +153,24 @@ describe("Code browser page — toolbar chrome", () => {
       commentrayMarkdown: "body",
       documentedPairsEmbeddedB64: pairsB64,
     });
-    expect(html).toContain('id="documented-files-hub"');
-    expect(html).toContain('id="documented-files-filter"');
+    expect(html).toContain("Comment-rayed files");
+    expect(html).toContain('placeholder="Filter by path…"');
     expect(html).toContain('data-nav-json-url=""');
     expect(html).toContain('data-documented-pairs-b64="');
   });
 });
 
 describe("Code browser page — source line chrome", () => {
-  it("should print one-based, non-selectable line numbers for every source line", async () => {
+  it("should print one-based line numbers beside each source line (non-selectable gutter)", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
       code: "one\ntwo\nthree",
       language: "txt",
       commentrayMarkdown: "body",
     });
-    expect(html).toContain('<span class="ln" aria-hidden="true">1</span>');
-    expect(html).toContain('<span class="ln" aria-hidden="true">2</span>');
-    expect(html).toContain('<span class="ln" aria-hidden="true">3</span>');
+    expect(html).toContain(">1</span>");
+    expect(html).toContain(">2</span>");
+    expect(html).toContain(">3</span>");
     expect(html).toMatch(/\.code-line \.ln[\s\S]*?user-select: none/);
   });
 
@@ -195,7 +195,7 @@ describe("Code browser page — file path display", () => {
       language: "ts",
       commentrayMarkdown: "body",
     });
-    expect(html).toContain("nav-rail__context");
+    expect(html).toContain('aria-label="Current documentation pair"');
     expect(html).toContain("packages/render/src/code-browser.ts");
   });
 
@@ -206,7 +206,6 @@ describe("Code browser page — file path display", () => {
       language: "md",
       commentrayMarkdown: "body",
     });
-    expect(html).toContain("nav-rail__pair-path");
     expect(html).toContain("README.md");
   });
 
@@ -232,9 +231,8 @@ describe("Code browser page — toolbar link policy", () => {
       githubRepoUrl: "https://github.com/example/demo",
       toolHomeUrl: "https://github.com/d-led/commentray",
     });
-    expect(html).toContain('class="toolbar-github"');
+    expect(html).toContain('aria-label="View repository on GitHub"');
     expect(html).toContain('href="https://github.com/example/demo"');
-    expect(html).toContain('class="toolbar-attribution"');
     expect(html).toContain('href="https://github.com/d-led/commentray"');
     expect(html).toContain("Rendered with");
     expect(html).toMatch(/toolbar-attribution__version[^>]*>v\d+\.\d+\.\d+/);
@@ -248,7 +246,6 @@ describe("Code browser page — toolbar link policy", () => {
       commentrayMarkdown: "body",
       builtAt: new Date("2026-05-01T12:00:00.000Z"),
     });
-    expect(html).toContain('class="app__footer"');
     expect(html).toContain("HTML generated");
     expect(html).toContain('datetime="2026-05-01T12:00:00.000Z"');
   });
@@ -262,9 +259,8 @@ describe("Code browser page — toolbar link policy", () => {
       githubRepoUrl: "javascript:alert(1)",
       toolHomeUrl: "data:text/html,hi",
     });
-    // CSS still defines `.toolbar-github` / `.toolbar-attribution`; assert markup only.
-    expect(html).not.toContain('<a class="toolbar-github"');
-    expect(html).not.toContain('<span class="toolbar-attribution"');
+    expect(html).not.toContain('aria-label="View repository on GitHub"');
+    expect(html).not.toContain("Rendered with");
     expect(html).not.toContain("javascript:");
     expect(html).not.toContain('href="data:');
   });
@@ -322,7 +318,7 @@ describe("Code browser page — multi-angle browsing", () => {
         ],
       },
     });
-    expect(html).toContain('id="angle-select"');
+    expect(html).toContain('aria-label="Commentray angle"');
     expect(html).toContain('value="main"');
     expect(html).toContain('value="architecture"');
     expect(html).toContain('id="commentray-multi-angle-b64"');
@@ -338,7 +334,8 @@ describe("Code browser page — block markers and scroll sync payload", () => {
       language: "txt",
       commentrayMarkdown: "<!-- commentray:block id=myblock -->\n\n## Title\n",
     });
-    expect(html).toContain('class="commentray-block-anchor"');
+    expect(html).toContain("<h2");
+    expect(html).toContain("Title");
     expect(html).toContain('id="commentray-block-myblock"');
   });
 

@@ -155,9 +155,10 @@ function remarkMermaidPlaceholders() {
       const value = node.value;
       const html: Html = {
         type: "html",
-        value: `<div class="commentray-mermaid"><pre class="mermaid"><code>${escapeHtml(
+        /** Diagram text must live directly under `<pre class="mermaid">` (no nested `<code>`); Mermaid 11 can mis-parse or fail when the source is only inside `<code>`. */
+        value: `<div class="commentray-mermaid"><pre class="mermaid">${escapeHtml(
           value,
-        )}</code></pre></div>`,
+        )}</pre></div>`,
       };
       parent.children[index] = html;
     });

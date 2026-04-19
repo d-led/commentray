@@ -31,7 +31,7 @@ describe("Static browse HTML build — shell", () => {
     expect(html).toContain('<meta name="generator" content="Commentray @commentray/render@');
     expect(html).toContain("@commentray/code-commentray-static@");
     expect(html).toContain("builtAt=2026-01-02T03:04:05.006Z");
-    expect(html).toContain('class="app__footer"');
+    expect(html).toContain("HTML generated");
     expect(html).toContain('datetime="2026-01-02T03:04:05.006Z"');
   });
 
@@ -58,7 +58,7 @@ describe("Static browse HTML build — shell", () => {
       filePath: "packages/code-commentray-static/fixtures/sample.ts",
     });
     const html = await readFile(outHtml, "utf8");
-    expect(html).toContain("nav-rail__context");
+    expect(html).toContain('aria-label="Current documentation pair"');
     expect(html).toContain("packages/code-commentray-static/fixtures/sample.ts");
   });
 
@@ -71,7 +71,6 @@ describe("Static browse HTML build — shell", () => {
       outHtml,
     });
     const html = await readFile(outHtml, "utf8");
-    expect(html).toContain("nav-rail__pair-path");
     expect(html).toContain("sample.ts");
   });
 });
@@ -122,8 +121,8 @@ describe("Static browse HTML build — URLs and toolbar", () => {
       toolHomeUrl: "https://github.com/d-led/commentray",
     });
     const html = await readFile(outHtml, "utf8");
-    expect(html).toContain('class="toolbar-github"');
+    expect(html).toContain('aria-label="View repository on GitHub"');
     expect(html).toContain('href="https://github.com/example/repo"');
-    expect(html).toContain('class="toolbar-attribution"');
+    expect(html).toContain("Rendered with");
   });
 });

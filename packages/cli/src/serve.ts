@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
@@ -88,13 +89,39 @@ export async function runServeStaticPages(
     queueRebuild();
   });
 
-  const shutdown = (): void => {
-    void watcher.close();
+  /** Wait for the inner HTTP server to exit so the configured port is free before this process exits (avoids the next `commentray serve` seeing 4173 still in use). */
+  async function stopServeChildAsync(): Promise<void> {
+    if (serveChild.exitCode !== null || serveChild.signalCode !== null) {
+      return;
+    }
+    const exitPromise = once(serveChild, "exit");
     serveChild.kill("SIGTERM");
+    const killTimer = setTimeout(() => {
+      try {
+        serveChild.kill("SIGKILL");
+      } catch {
+        // ESRCH if already gone
+      }
+    }, 8000);
+    try {
+      await exitPromise;
+    } finally {
+      clearTimeout(killTimer);
+    }
+  }
+
+  let exiting = false;
+  const exitClean = (): void => {
+    if (exiting) return;
+    exiting = true;
+    void (async () => {
+      void watcher.close();
+      await stopServeChildAsync();
+      process.exit(0);
+    })();
   };
 
-  process.on("SIGINT", () => {
-    shutdown();
-    process.exit(0);
-  });
+  process.once("SIGINT", exitClean);
+  // `serve-with-package-watch.mjs` restarts the CLI via SIGTERM.
+  process.once("SIGTERM", exitClean);
 }
