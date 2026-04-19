@@ -2,6 +2,12 @@
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+
+# Vitest workers often have a non-TTY stderr; default FORCE_COLOR so CLI warnings stay
+# highlighted in test and quality-gate output (NO_COLOR and FORCE_COLOR=0 still win).
+: "${FORCE_COLOR:=1}"
+export FORCE_COLOR
+
 mode="${COMMENTRAY_TEST_MODE:-unit}"
 case "$mode" in
   unit) exec npm run test:unit ;;
