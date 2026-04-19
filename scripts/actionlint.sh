@@ -34,7 +34,8 @@ resolve_bin() {
   tmp="$(mktemp -d)"
   dl="${tmp}/download-actionlint.bash"
   curl -fsSL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash" -o "${dl}"
-  bash "${dl}" "${ACTIONLINT_VERSION}" "${CACHE_DIR}"
+  # download-actionlint.bash logs to stdout; keep stdout clean for $(resolve_bin).
+  bash "${dl}" "${ACTIONLINT_VERSION}" "${CACHE_DIR}" >&2
   rm -rf "${tmp}"
   printf '%s\n' "${ACTIONLINT_VERSION}" >"${VERSION_FILE}"
   printf '%s\n' "${CACHED_BIN}"
