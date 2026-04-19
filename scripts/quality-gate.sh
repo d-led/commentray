@@ -24,7 +24,7 @@ cd "$REPO_ROOT"
 
 quality_gate_require_external_tools() {
   local failed=0
-  local al_version="${ACTIONLINT_VERSION:-1.7.7}"
+  local al_version="${ACTIONLINT_VERSION:-1.7.12}"
 
   if [[ ! -d "${REPO_ROOT}/node_modules" ]]; then
     echo "" >&2

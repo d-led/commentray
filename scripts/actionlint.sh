@@ -9,7 +9,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-ACTIONLINT_VERSION="${ACTIONLINT_VERSION:-1.7.7}"
+ACTIONLINT_VERSION="${ACTIONLINT_VERSION:-1.7.12}"
 CACHE_DIR="${REPO_ROOT}/.cache/actionlint"
 CACHED_BIN="${CACHE_DIR}/actionlint"
 VERSION_FILE="${CACHE_DIR}/version.txt"
