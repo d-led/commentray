@@ -33,8 +33,8 @@ The user-facing README should remain **terse and skimmable**, in the spirit of [
 - **Rendering**: `@commentray/render` provides Markdown → HTML with sanitization, highlighting, Mermaid containers, and HTML shells (simple side-by-side plus an interactive **static code browser** page).
 - **Static code browser sample**: the `@commentray/code-commentray-static` package emits a self-contained HTML file: highlighted code, rendered Markdown commentray, a **draggable vertical splitter**, and a **line-wrap toggle** for the code pane (client-side persistence via `localStorage`).
 - **Manipulation library**: `@commentray/core` owns models, validation, migrations, and staleness helpers.
-- **CLI**: `@commentray/cli` provides `init` (full idempotent setup), `init config`, `init scm` (git hooks), `validate`, `doctor`, `migrate`, `render`, and `paths`; **standalone SEA binaries** for Linux (x64, arm64), macOS (x64, arm64), and Windows (x64) are built in [`.github/workflows/binaries.yml`](../../.github/workflows/binaries.yml). CI workflow **artifacts expire** (14-day retention); **`v*`** tags attach binaries to **GitHub Releases** as the long-lived distribution surface (GitHub’s release asset store).
-- **Monorepo**: TypeScript, semantic versioning, packages start at **0.0.1**, **MPL-2.0** per published package.
+- **CLI**: `@commentray/cli` provides `init` (full idempotent setup), `init config`, `init scm` (git hooks), `validate`, `doctor`, `migrate`, `render`, and `paths`; **standalone SEA binaries** for Linux (x64, arm64), macOS (x64, arm64), and Windows (x64) are built in [`.github/workflows/binaries.yml`](../../.github/workflows/binaries.yml). CI workflow **artifacts expire** (14-day retention); **`v*`** tags are meant to attach binaries to **GitHub Releases** as the long-lived distribution surface (none published on that page yet).
+- **Monorepo**: TypeScript, coordinated **semver** across **`@commentray/*`** (see each `package.json`), **MPL-2.0** per published package.
 - **Config**: `.commentray.toml` at repo root with sensible defaults.
 - **Tooling**: Prettier for TS/JS/JSON/Markdown; ESLint for TS; Vitest at multiple tiers.
 - **CI**: GitHub Actions runs quick checks broadly; expensive workflows are opt-in.
@@ -81,7 +81,6 @@ docs/
   e2e-publish-checks.yml
   e2e.yml
   pages.yml
-.gitlab-ci.yml
 cypress/
   e2e/
   support/
@@ -123,7 +122,7 @@ This repository keeps **terse** commentray beside selected sources under [`.comm
 
 ## Packages and configuration
 
-- **Packages / workspaces** — See [`README.md` → What’s in this repo](../../README.md#whats-in-this-repo) and root [`package.json`](../../package.json) `workspaces`. Implementation lives under `packages/*/`.
+- **Packages / workspaces** — See [`README.md` → npm packages (library ecosystem)](../../README.md#npm-packages-library-ecosystem) and root [`package.json`](../../package.json) `workspaces`. Implementation lives under `packages/*/`.
 - **`.commentray.toml`** — Key semantics, Angles, and `[static_site]` fields are specified in [`docs/spec/storage.md`](../spec/storage.md) (and related specs). Defaults and comments live in the repo’s [`.commentray.toml`](../../.commentray.toml); parsing and merge rules in [`packages/core/src/config.ts`](../../packages/core/src/config.ts). Dependency: `@iarna/toml` (revisit periodically for maintenance and security).
 
 ## Static code browser (`@commentray/code-commentray-static`)
@@ -210,7 +209,7 @@ The plan doc, the specs under `docs/spec/`, and README/CONTRIBUTING cover engine
 
 ## Implementation status (living)
 
-**In place today:** monorepo scaffolding; `@commentray/core` (paths, index schema, migrations, Git SCM, anchors, staleness, scroll/block helpers, Angles resolution); `@commentray/render` (sanitize, highlight, Mermaid, static code browser HTML + client search/sync, line-gutter alignment fix for wrapped rows); `@commentray/code-commentray-static`; `@commentray/cli` (init family, validate, doctor, migrate, render, paths, SEA binaries workflow); `commentray-vscode` (paired panes, block-from-selection, validation channel, block-aware scroll when index + markers agree, Angles commands); tiered Vitest; `quality-gate.sh` on every push/PR; optional expensive CI; GitHub Pages via `pages.yml`; **Cypress on GitHub** — [`ci.yml`](../../.github/workflows/ci.yml) job **`e2e-static`** (`pages:build` + Cypress in `cypress/included`, artifact **`e2e-ci-bundle`**), then [`e2e-publish-checks.yml`](../../.github/workflows/e2e-publish-checks.yml) for Checks; [`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml) is manual-only. Locally **`npm run e2e`** / **`npm run cy`** (see README). **GitLab** still runs `npm run e2e` in [`.gitlab-ci.yml`](../../.gitlab-ci.yml) for teams using that mirror.
+**In place today:** monorepo scaffolding; `@commentray/core` (paths, index schema, migrations, Git SCM, anchors, staleness, scroll/block helpers, Angles resolution); `@commentray/render` (sanitize, highlight, Mermaid, static code browser HTML + client search/sync, line-gutter alignment fix for wrapped rows); `@commentray/code-commentray-static`; `@commentray/cli` (init family, validate, doctor, migrate, render, paths, SEA binaries workflow); `commentray-vscode` (paired panes, block-from-selection, validation channel, block-aware scroll when index + markers agree, Angles commands); tiered Vitest; `quality-gate.sh` on every push/PR; optional expensive CI; GitHub Pages via `pages.yml`; **Cypress on GitHub** — [`ci.yml`](../../.github/workflows/ci.yml) job **`e2e-static`** (`pages:build` + Cypress in `cypress/included`, artifact **`e2e-ci-bundle`**), then [`e2e-publish-checks.yml`](../../.github/workflows/e2e-publish-checks.yml) for Checks; [`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml) is manual-only. Locally **`npm run e2e`** / **`npm run cy`** (`package.json` scripts).
 
 **Gaps and follow-ups (engineering, not duplicate of Open technical choices):**
 

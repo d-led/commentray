@@ -18,11 +18,11 @@ Initialize Git first (`git init`) or run the command from the **repository root*
 
 ## macOS blocks the downloaded CLI binary
 
-See [Install → macOS Gatekeeper](install.md#macos-gatekeeper).
+See [Development → macOS quarantine (standalone CLI)](../development.md#macos-quarantine-standalone-cli).
 
 ## `COMMENTRAY_SEA_NODE` / binary build complaints
 
-Local **SEA** builds want a Node layout compatible with the bundling step. Point **`COMMENTRAY_SEA_NODE`** at a **nodejs.org**-style binary matching CI’s major version. Details: root [`README.md` → Standalone CLI binaries](../../README.md#standalone-cli-binaries).
+Local **SEA** builds want a Node layout compatible with the bundling step. Point **`COMMENTRAY_SEA_NODE`** at a **nodejs.org**-style binary matching CI’s major version. Details: [Development → Building binaries locally](../development.md#building-binaries-locally).
 
 ## Extension does not open the file I expect
 

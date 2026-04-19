@@ -30,10 +30,10 @@ Warnings from **`validate`** / **`doctor`** do **not** force exit **1**.
 
 ## Environment variables
 
-| Variable                  | Used for                                                                                                                                                                                                  |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`COMMENTRAY_EDITOR`**   | Repo scripts that launch an editor (`code` vs `cursor`, etc.). See root [`README.md`](../../README.md).                                                                                                   |
-| **`COMMENTRAY_SEA_NODE`** | Local **standalone binary** builds: point at a **nodejs.org**-style Node binary when Homebrew’s Node is unsuitable. See [`README.md` → Standalone CLI binaries](../../README.md#standalone-cli-binaries). |
+| Variable                  | Used for                                                                                                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`COMMENTRAY_EDITOR`**   | Repo scripts that launch an editor (`code` vs `cursor`, etc.). See root [`README.md`](../../README.md).                                                                                                         |
+| **`COMMENTRAY_SEA_NODE`** | Local **standalone binary** builds: point at a **nodejs.org**-style Node binary when Homebrew’s Node is unsuitable. See [Development → Building binaries locally](../development.md#building-binaries-locally). |
 
 ## See also
 

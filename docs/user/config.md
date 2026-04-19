@@ -18,11 +18,11 @@ Paths in config must be **repo-relative** with **no `..` segments**. **`storage.
 
 ## `[render]`
 
-| Key                              | Default       | Meaning                                                               |
-| -------------------------------- | ------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **`mermaid`**                    | `true`        | Allow Mermaid fences in rendered HTML pipelines that honor this flag. |
-| **`syntaxTheme`**                | `github-dark` | Highlight.js theme name for HTML output.                              |
-| **`relative_github_blob_links`** | `false`       | When `true`, rewrite `https://github.com/owner/repo/blob              | tree/branch/…` links in commentray to paths relative to generated HTML; needs a parseable **`[static_site].github_url`\*\*. |
+| Key                              | Default       | Meaning                                                                                                                                                   |
+| -------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`mermaid`**                    | `true`        | Allow Mermaid fences in rendered HTML pipelines that honor this flag.                                                                                     |
+| **`syntaxTheme`**                | `github-dark` | Highlight.js theme name for HTML output.                                                                                                                  |
+| **`relative_github_blob_links`** | `false`       | When `true`, rewrite GitHub `blob` / `tree` links in commentray to paths relative to generated HTML; requires a parseable **`[static_site].github_url`**. |
 
 ## `[anchors]`
 

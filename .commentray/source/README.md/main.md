@@ -39,7 +39,7 @@ You may be reading a **generated** page: `@commentray/code-commentray-static`, [
 - **Greenfield adopt** — `commentray init` is idempotent; nothing in the primary tree has to move first.
 - **Hook paranoia** — `init scm` runs `validate` before merge; opt-in because hooks are a team contract.
 - **“Why is my tree red?”** — `doctor` stacks environment checks on `validate`.
-- **Binaries** — **GitHub Releases** for downloads; CI artifacts from [`binaries.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml) expire after 14 days by design.
+- **Binaries** — **GitHub Releases** when published (none yet); CI artifacts from [`binaries.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml) expire after 14 days by design.
 - **Your own Pages** — Copy [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml), adjust `[static_site]`, run `npm run pages:build`.
 
 ## Architecture (who talks to whom)

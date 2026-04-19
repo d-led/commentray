@@ -15,7 +15,7 @@ Commands below assume your **shell’s current directory** is the **repository r
 commentray init
 ```
 
-This is **idempotent**: it ensures `.commentray/`, a starter **`.commentray/metadata/index.json`** if missing, **`.commentray.toml`** if missing, refreshes index migrations, merges the **Commentray** VS Code extension into `.vscode/extensions.json` when safe, and runs **`commentray validate`**. Exit code **1** means validation reported **errors** (fix them before relying on CI or hooks).
+This is **idempotent**: it ensures `.commentray/`, a starter **`.commentray/metadata/index.json`** if missing, **`.commentray.toml`** if missing, refreshes index migrations, merges the **Commentray** VS Code extension into `.vscode/extensions.json` when safe, and runs **`commentray validate`**. Exit code **1** means validation reported **errors** (fix them before relying on hooks or any **`validate`** step you run in CI).
 
 Optional: install the **pre-commit** fragment so commits run validate when `commentray` is on `PATH`:
 

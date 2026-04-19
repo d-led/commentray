@@ -1,6 +1,6 @@
 # What Commentray detects (and where)
 
-Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. Each layer catches different failures at different moments. None of them replace the others: use **hooks + CI** for hard guarantees, **validate** for scripts, **doctor** for troubleshooting, and the **extension** for feedback while you type.
+Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. Each layer catches different failures at different moments. None of them replace the others: use **hooks** and, in **your own** CI, **`commentray validate`** on pull requests when you want blocking checks; run **`validate`** manually or from scripts; use **`doctor`** for troubleshooting; use the **extension** for feedback while you type. (This monorepo’s default GitHub Actions **quick** job runs the **quality gate** and tests—it does not invoke `commentray validate` unless you add a step.)
 
 ## Pre-commit hook (`commentray init scm`)
 
@@ -36,7 +36,7 @@ Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. E
 
 - **When:** While editing in VS Code or Cursor.
 - **What:** Open paired commentray, **bidirectional scroll sync** (block-aware when **index.json** and Markdown markers align), **add block from selection**, workspace validation in an **output channel**.
-- **Exit:** N/A—this is interactive. It does **not** replace hooks or CI for blocking bad commits.
+- **Exit:** N/A—this is interactive. It does **not** replace hooks or pipeline checks you add in CI for blocking bad commits.
 
 ## Known gaps (policy, not silent bugs)
 

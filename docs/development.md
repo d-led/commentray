@@ -16,6 +16,22 @@ install Commentray to use it, see the top-level `README.md`.
   rendered commentary pages.
 - `packages/vscode` — VS Code / Cursor extension.
 
+## Clone and workspace setup
+
+```bash
+git clone https://github.com/d-led/commentray.git
+cd commentray
+npm ci
+npm run setup          # install, build, init, doctor — idempotent
+```
+
+Symlink the workspace CLI so rebuilds pick up without reinstalling:
+
+```bash
+npm run cli:install    # bash scripts/install-cli.sh
+# later: npm run cli:uninstall
+```
+
 ## Quality gate
 
 One command gates every review:
@@ -54,9 +70,29 @@ The repo is developed with **npm**. **Yarn** is an alternative path via `.yarnrc
 **Permalinks:** the static hub and `_site/browse/` pages are meant to provide **stable, working URLs** for sharing. Policy and constraints are in [`docs/plan/plan.md` § Permalinks and stable URLs](plan/plan.md#permalinks-and-stable-urls-design-intent). When you change URL shape or client navigation, update tests and note breaking changes in the PR.
 
 - **Init:** `npm run commentray -- init` is idempotent (storage, seed `index.json` / `.commentray.toml` when missing). Use `npm run commentray -- init config` for TOML defaults, or `init config --force` to replace. `npm run commentray -- init scm` refreshes the marked `pre-commit` block that runs `commentray validate` when the linked CLI exists at the repo root.
-- **Standalone binaries:** `npm run binary:build` then `npm run binary:smoke` (README **Standalone CLI binaries**). CI: [`.github/workflows/binaries.yml`](../.github/workflows/binaries.yml); workflow artifacts expire; **`v*`** tags attach builds to [GitHub Releases](https://github.com/d-led/commentray/releases). On macOS with Homebrew Node, point `COMMENTRAY_SEA_NODE` at an official `node` binary for local SEA builds.
+- **Standalone binaries / CI:** [`.github/workflows/binaries.yml`](../.github/workflows/binaries.yml); workflow artifacts expire; **`v*`** tags are meant to attach builds to [GitHub Releases](https://github.com/d-led/commentray/releases) (none published yet). Local builds, smoke tests, and macOS quarantine: see subsections below (README **Standalone CLI binaries**).
 - **GitHub Pages:** set `[static_site]` in `.commentray.toml`; `npm run pages:build` writes `_site/`. [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) deploys on `main` when **Settings → Pages → Build: GitHub Actions** is enabled.
 - **Local Pages preview (watch):** **`npm run serve`** and **`npm run pages:serve`** both run [`scripts/serve.sh`](../scripts/serve.sh), which builds the CLI stack then runs [`scripts/serve-with-package-watch.mjs`](../scripts/serve-with-package-watch.mjs): that layer watches `packages/{core,render,code-commentray-static,cli}/src` (and render's `esbuild-code-browser-client.mjs`), rebuilds affected workspace packages on save, and **automatically restarts** **`commentray serve`** when needed so Node reloads `dist/`—you do **not** need to stop or restart the dev server by hand. Inside the CLI, **`commentray serve`** watches `.commentray.toml`, static-site inputs, companions under `.commentray/`, and `index.json`, rebuilds **`_site/`** on change, and keeps the same HTTP listener; new files are picked up without a manual **`serve` restart** (refresh the browser to load them; there is no built-in browser livereload yet). Default port **4173** (override with `npm run serve -- --port 8080`). Set **`COMMENTRAY_SERVE_NO_PACKAGE_WATCH=1`** to skip the workspace watcher (one-shot package builds only). For native file watching on the workspace tree, set **`COMMENTRAY_SERVE_PACKAGE_WATCH_POLL=0`** (defaults to polling to avoid **EMFILE** with small `ulimit -n`).
+
+### macOS quarantine (standalone CLI)
+
+Apple’s security layer may block a downloaded `commentray-darwin-*` binary until you clear the quarantine extended attribute:
+
+```bash
+xattr -d com.apple.quarantine /path/to/commentray-darwin-arm64
+```
+
+Broader cleanup (all extended attributes on one file):
+
+```bash
+xattr -c /path/to/commentray-darwin-arm64
+```
+
+(`xattr -r` is not valid on macOS; use `find … -exec` only if you truly need a tree.)
+
+### Building binaries locally
+
+From the repo root: `npm ci`, then `npm run binary:build` and `npm run binary:smoke`. If your `node` is from **Homebrew**, the SEA build may need a **nodejs.org**-style Node of the same major as CI—set **`COMMENTRAY_SEA_NODE`** to that binary’s path (the build script logs what it used).
 
 ## Expensive CI
 
@@ -64,7 +100,7 @@ The repo is developed with **npm**. **Yarn** is an alternative path via `.yarnrc
 
 ## GitHub CI (Cypress static site)
 
-On push/PR, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs job **`e2e-static`** after **`quick`**: `pages:build`, Cypress in `cypress/included`, artifact **`e2e-ci-bundle`**. The static server listens on **14173** (not the dev **`commentray serve`** default **4173**). [`.github/workflows/e2e-publish-checks.yml`](../.github/workflows/e2e-publish-checks.yml) (`workflow_run` on **`ci`**) downloads that bundle and publishes JUnit to **GitHub Checks** without checking out fork PR SHAs. Ad-hoc runs: [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml) (**workflow_dispatch** only). See the top-level README **GitHub Actions**; locally use `npm run e2e` or `npm run e2e:ci`.
+On push/PR, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs job **`e2e-static`** after **`quick`**: `pages:build`, Cypress in `cypress/included`, artifact **`e2e-ci-bundle`**. The static server listens on **14173** (not the dev **`commentray serve`** default **4173**). [`.github/workflows/e2e-publish-checks.yml`](../.github/workflows/e2e-publish-checks.yml) (`workflow_run` on **`ci`**) downloads that bundle and publishes JUnit to **GitHub Checks** without checking out fork PR SHAs. Ad-hoc runs: [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml) (**workflow_dispatch** only). Locally use `npm run e2e` or `npm run e2e:ci`.
 
 ## Editor extension workflows
 
