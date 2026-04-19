@@ -11,7 +11,11 @@ import {
   githubRepoBlobFileUrl,
   parseGithubRepoWebUrl,
 } from "@commentray/core";
-import type { CodeBrowserMultiAngleBrowsing, CodeBrowserMultiAngleSpec } from "@commentray/render";
+import {
+  browsePageSlugFromPair,
+  type CodeBrowserMultiAngleBrowsing,
+  type CodeBrowserMultiAngleSpec,
+} from "@commentray/render";
 
 import type { BuildCommentrayStaticOptions } from "./build.js";
 import { composeCommentrayMarkdown, pathExists } from "./github-pages-site-shared.js";
@@ -22,6 +26,49 @@ export function resolveGithubNavBase(ss: ResolvedStaticSite): GithubNavBase | nu
   const ghWeb = ss.githubUrl ? parseGithubRepoWebUrl(ss.githubUrl) : null;
   if (!ghWeb) return null;
   return { owner: ghWeb.owner, repo: ghWeb.repo, branch: ss.githubBlobBranch || "main" };
+}
+
+async function multiAngleSpecForDefinition(
+  repoRoot: string,
+  cfg: ResolvedCommentrayConfig,
+  ss: ResolvedStaticSite,
+  projectIndex: CommentrayIndex | null,
+  ghNavBase: GithubNavBase | null,
+  def: NonNullable<ResolvedCommentrayConfig["angles"]>["definitions"][number],
+): Promise<CodeBrowserMultiAngleSpec | undefined> {
+  const rel = commentrayMarkdownPathForAngle(ss.sourceFile, def.id, cfg.storageDir);
+  const abs = path.join(repoRoot, rel);
+  if (!(await pathExists(abs))) return undefined;
+  const rawFile = await readFile(abs, "utf8");
+  const composed = composeCommentrayMarkdown(ss.introMarkdown, rawFile);
+  let angleBlockStretch: CodeBrowserMultiAngleSpec["blockStretchRows"];
+  if (projectIndex) {
+    const entry = projectIndex.byCommentrayPath[rel];
+    if (entry && entry.blocks.length > 0 && entry.sourcePath === ss.sourceFile) {
+      angleBlockStretch = {
+        index: projectIndex,
+        sourceRelative: entry.sourcePath,
+        commentrayPathRel: rel,
+      };
+    }
+  }
+  const commentrayOnGithubUrl =
+    ghNavBase !== null
+      ? githubRepoBlobFileUrl(ghNavBase.owner, ghNavBase.repo, ghNavBase.branch, rel)
+      : undefined;
+  const staticBrowseUrl =
+    ghNavBase !== null
+      ? `./browse/${browsePageSlugFromPair({ sourcePath: ss.sourceFile, commentrayPath: rel })}.html`
+      : undefined;
+  return {
+    id: def.id,
+    title: def.title,
+    markdown: composed,
+    commentrayPathRel: rel,
+    commentrayOnGithubUrl,
+    ...(staticBrowseUrl !== undefined ? { staticBrowseUrl } : {}),
+    ...(angleBlockStretch ? { blockStretchRows: angleBlockStretch } : {}),
+  };
 }
 
 export async function loadMultiAngleBrowsingIfEnabled(
@@ -37,34 +84,8 @@ export async function loadMultiAngleBrowsingIfEnabled(
 
   const angles: CodeBrowserMultiAngleSpec[] = [];
   for (const def of angleDefs) {
-    const rel = commentrayMarkdownPathForAngle(ss.sourceFile, def.id, cfg.storageDir);
-    const abs = path.join(repoRoot, rel);
-    if (!(await pathExists(abs))) continue;
-    const rawFile = await readFile(abs, "utf8");
-    const composed = composeCommentrayMarkdown(ss.introMarkdown, rawFile);
-    let angleBlockStretch: CodeBrowserMultiAngleSpec["blockStretchRows"];
-    if (projectIndex) {
-      const entry = projectIndex.byCommentrayPath[rel];
-      if (entry && entry.blocks.length > 0 && entry.sourcePath === ss.sourceFile) {
-        angleBlockStretch = {
-          index: projectIndex,
-          sourceRelative: entry.sourcePath,
-          commentrayPathRel: rel,
-        };
-      }
-    }
-    const commentrayOnGithubUrl =
-      ghNavBase !== null
-        ? githubRepoBlobFileUrl(ghNavBase.owner, ghNavBase.repo, ghNavBase.branch, rel)
-        : undefined;
-    angles.push({
-      id: def.id,
-      title: def.title,
-      markdown: composed,
-      commentrayPathRel: rel,
-      commentrayOnGithubUrl,
-      ...(angleBlockStretch ? { blockStretchRows: angleBlockStretch } : {}),
-    });
+    const spec = await multiAngleSpecForDefinition(repoRoot, cfg, ss, projectIndex, ghNavBase, def);
+    if (spec !== undefined) angles.push(spec);
   }
   if (angles.length < 2) return undefined;
   return { defaultAngleId: defaultAngleIdForOpen(cfg), angles };

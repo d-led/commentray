@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -13,6 +12,7 @@ import {
 import {
   type CodeBrowserMultiAngleBrowsing,
   type CommentrayNavSearchDocument,
+  browsePageSlugFromPair,
   buildCommentrayNavSearchDocument,
 } from "@commentray/render";
 
@@ -30,13 +30,6 @@ import {
 import { pathExists } from "./github-pages-site-shared.js";
 
 const DEFAULT_TOOL_HOME = "https://github.com/d-led/commentray";
-
-function browsePageSlug(pair: { sourcePath: string; commentrayPath: string }): string {
-  return createHash("sha256")
-    .update(`${pair.commentrayPath}\0${pair.sourcePath}`, "utf8")
-    .digest("base64url")
-    .slice(0, 28);
-}
 
 /**
  * Emits one static code browser HTML per documented pair under `_site/browse/*.html` and adds
@@ -57,7 +50,7 @@ async function writePerPairBrowseHtmlPages(input: {
 
   const augmented = pairs.map((p) => ({
     ...p,
-    staticBrowseUrl: `./browse/${browsePageSlug(p)}.html`,
+    staticBrowseUrl: `./browse/${browsePageSlugFromPair(p)}.html`,
   }));
   const navWithUrls: CommentrayNavSearchDocument = { ...input.navDoc, documentedPairs: augmented };
   const emb = documentedPairsEmbeddedB64FromNav(navWithUrls, input.ghNavBase);
@@ -66,7 +59,7 @@ async function writePerPairBrowseHtmlPages(input: {
   await mkdir(browseDir, { recursive: true });
 
   for (const p of augmented) {
-    const slug = browsePageSlug(p);
+    const slug = browsePageSlugFromPair(p);
     const outPath = path.join(browseDir, `${slug}.html`);
     const sourceAbs = resolvePathUnderRepoRoot(input.repoRoot, p.sourcePath);
     const mdAbs = resolvePathUnderRepoRoot(input.repoRoot, p.commentrayPath);

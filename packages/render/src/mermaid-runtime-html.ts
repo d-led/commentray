@@ -9,6 +9,8 @@ export function mermaidRuntimeScriptHtml(include: boolean | undefined): string {
   const moduleSource = [
     `import mermaid from "${cdn}";`,
     `mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });`,
+    // Multi-angle swaps replace #doc-pane-body HTML after load; the client calls this to render new .mermaid nodes.
+    `globalThis.commentrayMermaid=mermaid;`,
     `mermaid.run({ querySelector: ".mermaid" });`,
   ].join("");
   const asTextContent = JSON.stringify(moduleSource);

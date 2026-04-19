@@ -53,6 +53,24 @@ describe("Code browser page — layout shell and search", () => {
     expect(html.replaceAll(/<[^>]*>/g, "")).toContain("const x = 1;");
     expect(html).toMatch(/hljs|language-ts/);
     expect(html).toContain("Notes");
+    expect(html).toContain(
+      '<meta name="description" content="Demo — Side-by-side source and commentray documentation." />',
+    );
+    expect(html).toContain('<main id="main-content" class="app__main" tabindex="-1">');
+    expect(html).toContain('<h1 class="sr-only">Demo</h1>');
+    expect(html).toContain('class="skip-link" href="#main-content"');
+    expect(html).toContain('role="banner"');
+  });
+
+  it("should use a custom meta description when provided", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      metaDescription: "Custom summary for listings.",
+    });
+    expect(html).toContain('<meta name="description" content="Custom summary for listings." />');
   });
 
   it("should render commentray inline markdown after block markers (anchors must not break mdast)", async () => {

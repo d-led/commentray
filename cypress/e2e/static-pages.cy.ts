@@ -26,14 +26,15 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.get('[aria-label="Commentray"] em').first().should("contain.text", "You have the main");
     });
 
-    it("then the hub exposes GitHub source links and a collapsible Comment-rayed files tree", () => {
+    it("then the hub exposes GitHub source link, same-site Doc browse link, and a collapsible Comment-rayed files tree", () => {
       cy.visitStaticSiteHome();
       cy.get('a[aria-label="Source file on GitHub"]')
         .should("have.attr", "href")
         .and("match", /github\.com/);
-      cy.get('a[aria-label="Companion commentray on GitHub"]')
+      cy.get("#toolbar-commentray-github")
         .should("have.attr", "href")
-        .and("match", /github\.com/);
+        .and("match", /\/browse\/[^/]+\.html$/)
+        .and("not.include", "github.com");
       cy.contains("summary", "Comment-rayed files").click();
       cy.get('[role="tree"]', { timeout: 15000 })
         .find("a")
@@ -96,16 +97,18 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.get('select[aria-label="Commentray angle"]').select("architecture");
       cy.get('select[aria-label="Commentray angle"]').should("have.value", "architecture");
       cy.get('[aria-label="Commentray"]').should("contain", "architecture angle");
-      cy.get('a[aria-label="Companion commentray on GitHub"]')
+      cy.get("#toolbar-commentray-github")
         .should("have.attr", "href")
-        .and("match", /architecture\.md/);
+        .and("match", /\/browse\/[^/]+\.html$/)
+        .and("not.include", "github.com");
 
       cy.get('select[aria-label="Commentray angle"]').select("main");
       cy.get('select[aria-label="Commentray angle"]').should("have.value", "main");
       cy.get('[aria-label="Commentray"]').should("contain", "quick-start");
-      cy.get('a[aria-label="Companion commentray on GitHub"]')
+      cy.get("#toolbar-commentray-github")
         .should("have.attr", "href")
-        .and("match", /main\.md/);
+        .and("match", /\/browse\/[^/]+\.html$/)
+        .and("not.include", "github.com");
     });
 
     it("then switching Angle clears the in-page search field and hides results", () => {

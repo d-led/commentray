@@ -24,6 +24,11 @@ export type CodeBrowserMultiAngleSpec = {
   markdown: string;
   commentrayPathRel: string;
   commentrayOnGithubUrl?: string;
+  /**
+   * When the static site emits `_site/browse/<slug>.html` per pair, same-tab navigation for the
+   * Doc toolbar control (preferred over {@link commentrayOnGithubUrl} on the hub).
+   */
+  staticBrowseUrl?: string;
   blockStretchRows?: {
     index: CommentrayIndex;
     sourceRelative: string;
@@ -73,6 +78,10 @@ export type CodeBrowserPageOptions = {
    */
   generatorLabel?: string;
   /**
+   * `<meta name="description">` content. When omitted, a short string is derived from the page title.
+   */
+  metaDescription?: string;
+  /**
    * Instant this HTML was produced (footer “generated at” line and default generator meta).
    * Defaults to `new Date()` when omitted.
    */
@@ -113,6 +122,11 @@ export type CodeBrowserPageOptions = {
    */
   commentrayOnGithubUrl?: string;
   /**
+   * When set (e.g. `./browse/<slug>.html` from the static Pages build), the Doc toolbar icon
+   * opens this URL on the **same origin** instead of GitHub.
+   */
+  commentrayStaticBrowseUrl?: string;
+  /**
    * Relative URL to a nav JSON document (e.g. `./commentray-nav-search.json`) that includes
    * `documentedPairs` — enables the **Comment-rayed files** tree in the toolbar.
    */
@@ -134,6 +148,20 @@ function renderGeneratorMetaHtml(label: string | undefined): string {
   const t = label?.trim();
   if (!t) return "";
   return `<meta name="generator" content="${escapeHtml(t)}" />\n    `;
+}
+
+const META_DESCRIPTION_MAX_LEN = 320;
+
+function codeBrowserMetaDescription(opts: CodeBrowserPageOptions, title: string): string {
+  const custom = opts.metaDescription?.trim();
+  if (custom) return custom.slice(0, META_DESCRIPTION_MAX_LEN);
+  const fallback = `${title} — Side-by-side source and commentray documentation.`;
+  return fallback.slice(0, META_DESCRIPTION_MAX_LEN);
+}
+
+function renderMetaDescriptionHtml(opts: CodeBrowserPageOptions, title: string): string {
+  const content = codeBrowserMetaDescription(opts, title);
+  return `<meta name="description" content="${escapeHtml(content)}" />\n    `;
 }
 
 /** Single capture: marker id (avoid a wrapping group around the whole comment — that shifted indices). */
@@ -264,6 +292,14 @@ function safeExternalHttpUrl(url: string | undefined): string | null {
   return t;
 }
 
+/** Allows relative static browse links (`./browse/…`) and `http(s):` URLs; rejects `javascript:` / `data:`. */
+function safeToolbarNavigationHref(url: string | undefined): string | null {
+  const t = url?.trim();
+  if (!t) return null;
+  if (/^(javascript|data):/i.test(t)) return null;
+  return t;
+}
+
 function buildToolbarEndHtml(
   githubRepoUrl: string | undefined,
   toolHomeUrl: string | undefined,
@@ -340,27 +376,34 @@ function renderToolbarDocHubHtml(opts: {
 function renderNavRailContextHtml(
   filePath: string | undefined,
   commentrayPath: string | undefined,
-  opts?: { sourceOnGithubUrl?: string; commentrayOnGithubUrl?: string },
+  opts?: {
+    sourceOnGithubUrl?: string;
+    commentrayOnGithubUrl?: string;
+    commentrayStaticBrowseUrl?: string;
+  },
 ): string {
   const fpRaw = (filePath ?? "").trim();
   const crRaw = (commentrayPath ?? "").trim();
   const srcUrl = safeExternalHttpUrl(opts?.sourceOnGithubUrl);
   const crUrl = safeExternalHttpUrl(opts?.commentrayOnGithubUrl);
-  if (fpRaw.length === 0 && crRaw.length === 0 && srcUrl === null && crUrl === null) {
+  const browseForCr = safeToolbarNavigationHref(opts?.commentrayStaticBrowseUrl);
+  const srcGh =
+    srcUrl !== null
+      ? `<a class="nav-rail__pair-gh" id="toolbar-source-github" href="${escapeHtml(srcUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Source file on GitHub" title="Open source on GitHub">${GITHUB_MARK_SVG}</a>`
+      : "";
+  const crGh =
+    browseForCr !== null
+      ? `<a class="nav-rail__pair-gh" id="toolbar-commentray-github" href="${escapeHtml(browseForCr)}" rel="noopener" aria-label="Open companion pair in the site viewer" title="Open on site">${GITHUB_MARK_SVG}</a>`
+      : crUrl !== null
+        ? `<a class="nav-rail__pair-gh" id="toolbar-commentray-github" href="${escapeHtml(crUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Companion commentray on GitHub" title="Open companion Markdown on GitHub">${GITHUB_MARK_SVG}</a>`
+        : "";
+  if (fpRaw.length === 0 && crRaw.length === 0 && srcGh === "" && crGh === "") {
     return "";
   }
   const fp = escapeHtml(fpRaw);
   const cr = escapeHtml(crRaw);
   const fpDisp = fpRaw.length > 0 ? fp : "—";
   const crDisp = crRaw.length > 0 ? cr : "—";
-  const srcGh =
-    srcUrl !== null
-      ? `<a class="nav-rail__pair-gh" id="toolbar-source-github" href="${escapeHtml(srcUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Source file on GitHub" title="Open source on GitHub">${GITHUB_MARK_SVG}</a>`
-      : "";
-  const crGh =
-    crUrl !== null
-      ? `<a class="nav-rail__pair-gh" id="toolbar-commentray-github" href="${escapeHtml(crUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Companion commentray on GitHub" title="Open companion Markdown on GitHub">${GITHUB_MARK_SVG}</a>`
-      : "";
   return `<div class="nav-rail__context nav-rail__context--compact" aria-label="Current documentation pair">
     <span class="nav-rail__pair">
       <span class="nav-rail__pair-lab">Src</span>
@@ -393,6 +436,49 @@ const CODE_BROWSER_STYLES = `
       :root { color-scheme: light dark; }
       * { box-sizing: border-box; }
       body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      .skip-link {
+        position: absolute;
+        left: -9999px;
+        top: 0;
+        z-index: 10000;
+        padding: 8px 16px;
+        margin: 0;
+        font: inherit;
+        font-size: 14px;
+        text-decoration: none;
+        border-radius: 8px;
+        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+        background: Canvas;
+        color: CanvasText;
+      }
+      .skip-link:focus {
+        left: 12px;
+        top: 8px;
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
+      }
+      .skip-link:focus:not(:focus-visible) {
+        left: -9999px;
+        top: 0;
+        outline: none;
+      }
+      .skip-link:focus-visible {
+        left: 12px;
+        top: 8px;
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
       .app {
         display: flex;
         flex-direction: column;
@@ -440,6 +526,11 @@ const CODE_BROWSER_STYLES = `
         border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
         background: color-mix(in oklab, CanvasText 6%, Canvas);
         color: CanvasText;
+      }
+      .chrome__search-row input[type="search"]:focus-visible,
+      .chrome__search-row #search-clear:focus-visible {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
       }
       .chrome__search-label {
         flex: 0 0 auto;
@@ -667,6 +758,10 @@ const CODE_BROWSER_STYLES = `
       }
       .toolbar-attribution a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
       .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+      .toolbar label input:focus-visible {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
+      }
       .toolbar .file-path {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
         font-size: 13px; font-weight: 500;
@@ -858,6 +953,10 @@ const CODE_BROWSER_STYLES = `
         font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 6px;
         border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas); background: Canvas; color: CanvasText;
       }
+      .toolbar-angle-picker select:focus-visible {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
+      }
       .pane--doc { font-size: 15px; line-height: 1.45; }
       .pane--doc img { max-width: 100%; height: auto; }
       .pane--doc .commentray-line-anchor {
@@ -964,6 +1063,7 @@ const CODE_BROWSER_SEARCH_INPUT_TITLE =
 
 type CodeBrowserPageParts = {
   title: string;
+  metaDescriptionHtml: string;
   generatorMetaHtml: string;
   navRailContextHtml: string;
   angleSelectHtml: string;
@@ -997,7 +1097,7 @@ function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    ${p.generatorMetaHtml}<title>${escapeHtml(p.title)}</title>
+    ${p.metaDescriptionHtml}${p.generatorMetaHtml}<title>${escapeHtml(p.title)}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/${escapeHtml(
       p.hljs,
     )}.min.css" media="(prefers-color-scheme: light)" />
@@ -1009,8 +1109,9 @@ ${CODE_BROWSER_STYLES}
     </style>
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     <div class="app">
-      <header class="toolbar" aria-label="View options">
+      <header class="toolbar" role="banner" aria-label="View options">
         <div class="toolbar__main">
           ${p.navRailContextHtml}
           ${p.navRailDocumentedHtml}
@@ -1030,11 +1131,12 @@ ${CODE_BROWSER_STYLES}
         <div class="search-results" id="search-results" hidden aria-live="polite"></div>
         <p class="nav-rail__search-hint chrome__search-hint">This pair + merged <code class="nav-rail__code">commentray-nav-search.json</code> when the export ships it.</p>
       </header>
-      <div class="app__main">
+      <main id="main-content" class="app__main" tabindex="-1">
+        <h1 class="sr-only">${escapeHtml(p.title)}</h1>
         <div class="${shellClass}" id="shell" data-layout="${p.layout}" data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}>
 ${p.shellInner}
         </div>
-      </div>
+      </main>
       ${p.pageFooterHtml}
     </div>
     <script type="text/plain" id="commentray-multi-angle-b64">${p.multiAngleScriptBlock}</script>
@@ -1058,6 +1160,7 @@ type CodeBrowserShell = {
     scrollBlockLinksB64: string;
     commentrayPathForSearch: string;
     commentrayOnGithubUrl?: string;
+    commentrayStaticBrowseUrl?: string;
   };
 };
 
@@ -1069,7 +1172,45 @@ type MultiAngleJsonRow = {
   scrollBlockLinksB64: string;
   commentrayPathForSearch: string;
   commentrayOnGithubUrl?: string;
+  staticBrowseUrl?: string;
 };
+
+async function multiAngleJsonRowAndDocHtml(
+  opts: CodeBrowserPageOptions,
+  spec: CodeBrowserMultiAngleSpec,
+): Promise<{ jsonRow: MultiAngleJsonRow; commentrayHtml: string; scrollB64: string }> {
+  const rows = spec.blockStretchRows;
+  const links =
+    rows !== undefined
+      ? buildBlockScrollLinks(
+          rows.index,
+          rows.sourceRelative,
+          rows.commentrayPathRel,
+          spec.markdown,
+          opts.code,
+        )
+      : [];
+  const mdForDoc = injectCommentrayDocAnchors(spec.markdown, links.length > 0 ? links : undefined);
+  const scrollB64 =
+    links.length > 0 ? Buffer.from(JSON.stringify(links), "utf8").toString("base64") : "";
+  const commentrayHtml = await renderMarkdownToHtml(mdForDoc, {
+    commentrayOutputUrls: opts.commentrayOutputUrls,
+  });
+  return {
+    jsonRow: {
+      id: spec.id,
+      title: spec.title?.trim() || spec.id,
+      docInnerHtmlB64: Buffer.from(commentrayHtml, "utf8").toString("base64"),
+      rawMdB64: Buffer.from(spec.markdown, "utf8").toString("base64"),
+      scrollBlockLinksB64: scrollB64,
+      commentrayPathForSearch: spec.commentrayPathRel.trim(),
+      commentrayOnGithubUrl: spec.commentrayOnGithubUrl,
+      staticBrowseUrl: spec.staticBrowseUrl,
+    },
+    commentrayHtml,
+    scrollB64,
+  };
+}
 
 async function buildMultiAngleDualPaneShell(
   opts: CodeBrowserPageOptions,
@@ -1088,47 +1229,25 @@ async function buildMultiAngleDualPaneShell(
   let defaultScrollB64 = "";
   let defaultPathSearch = (opts.commentrayPathForSearch ?? "").trim();
   let defaultGh = opts.commentrayOnGithubUrl;
+  let defaultStaticBrowse = (opts.commentrayStaticBrowseUrl ?? "").trim();
   let defaultPaneHtml = "";
 
   const codeHtml = await renderHighlightedCodeLineRows(opts.code, opts.language);
 
   for (const spec of multi.angles) {
-    const rows = spec.blockStretchRows;
-    const links =
-      rows !== undefined
-        ? buildBlockScrollLinks(
-            rows.index,
-            rows.sourceRelative,
-            rows.commentrayPathRel,
-            spec.markdown,
-            opts.code,
-          )
-        : [];
-    const mdForDoc = injectCommentrayDocAnchors(
-      spec.markdown,
-      links.length > 0 ? links : undefined,
-    );
-    const scrollB64 =
-      links.length > 0 ? Buffer.from(JSON.stringify(links), "utf8").toString("base64") : "";
-    const commentrayHtml = await renderMarkdownToHtml(mdForDoc, {
-      commentrayOutputUrls: opts.commentrayOutputUrls,
-    });
+    const { jsonRow, commentrayHtml, scrollB64 } = await multiAngleJsonRowAndDocHtml(opts, spec);
     if (spec.id === defaultId) {
       defaultMarkdown = spec.markdown;
       defaultScrollB64 = scrollB64;
       defaultPathSearch = spec.commentrayPathRel.trim();
       defaultGh = spec.commentrayOnGithubUrl;
+      {
+        const sb = (spec.staticBrowseUrl ?? "").trim();
+        if (sb.length > 0) defaultStaticBrowse = sb;
+      }
       defaultPaneHtml = commentrayHtml;
     }
-    jsonAngles.push({
-      id: spec.id,
-      title: spec.title?.trim() || spec.id,
-      docInnerHtmlB64: Buffer.from(commentrayHtml, "utf8").toString("base64"),
-      rawMdB64: Buffer.from(spec.markdown, "utf8").toString("base64"),
-      scrollBlockLinksB64: scrollB64,
-      commentrayPathForSearch: spec.commentrayPathRel.trim(),
-      commentrayOnGithubUrl: spec.commentrayOnGithubUrl,
-    });
+    jsonAngles.push(jsonRow);
   }
 
   const selOpts = multi.angles
@@ -1160,6 +1279,7 @@ async function buildMultiAngleDualPaneShell(
       scrollBlockLinksB64: defaultScrollB64,
       commentrayPathForSearch: defaultPathSearch,
       commentrayOnGithubUrl: defaultGh,
+      ...(defaultStaticBrowse.length > 0 ? { commentrayStaticBrowseUrl: defaultStaticBrowse } : {}),
     },
     angleSelectHtml,
     multiAnglePayloadB64,
@@ -1296,6 +1416,18 @@ function toolbarCommentrayGithubFromShell(
   return shell.multiShell?.commentrayOnGithubUrl ?? opts.commentrayOnGithubUrl;
 }
 
+function toolbarCommentrayStaticBrowseFromShell(
+  shell: CodeBrowserShell,
+  opts: CodeBrowserPageOptions,
+): string | undefined {
+  const t = (
+    shell.multiShell?.commentrayStaticBrowseUrl ??
+    opts.commentrayStaticBrowseUrl ??
+    ""
+  ).trim();
+  return t.length > 0 ? t : undefined;
+}
+
 function rawMdB64FromShell(shell: CodeBrowserShell, opts: CodeBrowserPageOptions): string {
   return (
     shell.multiShell?.rawMdB64 ?? Buffer.from(opts.commentrayMarkdown, "utf8").toString("base64")
@@ -1332,6 +1464,7 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const rawCodeB64 = Buffer.from(opts.code, "utf8").toString("base64");
 
   const title = codeBrowserPageTitle(opts);
+  const metaDescriptionHtml = renderMetaDescriptionHtml(opts, title);
   const builtAt = opts.builtAt ?? new Date();
   const renderSemver = commentrayRenderVersion();
   const toolbarEndHtml = buildToolbarEndHtml(opts.githubRepoUrl, opts.toolHomeUrl, renderSemver);
@@ -1369,11 +1502,13 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     {
       sourceOnGithubUrl: opts.sourceOnGithubUrl,
       commentrayOnGithubUrl: toolbarCommentrayGithubFromShell(shell, opts),
+      commentrayStaticBrowseUrl: toolbarCommentrayStaticBrowseFromShell(shell, opts),
     },
   );
 
   return buildCodeBrowserPageHtml({
     title,
+    metaDescriptionHtml,
     generatorMetaHtml,
     navRailContextHtml,
     angleSelectHtml: shell.angleSelectHtml,

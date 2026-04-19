@@ -28,6 +28,9 @@ describe("Static browse HTML build — shell", () => {
     const html = await readFile(outHtml, "utf8");
     expect(html).toContain("greet");
     expect(html).toContain("Resizable divider");
+    expect(html).toContain(
+      '<meta name="description" content="Test — Side-by-side source and commentray documentation." />',
+    );
     expect(html).toContain('<meta name="generator" content="Commentray @commentray/render@');
     expect(html).toContain("@commentray/code-commentray-static@");
     expect(html).toContain("builtAt=2026-01-02T03:04:05.006Z");

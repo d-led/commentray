@@ -39,6 +39,21 @@ import {
 } from "./code-browser-pair-nav.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
+/** Set by the Mermaid module script in {@link ./mermaid-runtime-html.ts} (same origin, not `file:`). */
+type CommentrayMermaidGlobal = {
+  run: (opts: { nodes?: HTMLElement[]; querySelector?: string }) => Promise<unknown>;
+};
+
+function runMermaidOnFreshDocNodes(docBody: HTMLElement): void {
+  if (typeof globalThis.location !== "undefined" && globalThis.location.protocol === "file:") return;
+  const nodes = docBody.querySelectorAll(".mermaid");
+  if (nodes.length === 0) return;
+  const m = (globalThis as unknown as { commentrayMermaid?: CommentrayMermaidGlobal }).commentrayMermaid;
+  if (!m) return;
+  const list = Array.from(nodes) as HTMLElement[];
+  void m.run({ nodes: list }).catch(() => {});
+}
+
 type HitKind = "code" | "md" | "path";
 
 /** Optional `crPath` / `spPath` tie a hit to a companion file (hub search); omit for the open pair only. */
@@ -816,18 +831,12 @@ function centerYInViewport(el: Element): number {
 }
 
 /**
- * Vertical center of the highlighted source text for gutter rays. Using the outer `.code-line`
- * row includes the line-number column and extra vertical slack from the grid; Highlight.js
- * padding on `pre`/`code` can shift the glyph center above the row’s geometric center — anchoring
- * to `pre code` tracks the visible passage.
+ * Vertical anchor for gutter rays on the source side. Must match the **numbered row** the reader
+ * sees: the full `.code-line` row (line number + highlighted code) shares one grid row with
+ * aligned line-heights. Measuring only `pre code` can shift Y (hljs spans, sub-pixel layout) so
+ * rays sit above the line labels; the row’s geometric center tracks `lines:a-b` anchors reliably.
  */
 function codeLineHighlightCenterYViewport(lineEl: HTMLElement): number {
-  const code =
-    lineEl.querySelector<HTMLElement>("pre code.hljs") ??
-    lineEl.querySelector<HTMLElement>("pre code");
-  if (code) return centerYInViewport(code);
-  const pre = lineEl.querySelector<HTMLElement>("pre");
-  if (pre) return centerYInViewport(pre);
   return centerYInViewport(lineEl);
 }
 
@@ -1314,6 +1323,7 @@ type MultiAngleClientPayload = {
     scrollBlockLinksB64: string;
     commentrayPathForSearch: string;
     commentrayOnGithubUrl?: string;
+    staticBrowseUrl?: string;
   }[];
 };
 
@@ -1527,6 +1537,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
         const a = multiPayload.angles.find((x) => x.id === angleSel.value);
         if (!a) return;
         docBody.innerHTML = decodeBase64Utf8(a.docInnerHtmlB64);
+        runMermaidOnFreshDocNodes(docBody);
         mutable.rawMd = decodeBase64Utf8(a.rawMdB64);
         mutable.mdLines = mutable.rawMd.split("\n");
         mutable.commentrayPathLabel = a.commentrayPathForSearch;
@@ -1542,8 +1553,24 @@ function wireDualPaneMultiAngleAndScroll(args: {
           else docPathEl.removeAttribute("title");
         }
         const gh = document.getElementById("toolbar-commentray-github");
-        if (gh instanceof HTMLAnchorElement && a.commentrayOnGithubUrl?.trim()) {
-          gh.href = a.commentrayOnGithubUrl.trim();
+        if (gh instanceof HTMLAnchorElement) {
+          const browse = a.staticBrowseUrl?.trim() ?? "";
+          if (browse.length > 0) {
+            gh.href = resolveStaticBrowseHref(
+              browse,
+              globalThis.location.pathname,
+              globalThis.location.origin,
+            );
+            gh.removeAttribute("target");
+            gh.setAttribute("rel", "noopener");
+          } else {
+            const ghu = a.commentrayOnGithubUrl?.trim();
+            if (ghu) {
+              gh.href = ghu;
+              gh.target = "_blank";
+              gh.setAttribute("rel", "noopener noreferrer");
+            }
+          }
         }
         searchInput.value = "";
         searchResults.innerHTML = "";

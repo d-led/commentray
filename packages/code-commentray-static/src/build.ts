@@ -61,6 +61,8 @@ export type BuildCommentrayStaticOptions = {
   sourceOnGithubUrl?: string;
   /** GitHub blob URL for the companion commentray Markdown file. */
   commentrayOnGithubUrl?: string;
+  /** Same-site browse URL for the companion (e.g. `./browse/<slug>.html`); overrides GitHub for the Doc icon when set. */
+  commentrayStaticBrowseUrl?: string;
   /** Relative URL to `commentray-nav-search.json` for the documented-files tree. */
   documentedNavJsonUrl?: string;
   /** Base64 UTF-8 JSON of `documentedPairs` embedded on `#shell` for offline tree hydration. */
@@ -124,6 +126,7 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     blockStretchRows: opts.blockStretchRows,
     sourceOnGithubUrl: opts.sourceOnGithubUrl,
     commentrayOnGithubUrl: opts.commentrayOnGithubUrl,
+    commentrayStaticBrowseUrl: opts.commentrayStaticBrowseUrl,
     documentedNavJsonUrl: opts.documentedNavJsonUrl,
     documentedPairsEmbeddedB64: opts.documentedPairsEmbeddedB64,
     multiAngleBrowsing: opts.multiAngleBrowsing,
