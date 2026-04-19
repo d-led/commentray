@@ -1,12 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import {
   MARKER_ID_BODY,
   buildBlockScrollLinks,
   type BlockScrollLink,
   type CommentrayIndex,
+  findMonorepoPackagesDir,
+  monorepoLayoutStartDir,
 } from "@commentray/core";
 
 import { tryBuildBlockStretchTableHtml } from "./block-stretch-layout.js";
@@ -447,9 +448,10 @@ function renderNavRailContextHtml(
 
 /** IIFE produced by `npm run build -w @commentray/render` (esbuild of `code-browser-client.ts`). */
 function loadCodeBrowserClientBundle(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const inDist = join(here, "code-browser-client.bundle.js");
-  const fromSrc = join(here, "..", "dist", "code-browser-client.bundle.js");
+  const packagesDir = findMonorepoPackagesDir(monorepoLayoutStartDir(import.meta.url));
+  const renderDistDir = join(packagesDir, "render", "dist");
+  const inDist = join(renderDistDir, "code-browser-client.bundle.js");
+  const fromSrc = join(packagesDir, "render", "code-browser-client.bundle.js");
   for (const p of [inDist, fromSrc]) {
     if (existsSync(p)) {
       return readFileSync(p, "utf8");

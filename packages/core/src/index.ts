@@ -37,6 +37,7 @@ export {
   normalizeRepoRelativePath,
   resolvePathUnderRepoRoot,
 } from "./paths.js";
+export { findMonorepoPackagesDir, monorepoLayoutStartDir } from "./monorepo-layout.js";
 export {
   discoverCommentrayPairsOnDisk,
   pairFromCommentraySourceRel,

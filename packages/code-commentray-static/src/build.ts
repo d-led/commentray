@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import type { CommentrayIndex } from "@commentray/core";
+import {
+  type CommentrayIndex,
+  findMonorepoPackagesDir,
+  monorepoLayoutStartDir,
+} from "@commentray/core";
 import {
   type CodeBrowserMultiAngleBrowsing,
   type CommentrayOutputUrlOptions,
@@ -73,7 +76,10 @@ export type BuildCommentrayStaticOptions = {
   multiAngleBrowsing?: CodeBrowserMultiAngleBrowsing;
 };
 
-const staticPackageDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const staticPackageDir = path.join(
+  findMonorepoPackagesDir(monorepoLayoutStartDir(import.meta.url)),
+  "code-commentray-static",
+);
 
 function defaultGeneratorLabel(builtAt: Date): string {
   const raw = readFileSync(path.join(staticPackageDir, "package.json"), "utf8");

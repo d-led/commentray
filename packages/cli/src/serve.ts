@@ -3,9 +3,15 @@ import { once } from "node:events";
 import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 
 import { buildGithubPagesStaticSite } from "@commentray/code-commentray-static/github-pages-site";
-import { loadCommentrayConfig, normalizeRepoRelativePath } from "@commentray/core";
+import {
+  findMonorepoPackagesDir,
+  loadCommentrayConfig,
+  monorepoLayoutStartDir,
+  normalizeRepoRelativePath,
+} from "@commentray/core";
 import chokidar from "chokidar";
 
 export type ServeCliOptions = {
@@ -13,7 +19,9 @@ export type ServeCliOptions = {
 };
 
 function resolveServeMain(): string {
-  const require = createRequire(import.meta.url);
+  const packagesDir = findMonorepoPackagesDir(monorepoLayoutStartDir(import.meta.url));
+  const repoRoot = path.join(packagesDir, "..");
+  const require = createRequire(pathToFileURL(path.join(repoRoot, "package.json")).href);
   return require.resolve("serve/build/main.js");
 }
 

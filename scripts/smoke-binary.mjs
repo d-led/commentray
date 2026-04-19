@@ -5,11 +5,14 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const cliVersion = JSON.parse(
+  readFileSync(join(REPO_ROOT, "packages", "cli", "package.json"), "utf8"),
+).version;
 const OUT_DIR = join(REPO_ROOT, "packages", "cli", "dist", "bin");
 
 function binaryName() {
@@ -44,11 +47,11 @@ if (!existsSync(binPath)) {
   process.exit(1);
 }
 
-expectSuccess("--version prints 0.0.1", ["--version"], { expectOutput: "0.0.1" });
+expectSuccess(`--version prints ${cliVersion}`, ["--version"], { expectOutput: cliVersion });
 expectSuccess("--help lists init", ["--help"], { expectOutput: "init" });
 expectSuccess("init --help shows scm subcommand", ["init", "--help"], { expectOutput: "scm" });
-expectSuccess("paths prints .commentray/source path", ["paths", "src/foo.ts"], {
-  expectOutput: ".commentray/source/src/foo.ts.md",
+expectSuccess("paths prints companion commentray path for src/foo.ts", ["paths", "src/foo.ts"], {
+  expectOutput: ".commentray/source/src/foo.ts",
 });
 
 console.log("binary smoke tests passed");
