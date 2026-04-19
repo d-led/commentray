@@ -2,7 +2,7 @@
   "name": "commentray-vscode",
   "displayName": "Commentray",
   "description": "Side-by-side authoring for Commentray markdown tracks",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "d-led",
   "private": true,
   "license": "MPL-2.0",
@@ -96,7 +96,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@commentray/core": "0.0.4"
+    "@commentray/core": "0.0.5"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
