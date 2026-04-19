@@ -365,7 +365,7 @@ function renderNavRailContextHtml(
     <span class="nav-rail__pair-sep" aria-hidden="true">·</span>
     <span class="nav-rail__pair">
       <span class="nav-rail__pair-lab">Doc</span>
-      <span class="nav-rail__pair-path nav-rail__pair-path--secondary" title="${cr}">${crDisp}</span>${crGh}
+      <span class="nav-rail__pair-path nav-rail__pair-path--secondary" id="nav-rail-doc-path" title="${cr}">${crDisp}</span>${crGh}
     </span>
   </div>`;
 }
@@ -971,7 +971,18 @@ ${CODE_BROWSER_STYLES}
   </head>
   <body>
     <div class="app">
-      <header class="app__chrome" role="region" aria-label="Search and navigation">
+      <header class="toolbar" aria-label="View options">
+        <div class="toolbar__main">
+          ${p.navRailContextHtml}
+          ${p.navRailDocumentedHtml}
+          ${p.angleSelectHtml}
+          ${p.toolbarDocHubHtml}
+          ${p.relatedNavHtml}
+          <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
+        </div>
+        ${p.toolbarEndHtml}
+      </header>
+      <header class="app__chrome" role="region" aria-label="Search">
         <div class="chrome__search-row">
           <label class="chrome__search-label nav-rail__search-label" for="search-q">Search</label>
           <input type="search" id="search-q" placeholder="${escapeHtml(p.searchPlaceholder)}" title="${escapeHtml(CODE_BROWSER_SEARCH_INPUT_TITLE)}" autocomplete="off" spellcheck="false" />
@@ -981,17 +992,6 @@ ${CODE_BROWSER_STYLES}
         <p class="nav-rail__search-hint chrome__search-hint">This pair + merged <code class="nav-rail__code">commentray-nav-search.json</code> when the export ships it.</p>
       </header>
       <div class="app__main">
-        <header class="toolbar" aria-label="View options">
-          <div class="toolbar__main">
-            ${p.navRailContextHtml}
-            ${p.navRailDocumentedHtml}
-            ${p.angleSelectHtml}
-            ${p.toolbarDocHubHtml}
-            ${p.relatedNavHtml}
-            <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
-          </div>
-          ${p.toolbarEndHtml}
-        </header>
         <div class="${shellClass}" id="shell" data-layout="${p.layout}" data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}>
 ${p.shellInner}
         </div>

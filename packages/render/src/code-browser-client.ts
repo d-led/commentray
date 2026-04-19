@@ -1433,6 +1433,13 @@ function wireDualPaneMultiAngleAndScroll(args: {
         scrollLinksRef.current = parseScrollBlockLinksFromShell(a.scrollBlockLinksB64);
         shell.setAttribute("data-scroll-block-links-b64", a.scrollBlockLinksB64);
         shell.setAttribute("data-search-commentray-path", a.commentrayPathForSearch);
+        const docPathEl = document.getElementById("nav-rail-doc-path");
+        if (docPathEl) {
+          const path = a.commentrayPathForSearch.trim();
+          docPathEl.textContent = path.length > 0 ? path : "—";
+          if (path.length > 0) docPathEl.setAttribute("title", path);
+          else docPathEl.removeAttribute("title");
+        }
         const gh = document.getElementById("toolbar-commentray-github");
         if (gh instanceof HTMLAnchorElement && a.commentrayOnGithubUrl?.trim()) {
           gh.href = a.commentrayOnGithubUrl.trim();
