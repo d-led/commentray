@@ -18,6 +18,8 @@ describe("given the E2E dual-scroll fixture page", () => {
   it("then the gutter draws two Bézier splines per block (rays) with one active pair", () => {
     cy.visitE2eDualScrollSync();
     cy.get("span.nav-rail__pair-path").should("contain", "dual-scroll.ts");
+    /** Gutter SVG is drawn after layout + rAF; allow time for non-zero gutter height. */
+    cy.get("#gutter .gutter__rays svg", { timeout: 15000 }).should("be.visible");
     cy.get("#gutter .gutter__rays svg g.gutter__rays-block").should("have.length", 2);
     cy.get(
       '#gutter .gutter__rays svg g[data-commentray-block="b1"] path.gutter__rays-path:not(.gutter__rays-path--trail)',

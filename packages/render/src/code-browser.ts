@@ -834,7 +834,6 @@ const CODE_BROWSER_STYLES = `
         border-top: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
         pointer-events: none;
       }
-      .pane h2.pane-title { margin: 0 0 10px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
       .shell--stretch-rows {
         flex: 1;
         min-height: 0;
@@ -918,14 +917,6 @@ const CODE_BROWSER_STYLES = `
       .block-stretch.wrap .code-line pre code { white-space: pre-wrap; word-break: break-word; }
       .block-stretch:not(.wrap) .code-line pre,
       .block-stretch:not(.wrap) .code-line pre code { white-space: pre; }
-      .block-stretch-headings {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0 16px;
-        padding: 4px 12px 8px;
-        border-bottom: 1px solid color-mix(in oklab, CanvasText 10%, Canvas);
-      }
-      .block-stretch-headings .pane-title { margin: 0; }
 `;
 
 /** Native tooltip on #search-q (short hint is visible under the search row). */
@@ -1111,12 +1102,10 @@ async function buildMultiAngleDualPaneShell(
 
   const shellInner =
     `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
-    `<h2 class="pane-title">Code</h2>\n` +
     `          ${codeHtml}\n` +
     `        </section>\n` +
     `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
     `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
-    `          <h2 class="pane-title">Commentray</h2>\n` +
     `          <div id="doc-pane-body" class="doc-pane-body">\n` +
     `          ${defaultPaneHtml}\n` +
     `          </div>\n` +
@@ -1175,10 +1164,6 @@ async function buildCodeBrowserShell(
     if (stretched) {
       layout = "stretch";
       shellInner =
-        `        <div class="block-stretch-headings">` +
-        `<h2 class="pane-title">Code</h2>` +
-        `<h2 class="pane-title">Commentray</h2>` +
-        `</div>\n` +
         `        ${stretched.preambleHtml}\n` +
         `        ${stretched.tableInnerHtml}\n`;
     }
@@ -1210,12 +1195,10 @@ async function buildCodeBrowserShell(
     ]);
     shellInner =
       `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
-      `<h2 class="pane-title">Code</h2>\n` +
       `          ${codeHtml}\n` +
       `        </section>\n` +
       `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
       `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
-      `          <h2 class="pane-title">Commentray</h2>\n` +
       `          <div id="doc-pane-body" class="doc-pane-body">\n` +
       `          ${commentrayHtml}\n` +
       `          </div>\n` +

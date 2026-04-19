@@ -141,3 +141,43 @@ export function pathRowsFromDocumentedPairs(
   }
   return out;
 }
+
+/** Max source paths shown when the user opens the empty-query browse preview (ArrowDown). */
+export const MAX_BROWSE_SOURCE_FILE_PREVIEW = 80;
+
+export type SourceFilePreviewRow = {
+  sourcePath: string;
+  commentrayPath: string;
+};
+
+/**
+ * One preview row per distinct `sourcePath`. When several pairs share a source (multi-angle),
+ * keeps the pair with the lexicographically smallest `commentrayPath` so navigation is stable.
+ */
+export function uniqueSourceFilePreviewRows(
+  pairs: Array<{ sourcePath: string; commentrayPath: string }>,
+  maxRows: number = MAX_BROWSE_SOURCE_FILE_PREVIEW,
+): { rows: SourceFilePreviewRow[]; totalUnique: number } {
+  const bySource = new Map<string, SourceFilePreviewRow>();
+  for (const p of pairs) {
+    const sp = p.sourcePath.trim();
+    if (sp.length === 0) continue;
+    const prev = bySource.get(sp);
+    const candidate: SourceFilePreviewRow = {
+      sourcePath: p.sourcePath.trim(),
+      commentrayPath: p.commentrayPath.trim(),
+    };
+    if (!prev) {
+      bySource.set(sp, candidate);
+      continue;
+    }
+    if (candidate.commentrayPath.localeCompare(prev.commentrayPath) < 0) {
+      bySource.set(sp, candidate);
+    }
+  }
+  const totalUnique = bySource.size;
+  const rows = [...bySource.values()]
+    .sort((a, b) => a.sourcePath.localeCompare(b.sourcePath))
+    .slice(0, maxRows);
+  return { rows, totalUnique };
+}

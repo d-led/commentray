@@ -26,7 +26,14 @@ import {
   lineAtIndex,
   offsetToLineIndex,
   pathRowsFromDocumentedPairs,
+  uniqueSourceFilePreviewRows,
+  type SourceFilePreviewRow,
 } from "./code-browser-search.js";
+import {
+  findDocumentedPair,
+  isSameDocumentedPair,
+  resolveStaticBrowseHref,
+} from "./code-browser-pair-nav.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
 type HitKind = "code" | "md" | "path";
@@ -251,6 +258,46 @@ function searchResultsInnerHtml(
   return buf.join("");
 }
 
+function emptyBrowsePreviewHint(
+  scope: SearchScope,
+  rowCount: number,
+  totalUnique: number,
+  usedIndexFallback: boolean,
+): string {
+  if (scope === "full") {
+    return "Documented source for this page. Type to search.";
+  }
+  if (usedIndexFallback) {
+    return "Documented source on this page. Type to search the index when it is available.";
+  }
+  if (totalUnique > rowCount) {
+    return `Indexed source files (${String(rowCount)} of ${String(totalUnique)} shown). Type to search.`;
+  }
+  return `Indexed source files (${String(totalUnique)}). Type to search.`;
+}
+
+function emptySearchBrowsePreviewInnerHtml(
+  hint: string,
+  rows: SourceFilePreviewRow[],
+  ctx: SearchHitRenderContext,
+): string {
+  const tokens: string[] = [];
+  const buf: string[] = [`<div class="hint">${escapeHtmlText(hint)}</div>`];
+  const hits: Hit[] = rows.map((r, i) => ({
+    kind: "path",
+    line: i,
+    text: r.sourcePath,
+    score: 1000,
+    source: "ordered",
+    spPath: r.sourcePath,
+    crPath: r.commentrayPath,
+  }));
+  for (const h of hits) {
+    buf.push(searchHitButtonHtml(h, tokens, ctx));
+  }
+  return buf.join("");
+}
+
 function scrollDocToMarkdownLine0(
   docScrollEl: HTMLElement,
   line0: number,
@@ -271,25 +318,24 @@ function scrollDocToMarkdownLine0(
   docScrollEl.scrollTo({ top: ratio * Math.max(0, maxScroll), behavior: "smooth" });
 }
 
-function openForeignPairBrowseOrGithub(
-  pairs: DocumentedPairNav[],
-  commentrayPath: string,
-  mdLine0: number | null,
-): void {
-  const p = pairs.find((x) => x.commentrayPath === commentrayPath);
-  if (!p) return;
-  if (p.staticBrowseUrl?.trim()) {
-    const u = new URL(p.staticBrowseUrl.trim(), globalThis.location.href);
+function navigateToDocumentedPair(pair: DocumentedPairNav, mdLine0: number | null): void {
+  if (pair.staticBrowseUrl?.trim()) {
+    const href = resolveStaticBrowseHref(
+      pair.staticBrowseUrl.trim(),
+      globalThis.location.pathname,
+      globalThis.location.origin,
+    );
+    const u = new URL(href);
     if (mdLine0 !== null && mdLine0 >= 0) u.hash = `commentray-md-line-${String(mdLine0)}`;
-    globalThis.open(u.toString(), "_blank", "noopener,noreferrer");
+    globalThis.location.assign(u.toString());
     return;
   }
-  if (p.commentrayOnGithub) {
+  if (pair.commentrayOnGithub) {
     const url =
       mdLine0 !== null && mdLine0 >= 0
-        ? `${p.commentrayOnGithub}#L${String(mdLine0 + 1)}`
-        : p.commentrayOnGithub;
-    globalThis.open(url, "_blank", "noopener,noreferrer");
+        ? `${pair.commentrayOnGithub}#L${String(mdLine0 + 1)}`
+        : pair.commentrayOnGithub;
+    globalThis.location.assign(url);
   }
 }
 
@@ -374,6 +420,7 @@ type SearchUiContext = {
 type SearchHitClickDeps = {
   mutable: MutableSearchFields;
   docScrollEl: HTMLElement;
+  filePathLabel: string;
 };
 
 function findSearchHitButton(
@@ -395,19 +442,23 @@ function scrollCodeHitToView(line: number): void {
 }
 
 function handlePathSearchHit(button: HTMLElement, deps: SearchHitClickDeps): void {
-  const cr = (button.getAttribute("data-cr-path")?.trim() ?? "").trim();
-  const curCr = deps.mutable.commentrayPathLabel.trim();
-  const isCurrentPair = cr.length === 0 || cr === curCr;
-  if (isCurrentPair) {
+  const hitCr = (button.getAttribute("data-cr-path") ?? "").trim();
+  const hitSp = (button.getAttribute("data-sp-path") ?? "").trim();
+  const pair = findDocumentedPair(deps.mutable.documentedPairs, hitCr, hitSp);
+  if (
+    pair &&
+    isSameDocumentedPair(pair, deps.filePathLabel, deps.mutable.commentrayPathLabel)
+  ) {
     deps.docScrollEl.scrollTo({ top: 0, behavior: "smooth" });
     return;
   }
-  openForeignPairBrowseOrGithub(deps.mutable.documentedPairs, cr, null);
+  if (pair) navigateToDocumentedPair(pair, null);
 }
 
 function handleMdSearchHit(line: number, crHit: string, deps: SearchHitClickDeps): void {
   if (crHit.length > 0 && crHit !== deps.mutable.commentrayPathLabel) {
-    openForeignPairBrowseOrGithub(deps.mutable.documentedPairs, crHit, line);
+    const pair = findDocumentedPair(deps.mutable.documentedPairs, crHit, "");
+    if (pair) navigateToDocumentedPair(pair, line);
     return;
   }
   scrollDocToMarkdownLine0(deps.docScrollEl, line, deps.mutable.mdLines.length);
@@ -450,6 +501,39 @@ function wireSearchUi(ctx: SearchUiContext): void {
     searchResults.hidden = true;
   }
 
+  function renderEmptyBrowsePreview(): void {
+    const ctx: SearchHitRenderContext = {
+      currentCommentrayPath: mutable.commentrayPathLabel,
+      currentSourcePath: filePathLabel,
+    };
+    if (scope === "full") {
+      const sp = filePathLabel.trim();
+      if (sp.length === 0) return;
+      const rows: SourceFilePreviewRow[] = [
+        { sourcePath: sp, commentrayPath: mutable.commentrayPathLabel.trim() },
+      ];
+      const hint = emptyBrowsePreviewHint("full", rows.length, rows.length, false);
+      searchResults.hidden = false;
+      searchResults.innerHTML = emptySearchBrowsePreviewInnerHtml(hint, rows, ctx);
+      return;
+    }
+    const { rows, totalUnique } = uniqueSourceFilePreviewRows(mutable.documentedPairs);
+    if (rows.length > 0) {
+      const hint = emptyBrowsePreviewHint("commentray-and-paths", rows.length, totalUnique, false);
+      searchResults.hidden = false;
+      searchResults.innerHTML = emptySearchBrowsePreviewInnerHtml(hint, rows, ctx);
+      return;
+    }
+    const sp = filePathLabel.trim();
+    if (sp.length === 0) return;
+    const fb: SourceFilePreviewRow[] = [
+      { sourcePath: sp, commentrayPath: mutable.commentrayPathLabel.trim() },
+    ];
+    const hint = emptyBrowsePreviewHint("commentray-and-paths", fb.length, fb.length, true);
+    searchResults.hidden = false;
+    searchResults.innerHTML = emptySearchBrowsePreviewInnerHtml(hint, fb, ctx);
+  }
+
   function runSearch(): void {
     const tokens = tokenizeQuery(searchInput.value);
     if (tokens.length === 0) {
@@ -477,7 +561,7 @@ function wireSearchUi(ctx: SearchUiContext): void {
     });
   }
 
-  const hitClickDeps: SearchHitClickDeps = { mutable, docScrollEl };
+  const hitClickDeps: SearchHitClickDeps = { mutable, docScrollEl, filePathLabel };
   searchResults.addEventListener("click", (ev: MouseEvent) => {
     const hit = findSearchHitButton(ev.target as HTMLElement | null, searchResults);
     if (!hit) return;
@@ -487,6 +571,12 @@ function wireSearchUi(ctx: SearchUiContext): void {
   searchInput.addEventListener("input", () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(runSearch, 200);
+  });
+  searchInput.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key !== "ArrowDown") return;
+    if (tokenizeQuery(searchInput.value).length > 0) return;
+    renderEmptyBrowsePreview();
+    e.preventDefault();
   });
   searchClear.addEventListener("click", clearSearch);
 
@@ -717,6 +807,21 @@ function centerYInViewport(el: Element): number {
   return (r.top + r.bottom) / 2;
 }
 
+/**
+ * Vertical center of the highlighted source text for gutter rays. Using the outer `.code-line`
+ * row includes the line-number column and extra vertical slack from the grid; Highlight.js
+ * padding on `pre`/`code` can shift the glyph center above the row’s geometric center — anchoring
+ * to `pre code` tracks the visible passage.
+ */
+function codeLineHighlightCenterYViewport(lineEl: HTMLElement): number {
+  const code =
+    lineEl.querySelector<HTMLElement>("pre code.hljs") ?? lineEl.querySelector<HTMLElement>("pre code");
+  if (code) return centerYInViewport(code);
+  const pre = lineEl.querySelector<HTMLElement>("pre");
+  if (pre) return centerYInViewport(pre);
+  return centerYInViewport(lineEl);
+}
+
 function commentaryBandEndYViewport(
   docScrollEl: HTMLElement,
   next: BlockScrollLink | undefined,
@@ -787,8 +892,8 @@ function drawBlockRaysIntoSvg(
     if (!codeTop || !codeBot || !docTop) continue;
 
     const docEndYViewport = commentaryBandEndYViewport(docScrollEl, next, docTop);
-    const yCodeTop = centerYInViewport(codeTop);
-    const yCodeBot = centerYInViewport(codeBot);
+    const yCodeTop = codeLineHighlightCenterYViewport(codeTop);
+    const yCodeBot = codeLineHighlightCenterYViewport(codeBot);
     const yDocTop = docTop.getBoundingClientRect().top + 2;
     const yDocEnd = Math.max(docEndYViewport, yDocTop + 4);
 

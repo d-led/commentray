@@ -77,6 +77,14 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.get("#search-results mark.search-hit").should("have.length.at.least", 1);
     });
 
+    it("then ArrowDown on an empty search shows a capped list of indexed source files", () => {
+      cy.visitStaticSiteHome();
+      cy.get("#search-q").focus().type("{downarrow}");
+      cy.get("#search-results").should("not.have.attr", "hidden");
+      cy.get("#search-results .hint").first().should("contain", "Indexed source files");
+      cy.get("#search-results button.hit[data-kind='path']").should("have.length.at.least", 1);
+    });
+
     it("then the Angle selector lists main and architecture and swaps commentray bodies both ways", () => {
       cy.visitStaticSiteHome();
       cy.get("#angle-select").should("exist");

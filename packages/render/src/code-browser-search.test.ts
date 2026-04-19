@@ -5,6 +5,7 @@ import {
   lineAtIndex,
   offsetToLineIndex,
   pathRowsFromDocumentedPairs,
+  uniqueSourceFilePreviewRows,
 } from "./code-browser-search.js";
 
 describe("Ordered in-line search token matching", () => {
@@ -91,5 +92,31 @@ describe("Hub path rows from documented pairs", () => {
       ".commentray/source/README.md/architecture.md",
       ".commentray/source/README.md/main.md",
     ]);
+  });
+});
+
+describe("Empty-search browse preview rows (distinct source files)", () => {
+  it("should collapse multi-angle pairs to one row per source with the smallest commentray path", () => {
+    const { rows, totalUnique } = uniqueSourceFilePreviewRows(
+      [
+        { sourcePath: "README.md", commentrayPath: "b.md" },
+        { sourcePath: "README.md", commentrayPath: "a.md" },
+      ],
+      80,
+    );
+    expect(totalUnique).toBe(1);
+    expect(rows).toEqual([{ sourcePath: "README.md", commentrayPath: "a.md" }]);
+  });
+
+  it("should sort by source path and cap the list", () => {
+    const many = Array.from({ length: 85 }, (_, i) => ({
+      sourcePath: `f/${String(i).padStart(3, "0")}.ts`,
+      commentrayPath: `c/${String(i)}.md`,
+    }));
+    const { rows, totalUnique } = uniqueSourceFilePreviewRows(many, 80);
+    expect(totalUnique).toBe(85);
+    expect(rows).toHaveLength(80);
+    expect(rows[0]?.sourcePath).toBe("f/000.ts");
+    expect(rows[79]?.sourcePath).toBe("f/079.ts");
   });
 });
