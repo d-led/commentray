@@ -17,17 +17,22 @@ describe("Static browse HTML build — shell", () => {
   it("should write HTML that embeds highlighted source and the companion pane", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const outHtml = path.join(outDir, "index.html");
+    const builtAt = new Date("2026-01-02T03:04:05.006Z");
     await buildCommentrayStatic({
       sourceFile: path.join(pkgRoot, "fixtures", "sample.ts"),
       markdownFile: path.join(pkgRoot, "fixtures", "sample.md"),
       outHtml,
       title: "Test",
+      builtAt,
     });
     const html = await readFile(outHtml, "utf8");
     expect(html).toContain("greet");
     expect(html).toContain("Resizable divider");
     expect(html).toContain('<meta name="generator" content="Commentray @commentray/render@');
     expect(html).toContain("@commentray/code-commentray-static@");
+    expect(html).toContain("builtAt=2026-01-02T03:04:05.006Z");
+    expect(html).toContain('class="app__footer"');
+    expect(html).toContain('datetime="2026-01-02T03:04:05.006Z"');
   });
 
   it("should omit the generator meta tag when generatorLabel is explicitly empty", async () => {
@@ -66,7 +71,7 @@ describe("Static browse HTML build — shell", () => {
       outHtml,
     });
     const html = await readFile(outHtml, "utf8");
-    expect(html).toContain("nav-rail__context-path");
+    expect(html).toContain("nav-rail__pair-path");
     expect(html).toContain("sample.ts");
   });
 });

@@ -50,6 +50,7 @@ async function writePerPairBrowseHtmlPages(input: {
   cfg: ResolvedCommentrayConfig;
   ss: ResolvedStaticSite;
   toolHomeUrl: string;
+  builtAt: Date;
 }): Promise<CommentrayNavSearchDocument> {
   const pairs = input.navDoc.documentedPairs;
   if (!pairs?.length) return input.navDoc;
@@ -96,6 +97,7 @@ async function writePerPairBrowseHtmlPages(input: {
       sourceOnGithubUrl: p.sourceOnGithub,
       commentrayOnGithubUrl: p.commentrayOnGithub,
       documentedNavJsonUrl: "../commentray-nav-search.json",
+      builtAt: input.builtAt,
       ...(emb ? { documentedPairsEmbeddedB64: emb } : {}),
     });
   }
@@ -124,6 +126,7 @@ function staticRenderOptions(input: {
   ss: ResolvedStaticSite;
   cfg: ResolvedCommentrayConfig;
   toolHomeUrl: string;
+  builtAt: Date;
   commentrayOutputUrls: NonNullable<BuildCommentrayStaticOptions["commentrayOutputUrls"]>;
   blockStretchRows: BuildCommentrayStaticOptions["blockStretchRows"];
   multiAngleBrowsing: CodeBrowserMultiAngleBrowsing | undefined;
@@ -159,6 +162,7 @@ function staticRenderOptions(input: {
     ...(input.documentedPairsEmbeddedB64
       ? { documentedPairsEmbeddedB64: input.documentedPairsEmbeddedB64 }
       : {}),
+    builtAt: input.builtAt,
   };
 }
 
@@ -177,6 +181,7 @@ export async function buildGithubPagesStaticSite(
 ): Promise<{ outHtml: string; navSearchPath: string }> {
   const repoRoot = path.resolve(opts.repoRoot);
   const toolHomeUrl = opts.toolHomeUrl?.trim() || DEFAULT_TOOL_HOME;
+  const builtAt = new Date();
 
   const cfg = await loadCommentrayConfig(repoRoot);
   const ss = cfg.staticSite;
@@ -248,6 +253,7 @@ export async function buildGithubPagesStaticSite(
         cfg,
         ss,
         toolHomeUrl,
+        builtAt,
       });
     }
     const documentedPairsEmbeddedB64 = documentedPairsEmbeddedB64FromNav(navDoc, ghNavBase);
@@ -259,6 +265,7 @@ export async function buildGithubPagesStaticSite(
       ss,
       cfg,
       toolHomeUrl,
+      builtAt,
       commentrayOutputUrls,
       blockStretchRows,
       multiAngleBrowsing,

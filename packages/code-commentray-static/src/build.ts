@@ -28,7 +28,7 @@ export type BuildCommentrayStaticOptions = {
   hljsTheme?: string;
   /** If set, toolbar shows an Octocat link to this repository (`http`/`https` only). */
   githubRepoUrl?: string;
-  /** Shown as “Rendered with Commentray” in the toolbar (`http`/`https` only). */
+  /** Toolbar "Rendered with Commentray" link plus semver (`http`/`https` only). */
   toolHomeUrl?: string;
   /** When set, rewrites local and GitHub blob links in commentray for static HTML output. */
   commentrayOutputUrls?: CommentrayOutputUrlOptions;
@@ -39,6 +39,11 @@ export type BuildCommentrayStaticOptions = {
    * this package’s versions. Pass an empty string to omit the meta tag.
    */
   generatorLabel?: string;
+  /**
+   * Single clock for one static build (footer + default generator `builtAt=`). Defaults to
+   * `new Date()` when omitted.
+   */
+  builtAt?: Date;
   /** Forwarded to `renderCodeBrowserHtml` — narrows in-page search away from raw code lines. */
   staticSearchScope?: "full" | "commentray-and-paths";
   /** Repo-relative companion Markdown path (with `staticSearchScope: "commentray-and-paths"`). */
@@ -66,26 +71,28 @@ export type BuildCommentrayStaticOptions = {
 
 const staticPackageDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-function defaultGeneratorLabel(): string {
+function defaultGeneratorLabel(builtAt: Date): string {
   const raw = readFileSync(path.join(staticPackageDir, "package.json"), "utf8");
   const pkg = JSON.parse(raw) as { version?: string; name?: string };
   const name = pkg.name ?? "@commentray/code-commentray-static";
   const sv = pkg.version ?? "0.0.0";
-  return `Commentray @commentray/render@${commentrayRenderVersion()}; ${name}@${sv}`;
+  const iso = builtAt.toISOString();
+  return `Commentray @commentray/render@${commentrayRenderVersion()}; ${name}@${sv}; builtAt=${iso}`;
 }
 
-function resolveGeneratorLabel(explicit: string | undefined): string | undefined {
+function resolveGeneratorLabel(explicit: string | undefined, builtAt: Date): string | undefined {
   if (explicit !== undefined) {
     const t = explicit.trim();
     return t.length > 0 ? t : undefined;
   }
-  return defaultGeneratorLabel();
+  return defaultGeneratorLabel(builtAt);
 }
 
 export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions): Promise<void> {
   const sourcePath = path.resolve(opts.sourceFile);
   const mdPath = path.resolve(opts.markdownFile);
   const outPath = path.resolve(opts.outHtml);
+  const builtAt = opts.builtAt ?? new Date();
 
   const code = await readFile(sourcePath, "utf8");
   const multi = opts.multiAngleBrowsing;
@@ -110,7 +117,8 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     toolHomeUrl: opts.toolHomeUrl,
     commentrayOutputUrls: opts.commentrayOutputUrls,
     relatedGithubNav: opts.relatedGithubNav,
-    generatorLabel: resolveGeneratorLabel(opts.generatorLabel),
+    generatorLabel: resolveGeneratorLabel(opts.generatorLabel, builtAt),
+    builtAt,
     staticSearchScope: opts.staticSearchScope,
     commentrayPathForSearch: opts.commentrayPathForSearch,
     blockStretchRows: opts.blockStretchRows,

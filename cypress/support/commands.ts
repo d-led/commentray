@@ -25,6 +25,7 @@ Cypress.Commands.add("shouldDisplayCodeBrowserShell", () => {
   cy.get("#code-pane").should("exist");
   cy.get("#doc-pane").should("exist");
   cy.get("#search-q").should("be.visible");
+  cy.get(".app__footer").should("exist").and("contain", "HTML generated");
 });
 
 Cypress.Commands.add("shouldExposeNavSearchArtifact", () => {

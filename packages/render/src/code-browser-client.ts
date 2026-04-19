@@ -830,6 +830,26 @@ function insertSourcePathTrie(root: TrieNode, pair: DocumentedPairNav): void {
   }
 }
 
+function pathBasenamePosixStyle(p: string): string {
+  const t = p.replace(/\\/g, "/").replace(/\/+$/, "");
+  const i = t.lastIndexOf("/");
+  return i >= 0 ? t.slice(i + 1) : t;
+}
+
+/** Companion Markdown filename stem (e.g. `main` from `.../README.md/main.md`). */
+function companionDocStem(commentrayPath: string): string {
+  const norm = commentrayPath.replace(/\\/g, "/").replace(/\/+$/, "");
+  const lastSeg = norm.split("/").filter(Boolean).at(-1) ?? "";
+  return lastSeg.replace(/\.md$/i, "");
+}
+
+function treeFileLinkLabel(pr: DocumentedPairNav, disambiguate: boolean): string {
+  const base = pathBasenamePosixStyle(pr.sourcePath);
+  if (!disambiguate) return base;
+  const stem = companionDocStem(pr.commentrayPath);
+  return stem !== "" && stem !== base ? `${base} · ${stem}` : base;
+}
+
 function renderDocumentedTreeHtml(node: TrieNode): string {
   const keys = [...node.children.keys()].sort((a, b) => a.localeCompare(b));
   if (keys.length === 0) return "";
@@ -842,11 +862,13 @@ function renderDocumentedTreeHtml(node: TrieNode): string {
       lis.push(`<li><div class="tree-dir">${escapeHtmlText(name)}</div>${inner}</li>`);
     }
     if (ch.pairs.length > 0) {
+      const multi = ch.pairs.length > 1;
       for (const pr of ch.pairs) {
+        const label = escapeHtmlText(treeFileLinkLabel(pr, multi));
+        const title = escapeHtmlText(`${pr.sourcePath} — open companion on GitHub`);
         lis.push(
           `<li><div class="tree-file">` +
-            `<span class="tree-file-name">${escapeHtmlText(pr.sourcePath)}</span>` +
-            `<a class="tree-file-gh" href="${escapeHtmlText(pr.commentrayOnGithub)}" target="_blank" rel="noopener noreferrer" title="Open companion commentray on GitHub">GitHub</a>` +
+            `<a class="tree-file-link" href="${escapeHtmlText(pr.commentrayOnGithub)}" target="_blank" rel="noopener noreferrer" title="${title}">${label}</a>` +
             `</div></li>`,
         );
       }
@@ -858,7 +880,7 @@ function renderDocumentedTreeHtml(node: TrieNode): string {
 function renderDocumentedPairsIntoHost(treeHost: HTMLElement, pairs: DocumentedPairNav[]): void {
   if (pairs.length === 0) {
     treeHost.innerHTML =
-      '<p class="nav-rail__doc-hub-hint">No documented pairs in this export (build with a GitHub repo URL).</p>';
+      '<p class="nav-rail__doc-hub-hint" role="status">No documented pairs in this export.</p>';
     return;
   }
   const root: TrieNode = { children: new Map(), pairs: [] };
@@ -917,7 +939,7 @@ function wireDocumentedFilesTree(): void {
       renderDocumentedPairsIntoHost(treeMount, pairs);
     } catch {
       treeMount.innerHTML =
-        '<p class="nav-rail__doc-hub-hint">Could not load the file list. Check the browser network tab.</p>';
+        '<p class="nav-rail__doc-hub-hint" role="alert">Could not load the file list.</p>';
     }
   }
 

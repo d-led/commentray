@@ -6,11 +6,8 @@ import {
 } from "@commentray/core";
 
 import { escapeHtml } from "./html-utils.js";
-import {
-  type CommentrayOutputUrlOptions,
-  renderFencedCode,
-  renderMarkdownToHtml,
-} from "./markdown-pipeline.js";
+import { renderHighlightedCodeLineRows } from "./highlighted-code-lines.js";
+import { type CommentrayOutputUrlOptions, renderMarkdownToHtml } from "./markdown-pipeline.js";
 
 const BLOCK_MARKER_LINE = new RegExp(
   `^<!--\\s*commentray:block\\s+id=(${MARKER_ID_BODY})\\s*-->$`,
@@ -61,30 +58,6 @@ export function splitCommentrayMarkdownSegments(markdown: string): {
   return { preamble: preambleLines.join("\n").trimEnd(), segments };
 }
 
-function extractPreCodeInner(html: string): string {
-  const m = /<pre(?:\s[^>]*)?>\s*<code(?:\s[^>]*)?>([\s\S]*?)<\/code>\s*<\/pre>/i.exec(html.trim());
-  return m ? m[1] : escapeHtml(html);
-}
-
-async function renderSingleCodeLine(
-  line: string,
-  lineIndex0: number,
-  language: string,
-): Promise<string> {
-  const display = line === "" ? " " : line;
-  const fence = "```" + language + "\n" + display + "\n```\n";
-  const block = await renderFencedCode(fence);
-  const inner = extractPreCodeInner(block);
-  const langAttr = escapeHtml(language);
-  const num = lineIndex0 + 1;
-  return (
-    `<div class="code-line" id="code-line-${lineIndex0}" data-line="${lineIndex0}">` +
-    `<span class="ln" aria-hidden="true">${num}</span>` +
-    `<pre><code class="hljs language-${langAttr}">${inner}</code></pre>` +
-    `</div>`
-  );
-}
-
 /** Renders a contiguous 0-based inclusive range of source lines into one stacked column. */
 async function renderCodeLineStack(
   lines: string[],
@@ -92,11 +65,11 @@ async function renderCodeLineStack(
   endLine0: number,
   language: string,
 ): Promise<string> {
-  const parts: string[] = [];
-  for (let j = startLine0; j <= endLine0; j++) {
-    parts.push(await renderSingleCodeLine(lines[j] ?? "", j, language));
-  }
-  return `<div class="stretch-code-stack">${parts.join("\n")}</div>`;
+  const slice = lines.slice(startLine0, endLine0 + 1).join("\n");
+  const inner = await renderHighlightedCodeLineRows(slice, language, {
+    lineIndexOffset: startLine0,
+  });
+  return `<div class="stretch-code-stack">${inner}</div>`;
 }
 
 /**
@@ -143,7 +116,10 @@ export async function tryBuildBlockStretchTableHtml(
     const b = lineToBlock.get(L);
 
     if (!b) {
-      const codeLineHtml = await renderSingleCodeLine(lines[i] ?? "", i, opts.language);
+      const codeLineHtml = await renderHighlightedCodeLineRows(lines[i] ?? "", opts.language, {
+        lineIndexOffset: i,
+        omitLineStackWrapper: true,
+      });
       rows.push(
         `<tr class="stretch-row stretch-row--gap"><td class="stretch-code">${codeLineHtml}</td>` +
           `<td class="stretch-doc stretch-doc--gap"><span class="stretch-gap-mark" aria-hidden="true">—</span></td></tr>`,

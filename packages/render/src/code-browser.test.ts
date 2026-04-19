@@ -110,9 +110,9 @@ describe("Code browser page — toolbar chrome", () => {
       documentedNavJsonUrl: "./commentray-nav-search.json",
       documentedPairsEmbeddedB64: pairsB64,
     });
-    expect(html).toContain('class="toolbar-doc-hub"');
-    expect(html).toContain("Source on GitHub");
-    expect(html).toContain("Commentray on GitHub");
+    expect(html).toContain('id="toolbar-source-github"');
+    expect(html).toContain('id="toolbar-commentray-github"');
+    expect(html).toContain('class="nav-rail__pair-gh"');
     expect(html).toContain('href="https://github.com/acme/demo/blob/main/README.md"');
     expect(html).toContain('id="documented-files-hub"');
     expect(html).toContain('data-nav-json-url="./commentray-nav-search.json"');
@@ -158,6 +158,18 @@ describe("Code browser page — source line chrome", () => {
     expect(html).toContain('<span class="ln" aria-hidden="true">3</span>');
     expect(html).toMatch(/\.code-line \.ln[\s\S]*?user-select: none/);
   });
+
+  it("should wrap highlighted rows in a stack whose gutter width matches the highest line number", async () => {
+    const code = Array.from({ length: 100 }, (_, i) => `// ${i}`).join("\n");
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code,
+      language: "ts",
+      commentrayMarkdown: "body",
+    });
+    expect(html).toContain('class="code-line-stack"');
+    expect(html).toContain("--code-ln-min-ch:3");
+  });
 });
 
 describe("Code browser page — file path display", () => {
@@ -179,7 +191,7 @@ describe("Code browser page — file path display", () => {
       language: "md",
       commentrayMarkdown: "body",
     });
-    expect(html).toContain("nav-rail__context-path");
+    expect(html).toContain("nav-rail__pair-path");
     expect(html).toContain("README.md");
   });
 
@@ -210,6 +222,20 @@ describe("Code browser page — toolbar link policy", () => {
     expect(html).toContain('class="toolbar-attribution"');
     expect(html).toContain('href="https://github.com/d-led/commentray"');
     expect(html).toContain("Rendered with");
+    expect(html).toMatch(/toolbar-attribution__version[^>]*>v\d+\.\d+\.\d+/);
+  });
+
+  it("should include a footer with ISO and local wall-clock text for HTML generation", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      builtAt: new Date("2026-05-01T12:00:00.000Z"),
+    });
+    expect(html).toContain('class="app__footer"');
+    expect(html).toContain("HTML generated");
+    expect(html).toContain('datetime="2026-05-01T12:00:00.000Z"');
   });
 
   it("should omit executable toolbar links when URLs are not http(s)", async () => {

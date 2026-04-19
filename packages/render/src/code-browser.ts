@@ -10,13 +10,12 @@ import {
 } from "@commentray/core";
 
 import { tryBuildBlockStretchTableHtml } from "./block-stretch-layout.js";
+import { formatCommentrayBuiltAtLocal } from "./build-stamp.js";
 import { escapeHtml } from "./html-utils.js";
+import { renderHighlightedCodeLineRows } from "./highlighted-code-lines.js";
 import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
-import {
-  type CommentrayOutputUrlOptions,
-  renderFencedCode,
-  renderMarkdownToHtml,
-} from "./markdown-pipeline.js";
+import { type CommentrayOutputUrlOptions, renderMarkdownToHtml } from "./markdown-pipeline.js";
+import { commentrayRenderVersion } from "./package-version.js";
 
 /** One angle tab for {@link CodeBrowserPageOptions.multiAngleBrowsing}. */
 export type CodeBrowserMultiAngleSpec = {
@@ -54,7 +53,8 @@ export type CodeBrowserPageOptions = {
    */
   githubRepoUrl?: string;
   /**
-   * Home URL for the Commentray project (shown as “Rendered with Commentray”).
+   * Home URL for the Commentray project (toolbar shows "Rendered with Commentray" plus the
+   * package semver, linking here).
    * Only `http:` / `https:` URLs are emitted.
    */
   toolHomeUrl?: string;
@@ -72,6 +72,11 @@ export type CodeBrowserPageOptions = {
    * Free-form label for `<meta name="generator">` (e.g. package versions). Omitted when unset.
    */
   generatorLabel?: string;
+  /**
+   * Instant this HTML was produced (footer “generated at” line and default generator meta).
+   * Defaults to `new Date()` when omitted.
+   */
+  builtAt?: Date;
   /**
    * When set and index blocks align with `<!-- commentray:block id=… -->` markers,
    * emits a two-column **blame-style** table: **one row per block** (plus gap rows for
@@ -129,11 +134,6 @@ function renderGeneratorMetaHtml(label: string | undefined): string {
   const t = label?.trim();
   if (!t) return "";
   return `<meta name="generator" content="${escapeHtml(t)}" />\n    `;
-}
-
-function extractPreCodeInner(html: string): string {
-  const m = /<pre(?:\s[^>]*)?>\s*<code(?:\s[^>]*)?>([\s\S]*?)<\/code>\s*<\/pre>/i.exec(html.trim());
-  return m ? m[1] : escapeHtml(html);
 }
 
 /** Single capture: marker id (avoid a wrapping group around the whole comment — that shifted indices). */
@@ -245,27 +245,6 @@ function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[])
   return out.join("\n");
 }
 
-/** One highlighted row per source line so in-page search can scroll to a line. */
-async function renderCodeLineBlocks(code: string, language: string): Promise<string> {
-  const lines = code.split("\n");
-  const langAttr = escapeHtml(language);
-  const parts: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] === "" ? " " : lines[i];
-    const fence = "```" + language + "\n" + line + "\n```\n";
-    const block = await renderFencedCode(fence);
-    const inner = extractPreCodeInner(block);
-    const num = i + 1;
-    parts.push(
-      `<div class="code-line" id="code-line-${i}" data-line="${i}">` +
-        `<span class="ln" aria-hidden="true">${num}</span>` +
-        `<pre><code class="hljs language-${langAttr}">${inner}</code></pre>` +
-        `</div>`,
-    );
-  }
-  return parts.join("\n");
-}
-
 /** GitHub “mark” glyph (Octicons-style path), MIT-licensed silhouette. */
 const GITHUB_MARK_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true">' +
@@ -282,6 +261,7 @@ function safeExternalHttpUrl(url: string | undefined): string | null {
 function buildToolbarEndHtml(
   githubRepoUrl: string | undefined,
   toolHomeUrl: string | undefined,
+  commentrayRenderSemver: string,
 ): string {
   const gh = safeExternalHttpUrl(githubRepoUrl);
   const tool = safeExternalHttpUrl(toolHomeUrl);
@@ -294,12 +274,23 @@ function buildToolbarEndHtml(
   }
   if (tool) {
     const te = escapeHtml(tool);
+    const ver = escapeHtml(commentrayRenderSemver);
     bits.push(
-      `<span class="toolbar-attribution" role="note">Rendered with <a href="${te}" target="_blank" rel="noopener noreferrer">Commentray</a></span>`,
+      `<span class="toolbar-attribution" role="note">Rendered with <a href="${te}" target="_blank" rel="noopener noreferrer">Commentray</a> <span class="toolbar-attribution__version" translate="no">v${ver}</span></span>`,
     );
   }
   if (bits.length === 0) return "";
   return `<div class="toolbar__end">${bits.join("")}</div>`;
+}
+
+function renderPageFooterHtml(builtAt: Date): string {
+  const iso = builtAt.toISOString();
+  const human = formatCommentrayBuiltAtLocal(builtAt);
+  return (
+    `<footer class="app__footer" role="contentinfo">` +
+    `<p class="app__footer-line">HTML generated <time datetime="${escapeHtml(iso)}">${escapeHtml(human)}</time></p>` +
+    `</footer>`
+  );
 }
 
 function renderRelatedGithubNavHtml(links: { label: string; href: string }[]): string {
@@ -317,37 +308,18 @@ function renderRelatedGithubNavHtml(links: { label: string; href: string }[]): s
 }
 
 function renderToolbarDocHubHtml(opts: {
-  sourceOnGithubUrl?: string;
-  commentrayOnGithubUrl?: string;
   documentedNavJsonUrl?: string;
   documentedPairsEmbeddedB64?: string;
 }): { toolbarDocHubHtml: string; navRailDocumentedHtml: string } {
-  const parts: string[] = [];
-  const src = safeExternalHttpUrl(opts.sourceOnGithubUrl);
-  const cr = safeExternalHttpUrl(opts.commentrayOnGithubUrl);
   const nav = opts.documentedNavJsonUrl?.trim();
   const hasEmbed = (opts.documentedPairsEmbeddedB64?.trim() ?? "").length > 0;
   const showDocumentedTree = Boolean(nav) || hasEmbed;
-  if (src) {
-    parts.push(
-      `<a class="toolbar-blob-link" id="toolbar-source-github" href="${escapeHtml(src)}" target="_blank" rel="noopener noreferrer">Source on GitHub</a>`,
-    );
-  }
-  if (cr) {
-    parts.push(
-      `<a class="toolbar-blob-link" id="toolbar-commentray-github" href="${escapeHtml(cr)}" target="_blank" rel="noopener noreferrer">Commentray on GitHub</a>`,
-    );
-  }
-  const toolbarDocHubHtml =
-    parts.length > 0
-      ? `<div class="toolbar-doc-hub">${parts.join('<span class="toolbar-doc-hub__sep" aria-hidden="true"> · </span>')}</div>`
-      : "";
+  const toolbarDocHubHtml = "";
   const navAttr = escapeHtml(nav ?? "");
   const navRailDocumentedHtml = showDocumentedTree
     ? `<details class="nav-rail__doc-hub" id="documented-files-hub" data-nav-json-url="${navAttr}">
-        <summary class="nav-rail__doc-hub-summary">Browse files (GitHub)</summary>
+        <summary class="nav-rail__doc-hub-summary">Documented files</summary>
         <div class="nav-rail__doc-hub-inner">
-          <p class="nav-rail__doc-hub-hint">Paths only—open a companion on GitHub. Use <strong>Search</strong> above to jump by filename or words across indexed commentray.</p>
           <div id="documented-files-tree" class="documented-files-tree" role="tree"></div>
         </div>
       </details>`
@@ -358,15 +330,37 @@ function renderToolbarDocHubHtml(opts: {
 function renderNavRailContextHtml(
   filePath: string | undefined,
   commentrayPath: string | undefined,
+  opts?: { sourceOnGithubUrl?: string; commentrayOnGithubUrl?: string },
 ): string {
-  const fp = escapeHtml((filePath ?? "").trim());
-  const cr = escapeHtml((commentrayPath ?? "").trim());
-  if (fp.length === 0 && cr.length === 0) return "";
-  return `<div class="nav-rail__context" aria-label="Current documentation pair">
-    <div class="nav-rail__context-label">Source</div>
-    <div class="nav-rail__context-path" title="${fp}">${fp.length > 0 ? fp : "—"}</div>
-    <div class="nav-rail__context-label">Commentray</div>
-    <div class="nav-rail__context-path nav-rail__context-path--secondary" title="${cr}">${cr.length > 0 ? cr : "—"}</div>
+  const fpRaw = (filePath ?? "").trim();
+  const crRaw = (commentrayPath ?? "").trim();
+  const srcUrl = safeExternalHttpUrl(opts?.sourceOnGithubUrl);
+  const crUrl = safeExternalHttpUrl(opts?.commentrayOnGithubUrl);
+  if (fpRaw.length === 0 && crRaw.length === 0 && srcUrl === null && crUrl === null) {
+    return "";
+  }
+  const fp = escapeHtml(fpRaw);
+  const cr = escapeHtml(crRaw);
+  const fpDisp = fpRaw.length > 0 ? fp : "—";
+  const crDisp = crRaw.length > 0 ? cr : "—";
+  const srcGh =
+    srcUrl !== null
+      ? `<a class="nav-rail__pair-gh" id="toolbar-source-github" href="${escapeHtml(srcUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Source file on GitHub" title="Open source on GitHub">${GITHUB_MARK_SVG}</a>`
+      : "";
+  const crGh =
+    crUrl !== null
+      ? `<a class="nav-rail__pair-gh" id="toolbar-commentray-github" href="${escapeHtml(crUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Companion commentray on GitHub" title="Open companion Markdown on GitHub">${GITHUB_MARK_SVG}</a>`
+      : "";
+  return `<div class="nav-rail__context nav-rail__context--compact" aria-label="Current documentation pair">
+    <span class="nav-rail__pair">
+      <span class="nav-rail__pair-lab">Src</span>
+      <span class="nav-rail__pair-path" title="${fp}">${fpDisp}</span>${srcGh}
+    </span>
+    <span class="nav-rail__pair-sep" aria-hidden="true">·</span>
+    <span class="nav-rail__pair">
+      <span class="nav-rail__pair-lab">Doc</span>
+      <span class="nav-rail__pair-path nav-rail__pair-path--secondary" title="${cr}">${crDisp}</span>${crGh}
+    </span>
   </div>`;
 }
 
@@ -391,65 +385,34 @@ const CODE_BROWSER_STYLES = `
       body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
       .app {
         display: flex;
-        flex-direction: row;
+        flex-direction: column;
         align-items: stretch;
         height: 100vh;
         width: 100%;
         overflow: hidden;
       }
-      .app__nav {
-        flex: 0 0 min(300px, 32vw);
-        max-width: 360px;
-        min-width: 220px;
+      .app__chrome {
+        flex: 0 0 auto;
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        padding: 10px 12px 12px;
-        border-right: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
-        background: color-mix(in oklab, CanvasText 5%, Canvas);
+        gap: 8px;
+        padding: 8px 12px 10px;
+        border-bottom: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
+        background: color-mix(in oklab, CanvasText 4%, Canvas);
+        max-height: min(40vh, 420px);
         min-height: 0;
+        overflow: auto;
       }
-      .nav-rail__context {
-        flex: 0 0 auto;
-        padding: 8px 10px;
-        border-radius: 8px;
-        border: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
-        background: Canvas;
-        font-size: 12px;
-        line-height: 1.35;
-      }
-      .nav-rail__context-label {
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        opacity: 0.72;
-        margin-top: 6px;
-      }
-      .nav-rail__context-label:first-child { margin-top: 0; }
-      .nav-rail__context-path {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-        font-size: 12px;
-        word-break: break-all;
-        color: CanvasText;
-      }
-      .nav-rail__context-path--secondary { opacity: 0.88; }
-      .nav-rail__search {
+      .chrome__search-row {
         display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 6px;
-        flex: 0 0 auto;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: nowrap;
       }
-      .nav-rail__search-label {
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        opacity: 0.8;
-      }
-      .nav-rail__search input[type="search"] {
-        width: 100%;
+      .chrome__search-row input[type="search"] {
+        flex: 1 1 auto;
+        min-width: 140px;
         padding: 8px 10px;
         font: inherit;
         font-size: 14px;
@@ -458,20 +421,116 @@ const CODE_BROWSER_STYLES = `
         background: Canvas;
         color: CanvasText;
       }
-      .nav-rail__search #search-clear {
-        align-self: flex-start;
+      .chrome__search-row #search-clear {
+        flex: 0 0 auto;
         font: inherit;
-        padding: 5px 12px;
-        border-radius: 6px;
+        padding: 6px 14px;
+        border-radius: 8px;
         cursor: pointer;
         border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
         background: color-mix(in oklab, CanvasText 6%, Canvas);
         color: CanvasText;
       }
+      .chrome__search-label {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+      .nav-rail__context--compact {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 10px;
+        padding: 5px 10px;
+        border-radius: 8px;
+        border: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
+        background: Canvas;
+        font-size: 12px;
+        line-height: 1.3;
+      }
+      .nav-rail__pair {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        flex: 1 1 140px;
+        max-width: min(48%, 100%);
+      }
+      .nav-rail__pair-lab {
+        flex: 0 0 auto;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        opacity: 0.72;
+      }
+      .nav-rail__pair-path {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        font-size: 11px;
+        color: CanvasText;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nav-rail__pair-path--secondary { opacity: 0.88; }
+      .nav-rail__pair-sep {
+        flex: 0 0 auto;
+        opacity: 0.45;
+        user-select: none;
+        padding: 0 2px;
+      }
+      .nav-rail__pair-gh {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 6px;
+        border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas);
+        background: color-mix(in oklab, CanvasText 5%, Canvas);
+        color: CanvasText;
+      }
+      .nav-rail__pair-gh:hover {
+        background: color-mix(in oklab, CanvasText 10%, Canvas);
+      }
+      .nav-rail__pair-gh:focus-visible {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
+      }
+      .nav-rail__pair-gh svg {
+        width: 14px;
+        height: 14px;
+        display: block;
+      }
+      .toolbar .nav-rail__context--compact {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        flex: 1 1 200px;
+        min-width: 0;
+        max-width: none;
+        gap: 6px 10px;
+      }
+      .toolbar .nav-rail__pair {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: min(44vw, 420px);
+      }
+      .nav-rail__search-label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        opacity: 0.8;
+      }
       .nav-rail__search-hint {
         margin: 0;
         font-size: 11px;
-        line-height: 1.4;
+        line-height: 1.35;
         opacity: 0.78;
       }
       .nav-rail__code {
@@ -479,35 +538,46 @@ const CODE_BROWSER_STYLES = `
         font-size: 10px;
       }
       .nav-rail__doc-hub {
-        flex: 1 1 auto;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        border-radius: 8px;
-        border: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
+        position: relative;
+        flex: 0 0 auto;
+        align-self: center;
+        display: block;
+        border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
+        border-radius: 6px;
         background: Canvas;
-        overflow: hidden;
+        overflow: visible;
       }
       .nav-rail__doc-hub-summary {
         cursor: pointer;
         font-size: 12px;
         font-weight: 600;
-        padding: 8px 10px;
+        padding: 4px 10px;
         list-style: none;
         user-select: none;
+        line-height: 1.35;
       }
       .nav-rail__doc-hub-summary::-webkit-details-marker { display: none; }
       .nav-rail__doc-hub-inner {
-        padding: 0 10px 10px;
+        position: absolute;
+        left: 0;
+        top: calc(100% + 4px);
+        z-index: 60;
+        min-width: min(280px, 78vw);
+        max-width: min(440px, 94vw);
+        max-height: min(52vh, 400px);
         overflow: auto;
-        flex: 1 1 auto;
-        min-height: 0;
+        padding: 8px 10px;
         font-size: 12px;
+        border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
+        border-radius: 8px;
+        background: Canvas;
+        box-shadow: 0 8px 28px color-mix(in oklab, CanvasText 12%, transparent);
       }
       .nav-rail__doc-hub-hint {
         margin: 0 0 8px;
         opacity: 0.78;
         line-height: 1.4;
+        font-size: 12px;
       }
       .app__main {
         flex: 1 1 auto;
@@ -516,6 +586,17 @@ const CODE_BROWSER_STYLES = `
         display: flex;
         flex-direction: column;
       }
+      .app__footer {
+        flex: 0 0 auto;
+        padding: 6px 12px 10px;
+        border-top: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+        background: color-mix(in oklab, CanvasText 3%, Canvas);
+        font-size: 11px;
+        line-height: 1.4;
+        color: color-mix(in oklab, CanvasText 72%, Canvas);
+      }
+      .app__footer-line { margin: 0; }
+      .app__footer time { font-variant-numeric: tabular-nums; }
       .toolbar {
         display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 8px 12px;
         border-bottom: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
@@ -572,51 +653,34 @@ const CODE_BROWSER_STYLES = `
         word-break: break-word;
       }
       .toolbar-related__sep { opacity: 0.55; user-select: none; }
-      .toolbar-doc-hub {
-        display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
-        font-size: 12px; line-height: 1.35;
-        color: color-mix(in oklab, CanvasText 88%, Canvas);
-      }
-      .toolbar-doc-hub__sep { opacity: 0.45; user-select: none; }
-      .toolbar-blob-link {
-        color: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 2px;
-        white-space: nowrap;
-      }
       .documented-files-tree ul { list-style: none; margin: 0; padding-left: 12px; }
       .documented-files-tree > ul { padding-left: 0; }
       .documented-files-tree li { margin: 2px 0; line-height: 1.35; }
       .documented-files-tree .tree-dir { font-weight: 600; margin-top: 4px; font-size: 12px; }
       .documented-files-tree .tree-file {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 8px;
         margin: 3px 0;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
         font-size: 11px;
       }
-      .documented-files-tree .tree-file-name { flex: 1 1 auto; min-width: 0; word-break: break-all; }
-      .documented-files-tree .tree-file-gh {
-        flex: 0 0 auto;
-        font-size: 10px;
-        font-weight: 600;
-        text-decoration: none;
-        opacity: 0.75;
-        border: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
-        padding: 2px 6px;
-        border-radius: 4px;
+      .documented-files-tree .tree-file-link {
         color: inherit;
+        font-weight: 500;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        word-break: break-word;
       }
-      .documented-files-tree .tree-file-gh:hover { opacity: 1; background: color-mix(in oklab, CanvasText 7%, Canvas); }
+      .documented-files-tree .tree-file-link:hover {
+        opacity: 0.92;
+      }
       .toolbar button {
         font: inherit; padding: 4px 10px; border-radius: 6px; cursor: pointer;
         border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas); background: color-mix(in oklab, CanvasText 6%, Canvas);
         color: CanvasText;
       }
       .search-results {
-        flex: 1 1 auto;
-        min-height: 120px;
-        max-height: 38vh;
+        flex: 0 1 auto;
+        min-height: 0;
+        max-height: min(320px, 38vh);
         overflow: auto;
         padding: 8px 8px 10px;
         border-radius: 8px;
@@ -660,12 +724,12 @@ const CODE_BROWSER_STYLES = `
         --code-line-font-size: 13px;
         --code-line-height: 1.5;
       }
+      .pane--code .code-line-stack { --code-ln-min-ch: 3; }
       .pane--code .code-line {
         display: grid;
-        /* max-content: column wide enough for the longest line number (avoids 100+ bleeding into code). */
         grid-template-columns: max-content 1fr;
-        column-gap: 12px;
-        align-items: baseline;
+        column-gap: 10px;
+        align-items: start;
       }
       .pane--code .code-line pre {
         margin: 0;
@@ -691,6 +755,8 @@ const CODE_BROWSER_STYLES = `
         white-space: nowrap;
         font-size: var(--code-line-font-size);
         line-height: var(--code-line-height);
+        min-width: calc(var(--code-ln-min-ch, 3) * 1ch + 0.6ch);
+        box-sizing: content-box;
       }
       .pane--code .code-line:target .ln,
       .pane--code .code-line:hover .ln {
@@ -741,7 +807,6 @@ const CODE_BROWSER_STYLES = `
         pointer-events: none;
       }
       .pane h2.pane-title { margin: 0 0 10px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
-      .app { display: flex; flex-direction: column; height: 100vh; }
       .shell--stretch-rows {
         flex: 1;
         min-height: 0;
@@ -805,6 +870,7 @@ const CODE_BROWSER_STYLES = `
         font-size: var(--code-line-font-size, 13px);
         line-height: var(--code-line-height, 1.5);
       }
+      .block-stretch .code-line-stack { --code-ln-min-ch: 3; }
       .block-stretch .code-line .ln {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
         font-variant-numeric: tabular-nums;
@@ -817,6 +883,8 @@ const CODE_BROWSER_STYLES = `
         white-space: nowrap;
         font-size: var(--code-line-font-size, 13px);
         line-height: var(--code-line-height, 1.5);
+        min-width: calc(var(--code-ln-min-ch, 3) * 1ch + 0.6ch);
+        box-sizing: content-box;
       }
       .block-stretch.wrap .code-line pre,
       .block-stretch.wrap .code-line pre code { white-space: pre-wrap; word-break: break-word; }
@@ -832,6 +900,10 @@ const CODE_BROWSER_STYLES = `
       .block-stretch-headings .pane-title { margin: 0; }
 `;
 
+/** Native tooltip on #search-q (short hint is visible under the search row). */
+const CODE_BROWSER_SEARCH_INPUT_TITLE =
+  "Filename, path, or words. Matches this pair (source + commentray lines) first; merges commentray-nav-search.json when the export includes it (indexed paths + commentray lines).";
+
 type CodeBrowserPageParts = {
   title: string;
   generatorMetaHtml: string;
@@ -841,6 +913,7 @@ type CodeBrowserPageParts = {
   navRailDocumentedHtml: string;
   relatedNavHtml: string;
   toolbarEndHtml: string;
+  pageFooterHtml: string;
   /** `dual`: resizable panes; `stretch`: rowspan table aligned to index blocks. */
   layout: "dual" | "stretch";
   shellInner: string;
@@ -879,20 +952,20 @@ ${CODE_BROWSER_STYLES}
   </head>
   <body>
     <div class="app">
-      <aside class="app__nav" aria-label="Search and navigation">
-        ${p.navRailContextHtml}
-        <div class="nav-rail__search">
-          <label class="nav-rail__search-label" for="search-q">Search</label>
-          <input type="search" id="search-q" placeholder="${escapeHtml(p.searchPlaceholder)}" autocomplete="off" spellcheck="false" />
+      <header class="app__chrome" role="region" aria-label="Search and navigation">
+        <div class="chrome__search-row">
+          <label class="chrome__search-label nav-rail__search-label" for="search-q">Search</label>
+          <input type="search" id="search-q" placeholder="${escapeHtml(p.searchPlaceholder)}" title="${escapeHtml(CODE_BROWSER_SEARCH_INPUT_TITLE)}" autocomplete="off" spellcheck="false" />
           <button type="button" id="search-clear" title="Clear search">Clear</button>
-          <p class="nav-rail__search-hint">Filename, path segment, or words. Matches this pair first; merges <code class="nav-rail__code">commentray-nav-search.json</code> when the build ships it (indexed commentray lines + paths).</p>
         </div>
         <div class="search-results" id="search-results" hidden aria-live="polite"></div>
-        ${p.navRailDocumentedHtml}
-      </aside>
+        <p class="nav-rail__search-hint chrome__search-hint">This pair + merged <code class="nav-rail__code">commentray-nav-search.json</code> when the export ships it.</p>
+      </header>
       <div class="app__main">
         <header class="toolbar" aria-label="View options">
           <div class="toolbar__main">
+            ${p.navRailContextHtml}
+            ${p.navRailDocumentedHtml}
             ${p.angleSelectHtml}
             ${p.toolbarDocHubHtml}
             ${p.relatedNavHtml}
@@ -904,6 +977,7 @@ ${CODE_BROWSER_STYLES}
 ${p.shellInner}
         </div>
       </div>
+      ${p.pageFooterHtml}
     </div>
     <script type="text/plain" id="commentray-multi-angle-b64">${p.multiAngleScriptBlock}</script>
     <script>
@@ -958,7 +1032,7 @@ async function buildMultiAngleDualPaneShell(
   let defaultGh = opts.commentrayOnGithubUrl;
   let defaultPaneHtml = "";
 
-  const codeHtml = await renderCodeLineBlocks(opts.code, opts.language);
+  const codeHtml = await renderHighlightedCodeLineRows(opts.code, opts.language);
 
   for (const spec of multi.angles) {
     const rows = spec.blockStretchRows;
@@ -1101,7 +1175,7 @@ async function buildCodeBrowserShell(
       scrollBlockLinksB64 = Buffer.from(JSON.stringify(links), "utf8").toString("base64");
     }
     const [codeHtml, commentrayHtml] = await Promise.all([
-      renderCodeLineBlocks(opts.code, opts.language),
+      renderHighlightedCodeLineRows(opts.code, opts.language),
       renderMarkdownToHtml(mdForDoc, {
         commentrayOutputUrls: opts.commentrayOutputUrls,
       }),
@@ -1210,7 +1284,10 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const rawCodeB64 = Buffer.from(opts.code, "utf8").toString("base64");
 
   const title = codeBrowserPageTitle(opts);
-  const toolbarEndHtml = buildToolbarEndHtml(opts.githubRepoUrl, opts.toolHomeUrl);
+  const builtAt = opts.builtAt ?? new Date();
+  const renderSemver = commentrayRenderVersion();
+  const toolbarEndHtml = buildToolbarEndHtml(opts.githubRepoUrl, opts.toolHomeUrl, renderSemver);
+  const pageFooterHtml = renderPageFooterHtml(builtAt);
   const { hljs, hljsDark } = codeBrowserHljsThemes(opts);
 
   const mermaidScript = mermaidRuntimeScriptHtml(opts.includeMermaidRuntime);
@@ -1222,8 +1299,6 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const shell = await buildCodeBrowserShell(opts, layoutPref);
 
   const { toolbarDocHubHtml, navRailDocumentedHtml } = renderToolbarDocHubHtml({
-    sourceOnGithubUrl: opts.sourceOnGithubUrl,
-    commentrayOnGithubUrl: toolbarCommentrayGithubFromShell(shell, opts),
     documentedNavJsonUrl: opts.documentedNavJsonUrl,
     documentedPairsEmbeddedB64: opts.documentedPairsEmbeddedB64,
   });
@@ -1243,6 +1318,10 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const navRailContextHtml = renderNavRailContextHtml(
     opts.filePath,
     navRailCommentrayPathFromShell(shell, opts),
+    {
+      sourceOnGithubUrl: opts.sourceOnGithubUrl,
+      commentrayOnGithubUrl: toolbarCommentrayGithubFromShell(shell, opts),
+    },
   );
 
   return buildCodeBrowserPageHtml({
@@ -1254,6 +1333,7 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     navRailDocumentedHtml,
     relatedNavHtml,
     toolbarEndHtml,
+    pageFooterHtml,
     layout: shell.layout,
     shellInner: shell.shellInner,
     rawCodeB64,

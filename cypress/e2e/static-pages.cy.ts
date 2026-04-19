@@ -22,14 +22,14 @@ describe("Commentray static site (GitHub Pages build)", () => {
 
     it("then the hub exposes GitHub source links and a collapsible browse-files tree", () => {
       cy.visitStaticSiteHome();
-      cy.contains("a", "Source on GitHub")
+      cy.get("#toolbar-source-github")
         .should("have.attr", "href")
         .and("match", /github\.com/);
-      cy.contains("a", "Commentray on GitHub")
+      cy.get("#toolbar-commentray-github")
         .should("have.attr", "href")
         .and("match", /github\.com/);
       cy.get("#documented-files-hub").should("exist");
-      cy.get("#documented-files-hub").find("summary").contains("Browse files");
+      cy.get("#documented-files-hub").find("summary").contains("Documented files");
       cy.get("#documented-files-hub").then(($d) => {
         if (!$d.attr("open")) cy.wrap($d).find("summary").click();
       });
