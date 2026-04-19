@@ -3,7 +3,8 @@
  */
 describe("given the E2E dual-scroll fixture page", () => {
   beforeEach(() => {
-    cy.viewport(1280, 720);
+    /** Short viewport so the code pane must overflow (block sync only runs when the source pane actually scrolls). */
+    cy.viewport(1280, 480);
   });
 
   it("then the fixture loads as a dual-pane code browser", () => {
@@ -23,20 +24,24 @@ describe("given the E2E dual-scroll fixture page", () => {
 
   it("then scrolling the code pane down pulls the commentray pane to follow (block sync)", () => {
     cy.visitE2eDualScrollSync();
-    cy.get('[aria-label="Commentray"] .doc-pane-body').invoke("scrollTop").should("eq", 0);
-    cy.get('[aria-label="Source code"]').invoke("scrollTop").should("eq", 0);
-    /** Bring the last source line into view — same gesture a reader uses to reach the end of the file. */
-    cy.get('[aria-label="Source code"] .code-line').last().scrollIntoView();
-    cy.get('[aria-label="Commentray"] .doc-pane-body').invoke("scrollTop").should("be.gt", 80);
+    cy.get("#doc-pane-body").invoke("scrollTop").should("eq", 0);
+    cy.get("#code-pane").invoke("scrollTop").should("eq", 0);
+    /** Scroll the code pane to the end so the scroll listener runs deterministically (scrollIntoView on a line can miss the pane’s scroll edge in headless Chrome). */
+    cy.get("#code-pane").then(($pane) => {
+      const el = $pane[0];
+      el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    });
+    cy.get("#doc-pane-body").invoke("scrollTop").should("be.gt", 80);
   });
 
   it("then scrolling the commentray pane down pulls the code pane to follow (reverse sync)", () => {
     cy.visitE2eDualScrollSync();
-    cy.get('[aria-label="Commentray"] .doc-pane-body').invoke("scrollTop").should("eq", 0);
-    cy.get('[aria-label="Source code"]').invoke("scrollTop").should("eq", 0);
-    cy.get('[aria-label="Commentray"] .doc-pane-body')
-      .contains("Second-block commentary line 45")
-      .scrollIntoView();
-    cy.get('[aria-label="Source code"]').invoke("scrollTop").should("be.gt", 80);
+    cy.get("#doc-pane-body").invoke("scrollTop").should("eq", 0);
+    cy.get("#code-pane").invoke("scrollTop").should("eq", 0);
+    cy.get("#doc-pane-body").then(($body) => {
+      const el = $body[0];
+      el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    });
+    cy.get("#code-pane").invoke("scrollTop").should("be.gt", 80);
   });
 });

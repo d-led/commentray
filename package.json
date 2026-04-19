@@ -21,6 +21,7 @@
     "format:check": "bash scripts/format-check.sh",
     "lint": "bash scripts/lint.sh",
     "lint:shell": "bash scripts/shellcheck.sh",
+    "actionlint": "bash scripts/actionlint.sh",
     "dupes": "bash scripts/find-duplicates.sh",
     "quality": "npm run lint && npm run dupes",
     "quality:gate": "bash scripts/quality-gate.sh",

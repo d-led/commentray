@@ -21,7 +21,7 @@ install Commentray to use it, see the top-level `README.md`.
 One command gates every review:
 
 ```bash
-npm run quality:gate   # format check, ESLint x2, shellcheck, jscpd, tsc -b, unit tests
+npm run quality:gate   # format check, actionlint, ESLint x2, shellcheck, jscpd, tsc -b, unit tests
 ```
 
 Slow lane (integration + expensive suites) on top of the gate:

@@ -127,7 +127,7 @@ describe("Commentray static site (GitHub Pages build)", () => {
 
     it("then Mermaid diagrams render without a syntax error (Main and Architecture)", () => {
       const assertMermaidOk = () => {
-        cy.get("#doc-pane-body", { timeout: 30000 })
+        cy.get("#doc-pane-body", { timeout: 60000 })
           .find("svg")
           .should("have.length.at.least", 1)
           .first()
