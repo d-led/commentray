@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   findDocumentedPair,
+  isHubRelativeStaticBrowseHref,
   isSameDocumentedPair,
   normPosixPath,
   resolveStaticBrowseHref,
@@ -23,6 +24,19 @@ describe("siteRootPathnameFromPathname", () => {
   it("should strip the filename for the hub index", () => {
     expect(siteRootPathnameFromPathname("/repo/index.html")).toBe("/repo");
     expect(siteRootPathnameFromPathname("/index.html")).toBe("/");
+  });
+});
+
+describe("isHubRelativeStaticBrowseHref", () => {
+  it("should accept hub-root browse URLs from nav JSON", () => {
+    expect(isHubRelativeStaticBrowseHref("./browse/x.html")).toBe(true);
+    expect(isHubRelativeStaticBrowseHref("browse/y.html")).toBe(true);
+  });
+
+  it("should reject non-browse relative links", () => {
+    expect(isHubRelativeStaticBrowseHref("./docs/a.md")).toBe(false);
+    expect(isHubRelativeStaticBrowseHref("../index.html")).toBe(false);
+    expect(isHubRelativeStaticBrowseHref("https://ex/browse/z.html")).toBe(false);
   });
 });
 

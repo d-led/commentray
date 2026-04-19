@@ -44,6 +44,26 @@ describe("Commentray static site (GitHub Pages build)", () => {
         .should("be.visible");
     });
 
+    it("then a per-pair browse page rewrites hub-relative Doc links so paths do not stack /browse/browse/", () => {
+      cy.visitStaticSiteHome();
+      cy.contains("summary", "Comment-rayed files").click();
+      cy.get('[role="tree"]', { timeout: 15000 })
+        .find('a.tree-file-link[href*="/browse/"]')
+        .first()
+        .then(($a) => {
+          const href = $a.attr("href");
+          expect(href)
+            .to.be.a("string")
+            .and.match(/\/browse\/[^/]+\.html(\?.*)?$/);
+          cy.visit(href!);
+        });
+      cy.shouldDisplayCodeBrowserShell();
+      cy.get("#toolbar-commentray-github")
+        .should("have.attr", "href")
+        .and("match", /\/browse\/[^/]+\.html(\?.*)?$/)
+        .and("not.contain", "/browse/browse/");
+    });
+
     it("then the Comment-rayed files list still appears when the nav search index cannot be fetched", () => {
       cy.intercept("GET", "**/commentray-nav-search.json", { statusCode: 503, body: "{}" }).as(
         "navJsonFail",

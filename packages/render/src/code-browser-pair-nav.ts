@@ -29,8 +29,13 @@ export function siteRootPathnameFromPathname(pathname: string): string {
   return noFile.replace(/\/+$/, "") || "/";
 }
 
-/** `./browse/<slug>.html` from nav JSON (see `github-pages-site.ts`). */
-const STATIC_BROWSE_REL = /^\.\/?browse\/([^/?#]+\.html)$/i;
+/** `./browse/<slug>.html` or `browse/<slug>.html` from nav JSON (see `github-pages-site.ts`). */
+const STATIC_BROWSE_REL = /^(?:\.\/)?browse\/([^/?#]+\.html)$/i;
+
+/** True when `href` is hub-root-relative static browse (not same-dir `./other.html`). */
+export function isHubRelativeStaticBrowseHref(href: string): boolean {
+  return STATIC_BROWSE_REL.test(href.trim());
+}
 
 /**
  * Resolves `staticBrowseUrl` from nav JSON (typically `./browse/<slug>.html`) to an absolute href.

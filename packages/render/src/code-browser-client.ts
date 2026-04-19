@@ -33,11 +33,27 @@ import {
 } from "./code-browser-search.js";
 import {
   findDocumentedPair,
+  isHubRelativeStaticBrowseHref,
   isSameDocumentedPair,
   normPosixPath,
   resolveStaticBrowseHref,
 } from "./code-browser-pair-nav.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
+
+/**
+ * Hub pages emit `./browse/…` relative to the site root. From `/…/browse/current.html` the browser
+ * would otherwise resolve that to `…/browse/browse/…`.
+ */
+function rewriteHubRelativeBrowseAnchorsIn(root: ParentNode): void {
+  const path = globalThis.location.pathname;
+  const origin = globalThis.location.origin;
+  for (const el of Array.from(root.querySelectorAll("a[href]"))) {
+    if (!(el instanceof HTMLAnchorElement)) continue;
+    const raw = el.getAttribute("href")?.trim() ?? "";
+    if (!isHubRelativeStaticBrowseHref(raw)) continue;
+    el.href = resolveStaticBrowseHref(raw, path, origin);
+  }
+}
 
 /** Set by the Mermaid module script in {@link ./mermaid-runtime-html.ts} (same origin, not `file:`). */
 type CommentrayMermaidGlobal = {
@@ -1545,6 +1561,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
         if (!a) return;
         docBody.innerHTML = decodeBase64Utf8(a.docInnerHtmlB64);
         runMermaidOnFreshDocNodes(docBody);
+        rewriteHubRelativeBrowseAnchorsIn(docBody);
         mutable.rawMd = decodeBase64Utf8(a.rawMdB64);
         mutable.mdLines = mutable.rawMd.split("\n");
         mutable.commentrayPathLabel = a.commentrayPathForSearch;
@@ -1661,6 +1678,8 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     );
   }
   rebuildSearcher();
+
+  rewriteHubRelativeBrowseAnchorsIn(document);
 
   wireSearchUi({
     scope,
