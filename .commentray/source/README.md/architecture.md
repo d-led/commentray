@@ -12,13 +12,13 @@ flowchart TB
   cli["commentray/cli"]
   vscode["commentray-vscode"]
 
-  core --> pkgRender
-  core --> ccStatic
-  pkgRender --> ccStatic
-  core --> cli
-  pkgRender --> cli
-  ccStatic --> cli
-  core --> vscode
+  core -->|npm dep| pkgRender
+  core -->|npm dep| ccStatic
+  pkgRender -->|npm dep| ccStatic
+  core -->|npm dep| cli
+  pkgRender -->|npm dep| cli
+  ccStatic -->|npm dep| cli
+  core -->|npm dep| vscode
 ```
 
 - **`@commentray/core`** — paths, index, config merge, Angles resolution, Git-backed evidence.

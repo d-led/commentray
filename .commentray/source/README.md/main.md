@@ -54,13 +54,13 @@ flowchart TB
   nCli["CLI init validate pages serve"]
   nExt["Editor paired files scroll sync"]
 
-  nCore --> nHtml
-  nCore --> nSsg
-  nHtml --> nSsg
-  nCore --> nCli
-  nHtml --> nCli
-  nSsg --> nCli
-  nCore --> nExt
+  nCore -->|builds on| nHtml
+  nCore -->|paths and index| nSsg
+  nHtml -->|shell uses| nSsg
+  nCore -->|uses| nCli
+  nHtml -->|uses| nCli
+  nSsg -->|bundled in| nCli
+  nCore -->|uses| nExt
 ```
 
 In one line: **core** holds paths and index truth; **render** holds safe HTML; **cli** and the extension are **surfaces**; the static-site package is the thinnest **consumer** of render for publishing. Change the HTML contract, then walk that chain backward before you tag.
