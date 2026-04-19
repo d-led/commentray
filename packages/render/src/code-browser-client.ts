@@ -18,6 +18,7 @@ import {
   findOrderedTokenSpans,
   lineAtIndex,
   offsetToLineIndex,
+  pathRowsFromDocumentedPairs,
 } from "./code-browser-search.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
@@ -740,27 +741,6 @@ function pairsFromJsonArray(raw: unknown): DocumentedPairNav[] {
     if (isDocumentedPairNav(x)) pairs.push(x);
   }
   return pairs;
-}
-
-function pathRowsFromDocumentedPairs(pairs: DocumentedPairNav[]): Row[] {
-  const seen = new Set<string>();
-  const out: Row[] = [];
-  let line = 0;
-  for (const p of pairs) {
-    for (const seg of [p.sourcePath, p.commentrayPath]) {
-      const t = seg.trim();
-      if (!t || seen.has(t)) continue;
-      seen.add(t);
-      out.push({
-        kind: "path",
-        line: line++,
-        text: t,
-        spPath: p.sourcePath,
-        crPath: p.commentrayPath,
-      });
-    }
-  }
-  return out;
 }
 
 function commentrayLineRowFromNavJson(r: Record<string, unknown>): Row | null {

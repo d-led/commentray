@@ -88,3 +88,56 @@ export function lineAtIndex(text: string, lineIndex: number): string {
   if (lineIndex < 0 || lineIndex >= lines.length) return "";
   return lines[lineIndex] ?? "";
 }
+
+/** Hub path search row: `text` is shown; `spPath` / `crPath` tie hits to a documented pair. */
+export type HubPathSearchRow = {
+  kind: "path";
+  line: number;
+  text: string;
+  spPath: string;
+  crPath: string;
+};
+
+/**
+ * Builds path rows for the static hub search index from documented pairs.
+ *
+ * When several pairs share the same source filename (multi-angle), we must emit one source-path
+ * row per pair — same visible `text`, distinct `crPath` — so ordered path hits open the right
+ * companion (not only the first pair after lexicographic sort of commentray paths).
+ */
+export function pathRowsFromDocumentedPairs(
+  pairs: Array<{ sourcePath: string; commentrayPath: string }>,
+): HubPathSearchRow[] {
+  const seenSourceWithCompanion = new Set<string>();
+  const seenCommentray = new Set<string>();
+  const out: HubPathSearchRow[] = [];
+  let line = 0;
+  for (const p of pairs) {
+    const sp = p.sourcePath.trim();
+    const cr = p.commentrayPath.trim();
+    if (sp.length > 0) {
+      const spKey = `${sp}\0${cr}`;
+      if (!seenSourceWithCompanion.has(spKey)) {
+        seenSourceWithCompanion.add(spKey);
+        out.push({
+          kind: "path",
+          line: line++,
+          text: sp,
+          spPath: p.sourcePath,
+          crPath: p.commentrayPath,
+        });
+      }
+    }
+    if (cr.length > 0 && !seenCommentray.has(cr)) {
+      seenCommentray.add(cr);
+      out.push({
+        kind: "path",
+        line: line++,
+        text: cr,
+        spPath: p.sourcePath,
+        crPath: p.commentrayPath,
+      });
+    }
+  }
+  return out;
+}

@@ -4,6 +4,7 @@ import {
   findOrderedTokenSpans,
   lineAtIndex,
   offsetToLineIndex,
+  pathRowsFromDocumentedPairs,
 } from "./code-browser-search.js";
 
 describe("Ordered in-line search token matching", () => {
@@ -68,5 +69,27 @@ describe("Search snippet HTML with safe highlighting", () => {
   it("should escape the snippet and emit no marks when there are no real tokens", () => {
     expect(escapeHtmlHighlightingSearchTokens("<x>", [])).toBe("&lt;x&gt;");
     expect(escapeHtmlHighlightingSearchTokens("<x>", ["  ", ""])).toBe("&lt;x&gt;");
+  });
+});
+
+describe("Hub path rows from documented pairs", () => {
+  it("should emit one source-path row per pair when the same source file has multiple angles", () => {
+    const pairs = [
+      {
+        sourcePath: "README.md",
+        commentrayPath: ".commentray/source/README.md/architecture.md",
+      },
+      {
+        sourcePath: "README.md",
+        commentrayPath: ".commentray/source/README.md/main.md",
+      },
+    ];
+    const rows = pathRowsFromDocumentedPairs(pairs);
+    const readmeRows = rows.filter((r) => r.text === "README.md");
+    expect(readmeRows).toHaveLength(2);
+    expect(readmeRows.map((r) => r.crPath)).toEqual([
+      ".commentray/source/README.md/architecture.md",
+      ".commentray/source/README.md/main.md",
+    ]);
   });
 });
