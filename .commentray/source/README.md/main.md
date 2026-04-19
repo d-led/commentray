@@ -44,7 +44,32 @@ You may be reading a **generated** page: `@commentray/code-commentray-static`, [
 
 ## Architecture (who talks to whom)
 
-Do not duplicate the README’s package list here—that list is canonical. In one line: **core** holds paths and index truth; **render** holds safe HTML; **cli** and **vscode** are surfaces; **code-commentray-static** is the smallest renderer consumer. Change the HTML contract, then walk that chain backward before you tag.
+Do not duplicate the README’s package list here—that list is canonical. The diagram below is **roles**, not package names—see the **[Architecture](https://github.com/d-led/commentray/blob/main/.commentray/source/README.md/architecture.md)** angle for the exact `@commentray/*` dependency graph.
+
+```mermaid
+flowchart TB
+  subgraph libs["Libraries (shared implementation)"]
+    core["Core: paths, index, config, SCM"]
+    render["Render: Markdown to safe HTML, code-browser shell"]
+  end
+
+  subgraph surfaces["Tooling (how you work in-repo)"]
+    cli["CLI: init, validate, render, serve, pages"]
+    ext["Editor extension: paired files, scroll sync"]
+  end
+
+  siteGen["Static site generator: one-file HTML for Pages"]
+
+  core --> render
+  core --> siteGen
+  render --> siteGen
+  core --> cli
+  render --> cli
+  siteGen --> cli
+  core --> ext
+```
+
+In one line: **core** holds paths and index truth; **render** holds safe HTML; **cli** and the extension are **surfaces**; the static-site package is the thinnest **consumer** of render for publishing. Change the HTML contract, then walk that chain backward before you tag.
 
 ## Reference (jump off points)
 
