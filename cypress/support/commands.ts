@@ -30,11 +30,13 @@ Cypress.Commands.add("visitE2eDualScrollSync", () => {
 });
 
 Cypress.Commands.add("shouldDisplayCodeBrowserShell", () => {
-  cy.get("#shell").should("exist").and("have.attr", "data-layout");
-  cy.get("#code-pane").should("exist");
-  cy.get("#doc-pane").should("exist");
-  cy.get("#search-q").should("be.visible");
-  cy.get(".app__footer").should("exist").and("contain", "HTML generated");
+  cy.get(".shell").should("exist").and("have.attr", "data-layout");
+  cy.get('[aria-label="Source code"]').should("be.visible");
+  cy.get('[aria-label="Commentray"]').should("be.visible");
+  cy.get('[role="region"][aria-label="Search"]').within(() => {
+    cy.get('input[type="search"]').should("be.visible");
+  });
+  cy.contains("HTML generated").should("be.visible");
 });
 
 Cypress.Commands.add("shouldExposeNavSearchArtifact", () => {
