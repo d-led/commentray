@@ -78,7 +78,7 @@ async function writePerPairBrowseHtmlPages(input: {
       filePath: p.sourcePath,
       includeMermaidRuntime: input.cfg.render.mermaid,
       hljsTheme: input.cfg.render.syntaxTheme,
-      githubRepoUrl: input.ss.githubUrl ?? undefined,
+      siteHubUrl: "../index.html",
       toolHomeUrl: input.toolHomeUrl,
       commentrayOutputUrls,
       relatedGithubNav:
@@ -141,7 +141,7 @@ function staticRenderOptions(input: {
     filePath: input.ss.sourceFile,
     includeMermaidRuntime: input.cfg.render.mermaid,
     hljsTheme: input.cfg.render.syntaxTheme,
-    githubRepoUrl: input.ss.githubUrl ?? undefined,
+    siteHubUrl: "./",
     toolHomeUrl: input.toolHomeUrl,
     commentrayOutputUrls: input.commentrayOutputUrls,
     relatedGithubNav: input.ss.relatedGithubNav.length > 0 ? input.ss.relatedGithubNav : undefined,

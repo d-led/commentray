@@ -48,6 +48,13 @@ describe("GitHub Pages static site output", () => {
     expect(nav.documentedPairs?.[0]?.staticBrowseUrl).toMatch(/^\.\/browse\/.+\.html$/);
     const browseFiles = await readdir(path.join(repo, "_site", "browse"));
     expect(browseFiles.some((f) => f.endsWith(".html"))).toBe(true);
+    expect(html).toContain('aria-label="Documentation home"');
+    expect(html).toContain('href="./"');
+    const browseName = browseFiles.find((f) => f.endsWith(".html"));
+    expect(browseName).toBeTruthy();
+    const browseHtml = await readFile(path.join(repo, "_site", "browse", browseName!), "utf8");
+    expect(browseHtml).toContain('href="../index.html"');
+    expect(browseHtml).toContain('aria-label="Documentation home"');
   });
 
   it("writes browse pages and hub nav without static_site.github_url (same-site navigation only)", async () => {
@@ -75,6 +82,8 @@ describe("GitHub Pages static site output", () => {
 
     const html = await readFile(outHtml, "utf8");
     expect(html).not.toMatch(/aria-label="Source file on GitHub"/);
+    expect(html).toContain('aria-label="Documentation home"');
+    expect(html).toContain('href="./"');
     expect(html).toContain('data-nav-search-json-url="./commentray-nav-search.json"');
     const nav = JSON.parse(await readFile(navSearchPath, "utf8")) as {
       documentedPairs?: { staticBrowseUrl?: string; sourceOnGithub?: string }[];

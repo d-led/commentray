@@ -265,6 +265,22 @@ describe("Code browser page — toolbar link policy", () => {
     expect(html).toMatch(/toolbar-attribution__version[^>]*>v\d+\.\d+\.\d+/);
   });
 
+  it("should prefer same-site documentation home over GitHub when siteHubUrl is set", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      siteHubUrl: "./",
+      githubRepoUrl: "https://github.com/example/demo",
+      toolHomeUrl: "https://github.com/d-led/commentray",
+    });
+    expect(html).toContain('aria-label="Documentation home"');
+    expect(html).toContain('href="./"');
+    expect(html).not.toContain('aria-label="View repository on GitHub"');
+    expect(html).toContain('href="https://github.com/d-led/commentray"');
+  });
+
   it("should include a footer with ISO and local wall-clock text for HTML generation", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",

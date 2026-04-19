@@ -26,8 +26,10 @@ export type BuildCommentrayStaticOptions = {
   includeMermaidRuntime?: boolean;
   /** Highlight.js theme base name (e.g. github, github-dark); forwarded to `renderCodeBrowserHtml`. */
   hljsTheme?: string;
-  /** If set, toolbar shows an Octocat link to this repository (`http`/`https` only). */
+  /** If set, toolbar shows an Octocat link to this repository (`http`/`https` only). Omitted when {@link siteHubUrl} is used for the same slot. */
   githubRepoUrl?: string;
+  /** Same-site link to the static hub (`./` on index, `../index.html` from `browse/`). */
+  siteHubUrl?: string;
   /** Toolbar "Rendered with Commentray" link plus semver (`http`/`https` only). */
   toolHomeUrl?: string;
   /** When set, rewrites local and GitHub blob links in commentray for static HTML output. */
@@ -116,6 +118,7 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     includeMermaidRuntime: opts.includeMermaidRuntime ?? false,
     hljsTheme: opts.hljsTheme,
     githubRepoUrl: opts.githubRepoUrl,
+    siteHubUrl: opts.siteHubUrl,
     toolHomeUrl: opts.toolHomeUrl,
     commentrayOutputUrls: opts.commentrayOutputUrls,
     relatedGithubNav: opts.relatedGithubNav,

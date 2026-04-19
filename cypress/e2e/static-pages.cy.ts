@@ -26,8 +26,9 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.get('[aria-label="Commentray"] em').first().should("contain.text", "You have the main");
     });
 
-    it("then the hub exposes GitHub source link, same-site Doc browse link, and a collapsible Comment-rayed files tree", () => {
+    it("then the hub exposes a same-site home link, GitHub source link, same-site Doc browse link, and a collapsible Comment-rayed files tree", () => {
       cy.visitStaticSiteHome();
+      cy.get('a[aria-label="Documentation home"]').should("have.attr", "href", "./");
       cy.get('a[aria-label="Source file on GitHub"]')
         .should("have.attr", "href")
         .and("match", /github\.com/);
