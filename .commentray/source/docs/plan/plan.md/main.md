@@ -12,6 +12,8 @@ flowchart LR
 
 **Metaphor** — Commentary on a film: extra audio without splicing new frames into the picture.
 
+**Navigation & links** — We strive for **easy, understandable navigation** everywhere (extension, rendered HTML, docs). **Cross-linking must be very easy**—plain Markdown and repo-relative paths; details in the plan’s § Product principles and in `docs/spec/anchors.md` § Cross references.
+
 **Goals / non-goals** — v0 stays small; deferred work (LSP, every SCM, …) is named so absence reads as policy, not neglect.
 
 **Angles** — Core + VS Code: add angle + pick angle (see `packages/vscode/package.json` command titles). **`@commentray/render`:** no Angle switcher. Pages: one `commentray_markdown` until static work lands.

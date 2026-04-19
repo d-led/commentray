@@ -46,6 +46,8 @@ Any string that does not match the forms above is stored as an **opaque** anchor
 
 ## Cross references
 
+Commentray treats **effortless cross-linking** as a first-class requirement: prose should connect primary artifacts, commentray files, and external resources without ceremony. The conventions below keep links **simple, portable, and reviewable**—no custom syntax required for the usual case.
+
 Cross references are authored in Markdown using normal links and conventions:
 
 - Repo-relative links where possible.

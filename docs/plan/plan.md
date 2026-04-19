@@ -16,6 +16,11 @@ The user-facing README should remain **terse and skimmable**, in the spirit of [
 - **This plan** carries **intent**, boundaries, backlog, and high-level CI/testing posture. It should **link** to README, specs, and workflows instead of growing a second package inventory, command cheat sheet, or full default-config dump.
 - **Commentray** under [`.commentray/source/`](../../.commentray/source/) is **optional narrative** beside a primary file: rationale, mental models, pointers. It must **not** restate authoritative lists (workspaces, CI matrix, every `npm run`). Prefer one sentence plus a link to the file on the left or to specs.
 
+## Product principles (navigation and linking)
+
+- **Navigation:** We strive to make moving around the system—as an author or reader in the extension, rendered views, static hub and browse tree, and repo documentation—as **easy and understandable** as possible: predictable entry points and clear mental models over cleverness. Concrete URL and in-site navigation policy lives under [§ Permalinks and stable URLs (design intent)](#permalinks-and-stable-urls-design-intent) below.
+- **Cross-linking:** **Cross-linking must be very easy.** Authors should rely on ordinary Markdown links and repo-relative paths wherever practical; normative authoring rules are in [`docs/spec/anchors.md` § Cross references](../spec/anchors.md#cross-references). Optional higher-level xref syntax, if added later, stays optional—the common case must stay plain links.
+
 ## Goals (v0)
 
 - **Out-of-file docs** under `.commentray/` with transparent paths: `.commentray/source/<repo-relative-path>.md` (append `.md` to the original path; normalize separators; reject `..`).
