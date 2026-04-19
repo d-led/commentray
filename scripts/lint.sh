@@ -15,15 +15,20 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 CONFIG_ABS="${REPO_ROOT}/scripts/eslint.refactor-metrics.mjs"
+ESLINT_BIN="${REPO_ROOT}/node_modules/.bin/eslint"
+if [[ ! -x "${ESLINT_BIN}" ]]; then
+  echo "Missing ${ESLINT_BIN}. Install dependencies: npm ci" >&2
+  exit 1
+fi
 
 echo "== ESLint (project) ==" >&2
-npx eslint .
+"${ESLINT_BIN}" .
 
 echo "== ShellCheck (scripts/) ==" >&2
 bash "${REPO_ROOT}/scripts/shellcheck.sh"
 
 echo "== ESLint (refactor metrics) ==" >&2
-eslint_cmd=(npx eslint --no-config-lookup -c "${CONFIG_ABS}" --max-warnings 0 .)
+eslint_cmd=("${ESLINT_BIN}" --no-config-lookup -c "${CONFIG_ABS}" --max-warnings 0 .)
 
 if [[ "${REFACTOR_METRICS_FORMAT:-}" == "json" ]]; then
   eslint_cmd+=(-f json)

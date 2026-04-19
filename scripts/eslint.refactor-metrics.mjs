@@ -1,5 +1,5 @@
 // ESLint flat config: refactoring / maintainability (complexity, size, async hygiene).
-// Loaded via: npx eslint --no-config-lookup -c scripts/eslint.refactor-metrics.mjs
+// Loaded via: node_modules/.bin/eslint --no-config-lookup -c scripts/eslint.refactor-metrics.mjs (see scripts/lint.sh)
 //
 // Rule IDs for ESLINT_REFACTOR_METRICS_ONLY: keys in eslint.refactor-metrics.rules.json
 
