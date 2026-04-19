@@ -45,10 +45,12 @@ type CommentrayMermaidGlobal = {
 };
 
 function runMermaidOnFreshDocNodes(docBody: HTMLElement): void {
-  if (typeof globalThis.location !== "undefined" && globalThis.location.protocol === "file:") return;
+  if (typeof globalThis.location !== "undefined" && globalThis.location.protocol === "file:")
+    return;
   const nodes = docBody.querySelectorAll(".mermaid");
   if (nodes.length === 0) return;
-  const m = (globalThis as unknown as { commentrayMermaid?: CommentrayMermaidGlobal }).commentrayMermaid;
+  const m = (globalThis as unknown as { commentrayMermaid?: CommentrayMermaidGlobal })
+    .commentrayMermaid;
   if (!m) return;
   const list = Array.from(nodes) as HTMLElement[];
   void m.run({ nodes: list }).catch(() => {});
