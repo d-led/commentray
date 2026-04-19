@@ -5,7 +5,7 @@ import {
   sourceLineRangeForMarkerId,
 } from "./source-markers.js";
 
-describe("commentrayRegionInsertions", () => {
+describe("Inserting Commentray region markers into source text", () => {
   it("matches Region Marker-style //#region for TypeScript", () => {
     const { start, end } = commentrayRegionInsertions("typescript", "abc123", "  ");
     expect(start).toBe("  //#region commentray:abc123\n");
@@ -43,7 +43,7 @@ describe("commentrayRegionInsertions", () => {
   });
 });
 
-describe("parseCommentrayRegionBoundary", () => {
+describe("Parsing Commentray region boundary lines", () => {
   it("detects //#region / //#endregion with commentray id", () => {
     expect(parseCommentrayRegionBoundary("//#region commentray:ab12")).toEqual({
       kind: "start",
@@ -67,7 +67,7 @@ describe("parseCommentrayRegionBoundary", () => {
   });
 });
 
-describe("sourceLineRangeForMarkerId", () => {
+describe("Resolving source line ranges for a marker id", () => {
   it("returns 1-based inclusive lines between region markers", () => {
     const src = [
       "//#region commentray:ab12",

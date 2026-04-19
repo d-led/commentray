@@ -1,31 +1,6 @@
-import { spawn } from "node:child_process";
-
 import { normalizeRepoRelativePath } from "../paths.js";
+import { runGit } from "./git-spawn.js";
 import type { ScmPathRename, ScmProvider } from "./scm-provider.js";
-
-function runGit(
-  repoRoot: string,
-  args: string[],
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("git", args, {
-      cwd: repoRoot,
-      env: process.env,
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (d: Buffer | string) => {
-      stdout += String(d);
-    });
-    child.stderr.on("data", (d: Buffer | string) => {
-      stderr += String(d);
-    });
-    child.on("error", reject);
-    child.on("close", (code: number | null) => {
-      resolve({ code: code ?? 1, stdout, stderr });
-    });
-  });
-}
 
 /**
  * Parses `git diff --name-status` output for `R` (rename) lines. Tab-separated

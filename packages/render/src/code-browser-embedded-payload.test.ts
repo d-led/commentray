@@ -6,7 +6,7 @@ import { decodeBase64Utf8 } from "./code-browser-encoding.js";
 import { readEmbeddedRawB64Strings } from "./code-browser-embedded-payload.js";
 import { findOrderedTokenSpans } from "./code-browser-search.js";
 
-describe("readEmbeddedRawB64Strings", () => {
+describe("Reading embedded base64 payloads from static HTML", () => {
   it("prefers attributes on #shell when present", () => {
     const codeB64 = Buffer.from("alpha", "utf8").toString("base64");
     const mdB64 = Buffer.from("beta", "utf8").toString("base64");

@@ -7,7 +7,7 @@ function configFrom(partial: CommentrayToml): ReturnType<typeof mergeCommentrayC
   return mergeCommentrayConfig(partial);
 }
 
-describe("resolveRenderInputs", () => {
+describe("Resolving static render CLI inputs", () => {
   it("falls back to .commentray.toml [static_site] when every flag is omitted", () => {
     const cfg = configFrom({
       static_site: {

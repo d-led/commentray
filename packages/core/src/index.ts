@@ -84,6 +84,8 @@ export {
   validateProject,
   writeIndex,
 } from "./validate-project.js";
+export { relocationHintMessages } from "./relocation-hints.js";
+export type { RelocationHintsInput } from "./relocation-hints.js";
 export { runCommanderMain } from "./cli-bootstrap.js";
 export type { BlockScrollLink } from "./scroll-sync.js";
 export {

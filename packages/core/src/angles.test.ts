@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { assertValidAngleId } from "./angles.js";
 
-describe("assertValidAngleId", () => {
+describe("Angle id validation rules", () => {
   it("accepts alphanumeric ids with hyphen and underscore", () => {
     expect(assertValidAngleId("architecture")).toBe("architecture");
     expect(assertValidAngleId("intro-v2")).toBe("intro-v2");

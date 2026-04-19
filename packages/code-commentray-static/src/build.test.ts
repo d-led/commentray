@@ -7,14 +7,14 @@ import { buildCommentrayStatic } from "./build.js";
 
 const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-describe("buildCommentrayStatic — HTML shell", () => {
+describe("Static browse HTML build — shell", () => {
   let outDir: string;
 
   afterEach(async () => {
     if (outDir) await rm(outDir, { recursive: true, force: true });
   });
 
-  it("writes HTML that includes code and commentray", async () => {
+  it("should write HTML that embeds highlighted source and the companion pane", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const outHtml = path.join(outDir, "index.html");
     await buildCommentrayStatic({
@@ -30,7 +30,7 @@ describe("buildCommentrayStatic — HTML shell", () => {
     expect(html).toContain("@commentray/code-commentray-static@");
   });
 
-  it("omits generator meta when generatorLabel is an empty string", async () => {
+  it("should omit the generator meta tag when generatorLabel is explicitly empty", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const outHtml = path.join(outDir, "index.html");
     await buildCommentrayStatic({
@@ -43,7 +43,7 @@ describe("buildCommentrayStatic — HTML shell", () => {
     expect(html).not.toContain('<meta name="generator"');
   });
 
-  it("surfaces the repo-relative file path in the left nav rail when provided", async () => {
+  it("should show the provided repo-relative path in the nav rail context", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const outHtml = path.join(outDir, "index.html");
     await buildCommentrayStatic({
@@ -57,7 +57,7 @@ describe("buildCommentrayStatic — HTML shell", () => {
     expect(html).toContain("packages/code-commentray-static/fixtures/sample.ts");
   });
 
-  it("falls back to the source basename in the nav rail when no filePath is given", async () => {
+  it("should fall back to the source basename in the nav rail when filePath is omitted", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const outHtml = path.join(outDir, "index.html");
     await buildCommentrayStatic({
@@ -71,14 +71,14 @@ describe("buildCommentrayStatic — HTML shell", () => {
   });
 });
 
-describe("buildCommentrayStatic — URLs and toolbar chrome", () => {
+describe("Static browse HTML build — URLs and toolbar", () => {
   let outDir: string;
 
   afterEach(async () => {
     if (outDir) await rm(outDir, { recursive: true, force: true });
   });
 
-  it("forwards commentrayOutputUrls into rendered commentray links", async () => {
+  it("should rewrite companion links using commentrayOutputUrls", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const repoRoot = path.join(outDir, "repo");
     await mkdir(path.join(repoRoot, "docs"), { recursive: true });
@@ -106,7 +106,7 @@ describe("buildCommentrayStatic — URLs and toolbar chrome", () => {
     expect(html).toContain('href="../docs/guide.md"');
   });
 
-  it("forwards GitHub + tool URLs into the rendered toolbar chrome", async () => {
+  it("should surface GitHub repo and tool home URLs in the toolbar chrome", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const outHtml = path.join(outDir, "index.html");
     await buildCommentrayStatic({

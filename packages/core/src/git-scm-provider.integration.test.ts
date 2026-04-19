@@ -12,7 +12,7 @@ async function git(repo: string, args: string[]) {
   await execFileAsync("git", ["-C", repo, ...args]);
 }
 
-describe("GitScmProvider", () => {
+describe("Git-backed SCM — blobs and rename detection", () => {
   let repo: string;
 
   afterEach(async () => {

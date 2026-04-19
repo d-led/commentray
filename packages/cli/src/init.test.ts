@@ -10,7 +10,7 @@ import {
   runInitFull,
 } from "./init.js";
 
-describe("runInitFull", () => {
+describe("Full init in an empty or partial repository", () => {
   it("creates storage, index, and config on a fresh directory", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "commentray-init-"));
     try {
@@ -89,7 +89,7 @@ describe("runInitFull", () => {
   });
 });
 
-describe("mergeCommentrayVscodeExtensionRecommendation", () => {
+describe("VS Code extension recommendations for Commentray", () => {
   it("creates .vscode/extensions.json when absent", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "commentray-ext-"));
     try {

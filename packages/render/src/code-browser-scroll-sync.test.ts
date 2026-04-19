@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { mirroredScrollTop } from "./code-browser-scroll-sync.js";
 
-describe("mirroredScrollTop", () => {
+describe("Proportional scroll position mirroring between panes", () => {
   it("maps top and bottom of the source range to the target range", () => {
     expect(mirroredScrollTop(0, 1000, 400, 500, 400)).toBe(0);
     expect(mirroredScrollTop(600, 1000, 400, 500, 400)).toBe(100);

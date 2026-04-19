@@ -6,7 +6,7 @@ import { CURRENT_SCHEMA_VERSION } from "@commentray/core";
 
 import { runMigrateAnglesFromCwd } from "./migrate-angles-cmd.js";
 
-describe("runMigrateAnglesFromCwd", () => {
+describe("Angles migration command from a working directory", () => {
   it("given a flat companion and index entry, moves files and rewrites index keys", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "commentray-migrate-ang-"));
     try {

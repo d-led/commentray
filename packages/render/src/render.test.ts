@@ -5,14 +5,14 @@ import { describe, expect, it } from "vitest";
 import { renderMarkdownToHtml } from "./markdown-pipeline.js";
 import { renderSideBySideHtml } from "./side-by-side.js";
 
-describe("renderMarkdownToHtml", () => {
-  it("renders basic markdown", async () => {
+describe("Markdown to HTML pipeline", () => {
+  it("should turn headings and inline emphasis into semantic HTML", async () => {
     const html = await renderMarkdownToHtml("# Title\n\nHello **world**.");
     expect(html).toContain("<h1");
     expect(html).toContain("world");
   });
 
-  it("rewrites matching GitHub blob URLs to paths relative to the HTML output file", async () => {
+  it("should rewrite in-repo GitHub blob links to paths relative to the output HTML file", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-gh-"));
     const repoRoot = path.join(tmp, "repo");
     await mkdir(path.join(repoRoot, "docs", "spec"), { recursive: true });
@@ -35,7 +35,7 @@ describe("renderMarkdownToHtml", () => {
     expect(html).toContain("github.com/other/repo");
   });
 
-  it("does not rewrite when the GitHub link targets another owner or repo", async () => {
+  it("should leave GitHub links untouched when owner or repo does not match the configured repo", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-gh2-"));
     const repoRoot = path.join(tmp, "r");
     await mkdir(repoRoot, { recursive: true });
@@ -53,8 +53,8 @@ describe("renderMarkdownToHtml", () => {
   });
 });
 
-describe("renderSideBySideHtml", () => {
-  it("produces a two-column document", async () => {
+describe("Side-by-side static HTML layout", () => {
+  it("should lay out source and companion columns with grid CSS", async () => {
     const html = await renderSideBySideHtml({
       title: "Demo",
       code: "const x = 1;",
@@ -67,7 +67,7 @@ describe("renderSideBySideHtml", () => {
     expect(html).toContain("Notes");
   });
 
-  it("loads highlight.js theme CSS so fenced code is not unstyled", async () => {
+  it("should link default highlight.js stylesheets for fenced code", async () => {
     const html = await renderSideBySideHtml({
       title: "Demo",
       code: "x",
@@ -83,7 +83,7 @@ describe("renderSideBySideHtml", () => {
     );
   });
 
-  it("honours hljsTheme for the dark stylesheet when the theme name includes dark", async () => {
+  it("should reuse the chosen hljs theme for the dark color-scheme stylesheet when it is already a dark theme", async () => {
     const html = await renderSideBySideHtml({
       title: "Demo",
       code: "x",
@@ -97,7 +97,7 @@ describe("renderSideBySideHtml", () => {
     );
   });
 
-  it("forwards commentrayOutputUrls into the commentray pane", async () => {
+  it("should apply commentrayOutputUrls when rewriting links in the companion column", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-sbs-"));
     const repoRoot = path.join(tmp, "repo");
     await mkdir(path.join(repoRoot, "a"), { recursive: true });
@@ -122,8 +122,8 @@ describe("renderSideBySideHtml", () => {
   });
 });
 
-describe("renderMarkdownToHtml — static asset URLs", () => {
-  it("resolves companion-relative and repo-root images for static HTML", async () => {
+describe("Markdown to HTML — static asset URL rewriting", () => {
+  it("should resolve companion-local and repo-root image paths for static output", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-img-"));
     const repoRoot = path.join(tmp, "repo");
     const companionDir = path.join(repoRoot, ".commentray", "source");
@@ -146,7 +146,7 @@ describe("renderMarkdownToHtml — static asset URLs", () => {
     expect(html).toContain('src="../docs/logo.svg"');
   });
 
-  it("resolves a path relative to the companion directory (no leading ./)", async () => {
+  it("should resolve figures next to the companion file without a leading ./", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-img2-"));
     const repoRoot = path.join(tmp, "repo");
     const companionDir = path.join(repoRoot, ".commentray", "source");

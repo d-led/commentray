@@ -142,32 +142,107 @@ const BLOCK_MARKER_HTML_LINE = new RegExp(
   "i",
 );
 
+function trimEndSpacesTabs(s: string): string {
+  return s.replace(/[ \t]+$/, "");
+}
+
+function isSetextUnderlineLine(line: string): boolean {
+  const t = trimEndSpacesTabs(line);
+  return /^\s{0,3}=+\s*$/.test(t) || /^\s{0,3}-+\s*$/.test(t);
+}
+
+function isThematicBreakLine(line: string): boolean {
+  const t = trimEndSpacesTabs(line);
+  return (
+    /^\s{0,3}(?:\*[ \t]*){3,}\s*$/.test(t) ||
+    /^\s{0,3}(?:-[ \t]*){3,}\s*$/.test(t) ||
+    /^\s{0,3}(?:_[ \t]*){3,}\s*$/.test(t)
+  );
+}
+
+type FenceState = { ch: "`" | "~"; len: number };
+
+function parseFenceDelimiter(line: string): { ch: "`" | "~"; runLen: number; rest: string } | null {
+  const t = trimEndSpacesTabs(line);
+  const m = /^(\s{0,3})(`{3,}|~{3,})(.*)$/.exec(t);
+  if (!m) return null;
+  const run = m[2];
+  const head = run[0];
+  if (head !== "`" && head !== "~") return null;
+  const ch: "`" | "~" = head === "`" ? "`" : "~";
+  return { ch, runLen: run.length, rest: m[3] ?? "" };
+}
+
+function isClosingFenceLine(
+  info: NonNullable<ReturnType<typeof parseFenceDelimiter>>,
+  open: FenceState,
+): boolean {
+  if (info.ch !== open.ch || info.runLen < open.len) return false;
+  return info.rest.trim() === "";
+}
+
+function lineAnchorHtml(mdLine0: number): string {
+  const mdLine = String(mdLine0);
+  return `<span class="commentray-line-anchor" data-commentray-md-line="${mdLine}" id="commentray-md-line-${mdLine}" aria-hidden="true"></span>`;
+}
+
+function appendMdLineAnchorWhenAllowed(line: string, mdLine0: number): string {
+  if (isSetextUnderlineLine(line) || isThematicBreakLine(line)) return line;
+  return `${line}${lineAnchorHtml(mdLine0)}`;
+}
+
 /**
- * Inserts a zero-height anchor before every source Markdown line (for search / hash jumps) and
- * block separator anchors after each `<!-- commentray:block … -->` line (optional index attrs).
+ * Inserts per-line anchors for search / hash jumps and block separator anchors after each
+ * `<!-- commentray:block … -->` line (optional index attrs).
+ *
+ * Anchors are appended to the line when safe. A **leading** `<span>` breaks CommonMark block
+ * recognition (`#` headings, lists, thematic breaks, fences). Fenced code lines must not get a
+ * trailing anchor either (would corrupt fence delimiters or appear inside code).
  */
 function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[]): string {
   const byId = links ? new Map(links.map((l) => [l.id, l])) : undefined;
   const lines = markdown.split("\n");
-  return lines
-    .map((line, i) => {
-      const mdLine = String(i);
-      /** Inline so the first line still parses as Markdown (a leading block `<div>` breaks link rewriting). */
-      const lineAnchor = `<span class="commentray-line-anchor" data-commentray-md-line="${mdLine}" id="commentray-md-line-${mdLine}" aria-hidden="true"></span>`;
-      const m = BLOCK_MARKER_HTML_LINE.exec(line);
-      if (!m?.[1]) return lineAnchor + line;
+  let fence: FenceState | null = null;
+  const out: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    const delim = parseFenceDelimiter(line);
+    if (fence) {
+      if (delim && isClosingFenceLine(delim, fence)) {
+        fence = null;
+        out.push(line);
+        continue;
+      }
+      out.push(line);
+      continue;
+    }
+
+    if (delim) {
+      fence = { ch: delim.ch, len: delim.runLen };
+      out.push(line);
+      continue;
+    }
+
+    const m = BLOCK_MARKER_HTML_LINE.exec(line);
+    if (m?.[1]) {
       const id = m[1];
       const link = byId?.get(id);
       const attrs =
         link !== undefined
           ? ` data-source-start="${String(link.sourceStart)}" data-commentray-line="${String(link.commentrayLine)}"`
           : "";
-      return (
-        lineAnchor +
-        `${line}\n\n<div id="commentray-block-${escapeHtml(id)}" class="commentray-block-anchor" aria-hidden="true"${attrs}></div>`
+      out.push(
+        `${line}${lineAnchorHtml(i)}\n\n<div id="commentray-block-${escapeHtml(id)}" class="commentray-block-anchor" aria-hidden="true"${attrs}></div>`,
       );
-    })
-    .join("\n");
+      continue;
+    }
+
+    out.push(appendMdLineAnchorWhenAllowed(line, i));
+  }
+
+  return out.join("\n");
 }
 
 /** One highlighted row per source line so in-page search can scroll to a line. */
@@ -448,7 +523,7 @@ const CODE_BROWSER_STYLES = `
       }
       .toolbar__main {
         display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
-        flex: 1 1 200px;
+        flex: 0 1 auto;
         min-width: 0;
       }
       .toolbar__end {

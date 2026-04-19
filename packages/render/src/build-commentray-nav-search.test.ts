@@ -33,8 +33,8 @@ async function setupRepoWithIndexedPair(opts: {
   return dir;
 }
 
-describe("buildCommentrayNavSearchDocument — index and fallback", () => {
-  it("indexes paths and commentray lines from metadata, not primary source", async () => {
+describe("Cross-file search manifest — index and fallback", () => {
+  it("should index paths and companion lines from metadata without ingesting primary source text", async () => {
     const cr = ".commentray/source/src/a.ts.md";
     const dir = await setupRepoWithIndexedPair({
       sourcePath: "src/a.ts",
@@ -52,7 +52,7 @@ describe("buildCommentrayNavSearchDocument — index and fallback", () => {
     expect(lines[0]?.line).toBe(0);
   });
 
-  it("adds documentedPairs with GitHub blob URLs when githubBlobBase is set", async () => {
+  it("should attach documentedPairs with GitHub blob URLs when a blob base is configured", async () => {
     const cr = ".commentray/source/src/a.ts.md";
     const dir = await setupRepoWithIndexedPair({
       sourcePath: "src/a.ts",
@@ -75,7 +75,7 @@ describe("buildCommentrayNavSearchDocument — index and fallback", () => {
     ]);
   });
 
-  it("uses fallback when index is absent and still omits source file contents", async () => {
+  it("should build from a lone companion when metadata is missing and still skip source bodies", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cr-nav-"));
     const mdAbs = path.join(dir, "notes.md");
     await writeFile(mdAbs, "One\nTwo\n", "utf8");
@@ -95,7 +95,7 @@ describe("buildCommentrayNavSearchDocument — index and fallback", () => {
     expect(doc.documentedPairs).toBeUndefined();
   });
 
-  it("adds documentedPairs for fallback-only when githubBlobBase is set", async () => {
+  it("should still emit documentedPairs for fallback-only pairs when GitHub metadata is present", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cr-nav-"));
     const mdAbs = path.join(dir, "notes.md");
     await writeFile(mdAbs, "One\n", "utf8");
@@ -122,8 +122,8 @@ describe("buildCommentrayNavSearchDocument — index and fallback", () => {
   });
 });
 
-describe("buildCommentrayNavSearchDocument — disk merge", () => {
-  it("merges disk-only companions with index pairs for search rows and documentedPairs", async () => {
+describe("Cross-file search manifest — disk merge", () => {
+  it("should merge disk-only companions with index-backed pairs for search rows and documentedPairs", async () => {
     const cr = ".commentray/source/src/a.ts.md";
     const dir = await setupRepoWithIndexedPair({
       sourcePath: "src/a.ts",

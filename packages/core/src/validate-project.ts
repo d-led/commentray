@@ -6,17 +6,97 @@ import { normalizeCommentrayIndex } from "./index-normalize.js";
 import { assertValidIndex } from "./metadata.js";
 import { migrateIndex } from "./migrate.js";
 import { coerceIndexSchemaVersion, CURRENT_SCHEMA_VERSION, type CommentrayIndex } from "./model.js";
-import { defaultMetadataIndexPath } from "./paths.js";
+import { defaultMetadataIndexPath, normalizeRepoRelativePath } from "./paths.js";
 import {
   validateIndexMarkerSemantics,
   validateMarkerBoundariesInSource,
 } from "./marker-validation.js";
+import { loadGitTrackedSourceTextsOutsideIndex } from "./git-relocation-scan.js";
+import { relocationHintMessages } from "./relocation-hints.js";
+import { GitScmProvider } from "./scm/git-scm-provider.js";
 
 export type ValidationIssue = { level: "error" | "warn"; message: string };
 
 export type ValidationResult = {
   issues: ValidationIssue[];
 };
+
+async function collectIssuesForLoadedIndex(
+  repoRoot: string,
+  index: CommentrayIndex,
+): Promise<ValidationIssue[]> {
+  const issues: ValidationIssue[] = [];
+  for (const issue of validateIndexMarkerSemantics(index)) {
+    issues.push({ level: issue.level, message: issue.message });
+  }
+  const uniqueSourcesNorm = [
+    ...new Set(
+      Object.values(index.byCommentrayPath).map((e) => normalizeRepoRelativePath(e.sourcePath)),
+    ),
+  ];
+  const indexedSourceTexts = new Map<string, string>();
+  const missingSourcesNorm = new Set<string>();
+
+  for (const norm of uniqueSourcesNorm) {
+    const abs = path.join(repoRoot, ...norm.split("/"));
+    try {
+      const text = await fs.readFile(abs, "utf8");
+      indexedSourceTexts.set(norm, text);
+    } catch {
+      missingSourcesNorm.add(norm);
+      const affected = Object.values(index.byCommentrayPath)
+        .filter((e) => normalizeRepoRelativePath(e.sourcePath) === norm)
+        .map((e) => e.commentrayPath);
+      const uniqAffected = [...new Set(affected)].sort((a, b) => a.localeCompare(b));
+      issues.push({
+        level: "warn",
+        message:
+          `Primary source "${norm}" is not readable (deleted, moved, or not checked out). ` +
+          `Commentray: ${uniqAffected.join(", ")}. ` +
+          `If Git renamed it, try: commentray sync-moved-paths --from HEAD~1 --to HEAD`,
+      });
+    }
+  }
+
+  for (const [norm, text] of indexedSourceTexts) {
+    for (const issue of validateMarkerBoundariesInSource(text, norm)) {
+      issues.push({ level: issue.level, message: issue.message });
+    }
+  }
+
+  if (missingSourcesNorm.size === 0) return issues;
+
+  let gitRenames: { from: string; to: string }[] | undefined;
+  try {
+    const scm = new GitScmProvider();
+    if (scm.listPathRenamesBetweenTreeishes) {
+      gitRenames = await scm.listPathRenamesBetweenTreeishes(repoRoot, "HEAD~1", "HEAD");
+    }
+  } catch {
+    /* no Git or shallow history — hints still run without renames */
+  }
+  let textsForRelocationHints: Map<string, string> = indexedSourceTexts;
+  try {
+    const extra = await loadGitTrackedSourceTextsOutsideIndex(
+      repoRoot,
+      new Set(indexedSourceTexts.keys()),
+    );
+    if (extra.size > 0) {
+      textsForRelocationHints = new Map([...extra, ...indexedSourceTexts]);
+    }
+  } catch {
+    /* not a git checkout or ls-files failed — use indexed primaries only */
+  }
+  for (const hint of relocationHintMessages({
+    index,
+    missingSourcePathsNorm: missingSourcesNorm,
+    gitRenames,
+    indexedSourceTextsByPath: textsForRelocationHints,
+  })) {
+    issues.push({ level: "warn", message: hint });
+  }
+  return issues;
+}
 
 export async function validateProject(repoRoot: string): Promise<ValidationResult> {
   const issues: ValidationIssue[] = [];
@@ -58,26 +138,7 @@ export async function validateProject(repoRoot: string): Promise<ValidationResul
   }
 
   if (index) {
-    for (const issue of validateIndexMarkerSemantics(index)) {
-      issues.push({ level: issue.level, message: issue.message });
-    }
-    const seenSources = new Set<string>();
-    for (const entry of Object.values(index.byCommentrayPath)) {
-      if (seenSources.has(entry.sourcePath)) continue;
-      seenSources.add(entry.sourcePath);
-      const abs = path.join(repoRoot, ...entry.sourcePath.split("/"));
-      try {
-        const text = await fs.readFile(abs, "utf8");
-        for (const issue of validateMarkerBoundariesInSource(text, entry.sourcePath)) {
-          issues.push({ level: issue.level, message: issue.message });
-        }
-      } catch {
-        issues.push({
-          level: "warn",
-          message: `Could not read "${entry.sourcePath}" to validate Commentray source markers.`,
-        });
-      }
-    }
+    issues.push(...(await collectIssuesForLoadedIndex(repoRoot, index)));
   }
 
   pushRelativeGithubLinkConfigWarnings(config, issues);

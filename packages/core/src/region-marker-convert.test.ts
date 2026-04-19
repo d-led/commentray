@@ -5,7 +5,7 @@ import {
   leadingIndentOfLine,
 } from "./region-marker-convert.js";
 
-describe("findCommentrayMarkerPairs", () => {
+describe("Finding paired Commentray region markers in source", () => {
   it("pairs generic // markers in order", () => {
     const src = ["// commentray:start id=ab", "x", "// commentray:end id=ab"].join("\n");
     expect(findCommentrayMarkerPairs(src)).toEqual([{ id: "ab", startLine0: 0, endLine0: 2 }]);
@@ -38,13 +38,13 @@ describe("findCommentrayMarkerPairs", () => {
   });
 });
 
-describe("leadingIndentOfLine", () => {
+describe("Detecting leading indentation on a source line", () => {
   it("returns leading tabs and spaces only", () => {
     expect(leadingIndentOfLine("  \t// x")).toBe("  \t");
   });
 });
 
-describe("convertCommentraySourceMarkersToLanguage", () => {
+describe("Converting Commentray region markers to another language style", () => {
   it("rewrites generic markers to TypeScript #region style", () => {
     const before = ["// commentray:start id=aa", "const n = 1;", "// commentray:end id=aa"].join(
       "\n",

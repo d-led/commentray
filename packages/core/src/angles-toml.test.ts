@@ -9,7 +9,7 @@ import { type CommentrayToml, mergeCommentrayConfig } from "./config.js";
 import { ensureAnglesSentinelFile, upsertAngleDefinitionInCommentrayToml } from "./angles-toml.js";
 import { commentrayAnglesSentinelPath } from "./paths.js";
 
-describe("ensureAnglesSentinelFile", () => {
+describe("Angles sentinel file creation", () => {
   it("creates the sentinel once under the configured storage dir", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "commentray-sent-"));
     const storage = "var/cr";
@@ -23,7 +23,7 @@ describe("ensureAnglesSentinelFile", () => {
   });
 });
 
-describe("upsertAngleDefinitionInCommentrayToml", () => {
+describe("Upserting angle definitions in .commentray.toml", () => {
   it("creates a new .commentray.toml with storage and the angle when missing", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "commentray-toml-"));
     await upsertAngleDefinitionInCommentrayToml(dir, { id: "architecture", title: "Architecture" });

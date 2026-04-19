@@ -18,7 +18,7 @@ function tinyIndex() {
   };
 }
 
-describe("tryBuildBlockStretchTableHtml", () => {
+describe("Block-aligned stretch table HTML", () => {
   it("emits one blame-style row per block (no rowspan) so code and doc share row height", async () => {
     const md = "<!-- commentray:block id=b1 -->\n\n## Hi\n\nBody.\n";
     const out = await tryBuildBlockStretchTableHtml({

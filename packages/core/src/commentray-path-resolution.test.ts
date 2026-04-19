@@ -8,7 +8,7 @@ import { ensureAnglesSentinelFile } from "./angles-toml.js";
 import { mergeCommentrayConfig } from "./config.js";
 import { resolveCommentrayMarkdownPath } from "./commentray-path-resolution.js";
 
-describe("resolveCommentrayMarkdownPath", () => {
+describe("Resolving companion Markdown paths from CLI arguments", () => {
   it("uses flat mapping when the Angles sentinel is absent", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "commentray-flat-"));
     const cfg = mergeCommentrayConfig(null);

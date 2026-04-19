@@ -17,7 +17,7 @@ function indexWithBlock(block: Record<string, unknown>): Record<string, unknown>
   };
 }
 
-describe("assertValidIndex", () => {
+describe("Index JSON shape validation", () => {
   it("accepts a minimal valid index", () => {
     const idx = assertValidIndex(indexWithBlock({ id: "b1", anchor: "lines:1-2" }));
     expect(idx.byCommentrayPath[cp]?.blocks[0]?.id).toBe("b1");

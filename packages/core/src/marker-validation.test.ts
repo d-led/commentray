@@ -5,7 +5,7 @@ import {
   validateMarkerBoundariesInSource,
 } from "./marker-validation.js";
 
-describe("validateMarkerBoundariesInSource", () => {
+describe("Region marker boundary validation in source files", () => {
   it("reports duplicate starts for the same id", () => {
     const src = [
       "// commentray:start id=x",
@@ -34,7 +34,7 @@ describe("validateMarkerBoundariesInSource", () => {
   });
 });
 
-describe("validateIndexMarkerSemantics", () => {
+describe("Index marker semantics versus on-disk source", () => {
   it("errors when the same source marker id is claimed by different block ids", () => {
     const cp1 = ".commentray/source/a.md";
     const cp2 = ".commentray/source/b.md";

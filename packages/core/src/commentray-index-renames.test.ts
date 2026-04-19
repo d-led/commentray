@@ -9,7 +9,7 @@ import {
 } from "./commentray-index-renames.js";
 import { CURRENT_SCHEMA_VERSION } from "./model.js";
 
-describe("inferAngleIdFromCommentrayPath", () => {
+describe("Inferring angle ids from companion paths", () => {
   it("extracts the angle file stem from an Angles-layout path", () => {
     expect(
       inferAngleIdFromCommentrayPath(
@@ -21,7 +21,7 @@ describe("inferAngleIdFromCommentrayPath", () => {
   });
 });
 
-describe("applyPathRenamesToCommentrayIndex", () => {
+describe("Applying Git path renames to the Commentray index", () => {
   it("updates flat-layout source and commentray paths", async () => {
     const repo = await mkdtemp(path.join(tmpdir(), "commentray-rename-flat-"));
     try {

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildGithubPagesStaticSite } from "./github-pages-site.js";
 
-describe("buildGithubPagesStaticSite", () => {
+describe("GitHub Pages static site output", () => {
   let repo: string;
 
   afterEach(async () => {

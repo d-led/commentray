@@ -6,7 +6,7 @@ import {
   normalizeHookNewlines,
 } from "./git-hooks.js";
 
-describe("mergeCommentrayPreCommitHook", () => {
+describe("Merging the Commentray pre-commit hook script", () => {
   it("creates a shell hook when the file is empty", () => {
     const out = mergeCommentrayPreCommitHook("");
     expect(out).toContain("#!/bin/sh");
@@ -48,7 +48,7 @@ describe("mergeCommentrayPreCommitHook", () => {
   });
 });
 
-describe("normalizeHookNewlines", () => {
+describe("Normalising hook script line endings", () => {
   it("converts CRLF to LF", () => {
     expect(normalizeHookNewlines("a\r\nb")).toBe("a\nb");
   });

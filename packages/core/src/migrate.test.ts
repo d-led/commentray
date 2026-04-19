@@ -7,7 +7,7 @@ import { migrateIndex } from "./migrate.js";
 import { CURRENT_SCHEMA_VERSION } from "./model.js";
 import { readIndex, refreshIndexMigrationsOnDisk } from "./validate-project.js";
 
-describe("migrateIndex", () => {
+describe("In-memory index schema migration", () => {
   it("fills schemaVersion for legacy objects", () => {
     const { index, changed } = migrateIndex({ bySourceFile: {}, schemaVersion: 0 });
     expect(changed).toBe(true);
@@ -58,7 +58,7 @@ describe("migrateIndex", () => {
   });
 });
 
-describe("readIndex auto-migration", () => {
+describe("Loading index.json with automatic on-disk migration", () => {
   it("rewrites a v2 index on disk to schema v3", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "commentray-idx-"));
     const meta = path.join(dir, ".commentray", "metadata");
@@ -87,7 +87,7 @@ describe("readIndex auto-migration", () => {
   });
 });
 
-describe("refreshIndexMigrationsOnDisk", () => {
+describe("Refreshing persisted index migrations on disk", () => {
   it("writes a JSON backup before downgrading a newer on-disk schemaVersion", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "commentray-idx-newer-"));
     const meta = path.join(dir, ".commentray", "metadata");

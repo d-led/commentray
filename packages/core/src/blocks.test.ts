@@ -16,7 +16,7 @@ function seeded(values: number[]): () => number {
   return () => values[i++ % values.length];
 }
 
-describe("createBlockForRange", () => {
+describe("Creating a new documentation block for a source range", () => {
   it("anchors the block with a marker id tied to the block id (source regions use the same id)", () => {
     const { block } = createBlockForRange({
       sourcePath: "src/greet.ts",
@@ -105,7 +105,7 @@ describe("createBlockForRange", () => {
   });
 });
 
-describe("appendBlockToCommentray", () => {
+describe("Appending a block into companion Markdown", () => {
   it("separates the new block from existing content with a blank line", () => {
     const existing = "# Commentray\n\n";
     const blockMd = "<!-- commentray:block id=abc -->\n## line 1\n\nbody\n";
@@ -126,7 +126,7 @@ describe("appendBlockToCommentray", () => {
   });
 });
 
-describe("addBlockToIndex", () => {
+describe("Registering a block in the index", () => {
   const block: CommentrayBlock = { id: "abc123", anchor: "lines:1-3" };
 
   it("creates the source entry lazily the first time a block is added", () => {
@@ -192,7 +192,7 @@ describe("addBlockToIndex", () => {
   });
 });
 
-describe("generateBlockId", () => {
+describe("Generating stable block identifiers", () => {
   it("returns a six-character lowercase alphanumeric id", () => {
     const id = generateBlockId(seeded([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]));
     expect(id).toMatch(/^[a-z0-9]{6}$/);

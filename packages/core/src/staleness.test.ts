@@ -12,7 +12,7 @@ const scm: ScmProvider = {
   },
 };
 
-describe("diagnoseBlock", () => {
+describe("Diagnosing stale or misaligned documentation blocks", () => {
   it("flags broken anchors", async () => {
     const block: CommentrayBlock = { id: "b", anchor: "lines:2-1" };
     const d = await diagnoseBlock({

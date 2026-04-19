@@ -12,14 +12,14 @@ import {
 } from "./migrate-angles-layout.js";
 import type { CommentrayIndex } from "./model.js";
 
-describe("flatRelToSourcePath", () => {
+describe("Flat companion paths to primary source paths", () => {
   it("strips the trailing companion .md suffix", () => {
     expect(flatRelToSourcePath("README.md.md")).toBe("README.md");
     expect(flatRelToSourcePath("packages/cli/src/init.ts.md")).toBe("packages/cli/src/init.ts");
   });
 });
 
-describe("planAnglesMigrationFromCompanions", () => {
+describe("Planning migration from flat companions to angles layout", () => {
   it("maps each flat companion to an angle path under the source folder", () => {
     const plan = planAnglesMigrationFromCompanions(
       [
@@ -41,7 +41,7 @@ describe("planAnglesMigrationFromCompanions", () => {
   });
 });
 
-describe("rewriteIndexKeysForAnglesMigration", () => {
+describe("Rewriting index keys after an angles migration", () => {
   it("rewrites byCommentrayPath keys and entry.commentrayPath", () => {
     const index: CommentrayIndex = {
       schemaVersion: 3,
@@ -66,7 +66,7 @@ describe("rewriteIndexKeysForAnglesMigration", () => {
   });
 });
 
-describe("discoverFlatCompanionMarkdownFiles", () => {
+describe("Discovering flat companion Markdown files", () => {
   it("given a repo with only flat companions, lists every *.md under source", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cr-migrate-discover-"));
     const storage = ".commentray";

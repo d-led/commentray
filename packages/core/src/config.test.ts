@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { type CommentrayToml, mergeCommentrayConfig } from "./config.js";
 
-describe("mergeCommentrayConfig", () => {
+describe("Merging Commentray TOML configuration", () => {
   it("applies defaults for empty input", () => {
     const cfg = mergeCommentrayConfig(null);
     expect(cfg.storageDir).toBe(".commentray");
@@ -75,7 +75,7 @@ describe("mergeCommentrayConfig", () => {
   });
 });
 
-describe("mergeCommentrayConfig — TOML edge cases and path safety", () => {
+describe("Commentray config merge — TOML edge cases and path safety", () => {
   it("accepts multiline basic strings and multiline arrays from real TOML", () => {
     const raw = parseToml(`
 [anchors]
@@ -118,7 +118,7 @@ commentray_markdown = """
     ).toThrow(/static_site\.commentray_markdown/);
   });
 
-  describe("storage.dir must not live inside .git/", () => {
+  describe("Rejecting storage.dir inside the .git directory", () => {
     it("rejects exactly .git", () => {
       expect(() => mergeCommentrayConfig({ storage: { dir: ".git" } })).toThrow(
         /storage\.dir must not live inside \.git\//,
@@ -154,8 +154,8 @@ commentray_markdown = """
   });
 });
 
-describe("mergeCommentrayConfig — angles", () => {
-  describe("angles", () => {
+describe("Commentray config merge — angles", () => {
+  describe("Angle definitions in TOML", () => {
     it("merges definitions and default_angle", () => {
       const cfg = mergeCommentrayConfig({
         angles: {

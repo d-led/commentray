@@ -8,7 +8,7 @@ import {
   pairFromCommentraySourceRel,
 } from "./commentray-disk-pairs.js";
 
-describe("pairFromCommentraySourceRel", () => {
+describe("Mapping companion paths to source pairs", () => {
   it("maps flat companions using the trailing .md slice rule", () => {
     expect(pairFromCommentraySourceRel(".commentray", "README.md.md", false)).toEqual({
       sourcePath: "README.md",
@@ -24,7 +24,7 @@ describe("pairFromCommentraySourceRel", () => {
   });
 });
 
-describe("discoverCommentrayPairsOnDisk", () => {
+describe("Discovering companion pairs on disk", () => {
   it("discovers every flat companion under source", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cr-disk-flat-"));
     await mkdir(path.join(dir, ".commentray", "source", "src"), { recursive: true });

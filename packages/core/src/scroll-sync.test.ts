@@ -26,7 +26,7 @@ const md =
   "text\n\n" +
   "<!-- commentray:block id=b2 -->\n## block 2\n";
 
-describe("buildBlockScrollLinks", () => {
+describe("Block scroll link derivation from index and markers", () => {
   it("returns an empty list when there is no index entry", () => {
     expect(buildBlockScrollLinks(undefined, "src/a.ts", crPath, md)).toEqual([]);
     expect(buildBlockScrollLinks(index, "missing.ts", crPath, md)).toEqual([]);
@@ -60,7 +60,7 @@ describe("buildBlockScrollLinks", () => {
   });
 });
 
-describe("pickCommentrayLineForSourceScroll", () => {
+describe("Choosing a companion scroll position from a source viewport", () => {
   const blocks = buildBlockScrollLinks(index, "src/a.ts", crPath, md);
 
   it("snaps to the block that contains the top source line", () => {
@@ -77,7 +77,7 @@ describe("pickCommentrayLineForSourceScroll", () => {
   });
 });
 
-describe("pickSourceLine0ForCommentrayScroll", () => {
+describe("Choosing a source line from a companion scroll position", () => {
   const blocks = buildBlockScrollLinks(index, "src/a.ts", crPath, md);
 
   it("reveals the start of the block whose marker is at or above the commentray top", () => {

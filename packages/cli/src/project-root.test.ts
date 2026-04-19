@@ -20,7 +20,7 @@ afterEach(async () => {
   await fs.rm(tmpRoot, { recursive: true, force: true });
 });
 
-describe("findProjectRoot", () => {
+describe("Discovering the Commentray project root from the CWD", () => {
   it("prefers the nearest .commentray.toml over any .git ancestor", async () => {
     const project = await makeDir(path.join(tmpRoot, "outer", "inner"));
     await makeDir(path.join(tmpRoot, "outer", ".git"));

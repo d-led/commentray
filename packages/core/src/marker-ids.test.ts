@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assertValidMarkerId, normaliseMarkerSlugOrThrow } from "./marker-ids.js";
 
-describe("assertValidMarkerId", () => {
+describe("Marker id validation rules", () => {
   it("accepts short alphanumeric ids", () => {
     expect(assertValidMarkerId("abc123")).toBe("abc123");
   });
@@ -17,7 +17,7 @@ describe("assertValidMarkerId", () => {
   });
 });
 
-describe("normaliseMarkerSlugOrThrow", () => {
+describe("Normalising marker ids to URL-safe slugs", () => {
   it("slugifies human phrases", () => {
     expect(normaliseMarkerSlugOrThrow("  Auth flow (v2) ")).toBe("auth-flow-v2");
   });

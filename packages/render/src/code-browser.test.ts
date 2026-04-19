@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import { renderCodeBrowserHtml } from "./code-browser.js";
 
-describe("renderCodeBrowserHtml — layout shell and search", () => {
-  it("puts search payload base64 on #shell so the client can read it (not only on #code-pane)", async () => {
+describe("Code browser page — layout shell and search", () => {
+  it("should attach raw code and Markdown payloads to #shell for the client bundle", async () => {
     const html = await renderCodeBrowserHtml({
       code: "x",
       language: "txt",
@@ -22,7 +22,7 @@ describe("renderCodeBrowserHtml — layout shell and search", () => {
     expect(m[0]).not.toContain("data-search-scope=");
   });
 
-  it("emits scoped search attributes when staticSearchScope is commentray-and-paths", async () => {
+  it("should narrow search to commentray paths when staticSearchScope requests it", async () => {
     const html = await renderCodeBrowserHtml({
       code: "const secret = 1;",
       language: "ts",
@@ -38,7 +38,7 @@ describe("renderCodeBrowserHtml — layout shell and search", () => {
     expect(html).toContain("commentray-nav-search.json");
   });
 
-  it("includes resizable gutter, wrap toggle, and rendered regions", async () => {
+  it("should ship gutter, wrap toggle, search field, highlighted source, and rendered Markdown", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
       code: "const x = 1;",
@@ -55,7 +55,7 @@ describe("renderCodeBrowserHtml — layout shell and search", () => {
     expect(html).toContain("Notes");
   });
 
-  it("includes a generator meta tag when generatorLabel is set", async () => {
+  it("should include a generator meta tag when a generator label is provided", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
       code: "x",
@@ -69,8 +69,8 @@ describe("renderCodeBrowserHtml — layout shell and search", () => {
   });
 });
 
-describe("renderCodeBrowserHtml — toolbar chrome in layout", () => {
-  it("renders optional related GitHub file links in the toolbar", async () => {
+describe("Code browser page — toolbar chrome", () => {
+  it("should show optional related GitHub file links when configured", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
       code: "x",
@@ -85,7 +85,7 @@ describe("renderCodeBrowserHtml — toolbar chrome in layout", () => {
     expect(html).toContain('href="https://github.com/acme/demo/blob/main/CONTRIBUTING.md"');
   });
 
-  it("renders optional GitHub blob links, documented-files toggle, and panel", async () => {
+  it("should expose GitHub blob links and the documented-files hub with nav JSON hooks", async () => {
     const pairsB64 = Buffer.from(
       JSON.stringify([
         {
@@ -120,7 +120,7 @@ describe("renderCodeBrowserHtml — toolbar chrome in layout", () => {
     expect(html).toContain('data-documented-pairs-b64="');
   });
 
-  it("shows the documented-files tree when only embedded pairs are set (no nav JSON URL)", async () => {
+  it("should hydrate the documented-files tree from embedded pairs alone", async () => {
     const pairsB64 = Buffer.from(
       JSON.stringify([
         {
@@ -145,8 +145,8 @@ describe("renderCodeBrowserHtml — toolbar chrome in layout", () => {
   });
 });
 
-describe("renderCodeBrowserHtml — source line chrome", () => {
-  it("renders a 1-based, non-selectable line number for every source line", async () => {
+describe("Code browser page — source line chrome", () => {
+  it("should print one-based, non-selectable line numbers for every source line", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
       code: "one\ntwo\nthree",
@@ -160,8 +160,8 @@ describe("renderCodeBrowserHtml — source line chrome", () => {
   });
 });
 
-describe("renderCodeBrowserHtml — file path display", () => {
-  it("shows the repo-relative source path in the left nav rail context", async () => {
+describe("Code browser page — file path display", () => {
+  it("should show the repo-relative source path in the nav rail context", async () => {
     const html = await renderCodeBrowserHtml({
       filePath: "packages/render/src/code-browser.ts",
       code: "export {};",
@@ -172,7 +172,7 @@ describe("renderCodeBrowserHtml — file path display", () => {
     expect(html).toContain("packages/render/src/code-browser.ts");
   });
 
-  it("shows a basename-only path in the nav rail context block", async () => {
+  it("should fall back to basename-only labelling when paths are shallow", async () => {
     const html = await renderCodeBrowserHtml({
       filePath: "README.md",
       code: "# hi\n",
@@ -183,7 +183,7 @@ describe("renderCodeBrowserHtml — file path display", () => {
     expect(html).toContain("README.md");
   });
 
-  it("escapes HTML in file paths to prevent injection", async () => {
+  it("should escape file path labels so angle brackets cannot inject markup", async () => {
     const html = await renderCodeBrowserHtml({
       filePath: "<script>x</script>/evil.ts",
       code: "x",
@@ -195,8 +195,8 @@ describe("renderCodeBrowserHtml — file path display", () => {
   });
 });
 
-describe("renderCodeBrowserHtml — toolbar link policy", () => {
-  it("adds an Octocat toolbar link and Commentray attribution for safe http(s) URLs", async () => {
+describe("Code browser page — toolbar link policy", () => {
+  it("should emit Octocat and Commentray links only for safe http(s) URLs", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
       code: "x",
@@ -212,7 +212,7 @@ describe("renderCodeBrowserHtml — toolbar link policy", () => {
     expect(html).toContain("Rendered with");
   });
 
-  it("does not emit toolbar links for javascript: or other non-http(s) URLs", async () => {
+  it("should omit executable toolbar links when URLs are not http(s)", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
       code: "x",
@@ -229,8 +229,32 @@ describe("renderCodeBrowserHtml — toolbar link policy", () => {
   });
 });
 
-describe("renderCodeBrowserHtml — block markers and scroll link payload", () => {
-  it("injects separator anchors after each commentray:block marker line", async () => {
+describe("Code browser page — companion Markdown rendering", () => {
+  it("should render headings, emphasis, and links without corrupting fenced code", async () => {
+    const md = [
+      "# Title",
+      "",
+      "Paragraph with **bold** and [link](https://example.com).",
+      "",
+      "```js",
+      "const fenced = 1",
+      "```",
+    ].join("\n");
+    const html = await renderCodeBrowserHtml({
+      code: "x",
+      language: "txt",
+      commentrayMarkdown: md,
+    });
+    expect(html).toMatch(/<h1[^>]*>\s*Title/);
+    expect(html).toContain("<strong>bold</strong>");
+    expect(html).toContain('href="https://example.com"');
+    expect(html).toContain('id="commentray-md-line-0"');
+    expect(html).not.toContain("const fenced = 1<span ");
+  });
+});
+
+describe("Code browser page — block markers and scroll sync payload", () => {
+  it("should insert block separator anchors after each commentray:block marker", async () => {
     const html = await renderCodeBrowserHtml({
       code: "x",
       language: "txt",
@@ -240,7 +264,7 @@ describe("renderCodeBrowserHtml — block markers and scroll link payload", () =
     expect(html).toContain('id="commentray-block-myblock"');
   });
 
-  it("embeds base64 block scroll links on the shell when dual layout aligns with the index", async () => {
+  it("should embed base64 block scroll links on #shell when dual panes align with the index", async () => {
     const crPath = ".commentray/source/pkg/x.txt.md";
     const index = {
       schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -275,7 +299,7 @@ describe("renderCodeBrowserHtml — block markers and scroll link payload", () =
     expect(links).toEqual([{ id: "b1", commentrayLine: 0, sourceStart: 1, sourceEnd: 2 }]);
   });
 
-  it("uses stretch layout for one shared scroll when the blame-style table builds", async () => {
+  it("should choose stretch layout with one shared scroll when the block table can be built", async () => {
     const crPath = ".commentray/source/pkg/readme.md.md";
     const index = {
       schemaVersion: CURRENT_SCHEMA_VERSION,

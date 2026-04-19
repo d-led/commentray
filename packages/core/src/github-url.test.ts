@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { githubRepoBlobFileUrl, parseGithubRepoWebUrl } from "./github-url.js";
 
-describe("parseGithubRepoWebUrl", () => {
+describe("Parsing GitHub repository web URLs", () => {
   it("parses canonical https URLs", () => {
     expect(parseGithubRepoWebUrl("https://github.com/d-led/commentray")).toEqual({
       owner: "d-led",
@@ -26,7 +26,7 @@ describe("parseGithubRepoWebUrl", () => {
   });
 });
 
-describe("githubRepoBlobFileUrl", () => {
+describe("Building GitHub blob URLs for repository files", () => {
   it("joins encoded path segments with slashes for the blob URL", () => {
     expect(githubRepoBlobFileUrl("acme", "demo", "main", "docs/spec/storage.md")).toBe(
       "https://github.com/acme/demo/blob/main/docs/spec/storage.md",

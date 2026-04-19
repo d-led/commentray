@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
 
-describe("mermaidRuntimeScriptHtml", () => {
+describe("Optional Mermaid runtime script injection", () => {
   it("returns empty when Mermaid is disabled", () => {
     expect(mermaidRuntimeScriptHtml(false)).toBe("");
     expect(mermaidRuntimeScriptHtml(undefined)).toBe("");
