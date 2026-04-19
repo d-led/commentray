@@ -7,7 +7,7 @@
  * under 1% of total lines, and red otherwise (cli-table3 defaults the header to red).
  */
 const { createHash } = require("node:crypto");
-const { dirname, join } = require("node:path");
+const { join } = require("node:path");
 const { getDefaultOptions, getModeHandler, Statistic, MemoryStore } = require("@jscpd/core");
 const {
   BlamerHook,

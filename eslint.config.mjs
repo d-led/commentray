@@ -22,6 +22,26 @@ export default tseslint.config(
       "no-console": "off",
     },
   },
+  /** Node CommonJS scripts (`require`, `__dirname`) — keep `require` and Node globals allowed. */
+  {
+    files: ["scripts/**/*.cjs"],
+    languageOptions: {
+      globals: {
+        __dirname: "readonly",
+        __filename: "readonly",
+        Buffer: "readonly",
+        console: "readonly",
+        exports: "readonly",
+        module: "readonly",
+        process: "readonly",
+        require: "readonly",
+      },
+      sourceType: "script",
+    },
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
   {
     rules: {
       "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
