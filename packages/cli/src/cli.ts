@@ -27,6 +27,7 @@ import { runInitConfig, runInitFull, runInitScm } from "./init.js";
 import { runMigrateAnglesFromCwd } from "./migrate-angles-cmd.js";
 import { findProjectRoot } from "./project-root.js";
 import { resolveRenderInputs, type RenderCliOptions } from "./render-inputs.js";
+import { logCliValidationIssue, logCliWarning } from "./cli-output.js";
 import { runServeStaticPages } from "./serve.js";
 
 async function repoRootFromCwd(): Promise<string> {
@@ -52,8 +53,7 @@ async function cmdValidate(): Promise<number> {
   const repoRoot = await repoRootFromCwd();
   const result = await validateProject(repoRoot);
   for (const issue of result.issues) {
-    const log = issue.level === "error" ? console.error : console.warn;
-    log(`[${issue.level}] ${issue.message}`);
+    logCliValidationIssue(issue);
   }
   const { errors, warnings } = summarizeValidation(result.issues);
   const summary = `validate: ${pluralize(errors, "error")}, ${pluralize(warnings, "warning")}`;
@@ -72,7 +72,7 @@ async function cmdDoctor(): Promise<number> {
     await fs.access(gitPath);
     console.log(`OK doctor: Git checkout detected at ${gitPath}`);
   } catch {
-    console.warn("[warn] No .git directory detected in cwd; SCM features require a Git checkout.");
+    logCliWarning("[warn] No .git directory detected in cwd; SCM features require a Git checkout.");
   }
   return code;
 }
@@ -107,6 +107,7 @@ async function cmdConvertSourceMarkers(opts: {
     return 0;
   }
   if (opts.dryRun) {
+    console.log("Dry run: preview only (no file written). Re-run without --dry-run to apply.");
     console.log(`Would rewrite ${convertedPairs} marker pair(s) in ${rel}.`);
     return 0;
   }
@@ -157,6 +158,9 @@ async function cmdSyncMovedPaths(opts: {
     return 0;
   }
   if (opts.dryRun) {
+    console.log(
+      "Dry run: preview only (index.json not written). Re-run without --dry-run to apply.",
+    );
     console.log(`Would apply ${renames.length} rename(s) to index.json (dry run).`);
     for (const r of renames) {
       console.log(`  ${r.from} -> ${r.to}`);

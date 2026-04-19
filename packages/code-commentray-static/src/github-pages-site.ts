@@ -127,6 +127,8 @@ async function writePerPairBrowseHtmlPages(input: {
       ...(multiAngleBrowsing ? { multiAngleBrowsing } : {}),
       ...(p.sourceOnGithub ? { sourceOnGithubUrl: p.sourceOnGithub } : {}),
       ...(p.commentrayOnGithub ? { commentrayOnGithubUrl: p.commentrayOnGithub } : {}),
+      /** Hub-relative; client resolves from `/browse/…` so the Doc icon never stacks `/browse/browse/`. */
+      commentrayStaticBrowseUrl: p.staticBrowseUrl,
       documentedNavJsonUrl: "../commentray-nav-search.json",
       builtAt: input.builtAt,
       ...(emb ? { documentedPairsEmbeddedB64: emb } : {}),

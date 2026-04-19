@@ -12,6 +12,7 @@ import {
   type ValidationIssue,
 } from "@commentray/core";
 
+import { logCliError, logCliValidationIssue, logCliWarning } from "./cli-output.js";
 import { mergeCommentrayPreCommitHook } from "./git-hooks.js";
 
 /** VS Code Marketplace id for the published Commentray extension. */
@@ -57,14 +58,14 @@ function readExtensionsDocFromJson(
   try {
     obj = JSON.parse(raw) as unknown;
   } catch (e) {
-    console.warn(
+    logCliWarning(
       `${path.relative(repoRoot, extPath)}: invalid JSON (${e instanceof Error ? e.message : String(e)}); left unchanged (Commentray recommendation not merged).`,
     );
     return "skipped";
   }
   const parsed = parseExtensionsObject(obj);
   if (parsed === null) {
-    console.warn(
+    logCliWarning(
       `${path.relative(repoRoot, extPath)}: expected a JSON object; left unchanged (Commentray recommendation not merged).`,
     );
     return "skipped";
@@ -93,7 +94,7 @@ export async function mergeCommentrayVscodeExtensionRecommendation(
     const code =
       e && typeof e === "object" && "code" in e ? (e as NodeJS.ErrnoException).code : undefined;
     if (code !== "ENOENT") {
-      console.warn(
+      logCliWarning(
         `${path.relative(repoRoot, extPath)}: ${e instanceof Error ? e.message : String(e)}; Commentray recommendation not merged.`,
       );
       return "skipped";
@@ -190,7 +191,7 @@ async function initVscodeExtensionRecommendation(repoRoot: string): Promise<void
       );
     }
   } catch (e) {
-    console.warn(
+    logCliWarning(
       `Could not update .vscode/extensions.json: ${e instanceof Error ? e.message : String(e)}`,
     );
   }
@@ -221,7 +222,7 @@ export async function runInitFull(repoRoot: string): Promise<number> {
       );
     }
   } catch (e) {
-    console.error(
+    logCliError(
       `Could not load or migrate ${defaultMetadataIndexPath()}: ${e instanceof Error ? e.message : String(e)}`,
     );
     return 1;
@@ -243,9 +244,7 @@ export async function runInitFull(repoRoot: string): Promise<number> {
 
   const validation = await validateProject(repoRoot);
   for (const issue of validation.issues) {
-    const log: (typeof console)["log"] =
-      issue.level === "error" ? console.error.bind(console) : console.warn.bind(console);
-    log(`[${issue.level}] ${issue.message}`);
+    logCliValidationIssue(issue);
   }
   const hasError = validation.issues.some((i: ValidationIssue) => i.level === "error");
 
@@ -267,7 +266,7 @@ export async function runInitConfig(repoRoot: string, opts: { force: boolean }):
     return 0;
   }
   if (exists && opts.force) {
-    console.warn("Overwriting .commentray.toml (--force).");
+    logCliWarning("Overwriting .commentray.toml (--force).");
   }
   await fs.writeFile(tomlPath, DEFAULT_COMMENTRAY_TOML, "utf8");
   console.log(`Wrote ${tomlPath}`);

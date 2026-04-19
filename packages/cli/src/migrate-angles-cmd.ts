@@ -28,6 +28,7 @@ async function printDryRun(
   plan: AnglesMigrationPlan,
   angleId: string,
 ): Promise<void> {
+  console.log("Dry run: preview only (no files written). Re-run without --dry-run to apply.");
   console.log(
     `Would migrate ${String(plan.moves.length)} companion file(s) to angle "${angleId}":`,
   );

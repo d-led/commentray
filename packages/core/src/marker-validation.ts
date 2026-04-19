@@ -69,18 +69,17 @@ export function validateMarkerBoundariesInSource(
   return issues;
 }
 
-/**
- * For each `marker:` block, ensures the primary file contains a well-formed paired
- * region that resolves to a non-empty span. Warns when a paired region exists in
- * the primary but no indexed block claims `marker:<id>` (orphan region).
- */
-export function validateMarkerRegionsAgainstIndexedSources(
-  index: CommentrayIndex,
-  indexedSourceTexts: Map<string, string>,
-): MarkerValidationIssue[] {
-  const issues: MarkerValidationIssue[] = [];
-  const claimedBySourceNorm = new Map<string, Set<string>>();
+function tryParseMarkerAnchorId(anchor: string): string | null {
+  try {
+    const parsed = parseAnchor(anchor);
+    return parsed.kind === "marker" ? parsed.id : null;
+  } catch {
+    return null;
+  }
+}
 
+function claimedMarkerIdsByNormalizedSource(index: CommentrayIndex): Map<string, Set<string>> {
+  const claimedBySourceNorm = new Map<string, Set<string>>();
   for (const entry of Object.values(index.byCommentrayPath)) {
     const norm = normalizeRepoRelativePath(entry.sourcePath);
     let set = claimedBySourceNorm.get(norm);
@@ -89,49 +88,57 @@ export function validateMarkerRegionsAgainstIndexedSources(
       claimedBySourceNorm.set(norm, set);
     }
     for (const block of entry.blocks) {
-      let parsed;
-      try {
-        parsed = parseAnchor(block.anchor);
-      } catch {
-        continue;
-      }
-      if (parsed.kind === "marker") set.add(parsed.id);
+      const markerId = tryParseMarkerAnchorId(block.anchor);
+      if (markerId !== null) set.add(markerId);
     }
   }
+  return claimedBySourceNorm;
+}
 
+function unresolvedMarkerAnchorIssues(
+  index: CommentrayIndex,
+  indexedSourceTexts: Map<string, string>,
+): MarkerValidationIssue[] {
+  const issues: MarkerValidationIssue[] = [];
   for (const [commentrayPath, entry] of Object.entries(index.byCommentrayPath)) {
     const norm = normalizeRepoRelativePath(entry.sourcePath);
     const text = indexedSourceTexts.get(norm);
     if (text === undefined) continue;
 
     for (const block of entry.blocks) {
-      let parsed;
-      try {
-        parsed = parseAnchor(block.anchor);
-      } catch {
-        continue;
-      }
-      if (parsed.kind !== "marker") continue;
-      const range = sourceLineRangeForMarkerId(text, parsed.id);
-      if (range !== null) continue;
+      const markerId = tryParseMarkerAnchorId(block.anchor);
+      if (markerId === null) continue;
+      if (sourceLineRangeForMarkerId(text, markerId) !== null) continue;
       issues.push({
         level: "error",
         message:
-          `Block "${block.id}" in ${commentrayPath} uses anchor "marker:${parsed.id}" but ` +
+          `Block "${block.id}" in ${commentrayPath} uses anchor "marker:${markerId}" but ` +
           `primary "${entry.sourcePath}" has no resolvable paired commentray region for that id ` +
-          `(see docs/spec/blocks.md — e.g. Markdown/HTML: <!-- #region commentray:${parsed.id} --> … <!-- #endregion commentray:${parsed.id} -->).`,
+          `(see docs/spec/blocks.md — e.g. Markdown/HTML: <!-- #region commentray:${markerId} --> … <!-- #endregion commentray:${markerId} -->).`,
       });
     }
   }
+  return issues;
+}
 
+function displaySourcePathForNorm(index: CommentrayIndex, norm: string): string {
+  const hit = Object.values(index.byCommentrayPath).find(
+    (e) => normalizeRepoRelativePath(e.sourcePath) === norm,
+  );
+  return hit?.sourcePath ?? norm;
+}
+
+function orphanRegionIssues(
+  index: CommentrayIndex,
+  indexedSourceTexts: Map<string, string>,
+  claimedBySourceNorm: Map<string, Set<string>>,
+): MarkerValidationIssue[] {
+  const issues: MarkerValidationIssue[] = [];
   const orphanWarned = new Set<string>();
   for (const [norm, text] of indexedSourceTexts) {
     const pairs = findCommentrayMarkerPairs(text);
     const claimed = claimedBySourceNorm.get(norm) ?? new Set();
-    const displayPath =
-      Object.values(index.byCommentrayPath).find(
-        (e) => normalizeRepoRelativePath(e.sourcePath) === norm,
-      )?.sourcePath ?? norm;
+    const displayPath = displaySourcePathForNorm(index, norm);
     for (const pair of pairs) {
       if (claimed.has(pair.id)) continue;
       const dedupe = `${norm}\0${pair.id}`;
@@ -147,8 +154,23 @@ export function validateMarkerRegionsAgainstIndexedSources(
       });
     }
   }
-
   return issues;
+}
+
+/**
+ * For each `marker:` block, ensures the primary file contains a well-formed paired
+ * region that resolves to a non-empty span. Warns when a paired region exists in
+ * the primary but no indexed block claims `marker:<id>` (orphan region).
+ */
+export function validateMarkerRegionsAgainstIndexedSources(
+  index: CommentrayIndex,
+  indexedSourceTexts: Map<string, string>,
+): MarkerValidationIssue[] {
+  const claimed = claimedMarkerIdsByNormalizedSource(index);
+  return [
+    ...unresolvedMarkerAnchorIssues(index, indexedSourceTexts),
+    ...orphanRegionIssues(index, indexedSourceTexts, claimed),
+  ];
 }
 
 function markerIdFromBlock(block: { anchor: string; markerId?: string }): string | null {

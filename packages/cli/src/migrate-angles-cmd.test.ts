@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CURRENT_SCHEMA_VERSION } from "@commentray/core";
 
 import { runMigrateAnglesFromCwd } from "./migrate-angles-cmd.js";
@@ -72,9 +72,14 @@ commentray_markdown = ".commentray/source/README.md.md"
     try {
       await mkdir(path.join(dir, ".commentray", "source"), { recursive: true });
       await writeFile(path.join(dir, ".commentray", "source", "a.ts.md"), "x\n", "utf8");
-      expect(
-        await runMigrateAnglesFromCwd({ angleId: "main", dryRun: true, repoRootOverride: dir }),
-      ).toBe(0);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      try {
+        expect(
+          await runMigrateAnglesFromCwd({ angleId: "main", dryRun: true, repoRootOverride: dir }),
+        ).toBe(0);
+      } finally {
+        logSpy.mockRestore();
+      }
       const flatStill = await readFile(path.join(dir, ".commentray", "source", "a.ts.md"), "utf8");
       expect(flatStill).toBe("x\n");
     } finally {

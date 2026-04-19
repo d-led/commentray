@@ -100,10 +100,7 @@ describe("Marker anchors versus regions in indexed primaries", () => {
       },
     };
     const src = "no markers here\n";
-    const issues = validateMarkerRegionsAgainstIndexedSources(
-      index,
-      new Map([["src/p.ts", src]]),
-    );
+    const issues = validateMarkerRegionsAgainstIndexedSources(index, new Map([["src/p.ts", src]]));
     expect(
       issues.some((i) => i.level === "error" && i.message.includes("no resolvable paired")),
     ).toBe(true);
@@ -128,10 +125,7 @@ describe("Marker anchors versus regions in indexed primaries", () => {
       "b",
       "//#endregion commentray:orphan",
     ].join("\n");
-    const issues = validateMarkerRegionsAgainstIndexedSources(
-      index,
-      new Map([["src/p.ts", src]]),
-    );
+    const issues = validateMarkerRegionsAgainstIndexedSources(index, new Map([["src/p.ts", src]]));
     expect(
       issues.some((i) => i.level === "warn" && i.message.includes("no indexed block claims")),
     ).toBe(true);

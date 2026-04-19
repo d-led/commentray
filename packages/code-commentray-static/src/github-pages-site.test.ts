@@ -9,7 +9,7 @@ import { buildGithubPagesStaticSite } from "./github-pages-site.js";
 
 async function writeMinimalPagesFixture(
   repo: string,
-  opts: { title: string; githubUrl?: string },
+  opts: { title: string; githubUrl?: string; githubBlobBranch?: string },
 ): Promise<void> {
   const staticSite: string[] = [
     "[static_site]",
@@ -19,6 +19,9 @@ async function writeMinimalPagesFixture(
   ];
   if (opts.githubUrl !== undefined) {
     staticSite.push(`github_url = "${opts.githubUrl}"`);
+  }
+  if (opts.githubBlobBranch !== undefined) {
+    staticSite.push(`github_blob_branch = "${opts.githubBlobBranch}"`);
   }
   await writeFile(
     path.join(repo, ".commentray.toml"),
@@ -62,6 +65,7 @@ async function runWritesSiteAndNavFromFlatCompanions(): Promise<string> {
   const browseHtml = await readFile(path.join(r, "_site", "browse", browseName), "utf8");
   expect(browseHtml).toContain('href="../index.html"');
   expect(browseHtml).toContain('aria-label="Documentation home"');
+  expect(browseHtml).toMatch(/id="toolbar-commentray-github"[^>]*href="\.\/browse\/[^"]+\.html"/);
   return r;
 }
 
@@ -120,6 +124,38 @@ async function runAngleSelectorOnBrowsePermalinks(): Promise<string> {
   return r;
 }
 
+async function runGithubToolbarUsesBlobUrlsForRealisticHost(): Promise<string> {
+  const r = await mkdtemp(path.join(tmpdir(), "cr-pages-realgh-"));
+  await writeMinimalPagesFixture(r, {
+    title: "Blob shape",
+    githubUrl: "https://github.com/d-led/commentray",
+    githubBlobBranch: "main",
+  });
+
+  const { outHtml, navSearchPath } = await buildGithubPagesStaticSite({ repoRoot: r });
+  const html = await readFile(outHtml, "utf8");
+  expect(html).toContain(
+    'id="toolbar-source-github" href="https://github.com/d-led/commentray/blob/main/src/x.ts"',
+  );
+  expect(html).not.toContain("/browse/browse/");
+  const nav = JSON.parse(await readFile(navSearchPath, "utf8")) as {
+    documentedPairs?: { commentrayOnGithub?: string }[];
+  };
+  expect(nav.documentedPairs?.[0]?.commentrayOnGithub).toBe(
+    "https://github.com/d-led/commentray/blob/main/.commentray/source/src/x.ts.md",
+  );
+  const browseFiles = await readdir(path.join(r, "_site", "browse"));
+  const browseName = browseFiles.find((f) => f.endsWith(".html"));
+  expect(browseName).toBeTruthy();
+  if (browseName === undefined) throw new Error("expected browse html");
+  const browseHtml = await readFile(path.join(r, "_site", "browse", browseName), "utf8");
+  expect(browseHtml).toContain(
+    'id="toolbar-source-github" href="https://github.com/d-led/commentray/blob/main/src/x.ts"',
+  );
+  expect(browseHtml).not.toContain("/browse/browse/");
+  return r;
+}
+
 async function runBrowseWithoutGithubUrl(): Promise<string> {
   const r = await mkdtemp(path.join(tmpdir(), "cr-pages-"));
   await writeMinimalPagesFixture(r, { title: "Local" });
@@ -158,5 +194,9 @@ describe("GitHub Pages static site output", () => {
 
   it("writes browse pages and hub nav without static_site.github_url (same-site navigation only)", async () => {
     repo = await runBrowseWithoutGithubUrl();
+  });
+
+  it("writes GitHub blob toolbar URLs for d-led/commentray + main when configured", async () => {
+    repo = await runGithubToolbarUsesBlobUrlsForRealisticHost();
   });
 });
