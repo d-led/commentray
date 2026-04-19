@@ -12,7 +12,7 @@ npm install -D @commentray/cli
 npm install -g @commentray/cli
 ```
 
-Standalone, self-contained binaries (no Node install needed) for Linux x64/arm64, macOS x64/arm64, and Windows x64 are **intended** to ship on **[GitHub Releases](https://github.com/d-led/commentray/releases)** with each **`v*`** tag (**none published yet**—use npm or build from the repo meanwhile). CI workflow artifacts expire after a short retention period; when releases exist, prefer them over old Actions runs.
+Standalone, self-contained binaries (no Node install needed) for Linux x64/arm64, macOS x64/arm64, and Windows x64 ship on **[GitHub Releases](https://github.com/d-led/commentray/releases)** with each **`v*`** tag. CI workflow artifacts expire after a short retention period—prefer **Release** assets for anything you rely on long term.
 
 ## Use
 

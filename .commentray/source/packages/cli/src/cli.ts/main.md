@@ -4,4 +4,4 @@ Commander registers **`init`**, **`init config`**, **`init scm`**, **`validate`*
 
 **Split** — `validate` is for machines (CI, hooks). `doctor` adds environment checks for humans. `paths` answers “where is the commentray for this source path?” without reimplementing storage rules.
 
-**Binaries** — [`binaries.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml) on **`v*`** tags; local smoke: **`npm run binary:smoke`**.
+**Binaries** — each **`v*`** tag publishes builds to **[GitHub Releases](https://github.com/d-led/commentray/releases)** ([`.github/workflows/binaries.yml`](../../../../../../.github/workflows/binaries.yml)); local smoke: **`npm run binary:smoke`**.

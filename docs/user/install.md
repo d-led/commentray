@@ -1,18 +1,18 @@
 # Install Commentray
 
-Pick one path: **release binary** (no Node, when a GitHub Release exists), **npm global** (needs Node), or **clone the repo** for extension packaging / full development ([Development → Clone and workspace setup](../development.md#clone-and-workspace-setup)).
+Pick one path: **release binary** (no Node — assets on [GitHub Releases](https://github.com/d-led/commentray/releases) under **`v*`** tags), **npm global** (needs Node), or **clone the repo** for extension packaging / full development ([Development → Clone and workspace setup](../development.md#clone-and-workspace-setup)).
 
 ## Standalone CLI binaries (GitHub Releases)
 
 Official builds ship from [`.github/workflows/binaries.yml`](../../.github/workflows/binaries.yml): one self-contained executable per OS/arch (Node SEA).
 
-**There are no entries on [GitHub Releases](https://github.com/d-led/commentray/releases) yet.** Until a **`v*`** tag publishes the first one, use [npm global](#npm-global-commentray-on-path) or work from a [clone](../development.md#clone-and-workspace-setup). A local **SEA** binary from source is a maintainer-style build—see [Building binaries locally](../development.md#building-binaries-locally).
+**[GitHub Releases](https://github.com/d-led/commentray/releases)** publishes standalone CLI assets on **`v*`** tags. To install:
 
-When a release exists:
-
-1. Open [GitHub Releases](https://github.com/d-led/commentray/releases) and download the binary for your platform (for example `commentray-darwin-arm64` on Apple Silicon).
+1. Open the [releases page](https://github.com/d-led/commentray/releases) and download the binary for your platform (for example `commentray-darwin-arm64` on Apple Silicon).
 2. Put the file on your `PATH` and mark it executable (`chmod +x …` on Unix).
 3. Run `commentray --version`.
+
+You can still use [npm global](#npm-global-commentray-on-path) or work from a [clone](../development.md#clone-and-workspace-setup). A local **SEA** binary from source is a maintainer-style build—see [Building binaries locally](../development.md#building-binaries-locally).
 
 **Workflow run artifacts** (not Releases) expire after about two weeks—prefer **Release** assets for anything you rely on long term.
 

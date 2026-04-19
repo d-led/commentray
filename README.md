@@ -4,7 +4,7 @@
 
 Have you ever wished a “commentary track” for code the way DVD extras let filmmakers talk over a film **without** changing the picture? When looking at code, that might answer the whys, reveal the intent **besides** the code itself.
 
-The **ecosystem** is a few published **`@commentray/*` libraries** (shared config and paths, Markdown → HTML, static “code + commentray” pages), the **`commentray` CLI**, and a **VS Code / Cursor** extension—all agreeing on **`.commentray.toml`** and the **`.commentray/`** tree. **Tooling** keeps companions tied to the source: optional **Git pre-commit**, **`validate`** / **`doctor`**, migrations, **`render`** / **`pages:build`** / **`serve`** for browsable HTML, and (when published) **standalone binaries** for machines without Node. This repo’s own CI runs the **quality gate** (format, lint, typecheck, unit tests, etc.) and **Cypress** against a built static site—it does **not** run `commentray validate` as a separate step unless you add that to your workflow.
+The **ecosystem** is a few published **`@commentray/*` libraries** (shared config and paths, Markdown → HTML, static “code + commentray” pages), the **`commentray` CLI**, and a **VS Code / Cursor** extension—all agreeing on **`.commentray.toml`** and the **`.commentray/`** tree. **Tooling** keeps companions tied to the source: optional **Git pre-commit**, **`validate`** / **`doctor`**, migrations, **`render`** / **`pages:build`** / **`serve`** for browsable HTML, and **[standalone binaries](https://github.com/d-led/commentray/releases)** for machines without Node. This repo’s own CI runs the **quality gate** (format, lint, typecheck, unit tests, etc.) and **Cypress** against a built static site—it does **not** run `commentray validate` as a separate step unless you add that to your workflow.
 
 <!-- #endregion commentray:readme-lede -->
 <!-- #region commentray:readme-why -->
@@ -41,11 +41,11 @@ Short, command-first guides (install the CLI or extension, first `.commentray/` 
 
 ## Install surfaces
 
-| Surface              | Get it                                                                                                                                                                                                                                               |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI (Node)**       | [`@commentray/cli`](https://www.npmjs.com/package/@commentray/cli) on npm — `npm install -g @commentray/cli`                                                                                                                                         |
-| **CLI (no Node)**    | [GitHub Releases](https://github.com/d-led/commentray/releases) per **`v*`** tag when published (**none yet**—use **npm -g** or a [clone build](docs/development.md#clone-and-workspace-setup); [Standalone CLI binaries](#standalone-cli-binaries)) |
-| **VS Code / Cursor** | Marketplace: **[`d-led.commentray-vscode`](https://marketplace.visualstudio.com/items?itemName=d-led.commentray-vscode)**                                                                                                                            |
+| Surface              | Get it                                                                                                                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CLI (Node)**       | [`@commentray/cli`](https://www.npmjs.com/package/@commentray/cli) on npm — `npm install -g @commentray/cli`                                                                        |
+| **CLI (no Node)**    | [GitHub Releases](https://github.com/d-led/commentray/releases) — download the asset for your platform from a **`v*`** tag; see [Standalone CLI binaries](#standalone-cli-binaries) |
+| **VS Code / Cursor** | Marketplace: **[`d-led.commentray-vscode`](https://marketplace.visualstudio.com/items?itemName=d-led.commentray-vscode)**                                                           |
 
 Install paths: [Install](docs/user/install.md). Clone, local SEA builds, and macOS quarantine on downloaded binaries: [Development](docs/development.md#cli-binaries-and-pages).
 
@@ -62,7 +62,7 @@ Published libraries and tools (versions move in lockstep; see [Developing this r
 
 The **VS Code / Cursor** extension ships as **`d-led.commentray-vscode`** on the Marketplace (not published as an npm package). `commentray init` merges that extension id into [`.vscode/extensions.json`](.vscode/extensions.json) when the file is mergeable JSON.
 
-**Also in this repo:** `packages/vscode` — extension sources (paired commentray beside source, **scroll sync when `index.json` and Markdown markers align**, workspace validation in an output channel). Standalone CLI executables (Node SEA) are built in [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml); **`v*`** tags are meant to publish them to [Releases](https://github.com/d-led/commentray/releases) (**none yet**).
+**Also in this repo:** `packages/vscode` — extension sources (paired commentray beside source, **scroll sync when `index.json` and Markdown markers align**, workspace validation in an output channel). Standalone CLI executables (Node SEA) are built in [`.github/workflows/binaries.yml`](.github/workflows/binaries.yml); **`v*`** tags publish them to [GitHub Releases](https://github.com/d-led/commentray/releases).
 
 ## Repository map
 
@@ -74,7 +74,7 @@ The **VS Code / Cursor** extension ships as **`d-led.commentray-vscode`** on the
 
 ## Standalone CLI binaries
 
-Prefer not to install Node? **`v*`-tagged** builds are meant to land on **[GitHub Releases](https://github.com/d-led/commentray/releases)** ([`.github/workflows/binaries.yml`](.github/workflows/binaries.yml)). **There are no releases on that page yet**—until the first one ships, use **`npm install -g @commentray/cli`** or work from a [clone](docs/development.md#clone-and-workspace-setup). Short-lived **workflow artifacts** (14 days) are only for debugging a run. End-user install detail: [Install](docs/user/install.md); macOS quarantine and local binary builds: [Development](docs/development.md#macos-quarantine-standalone-cli).
+Prefer not to install Node? **`v*`-tagged** builds land on **[GitHub Releases](https://github.com/d-led/commentray/releases)** ([`.github/workflows/binaries.yml`](.github/workflows/binaries.yml)). You can also use **`npm install -g @commentray/cli`** or work from a [clone](docs/development.md#clone-and-workspace-setup). Short-lived **workflow artifacts** (14 days) are only for debugging a run. End-user install detail: [Install](docs/user/install.md); macOS quarantine and local binary builds: [Development](docs/development.md#macos-quarantine-standalone-cli).
 
 ## Developing this repository
 

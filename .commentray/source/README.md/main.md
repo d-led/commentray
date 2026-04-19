@@ -10,7 +10,7 @@ The README’s _Why_ section names the product (**Commentray**) and the prose yo
 
 <!-- commentray:block id=readme-user-guides -->
 
-The README’s **Using Commentray** section links short guides under `docs/user/`—install, quickstart, detection, CLI reference, configuration, troubleshooting—without walking the whole monorepo first.
+The README’s **Using Commentray** section links short guides under `docs/user/`—install, quickstart, keeping blocks in sync, detection, CLI reference, configuration, troubleshooting—without walking the whole monorepo first.
 
 ## Try scroll sync (why the editor extension exists)
 
@@ -39,7 +39,7 @@ You may be reading a **generated** page: `@commentray/code-commentray-static`, [
 - **Greenfield adopt** — `commentray init` is idempotent; nothing in the primary tree has to move first.
 - **Hook paranoia** — `init scm` runs `validate` before merge; opt-in because hooks are a team contract.
 - **“Why is my tree red?”** — `doctor` stacks environment checks on `validate`.
-- **Binaries** — **GitHub Releases** when published (none yet); CI artifacts from [`binaries.yml`](https://github.com/d-led/commentray/blob/main/.github/workflows/binaries.yml) expire after 14 days by design.
+- **Binaries** — standalone CLI assets ship on **[GitHub Releases](https://github.com/d-led/commentray/releases)** with each **`v*`** tag; CI artifacts from [`.github/workflows/binaries.yml`](../../../.github/workflows/binaries.yml) expire after 14 days by design.
 - **Your own Pages** — Copy [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml), adjust `[static_site]`, run `npm run pages:build`.
 
 ## Architecture (who talks to whom)
