@@ -51,6 +51,8 @@ The repo is developed with **npm**. **Yarn** is an alternative path via `.yarnrc
 
 ## CLI, binaries, and Pages
 
+**Permalinks:** the static hub and `_site/browse/` pages are meant to provide **stable, working URLs** for sharing. Policy and constraints are in [`docs/plan/plan.md` § Permalinks and stable URLs](plan/plan.md#permalinks-and-stable-urls-design-intent). When you change URL shape or client navigation, update tests and note breaking changes in the PR.
+
 - **Init:** `npm run commentray -- init` is idempotent (storage, seed `index.json` / `.commentray.toml` when missing). Use `npm run commentray -- init config` for TOML defaults, or `init config --force` to replace. `npm run commentray -- init scm` refreshes the marked `pre-commit` block that runs `commentray validate` when the linked CLI exists at the repo root.
 - **Standalone binaries:** `npm run binary:build` then `npm run binary:smoke` (README **Standalone CLI binaries**). CI: [`.github/workflows/binaries.yml`](../.github/workflows/binaries.yml); workflow artifacts expire; **`v*`** tags attach builds to [GitHub Releases](https://github.com/d-led/commentray/releases). On macOS with Homebrew Node, point `COMMENTRAY_SEA_NODE` at an official `node` binary for local SEA builds.
 - **GitHub Pages:** set `[static_site]` in `.commentray.toml`; `npm run pages:build` writes `_site/`. [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) deploys on `main` when **Settings → Pages → Build: GitHub Actions** is enabled.

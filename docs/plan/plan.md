@@ -130,6 +130,15 @@ This repository keeps **terse** commentray beside selected sources under [`.comm
 - **Code pane line numbers:** Each **logical** source line is one `.code-line` row: a grid with `.ln` (the number) and a per-line highlighted `<pre><code>` from Highlight.js. **Done (v0):** wrapped rows use **`align-items: start`** (not `baseline`) in [`packages/render/src/code-browser.ts`](../../packages/render/src/code-browser.ts) so numbers stay top-aligned with each row. **Model limit:** one number per **logical** line, not per wrapped visual sub-line; a per-screen-line gutter would need a different layout.
 - **Quick search**: client-side whole-source ordered tokens plus per-line fuzzy ranking (bundled client); **Escape** clears search; see `packages/render` implementation.
 
+### Permalinks and stable URLs (design intent)
+
+We **design for URLs that work and keep working**—not one-off hacks. Concretely:
+
+- **Shareable links** to the static hub (`index.html`), per-pair **browse** pages under `_site/browse/`, and **location hashes** (e.g. scrolling to a commentray line) should remain **valid across typical rebuilds** of the same repo revision and deployment to GitHub Pages.
+- **Same-origin first**: when a site-local HTML view exists for a documented pair (hub search, browse tree, angle toolbar), navigation should prefer that view over bouncing readers to GitHub unless they explicitly want the raw blob.
+- **Identity-derived URLs**: browse page slugs are derived from the `(sourcePath, commentrayPath)` pair (see `@commentray/render` / static-site build). **Changing** that pair or the slug scheme is a **breaking change** for old bookmarks and should be rare, documented, and paired with redirects or release notes when unavoidable.
+- **Tests**: Cypress and unit tests should assert **user-visible navigation outcomes** (correct target page or scroll), not only implementation details—so regressions in permalink behavior are caught in CI.
+
 ## Markdown rendering stack
 
 - Baseline: **remark** + **GFM** + **rehype** stringify.
