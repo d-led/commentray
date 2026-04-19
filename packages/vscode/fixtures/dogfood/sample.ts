@@ -1,5 +1,5 @@
 // Sample source file for exercising the Commentray VS Code extension.
-// Open this file and run "Commentray: Open commentray beside source" to
+// Open this file and run "Commentray: Open paired markdown beside editor" to
 // create (or open) the paired `.commentray/source/sample.ts.md`.
 
 export function greet(name: string): string {

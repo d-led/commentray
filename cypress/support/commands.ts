@@ -8,6 +8,11 @@ declare global {
     interface Chainable {
       /** Visit the built static site root (`/`). */
       visitStaticSiteHome(): Chainable<void>;
+      /**
+       * Visit the dual-pane E2E fixture (block-aware scroll sync + gutter rays).
+       * Emitted by `scripts/build-static-pages.mjs` as `_site/__e2e__/dual-scroll-sync.html`.
+       */
+      visitE2eDualScrollSync(): Chainable<void>;
       /** Assert the code browser shell, panes, and search UI are present. */
       shouldDisplayCodeBrowserShell(): Chainable<void>;
       /** GET `/commentray-nav-search.json` and assert shape. */
@@ -18,6 +23,10 @@ declare global {
 
 Cypress.Commands.add("visitStaticSiteHome", () => {
   cy.visit("/");
+});
+
+Cypress.Commands.add("visitE2eDualScrollSync", () => {
+  cy.visit("/__e2e__/dual-scroll-sync/");
 });
 
 Cypress.Commands.add("shouldDisplayCodeBrowserShell", () => {

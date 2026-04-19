@@ -344,7 +344,7 @@ async function openCommentrayAngleCommand(): Promise<void> {
   if (!commentrayAnglesLayoutEnabled(active.folder.uri.fsPath, cfg.storageDir)) {
     const sentinel = commentrayAnglesSentinelPath(cfg.storageDir);
     await vscode.window.showInformationMessage(
-      `Angles layout is off (missing ${sentinel}). Use “Add Angle to project…” to enable it and register angles in .commentray.toml.`,
+      `Angles layout is off (missing ${sentinel}). Use “Commentray: Add angle to project…” to enable it and register angles in .commentray.toml.`,
     );
     return;
   }
@@ -492,11 +492,11 @@ async function validateWorkspaceCommand(output: vscode.OutputChannel): Promise<v
 async function openCommentrayPreviewCommand(): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
-    await vscode.window.showWarningMessage("Open a commentray markdown file first.");
+    await vscode.window.showWarningMessage("Open a paired Commentray Markdown file first.");
     return;
   }
   if (!editor.document.fileName.endsWith(".md")) {
-    await vscode.window.showWarningMessage("This command expects a Markdown file.");
+    await vscode.window.showWarningMessage("This command expects a Markdown (.md) file.");
     return;
   }
   await vscode.commands.executeCommand("markdown.showPreview", editor.document.uri);

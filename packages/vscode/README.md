@@ -6,7 +6,7 @@ workspace.
 
 ## Commands
 
-- `Commentray: Open commentray beside source` — opens (or creates) the
+- `Commentray: Open paired markdown beside editor` — opens (or creates) the
   commentray Markdown file that is paired with the active source file,
   side-by-side. While the pair is active, **scroll sync** keeps the two panes
   aligned: scrolling the source updates the commentray view, and scrolling
@@ -14,16 +14,25 @@ workspace.
   [blocks](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md)
   (metadata index + `<!-- commentray:block id=… -->` markers), sync prefers
   those anchors; otherwise it falls back to a simple proportional map.
-- `Commentray: Add block from selection` — appends a new block for the current
+- `Commentray: Add commentary block from selection` — appends a new block for the current
   selection (or current line) to the paired Markdown, updates
   `.commentray/metadata/index.json`, opens the pair, and selects the
   placeholder so you can type immediately. Default keybinding: **Cmd+Alt+K**
   (macOS) / **Ctrl+Alt+K** (Windows/Linux). Also available from the editor
-  context menu under the same commands as _Open commentray beside source_.
-- `Commentray: Open Markdown preview for commentray file` — opens VS Code's
+  context menu under the same commands as _Open paired markdown beside editor_.
+- `Commentray: Open Markdown preview for paired file` — opens VS Code's
   built-in Markdown preview for the active `.md` file.
-- `Commentray: Validate workspace metadata` — runs the same validation as
+- `Commentray: Validate workspace` — runs the same validation as
   `commentray validate` and prints issues to the _Commentray_ output channel.
+
+## Integration tests
+
+From the repo root, run extension integration tests (Extension Development Host):
+
+```bash
+bash scripts/test-vscode-extension.sh
+# or: npm run test:vscode-extension
+```
 
 ## Metadata vs Markdown
 
@@ -49,7 +58,7 @@ When `index.json` has a **higher** `schemaVersion` than the bundled library, the
 For a source file at repo-relative path `src/foo.ts`, the paired commentray
 file is `.commentray/source/src/foo.ts.md`. Missing files are created on
 demand (with a `# Commentray` placeholder) the first time you invoke
-_Open commentray beside source_.
+_Open paired markdown beside editor_.
 
 ## Install
 

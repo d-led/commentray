@@ -3,8 +3,9 @@
  * Used by `scripts/serve.sh`: initial workspace builds, then `commentray serve`.
  * Watches `packages/{core,render,code-commentray-static,cli}/src` (and render's
  * esbuild entry script); on change, rebuilds affected packages and restarts
- * serve so Node reloads workspace `dist` (ESM cache). Site file watching stays
- * inside `commentray serve` (see packages/cli/src/serve.ts).
+ * `commentray serve` so Node reloads workspace `dist` (ESM cache). No manual
+ * `serve` restart: static `_site/` rebuilds run inside the same `commentray serve`
+ * process (see packages/cli/src/serve.ts).
  */
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";

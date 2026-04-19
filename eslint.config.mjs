@@ -12,6 +12,8 @@ export default tseslint.config(
       "**/*.mjs",
       "eslint.config.mjs",
       "packages/vscode/fixtures/**",
+      /** Downloaded VS Code app for @vscode/test-* (contains nested tsconfigs that confuse the parser). */
+      "**/.vscode-test/**",
       "cypress/**",
       "cypress.config.ts",
     ],

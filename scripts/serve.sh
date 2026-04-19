@@ -4,8 +4,10 @@ set -euo pipefail
 # By default `node scripts/serve-with-package-watch.mjs` also watches
 # `packages/{core,render,code-commentray-static,cli}/src` (plus render's
 # esbuild script), rebuilds on change, and restarts `commentray serve` so
-# Node picks up new `dist/` output. Set COMMENTRAY_SERVE_NO_PACKAGE_WATCH=1
-# to skip that (one-shot package builds only).
+# Node picks up new `dist/` output. You should not need to restart `serve`
+# by hand: `commentray serve` also rebuilds `_site/` on static-site changes
+# while keeping the same HTTP listener. Set COMMENTRAY_SERVE_NO_PACKAGE_WATCH=1
+# to skip the package watcher (one-shot package builds only).
 # Used by `npm run serve` and `npm run pages:serve` at the repo root.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"

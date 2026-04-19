@@ -47,6 +47,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/node_modules/**",
       "**/coverage/**",
+      "**/.vscode-test/**",
       "**/cypress/**",
       "cypress.config.ts",
       "packages/code-commentray-static/site/**",

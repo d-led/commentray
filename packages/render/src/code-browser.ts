@@ -775,8 +775,30 @@ const CODE_BROWSER_STYLES = `
         white-space: pre;
       }
       .gutter {
-        flex: 0 0 8px; cursor: col-resize; background: color-mix(in oklab, CanvasText 12%, Canvas);
+        flex: 0 0 14px; cursor: col-resize; background: color-mix(in oklab, CanvasText 12%, Canvas);
         position: relative;
+        --commentray-ray-accent: #3b7dd8;
+      }
+      @media (prefers-color-scheme: dark) {
+        .gutter { --commentray-ray-accent: #6eb0ff; }
+      }
+      .gutter__rays {
+        position: absolute; inset: 0; pointer-events: none; z-index: 1;
+      }
+      .gutter__rays svg { width: 100%; height: 100%; display: block; overflow: visible; }
+      .gutter__rays-path {
+        fill: none; stroke-linecap: round; vector-effect: non-scaling-stroke;
+        stroke: color-mix(in oklab, var(--commentray-ray-accent) 72%, CanvasText);
+        stroke-width: 1.35px; opacity: 0.26;
+      }
+      .gutter__rays-path--active {
+        stroke-width: 2.4px; opacity: 0.88;
+      }
+      .gutter__rays-path--trail {
+        stroke-dasharray: 3 4; opacity: 0.42;
+      }
+      .gutter__rays-path--active.gutter__rays-path--trail {
+        opacity: 0.72;
       }
       .gutter:hover { background: color-mix(in oklab, CanvasText 22%, Canvas); }
       .gutter::after {

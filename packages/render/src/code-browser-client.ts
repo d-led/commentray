@@ -6,6 +6,13 @@ import {
   SubstringSearcher,
 } from "@m31coding/fuzzy-search";
 import {
+  activeBlockIdForViewport,
+  clampViewportYToGutterLocal,
+  codeLineDomIndex0,
+  gutterRayBezierPaths,
+  sortBlockLinksBySource,
+} from "./code-browser-block-rays.js";
+import {
   type BlockScrollLink,
   mirroredScrollTop,
   pickCommentrayLineForSourceScroll,
@@ -705,6 +712,163 @@ function wireProportionalScrollSync(codePane: HTMLElement, docPane: HTMLElement)
   );
 }
 
+function centerYInViewport(el: Element): number {
+  const r = el.getBoundingClientRect();
+  return (r.top + r.bottom) / 2;
+}
+
+function commentaryBandEndYViewport(
+  docScrollEl: HTMLElement,
+  next: BlockScrollLink | undefined,
+  docTop: HTMLElement,
+): number {
+  if (next) {
+    const nextEl = document.getElementById(`commentray-block-${next.id}`);
+    return nextEl ? nextEl.getBoundingClientRect().top - 3 : centerYInViewport(docTop);
+  }
+  const dr = docScrollEl.getBoundingClientRect();
+  let bottom = dr.bottom - 4;
+  const lastKid = docScrollEl.children[docScrollEl.children.length - 1];
+  if (lastKid) bottom = Math.min(bottom, lastKid.getBoundingClientRect().bottom - 4);
+  return bottom;
+}
+
+function subscribeBlockRayRedraw(
+  gutter: HTMLElement,
+  codePane: HTMLElement,
+  docScrollEl: HTMLElement,
+  scheduleDraw: () => void,
+): void {
+  const onScrollOrResize = (): void => scheduleDraw();
+  codePane.addEventListener("scroll", onScrollOrResize, { passive: true });
+  docScrollEl.addEventListener("scroll", onScrollOrResize, { passive: true });
+  globalThis.addEventListener("resize", onScrollOrResize);
+  const ro = new ResizeObserver(onScrollOrResize);
+  ro.observe(gutter);
+  ro.observe(codePane);
+  ro.observe(docScrollEl);
+  const shell = gutter.parentElement;
+  if (shell) ro.observe(shell);
+}
+
+function drawBlockRaysIntoSvg(
+  svg: SVGSVGElement,
+  gutter: HTMLElement,
+  docScrollEl: HTMLElement,
+  getLinks: () => BlockScrollLink[],
+  probeTopSourceLine1Based: () => number,
+): void {
+  const links = getLinks();
+  const sorted = sortBlockLinksBySource(links);
+  const gutterRect = gutter.getBoundingClientRect();
+  const w = gutterRect.width;
+  const h = gutterRect.height;
+  if (w <= 0 || h <= 0 || sorted.length === 0) {
+    svg.replaceChildren();
+    return;
+  }
+
+  const activeId = activeBlockIdForViewport(links, probeTopSourceLine1Based());
+  svg.setAttribute("viewBox", `0 0 ${String(w)} ${String(h)}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+
+  const parts: string[] = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const link = sorted[i];
+    if (!link) continue;
+    const next = sorted[i + 1];
+
+    const i0 = codeLineDomIndex0(link.sourceStart);
+    const i1 = codeLineDomIndex0(link.sourceEnd);
+    const codeTop = document.getElementById(`code-line-${String(i0)}`);
+    const codeBot = document.getElementById(`code-line-${String(i1)}`);
+    const docTop = document.getElementById(`commentray-block-${link.id}`);
+    if (!codeTop || !codeBot || !docTop) continue;
+
+    const docEndYViewport = commentaryBandEndYViewport(docScrollEl, next, docTop);
+    const yCodeTop = centerYInViewport(codeTop);
+    const yCodeBot = centerYInViewport(codeBot);
+    const yDocTop = docTop.getBoundingClientRect().top + 2;
+    const yDocEnd = Math.max(docEndYViewport, yDocTop + 4);
+
+    const c0 = clampViewportYToGutterLocal(yCodeTop, gutterRect.top, h);
+    const c1 = clampViewportYToGutterLocal(yDocTop, gutterRect.top, h);
+    const c2 = clampViewportYToGutterLocal(yCodeBot, gutterRect.top, h);
+    const c3 = clampViewportYToGutterLocal(yDocEnd, gutterRect.top, h);
+
+    const strokeClass =
+      link.id === activeId ? "gutter__rays-path gutter__rays-path--active" : "gutter__rays-path";
+    const trailClass = `${strokeClass} gutter__rays-path--trail`;
+
+    const topPaths = gutterRayBezierPaths(0, c0.y, w, c1.y, {
+      tension: 0.38,
+      clipStart: c0.clipped,
+      clipEnd: c1.clipped,
+    });
+    const botPaths = gutterRayBezierPaths(0, c2.y, w, c3.y, {
+      tension: 0.38,
+      clipStart: c2.clipped,
+      clipEnd: c3.clipped,
+    });
+
+    const topExtra = topPaths.dotted ? `<path class="${trailClass}" d="${topPaths.dotted}" />` : "";
+    const botExtra = botPaths.dotted ? `<path class="${trailClass}" d="${botPaths.dotted}" />` : "";
+
+    parts.push(
+      `<g class="gutter__rays-block" data-commentray-block="${escapeHtmlText(link.id)}">` +
+        `<path class="${strokeClass}" d="${topPaths.solid}" />` +
+        topExtra +
+        `<path class="${strokeClass}" d="${botPaths.solid}" />` +
+        botExtra +
+        `</g>`,
+    );
+  }
+
+  svg.innerHTML = parts.join("");
+}
+
+/**
+ * Splines in the gutter between each block’s source range and its commentary band (dual pane,
+ * index-backed blocks). Emphasizes the block aligned with the current source viewport; clamps
+ * off-screen endpoints so readers see which way to scroll.
+ */
+function wireBlockRayConnectors(args: {
+  gutter: HTMLElement;
+  codePane: HTMLElement;
+  docScrollEl: HTMLElement;
+  getLinks: () => BlockScrollLink[];
+  probeTopSourceLine1Based: () => number;
+}): void {
+  const { gutter, codePane, docScrollEl, getLinks, probeTopSourceLine1Based } = args;
+
+  const svgNs = "http://www.w3.org/2000/svg";
+  const host = document.createElement("div");
+  host.className = "gutter__rays";
+  host.setAttribute("aria-hidden", "true");
+  const svg = document.createElementNS(svgNs, "svg");
+  host.appendChild(svg);
+  gutter.appendChild(host);
+
+  let raf = 0;
+  function scheduleDraw(): void {
+    if (raf !== 0) return;
+    raf = globalThis.requestAnimationFrame(() => {
+      raf = 0;
+      drawBlockRaysIntoSvg(svg, gutter, docScrollEl, getLinks, probeTopSourceLine1Based);
+    });
+  }
+
+  subscribeBlockRayRedraw(gutter, codePane, docScrollEl, scheduleDraw);
+
+  scheduleDraw();
+  /** First paint can report gutter height 0 before flex layout settles; redraw after layout. */
+  globalThis.requestAnimationFrame(() => {
+    scheduleDraw();
+    globalThis.requestAnimationFrame(scheduleDraw);
+  });
+}
+
 type DocumentedPairNav = {
   sourcePath: string;
   commentrayPath: string;
@@ -1130,7 +1294,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
   docScrollEl: HTMLElement;
   docBody: HTMLElement | null;
   shell: HTMLElement;
-  scrollLinks: BlockScrollLink[];
+  scrollLinksRef: { current: BlockScrollLink[] };
   multiPayload: MultiAngleClientPayload | null;
   mutable: MutableSearchFields;
   rebuildSearcher: () => void;
@@ -1142,16 +1306,15 @@ function wireDualPaneMultiAngleAndScroll(args: {
     docScrollEl,
     docBody,
     shell,
-    scrollLinks,
+    scrollLinksRef,
     multiPayload,
     mutable,
     rebuildSearcher,
     searchInput,
     searchResults,
   } = args;
-  const activeLinks = { current: scrollLinks };
   if (multiPayload) {
-    wireBlockAwareScrollSync(codePane, docScrollEl, () => activeLinks.current);
+    wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinksRef.current);
     const angleSel = document.getElementById("angle-select") as HTMLSelectElement | null;
     if (angleSel && docBody) {
       angleSel.addEventListener("change", () => {
@@ -1162,7 +1325,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
         mutable.mdLines = mutable.rawMd.split("\n");
         mutable.commentrayPathLabel = a.commentrayPathForSearch;
         rebuildSearcher();
-        activeLinks.current = parseScrollBlockLinksFromShell(a.scrollBlockLinksB64);
+        scrollLinksRef.current = parseScrollBlockLinksFromShell(a.scrollBlockLinksB64);
         shell.setAttribute("data-scroll-block-links-b64", a.scrollBlockLinksB64);
         shell.setAttribute("data-search-commentray-path", a.commentrayPathForSearch);
         const gh = document.getElementById("toolbar-commentray-github");
@@ -1176,8 +1339,8 @@ function wireDualPaneMultiAngleAndScroll(args: {
     }
     return;
   }
-  if (scrollLinks.length > 0) {
-    wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinks);
+  if (scrollLinksRef.current.length > 0) {
+    wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinksRef.current);
     return;
   }
   wireProportionalScrollSync(codePane, docScrollEl);
@@ -1212,6 +1375,7 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
   const scrollLinks = parseScrollBlockLinksFromShell(
     shell.getAttribute("data-scroll-block-links-b64") || "",
   );
+  const scrollLinksRef = { current: scrollLinks };
   const { scope, filePathLabel, commentrayPathLabel } = readSearchScopeFromShell(shell);
 
   const pathInit = initialCommentrayScopePathState(
@@ -1279,13 +1443,23 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     docScrollEl,
     docBody,
     shell,
-    scrollLinks,
+    scrollLinksRef,
     multiPayload,
     mutable,
     rebuildSearcher,
     searchInput,
     searchResults,
   });
+
+  if (scrollLinksRef.current.length > 0) {
+    wireBlockRayConnectors({
+      gutter,
+      codePane,
+      docScrollEl,
+      getLinks: () => scrollLinksRef.current,
+      probeTopSourceLine1Based: () => probeCodeLine1FromViewport(codePane),
+    });
+  }
 
   wireDualPaneCommentrayLocationHash(docScrollEl, () => mutable.mdLines.length);
 }

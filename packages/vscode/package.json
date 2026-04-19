@@ -35,27 +35,27 @@
     "commands": [
       {
         "command": "commentray.openSideBySide",
-        "title": "Commentray: Open commentray beside source (default angle)"
+        "title": "Commentray: Open paired markdown beside editor"
       },
       {
         "command": "commentray.openCommentrayAngle",
-        "title": "Commentray: Open commentray beside source (pick angle)"
+        "title": "Commentray: Open paired markdown beside editor (choose angle)"
       },
       {
         "command": "commentray.addAngleDefinition",
-        "title": "Commentray: Add angle to project (updates .commentray.toml)"
+        "title": "Commentray: Add angle to project…"
       },
       {
         "command": "commentray.startBlockFromSelection",
-        "title": "Commentray: Add block from selection"
+        "title": "Commentray: Add commentary block from selection"
       },
       {
         "command": "commentray.openCommentrayPreview",
-        "title": "Commentray: Open Markdown preview for commentray file"
+        "title": "Commentray: Open Markdown preview for paired file"
       },
       {
         "command": "commentray.validateWorkspace",
-        "title": "Commentray: Validate workspace metadata"
+        "title": "Commentray: Validate workspace"
       }
     ],
     "keybindings": [
@@ -93,14 +93,19 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node ./esbuild.extension.mjs",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test:vscode": "tsc -p tsconfig.tests.json && vscode-test"
   },
   "dependencies": {
     "@commentray/core": "0.0.5"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^25.6.0",
     "@types/vscode": "1.95.0",
-    "esbuild": "^0.28.0"
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.28.0",
+    "mocha": "^11.7.5"
   }
 }
