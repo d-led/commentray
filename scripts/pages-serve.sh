@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Builds workspace packages needed by `commentray serve`, then runs it (watches + rebuilds `_site`).
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$REPO_ROOT"
-npm run build -w @commentray/core
-npm run build -w @commentray/render
-npm run build -w @commentray/code-commentray-static
-npm run build -w @commentray/cli
-exec node packages/cli/dist/cli.js serve "$@"
+# Back-compat entry: same as `scripts/serve.sh`.
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/serve.sh" "$@"
