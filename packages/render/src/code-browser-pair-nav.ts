@@ -7,7 +7,7 @@ export type DocumentedPairNavLike = {
   sourcePath: string;
   commentrayPath: string;
   staticBrowseUrl?: string;
-  commentrayOnGithub: string;
+  commentrayOnGithub?: string;
 };
 
 export function normPosixPath(s: string): string {

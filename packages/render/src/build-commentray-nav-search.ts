@@ -21,12 +21,17 @@ export type CommentrayNavSearchRow =
       text: string;
     };
 
-/** One indexed source ↔ commentray pair with absolute GitHub blob links for static hub pages. */
+/**
+ * One indexed source ↔ commentray pair for the static hub.
+ * Optional SCM blob URLs are filled when `[static_site].github_url` is set (GitHub-style today;
+ * configurable host URL — see plan). Same-site `./browse/…` links are added by the static-site
+ * build so navigation stays on the exported HTML without requiring an external host.
+ */
 export type DocumentedPairNav = {
   sourcePath: string;
   commentrayPath: string;
-  sourceOnGithub: string;
-  commentrayOnGithub: string;
+  sourceOnGithub?: string;
+  commentrayOnGithub?: string;
   /**
    * When the static Pages build emits per-pair browse HTML (e.g. `_site/browse/…html`), a URL
    * relative to the site root `index.html` (e.g. `./browse/x.html`) so the hub can open the same
@@ -59,19 +64,18 @@ export type BuildCommentrayNavSearchGithubBlobBase = {
 
 function buildDocumentedPairs(
   pairs: { sourcePath: string; commentrayPath: string }[],
-  gh: BuildCommentrayNavSearchGithubBlobBase,
+  gh?: BuildCommentrayNavSearchGithubBlobBase,
 ): DocumentedPairNav[] {
-  const { owner, repo, branch } = gh;
   const uniq = new Map<string, DocumentedPairNav>();
   for (const { sourcePath, commentrayPath } of pairs) {
     const key = `${sourcePath}\0${commentrayPath}`;
     if (uniq.has(key)) continue;
-    uniq.set(key, {
-      sourcePath,
-      commentrayPath,
-      sourceOnGithub: githubRepoBlobFileUrl(owner, repo, branch, sourcePath),
-      commentrayOnGithub: githubRepoBlobFileUrl(owner, repo, branch, commentrayPath),
-    });
+    const row: DocumentedPairNav = { sourcePath, commentrayPath };
+    if (gh !== undefined) {
+      row.sourceOnGithub = githubRepoBlobFileUrl(gh.owner, gh.repo, gh.branch, sourcePath);
+      row.commentrayOnGithub = githubRepoBlobFileUrl(gh.owner, gh.repo, gh.branch, commentrayPath);
+    }
+    uniq.set(key, row);
   }
   return [...uniq.values()].sort((a, b) =>
     a.sourcePath === b.sourcePath
@@ -142,8 +146,9 @@ async function appendPairRowsSync(
  * Builds a JSON-serialisable search corpus: **filenames / paths** plus **commentray Markdown lines**
  * for each indexed pair. Primary source file contents are intentionally omitted.
  *
- * When `githubBlobBase` is set, `documentedPairs` lists every pair with GitHub **blob** URLs for
- * the static hub tree and outbound links.
+ * `documentedPairs` lists every merged pair. When `githubBlobBase` is set, GitHub-style **blob**
+ * URLs are included for optional outbound links; the static-site build always adds same-site
+ * `staticBrowseUrl` when it emits `_site/browse/*.html`.
  *
  * Pairs are merged from the metadata index, a walk of the configured storage `source` tree for
  * every `*.md` companion (flat or Angles layout), and an optional single-page `fallback`. For the
@@ -181,12 +186,11 @@ export async function buildCommentrayNavSearchDocument(
     );
   }
 
-  const documentedPairs =
-    githubBlobBase !== undefined ? buildDocumentedPairs(merged, githubBlobBase) : undefined;
+  const documentedPairs = buildDocumentedPairs(merged, githubBlobBase);
 
   return {
     schemaVersion: COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION,
     rows,
-    ...(documentedPairs ? { documentedPairs } : {}),
+    documentedPairs,
   };
 }

@@ -1,14 +1,30 @@
 import { normalizeRepoRelativePath } from "./paths.js";
 
+function trimTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === "/") end--;
+  return s.slice(0, end);
+}
+
 /**
  * Parses a GitHub repository web URL into owner + repo name (no API calls).
  * Accepts optional trailing slash and `.git` suffix.
  */
 export function parseGithubRepoWebUrl(url: string): { owner: string; repo: string } | null {
-  const t = url.trim().replace(/\/+$/, "");
-  const m = t.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
-  if (!m) return null;
-  return { owner: m[1], repo: m[2] };
+  const t = trimTrailingSlashes(url.trim());
+  let parsed: URL;
+  try {
+    parsed = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`);
+  } catch {
+    return null;
+  }
+  if (parsed.hostname.toLowerCase() !== "github.com") return null;
+  const segments = parsed.pathname.split("/").filter(Boolean);
+  if (segments.length !== 2) return null;
+  const owner = segments[0];
+  let repo = segments[1];
+  if (repo.toLowerCase().endsWith(".git")) repo = repo.slice(0, -4);
+  return { owner, repo };
 }
 
 /**
@@ -21,7 +37,7 @@ export function githubRepoBlobFileUrl(
   branch: string,
   repoRelativePath: string,
 ): string {
-  const posix = normalizeRepoRelativePath(repoRelativePath.replace(/\\/g, "/"));
+  const posix = normalizeRepoRelativePath(repoRelativePath.replaceAll("\\", "/"));
   const tail = posix
     .split("/")
     .map((s) => encodeURIComponent(s))

@@ -171,7 +171,13 @@ const BLOCK_MARKER_HTML_LINE = new RegExp(
 );
 
 function trimEndSpacesTabs(s: string): string {
-  return s.replace(/[ \t]+$/, "");
+  let end = s.length;
+  while (end > 0) {
+    const c = s[end - 1];
+    if (c !== " " && c !== "\t") break;
+    end--;
+  }
+  return s.slice(0, end);
 }
 
 function isSetextUnderlineLine(line: string): boolean {

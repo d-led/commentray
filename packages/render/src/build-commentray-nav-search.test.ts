@@ -44,7 +44,7 @@ describe("Cross-file search manifest — index and fallback", () => {
 
     const doc = await buildCommentrayNavSearchDocument(dir);
     expect(doc.schemaVersion).toBe(1);
-    expect(doc.documentedPairs).toBeUndefined();
+    expect(doc.documentedPairs).toEqual([{ sourcePath: "src/a.ts", commentrayPath: cr }]);
     expect(doc.rows.some((r) => r.kind === "sourcePath" && r.sourcePath === "src/a.ts")).toBe(true);
     expect(doc.rows.some((r) => r.kind === "commentrayPath" && r.commentrayPath === cr)).toBe(true);
     const lines = doc.rows.filter((r) => r.kind === "commentrayLine");
@@ -92,7 +92,12 @@ describe("Cross-file search manifest — index and fallback", () => {
       "Two",
       "",
     ]);
-    expect(doc.documentedPairs).toBeUndefined();
+    expect(doc.documentedPairs).toEqual([
+      {
+        sourcePath: "lib/x.ts",
+        commentrayPath: ".commentray/source/lib/x.ts.md",
+      },
+    ]);
   });
 
   it("should still emit documentedPairs for fallback-only pairs when GitHub metadata is present", async () => {

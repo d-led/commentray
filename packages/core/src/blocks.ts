@@ -66,7 +66,7 @@ export function createBlockForRange(input: CreateBlockForRangeInput): CreatedBlo
  * single blank-line separator regardless of how the existing content ended.
  */
 export function appendBlockToCommentray(existing: string, blockMarkdown: string): string {
-  const trimmed = existing.replace(/\s+$/, "");
+  const trimmed = existing.trimEnd();
   const body = trimmed.length === 0 ? "" : `${trimmed}\n\n`;
   const fragment = blockMarkdown.endsWith("\n") ? blockMarkdown : `${blockMarkdown}\n`;
   return `${body}${fragment}`;

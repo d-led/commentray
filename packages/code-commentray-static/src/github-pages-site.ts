@@ -18,7 +18,6 @@ import {
 
 import { type BuildCommentrayStaticOptions, buildCommentrayStatic } from "./build.js";
 import {
-  type GithubNavBase,
   flatBlockStretchRows,
   loadMultiAngleBrowsingIfEnabled,
   pickCommentrayBody,
@@ -39,7 +38,6 @@ async function writePerPairBrowseHtmlPages(input: {
   repoRoot: string;
   outDir: string;
   navDoc: CommentrayNavSearchDocument;
-  ghNavBase: GithubNavBase;
   cfg: ResolvedCommentrayConfig;
   ss: ResolvedStaticSite;
   toolHomeUrl: string;
@@ -53,7 +51,7 @@ async function writePerPairBrowseHtmlPages(input: {
     staticBrowseUrl: `./browse/${browsePageSlugFromPair(p)}.html`,
   }));
   const navWithUrls: CommentrayNavSearchDocument = { ...input.navDoc, documentedPairs: augmented };
-  const emb = documentedPairsEmbeddedB64FromNav(navWithUrls, input.ghNavBase);
+  const emb = documentedPairsEmbeddedB64FromNav(navWithUrls);
 
   const browseDir = path.join(input.outDir, "browse");
   await mkdir(browseDir, { recursive: true });
@@ -87,8 +85,8 @@ async function writePerPairBrowseHtmlPages(input: {
         input.ss.relatedGithubNav.length > 0 ? input.ss.relatedGithubNav : undefined,
       staticSearchScope: "commentray-and-paths",
       commentrayPathForSearch: p.commentrayPath,
-      sourceOnGithubUrl: p.sourceOnGithub,
-      commentrayOnGithubUrl: p.commentrayOnGithub,
+      ...(p.sourceOnGithub ? { sourceOnGithubUrl: p.sourceOnGithub } : {}),
+      ...(p.commentrayOnGithub ? { commentrayOnGithubUrl: p.commentrayOnGithub } : {}),
       documentedNavJsonUrl: "../commentray-nav-search.json",
       builtAt: input.builtAt,
       ...(emb ? { documentedPairsEmbeddedB64: emb } : {}),
@@ -100,16 +98,23 @@ async function writePerPairBrowseHtmlPages(input: {
 
 function documentedPairsEmbeddedB64FromNav(
   navDoc: CommentrayNavSearchDocument,
-  ghNavBase: GithubNavBase | null,
 ): string | undefined {
-  if (
-    ghNavBase === null ||
-    !Array.isArray(navDoc.documentedPairs) ||
-    navDoc.documentedPairs.length === 0
-  ) {
+  if (!Array.isArray(navDoc.documentedPairs) || navDoc.documentedPairs.length === 0) {
     return undefined;
   }
   return Buffer.from(JSON.stringify(navDoc.documentedPairs), "utf8").toString("base64");
+}
+
+function staticBrowseUrlForConfiguredPair(
+  navDoc: CommentrayNavSearchDocument,
+  sourceFile: string,
+  commentrayRel: string,
+): string | undefined {
+  const pairs = navDoc.documentedPairs;
+  if (!pairs?.length || commentrayRel.length === 0) return undefined;
+  const hit = pairs.find((p) => p.sourcePath === sourceFile && p.commentrayPath === commentrayRel);
+  const u = hit?.staticBrowseUrl?.trim();
+  return u && u.length > 0 ? u : undefined;
 }
 
 function staticRenderOptions(input: {
@@ -126,6 +131,7 @@ function staticRenderOptions(input: {
   ghToolbar: ReturnType<typeof sourceAndCommentrayGithubUrls>;
   defaultCommentrayRel: string;
   documentedPairsEmbeddedB64: string | undefined;
+  commentrayStaticBrowseUrl?: string;
 }): BuildCommentrayStaticOptions {
   return {
     sourceFile: input.sourceAbs,
@@ -154,6 +160,9 @@ function staticRenderOptions(input: {
       : {}),
     ...(input.documentedPairsEmbeddedB64
       ? { documentedPairsEmbeddedB64: input.documentedPairsEmbeddedB64 }
+      : {}),
+    ...(input.commentrayStaticBrowseUrl
+      ? { commentrayStaticBrowseUrl: input.commentrayStaticBrowseUrl }
       : {}),
     builtAt: input.builtAt,
   };
@@ -233,23 +242,23 @@ export async function buildGithubPagesStaticSite(
 
   try {
     await mkdir(outDir, { recursive: true });
-    if (
-      ghNavBase !== null &&
-      Array.isArray(navDoc.documentedPairs) &&
-      navDoc.documentedPairs.length > 0
-    ) {
+    if (Array.isArray(navDoc.documentedPairs) && navDoc.documentedPairs.length > 0) {
       navDoc = await writePerPairBrowseHtmlPages({
         repoRoot,
         outDir,
         navDoc,
-        ghNavBase,
         cfg,
         ss,
         toolHomeUrl,
         builtAt,
       });
     }
-    const documentedPairsEmbeddedB64 = documentedPairsEmbeddedB64FromNav(navDoc, ghNavBase);
+    const documentedPairsEmbeddedB64 = documentedPairsEmbeddedB64FromNav(navDoc);
+
+    const hubStaticBrowseUrl =
+      defaultCommentrayRel.length > 0
+        ? staticBrowseUrlForConfiguredPair(navDoc, ss.sourceFile, defaultCommentrayRel)
+        : undefined;
 
     const staticOpts = staticRenderOptions({
       sourceAbs,
@@ -265,6 +274,7 @@ export async function buildGithubPagesStaticSite(
       ghToolbar,
       defaultCommentrayRel,
       documentedPairsEmbeddedB64,
+      commentrayStaticBrowseUrl: hubStaticBrowseUrl,
     });
 
     await buildCommentrayStatic(staticOpts);

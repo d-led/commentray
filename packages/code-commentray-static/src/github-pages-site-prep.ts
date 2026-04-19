@@ -56,17 +56,14 @@ async function multiAngleSpecForDefinition(
     ghNavBase !== null
       ? githubRepoBlobFileUrl(ghNavBase.owner, ghNavBase.repo, ghNavBase.branch, rel)
       : undefined;
-  const staticBrowseUrl =
-    ghNavBase !== null
-      ? `./browse/${browsePageSlugFromPair({ sourcePath: ss.sourceFile, commentrayPath: rel })}.html`
-      : undefined;
+  const staticBrowseUrl = `./browse/${browsePageSlugFromPair({ sourcePath: ss.sourceFile, commentrayPath: rel })}.html`;
   return {
     id: def.id,
     title: def.title,
     markdown: composed,
     commentrayPathRel: rel,
     commentrayOnGithubUrl,
-    ...(staticBrowseUrl !== undefined ? { staticBrowseUrl } : {}),
+    staticBrowseUrl,
     ...(angleBlockStretch ? { blockStretchRows: angleBlockStretch } : {}),
   };
 }
@@ -150,8 +147,15 @@ export function sourceAndCommentrayGithubUrls(
   ss: ResolvedStaticSite,
   defaultCommentrayRel: string,
 ): { sourceOnGithubUrl?: string; commentrayOnGithubUrl?: string; documentedNavJsonUrl?: string } {
+  const nav: {
+    sourceOnGithubUrl?: string;
+    commentrayOnGithubUrl?: string;
+    documentedNavJsonUrl?: string;
+  } = {
+    documentedNavJsonUrl: "./commentray-nav-search.json",
+  };
   if (ghNavBase === null) {
-    return {};
+    return nav;
   }
   const sourceOnGithubUrl = githubRepoBlobFileUrl(
     ghNavBase.owner,
@@ -163,8 +167,8 @@ export function sourceAndCommentrayGithubUrls(
     ? githubRepoBlobFileUrl(ghNavBase.owner, ghNavBase.repo, ghNavBase.branch, defaultCommentrayRel)
     : undefined;
   return {
+    ...nav,
     sourceOnGithubUrl,
     ...(commentrayOnGithubUrl ? { commentrayOnGithubUrl } : {}),
-    documentedNavJsonUrl: "./commentray-nav-search.json",
   };
 }

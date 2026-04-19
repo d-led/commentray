@@ -37,7 +37,10 @@ export async function runServeStaticPages(
 
   await rebuild();
 
-  const serveArgs = [serveMain, siteRel, "-s", "-l", String(opts.port), "-n"];
+  // Do not pass `--single` (`-s`): that mode serves `index.html` for unknown paths. Extensionless
+  // URLs like `/browse/<slug>` would then show the hub (default angle: main) instead of the
+  // real `browse/<slug>.html` file — the classic “wrong angle / wrong page” confusion.
+  const serveArgs = [serveMain, siteRel, "-l", String(opts.port), "-n"];
   const serveChild = spawn(process.execPath, serveArgs, {
     cwd: repoRoot,
     stdio: "inherit",

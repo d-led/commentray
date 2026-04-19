@@ -5,6 +5,15 @@ import { describe, expect, it } from "vitest";
 
 import { renderCodeBrowserHtml } from "./code-browser.js";
 
+function textContentWithoutTags(html: string): string {
+  let cur = html;
+  for (;;) {
+    const next = cur.replaceAll(/<[^>]+>/g, "");
+    if (next === cur) return cur;
+    cur = next;
+  }
+}
+
 describe("Code browser page — layout shell and search", () => {
   it("should embed raw payloads on the shell element for the client bundle", async () => {
     const html = await renderCodeBrowserHtml({
@@ -50,7 +59,7 @@ describe("Code browser page — layout shell and search", () => {
     expect(html).toContain('role="region" aria-label="Search"');
     expect(html).toContain('for="search-q"');
     expect(html).toContain("Wrap code lines");
-    expect(html.replaceAll(/<[^>]*>/g, "")).toContain("const x = 1;");
+    expect(textContentWithoutTags(html)).toContain("const x = 1;");
     expect(html).toMatch(/hljs|language-ts/);
     expect(html).toContain("Notes");
     expect(html).toContain(

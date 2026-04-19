@@ -346,11 +346,9 @@ function navigateToDocumentedPair(pair: DocumentedPairNav, mdLine0: number | nul
     globalThis.location.assign(u.toString());
     return;
   }
-  if (pair.commentrayOnGithub) {
-    const url =
-      mdLine0 !== null && mdLine0 >= 0
-        ? `${pair.commentrayOnGithub}#L${String(mdLine0 + 1)}`
-        : pair.commentrayOnGithub;
+  const gh = (pair.commentrayOnGithub ?? "").trim();
+  if (gh.length > 0) {
+    const url = mdLine0 !== null && mdLine0 >= 0 ? `${gh}#L${String(mdLine0 + 1)}` : gh;
     globalThis.location.assign(url);
   }
 }
@@ -997,8 +995,8 @@ function wireBlockRayConnectors(args: {
 type DocumentedPairNav = {
   sourcePath: string;
   commentrayPath: string;
-  sourceOnGithub: string;
-  commentrayOnGithub: string;
+  sourceOnGithub?: string;
+  commentrayOnGithub?: string;
   staticBrowseUrl?: string;
 };
 
@@ -1014,13 +1012,16 @@ type TrieNode = {
 function isDocumentedPairNav(x: unknown): x is DocumentedPairNav {
   if (typeof x !== "object" || x === null) return false;
   const o = x as Record<string, unknown>;
-  return (
-    typeof o.sourcePath === "string" &&
-    typeof o.commentrayPath === "string" &&
-    typeof o.sourceOnGithub === "string" &&
-    typeof o.commentrayOnGithub === "string" &&
-    (o.staticBrowseUrl === undefined || typeof o.staticBrowseUrl === "string")
-  );
+  if (typeof o.sourcePath !== "string" || typeof o.commentrayPath !== "string") return false;
+  if (o.staticBrowseUrl !== undefined && typeof o.staticBrowseUrl !== "string") return false;
+  const sg = o.sourceOnGithub;
+  const cg = o.commentrayOnGithub;
+  const hasSg = typeof sg === "string";
+  const hasCg = typeof cg === "string";
+  if (hasSg !== hasCg) return false;
+  const browseOk = typeof o.staticBrowseUrl === "string" && o.staticBrowseUrl.trim().length > 0;
+  if (!browseOk && !hasSg) return false;
+  return true;
 }
 
 function pairsFromJsonArray(raw: unknown): DocumentedPairNav[] {
@@ -1119,7 +1120,7 @@ function treeFileLinkLabel(pr: DocumentedPairNav, disambiguate: boolean): string
   return stem !== "" && stem !== base ? `${base} · ${stem}` : base;
 }
 
-/** Prefer static hub browse page; GitHub only when the export has no `staticBrowseUrl`. */
+/** Prefer static hub browse page; optional SCM blob URL when the export has no `staticBrowseUrl`. */
 function treeFileLinkHref(pr: DocumentedPairNav): string {
   const browse = (pr.staticBrowseUrl ?? "").trim();
   if (browse.length > 0) {
@@ -1129,7 +1130,8 @@ function treeFileLinkHref(pr: DocumentedPairNav): string {
       globalThis.location.origin,
     );
   }
-  return pr.commentrayOnGithub;
+  const gh = (pr.commentrayOnGithub ?? "").trim();
+  return gh.length > 0 ? gh : "#";
 }
 
 function treeFileLinkTitle(pr: DocumentedPairNav): string {
@@ -1137,7 +1139,10 @@ function treeFileLinkTitle(pr: DocumentedPairNav): string {
   if (browse.length > 0) {
     return `${pr.sourcePath} — open this pair in the site viewer`;
   }
-  return `${pr.sourcePath} — open companion commentray on GitHub`;
+  if ((pr.commentrayOnGithub ?? "").trim().length > 0) {
+    return `${pr.sourcePath} — open companion commentray on the repository host`;
+  }
+  return pr.sourcePath;
 }
 
 function renderDocumentedTreeHtml(node: TrieNode): string {

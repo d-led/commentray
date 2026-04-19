@@ -139,6 +139,11 @@ We **design for URLs that work and keep working**—not one-off hacks. Concretel
 - **Identity-derived URLs**: browse page slugs are derived from the `(sourcePath, commentrayPath)` pair (see `@commentray/render` / static-site build). **Changing** that pair or the slug scheme is a **breaking change** for old bookmarks and should be rare, documented, and paired with redirects or release notes when unavoidable.
 - **Tests**: Cypress and unit tests should assert **user-visible navigation outcomes** (correct target page or scroll), not only implementation details—so regressions in permalink behavior are caught in CI.
 
+### Self-contained static site and configurable repository links
+
+- **Comment-rayed navigation stays on the export**: `pages:build` emits `_site/browse/*.html` and enriches `commentray-nav-search.json` with same-site `staticBrowseUrl` for documented pairs **without** requiring `static_site.github_url`. The hub search UI, the Comment-rayed files tree, and the Doc toolbar **prefer** those in-site pages so `_site/` is fully browsable from a static file server or arbitrary origin (no dependency on `github.com` for moving between pairs).
+- **External SCM links are optional and configurable**: `static_site.github_url`, `related_github_files`, and Markdown link rewriting add **optional** outbound links where “open in the repository” is appropriate. Deployments may use **GitHub Enterprise, GitLab, or other hosts**; those URLs **must remain configuration-driven** (not hardcoded to `github.com`). Today the TOML field and helpers assume a GitHub-shaped web URL; evolving toward a neutral “repository web base” (or host-specific URL builders) belongs in config and `@commentray/core` as adoption grows.
+
 ## Markdown rendering stack
 
 - Baseline: **remark** + **GFM** + **rehype** stringify.
