@@ -459,7 +459,15 @@ function loadCodeBrowserClientBundle(): string {
 }
 
 const CODE_BROWSER_STYLES = `
-      :root { color-scheme: light dark; }
+      :root {
+        color-scheme: light dark;
+        --cr-control-h: 32px;
+        --cr-control-radius: 8px;
+        --cr-icon-inner: 18px;
+        --cr-label-caps-fs: 10px;
+        --cr-label-caps-track: 0.06em;
+        --cr-ui-fs: 12px;
+      }
       * { box-sizing: border-box; }
       body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
       .skip-link {
@@ -535,10 +543,12 @@ const CODE_BROWSER_STYLES = `
       .chrome__search-row input[type="search"] {
         flex: 1 1 auto;
         min-width: 140px;
-        padding: 8px 10px;
+        min-height: var(--cr-control-h);
+        padding: 0 12px;
         font: inherit;
-        font-size: 14px;
-        border-radius: 8px;
+        font-size: var(--cr-ui-fs);
+        line-height: 1.25;
+        border-radius: var(--cr-control-radius);
         border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
         background: Canvas;
         color: CanvasText;
@@ -546,8 +556,11 @@ const CODE_BROWSER_STYLES = `
       .chrome__search-row #search-clear {
         flex: 0 0 auto;
         font: inherit;
-        padding: 6px 14px;
-        border-radius: 8px;
+        font-size: var(--cr-ui-fs);
+        font-weight: 500;
+        min-height: var(--cr-control-h);
+        padding: 0 16px;
+        border-radius: var(--cr-control-radius);
         cursor: pointer;
         border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
         background: color-mix(in oklab, CanvasText 6%, Canvas);
@@ -569,10 +582,10 @@ const CODE_BROWSER_STYLES = `
         align-items: center;
         gap: 6px 10px;
         padding: 5px 10px;
-        border-radius: 8px;
+        border-radius: var(--cr-control-radius);
         border: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
         background: Canvas;
-        font-size: 12px;
+        font-size: var(--cr-ui-fs);
         line-height: 1.3;
       }
       .nav-rail__pair {
@@ -586,9 +599,9 @@ const CODE_BROWSER_STYLES = `
       }
       .nav-rail__pair-lab {
         flex: 0 0 auto;
-        font-size: 9px;
+        font-size: var(--cr-label-caps-fs);
         font-weight: 700;
-        letter-spacing: 0.06em;
+        letter-spacing: var(--cr-label-caps-track);
         text-transform: uppercase;
         opacity: 0.72;
       }
@@ -596,7 +609,7 @@ const CODE_BROWSER_STYLES = `
         flex: 1 1 auto;
         min-width: 0;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-        font-size: 11px;
+        font-size: var(--cr-ui-fs);
         color: CanvasText;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -614,9 +627,9 @@ const CODE_BROWSER_STYLES = `
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 26px;
-        height: 26px;
-        border-radius: 6px;
+        width: var(--cr-control-h);
+        height: var(--cr-control-h);
+        border-radius: var(--cr-control-radius);
         border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas);
         background: color-mix(in oklab, CanvasText 5%, Canvas);
         color: CanvasText;
@@ -629,8 +642,8 @@ const CODE_BROWSER_STYLES = `
         outline-offset: 2px;
       }
       .nav-rail__pair-gh svg {
-        width: 14px;
-        height: 14px;
+        width: var(--cr-icon-inner);
+        height: var(--cr-icon-inner);
         display: block;
       }
       .toolbar .nav-rail__context--compact {
@@ -648,11 +661,11 @@ const CODE_BROWSER_STYLES = `
         max-width: min(44vw, 420px);
       }
       .nav-rail__search-label {
-        font-size: 11px;
+        font-size: var(--cr-label-caps-fs);
         font-weight: 700;
-        letter-spacing: 0.05em;
+        letter-spacing: var(--cr-label-caps-track);
         text-transform: uppercase;
-        opacity: 0.8;
+        opacity: 0.78;
       }
       .nav-rail__search-hint {
         margin: 0;
@@ -670,18 +683,22 @@ const CODE_BROWSER_STYLES = `
         align-self: center;
         display: block;
         border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
-        border-radius: 6px;
+        border-radius: var(--cr-control-radius);
         background: Canvas;
         overflow: visible;
       }
       .nav-rail__doc-hub-summary {
         cursor: pointer;
-        font-size: 12px;
+        font-size: var(--cr-ui-fs);
         font-weight: 600;
-        padding: 4px 10px;
+        padding: 0 12px;
+        min-height: var(--cr-control-h);
+        display: inline-flex;
+        align-items: center;
+        box-sizing: border-box;
         list-style: none;
         user-select: none;
-        line-height: 1.35;
+        line-height: 1.25;
       }
       .nav-rail__doc-hub-summary::-webkit-details-marker { display: none; }
       .nav-rail__doc-hub-inner {
@@ -708,9 +725,9 @@ const CODE_BROWSER_STYLES = `
       }
       .nav-rail__doc-hub-filter-label {
         display: block;
-        font-size: 11px;
+        font-size: var(--cr-label-caps-fs);
         font-weight: 700;
-        letter-spacing: 0.05em;
+        letter-spacing: var(--cr-label-caps-track);
         text-transform: uppercase;
         opacity: 0.78;
         margin-bottom: 4px;
@@ -757,7 +774,8 @@ const CODE_BROWSER_STYLES = `
       .toolbar {
         display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 8px 12px;
         border-bottom: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
-        font-size: 13px; flex: 0 0 auto;
+        font-size: var(--cr-ui-fs);
+        flex: 0 0 auto;
       }
       .toolbar__main {
         display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
@@ -771,26 +789,49 @@ const CODE_BROWSER_STYLES = `
       }
       .toolbar-github {
         display: inline-flex; align-items: center; justify-content: center;
-        width: 34px; height: 34px; border-radius: 8px;
+        width: var(--cr-control-h);
+        height: var(--cr-control-h);
+        border-radius: var(--cr-control-radius);
         border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
         background: color-mix(in oklab, CanvasText 6%, Canvas);
         color: CanvasText;
       }
+      .toolbar-github svg {
+        width: var(--cr-icon-inner);
+        height: var(--cr-icon-inner);
+        display: block;
+      }
       .toolbar-github:hover { background: color-mix(in oklab, CanvasText 11%, Canvas); }
       .toolbar-github:focus-visible { outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas); outline-offset: 2px; }
       .toolbar-attribution {
-        font-size: 11px; line-height: 1.35; opacity: 0.82; max-width: min(360px, 42vw);
-        text-align: right; color: color-mix(in oklab, CanvasText 88%, Canvas);
+        font-size: var(--cr-ui-fs);
+        line-height: 1.35;
+        opacity: 0.85;
+        max-width: min(360px, 42vw);
+        text-align: right;
+        color: color-mix(in oklab, CanvasText 88%, Canvas);
       }
       .toolbar-attribution a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
       .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+      .toolbar__main > label:has(#wrap-lines) {
+        margin: 0;
+        min-height: var(--cr-control-h);
+        padding: 0 12px 0 10px;
+        border-radius: var(--cr-control-radius);
+        border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
+        background: color-mix(in oklab, CanvasText 4%, Canvas);
+        font-size: var(--cr-ui-fs);
+        font-weight: 500;
+        gap: 8px;
+      }
       .toolbar label input:focus-visible {
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
         outline-offset: 2px;
       }
       .toolbar .file-path {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-        font-size: 13px; font-weight: 500;
+        font-size: var(--cr-ui-fs);
+        font-weight: 500;
         display: inline-flex; align-items: baseline; gap: 0; margin-right: 4px;
         max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
@@ -804,7 +845,9 @@ const CODE_BROWSER_STYLES = `
       .toolbar .file-path--title { font-weight: 600; }
       .toolbar-related {
         display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
-        max-width: min(520px, 90vw); font-size: 12px; line-height: 1.35;
+        max-width: min(520px, 90vw);
+        font-size: var(--cr-ui-fs);
+        line-height: 1.35;
         color: color-mix(in oklab, CanvasText 88%, Canvas);
       }
       .toolbar-related__prefix { font-weight: 600; opacity: 0.85; white-space: nowrap; }
@@ -839,8 +882,15 @@ const CODE_BROWSER_STYLES = `
         opacity: 0.92;
       }
       .toolbar button {
-        font: inherit; padding: 4px 10px; border-radius: 6px; cursor: pointer;
-        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas); background: color-mix(in oklab, CanvasText 6%, Canvas);
+        font: inherit;
+        font-size: var(--cr-ui-fs);
+        font-weight: 500;
+        min-height: var(--cr-control-h);
+        padding: 0 12px;
+        border-radius: var(--cr-control-radius);
+        cursor: pointer;
+        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+        background: color-mix(in oklab, CanvasText 6%, Canvas);
         color: CanvasText;
       }
       .search-results {
@@ -972,12 +1022,29 @@ const CODE_BROWSER_STYLES = `
         flex: 1 1 auto; min-height: 0; overflow: auto;
       }
       .toolbar-angle-picker {
-        display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
-        font-size: 12px; color: color-mix(in oklab, CanvasText 88%, Canvas);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex: 0 0 auto;
+        color: color-mix(in oklab, CanvasText 88%, Canvas);
+      }
+      .toolbar-angle-picker > label {
+        font-size: var(--cr-label-caps-fs);
+        font-weight: 700;
+        letter-spacing: var(--cr-label-caps-track);
+        text-transform: uppercase;
+        opacity: 0.72;
       }
       .toolbar-angle-picker select {
-        font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 6px;
-        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas); background: Canvas; color: CanvasText;
+        font: inherit;
+        font-size: var(--cr-ui-fs);
+        min-height: var(--cr-control-h);
+        height: var(--cr-control-h);
+        padding: 0 10px;
+        border-radius: var(--cr-control-radius);
+        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+        background: Canvas;
+        color: CanvasText;
       }
       .toolbar-angle-picker select:focus-visible {
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);

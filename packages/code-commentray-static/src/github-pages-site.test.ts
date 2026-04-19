@@ -52,7 +52,10 @@ describe("GitHub Pages static site output", () => {
     expect(html).toContain('href="./"');
     const browseName = browseFiles.find((f) => f.endsWith(".html"));
     expect(browseName).toBeTruthy();
-    const browseHtml = await readFile(path.join(repo, "_site", "browse", browseName!), "utf8");
+    if (browseName === undefined) {
+      throw new Error("expected a .html file under _site/browse");
+    }
+    const browseHtml = await readFile(path.join(repo, "_site", "browse", browseName), "utf8");
     expect(browseHtml).toContain('href="../index.html"');
     expect(browseHtml).toContain('aria-label="Documentation home"');
   });
