@@ -2,8 +2,8 @@
 #
 # - **Workflow artifacts** (`actions/upload-artifact`): short-lived by design
 #   (`retention-days` below). Use them to debug a run or bridge jobs in this workflow only.
-# - **GitHub Releases** (job `release` on `v*` tags): the supported long-term “registry” for
-#   end-user downloads — assets live with the release until removed. Prefer Releases over
+# - **GitHub Releases** (job `release` on `v*` tags): attaches standalone CLI binaries (all
+#   targets), the packaged VS Code extension (`.vsix`), and release notes. Prefer Releases over
 #   re-downloading expired workflow artifacts.
 #
 # npm packages are **not** published from Actions (maintainers publish locally with 2FA); see README / CONTRIBUTING.
@@ -70,8 +70,32 @@ jobs:
           # Expire CI blobs automatically; tagged releases copy these into GitHub Release assets first.
           retention-days: 14
 
+  vsix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - run: npm ci
+
+      - name: Package VS Code extension (.vsix)
+        run: npm run extension:package
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: commentray-vsix
+          path: packages/vscode/dist/commentray-vscode-*.vsix
+          if-no-files-found: error
+          retention-days: 14
+
   release:
-    needs: build
+    needs: [build, vsix]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:

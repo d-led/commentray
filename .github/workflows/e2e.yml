@@ -39,7 +39,7 @@ jobs:
       - name: Wait for server
         run: |
           n=0
-          until node -e "require('http').get('http://127.0.0.1:4173/', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"; do
+          until node -e "require('http').get('http://127.0.0.1:14173/', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"; do
             n=$((n+1))
             [ "$n" -ge 60 ] && exit 1
             sleep 1
@@ -47,7 +47,7 @@ jobs:
 
       - name: Run E2E tests (with JUnit reporter)
         run: |
-          npx cypress run --e2e --browser electron --config-file cypress.config.ts --config baseUrl=http://127.0.0.1:4173
+          npx cypress run --e2e --browser chrome --config-file cypress.config.ts --config baseUrl=http://127.0.0.1:14173
         env:
           CYPRESS_CI: true
           NODE_OPTIONS: --dns-result-order=ipv4first
