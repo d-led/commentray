@@ -20,6 +20,12 @@ describe("Commentray static site (GitHub Pages build)", () => {
         .and("not.match", /href="\.\.\/README\.md"/);
     });
 
+    it("then the commentray pane renders inline markdown after block markers (not raw underscores)", () => {
+      cy.visitStaticSiteHome();
+      cy.get("#doc-pane-body").find("em").should("have.length.at.least", 1);
+      cy.get("#doc-pane-body em").first().should("contain.text", "You have the main");
+    });
+
     it("then the hub exposes GitHub source links and a collapsible browse-files tree", () => {
       cy.visitStaticSiteHome();
       cy.get("#toolbar-source-github")
@@ -71,15 +77,38 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.get("#search-results mark.search-hit").should("have.length.at.least", 1);
     });
 
-    it("then the Angle selector swaps commentray bodies for multi-angle Pages builds", () => {
+    it("then the Angle selector lists main and architecture and swaps commentray bodies both ways", () => {
       cy.visitStaticSiteHome();
       cy.get("#angle-select").should("exist");
-      cy.get("#doc-pane-body")
-        .invoke("text")
-        .then((mainText) => {
-          cy.get("#angle-select").select("architecture");
-          cy.get("#doc-pane-body").invoke("text").should("not.eq", mainText);
-        });
+      cy.get("#angle-select option").should("have.length.at.least", 2);
+      cy.get('#angle-select option[value="main"]').should("exist");
+      cy.get('#angle-select option[value="architecture"]').should("exist");
+      cy.get("#angle-select").should("have.value", "main");
+
+      cy.get("#doc-pane-body").should("contain", "quick-start");
+
+      cy.get("#angle-select").select("architecture");
+      cy.get("#angle-select").should("have.value", "architecture");
+      cy.get("#doc-pane-body").should("contain", "architecture angle");
+      cy.get("#toolbar-commentray-github")
+        .should("have.attr", "href")
+        .and("match", /architecture\.md/);
+
+      cy.get("#angle-select").select("main");
+      cy.get("#angle-select").should("have.value", "main");
+      cy.get("#doc-pane-body").should("contain", "quick-start");
+      cy.get("#toolbar-commentray-github")
+        .should("have.attr", "href")
+        .and("match", /main\.md/);
+    });
+
+    it("then switching Angle clears the in-page search field and hides results", () => {
+      cy.visitStaticSiteHome();
+      cy.get("#search-q").type("quickstart");
+      cy.get("#search-results").should("not.have.attr", "hidden");
+      cy.get("#angle-select").select("architecture");
+      cy.get("#search-q").should("have.value", "");
+      cy.get("#search-results").should("have.attr", "hidden");
     });
   });
 });

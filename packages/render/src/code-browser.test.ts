@@ -55,6 +55,19 @@ describe("Code browser page — layout shell and search", () => {
     expect(html).toContain("Notes");
   });
 
+  it("should render commentray inline markdown after block markers (anchors must not break mdast)", async () => {
+    const md =
+      "# Title\n\n<!-- commentray:block id=blk -->\n\n_Italic lede_ and **bold** after the marker.\n";
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "//",
+      language: "ts",
+      commentrayMarkdown: md,
+    });
+    expect(html).toContain("<em>Italic lede</em>");
+    expect(html).toContain("<strong>bold</strong>");
+  });
+
   it("should include a generator meta tag when a generator label is provided", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
@@ -276,6 +289,43 @@ describe("Code browser page — companion Markdown rendering", () => {
     expect(html).toContain('href="https://example.com"');
     expect(html).toContain('id="commentray-md-line-0"');
     expect(html).not.toContain("const fenced = 1<span ");
+  });
+});
+
+describe("Code browser page — multi-angle browsing", () => {
+  it("should emit an angle selector and a base64 multi-angle payload when two angles are configured", async () => {
+    const html = await renderCodeBrowserHtml({
+      code: "// x",
+      language: "ts",
+      commentrayMarkdown: "## Default pane\n",
+      multiAngleBrowsing: {
+        defaultAngleId: "main",
+        angles: [
+          {
+            id: "main",
+            title: "Main",
+            markdown: "## Main angle\n\nBody **one**.",
+            commentrayPathRel: ".commentray/source/README.md/main.md",
+            commentrayOnGithubUrl:
+              "https://github.com/acme/r/blob/main/.commentray/source/README.md/main.md",
+          },
+          {
+            id: "architecture",
+            title: "Architecture",
+            markdown: "## Architecture angle\n\nBody **two**.",
+            commentrayPathRel: ".commentray/source/README.md/architecture.md",
+            commentrayOnGithubUrl:
+              "https://github.com/acme/r/blob/main/.commentray/source/README.md/architecture.md",
+          },
+        ],
+      },
+    });
+    expect(html).toContain('id="angle-select"');
+    expect(html).toContain('value="main"');
+    expect(html).toContain('value="architecture"');
+    expect(html).toContain('id="commentray-multi-angle-b64"');
+    expect(html).toContain("Main angle");
+    expect(html).toContain("<strong>one</strong>");
   });
 });
 

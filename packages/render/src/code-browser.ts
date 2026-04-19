@@ -188,6 +188,8 @@ function lineAnchorHtml(mdLine0: number): string {
 
 function appendMdLineAnchorWhenAllowed(line: string, mdLine0: number): string {
   if (isSetextUnderlineLine(line) || isThematicBreakLine(line)) return line;
+  /** Blank lines must stay blank: a line that is only `<span …>` breaks CommonMark HTML / paragraph starts after block markers. */
+  if (line === "") return "";
   return `${line}${lineAnchorHtml(mdLine0)}`;
 }
 
@@ -233,9 +235,13 @@ function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[])
         link !== undefined
           ? ` data-source-start="${String(link.sourceStart)}" data-commentray-line="${String(link.commentrayLine)}"`
           : "";
+      /** One `push` with embedded `\n\n` merged poorly with `join("\\n")`; keep real blank lines around raw `<div>`. */
+      out.push(`${line}${lineAnchorHtml(i)}`);
+      out.push("");
       out.push(
-        `${line}${lineAnchorHtml(i)}\n\n<div id="commentray-block-${escapeHtml(id)}" class="commentray-block-anchor" aria-hidden="true"${attrs}></div>`,
+        `<div id="commentray-block-${escapeHtml(id)}" class="commentray-block-anchor" aria-hidden="true"${attrs}></div>`,
       );
+      out.push("");
       continue;
     }
 
