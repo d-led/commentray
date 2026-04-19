@@ -62,7 +62,7 @@ The repo is developed with **npm**. **Yarn** is an alternative path via `.yarnrc
 
 ## GitHub CI (Cypress static site)
 
-On push/PR, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs job **`e2e-static`** after **`quick`**: `pages:build`, Cypress in `cypress/included`, artifact **`e2e-ci-bundle`**. [`.github/workflows/e2e-publish-checks.yml`](../.github/workflows/e2e-publish-checks.yml) (`workflow_run` on **`ci`**) downloads that bundle and publishes JUnit to **GitHub Checks** without checking out fork PR SHAs. Ad-hoc runs: [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml) (**workflow_dispatch** only). See the top-level README **GitHub Actions**; locally use `npm run e2e` or `npm run e2e:ci`.
+On push/PR, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs job **`e2e-static`** after **`quick`**: `pages:build`, Cypress in `cypress/included`, artifact **`e2e-ci-bundle`**. The static server listens on **14173** (not the dev **`commentray serve`** default **4173**). [`.github/workflows/e2e-publish-checks.yml`](../.github/workflows/e2e-publish-checks.yml) (`workflow_run` on **`ci`**) downloads that bundle and publishes JUnit to **GitHub Checks** without checking out fork PR SHAs. Ad-hoc runs: [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml) (**workflow_dispatch** only). See the top-level README **GitHub Actions**; locally use `npm run e2e` or `npm run e2e:ci`.
 
 ## Editor extension workflows
 

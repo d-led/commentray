@@ -230,7 +230,7 @@ Use this section to resume work without re-deriving context.
 | Expensive tests                                                  | `npm run test:expensive` (or trigger `ci-expensive.yml` / PR label `run-expensive-ci`) |
 | Quality gate + integration + expensive (no Cypress)              | `npm run ci:full`                                                                      |
 | Regenerate GitHub Pages artifact locally                         | `npm run pages:build` → `_site/index.html`                                             |
-| Serve `_site` only (static, no rebuild; use after `pages:build`) | `npm run e2e:server` (port **4173**)                                                   |
+| Serve `_site` only (static, no rebuild; use after `pages:build`) | `npm run e2e:server` (port **14173**; override `COMMENTRAY_E2E_PORT`)                  |
 | Static browser E2E (Chrome installed)                            | `npm run e2e` or `npm run e2e:ci`                                                      |
 | Full workspace TypeScript build                                  | `npm run build`                                                                        |
 
