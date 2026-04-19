@@ -26,7 +26,7 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.get("#doc-pane-body em").first().should("contain.text", "You have the main");
     });
 
-    it("then the hub exposes GitHub source links and a collapsible browse-files tree", () => {
+    it("then the hub exposes GitHub source links and a collapsible Comment-rayed files tree", () => {
       cy.visitStaticSiteHome();
       cy.get("#toolbar-source-github")
         .should("have.attr", "href")
@@ -34,53 +34,43 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.get("#toolbar-commentray-github")
         .should("have.attr", "href")
         .and("match", /github\.com/);
-      cy.get("#documented-files-hub").should("exist");
-      cy.get("#documented-files-hub").find("summary").contains("Documented files");
-      cy.get("#documented-files-hub").then(($d) => {
-        if (!$d.attr("open")) cy.wrap($d).find("summary").click();
-      });
-      cy.get("#documented-files-tree ul", { timeout: 10000 }).should("exist");
+      cy.contains("#documented-files-hub summary", "Comment-rayed files").click();
+      cy.get("#documented-files-tree", { timeout: 15000 })
+        .find("a.tree-file-link")
+        .should("have.length.at.least", 1)
+        .first()
+        .should("be.visible");
     });
 
-    it("then documented pairs are embedded on #shell for offline tree hydration", () => {
-      cy.visitStaticSiteHome();
-      cy.get("#shell")
-        .invoke("attr", "data-documented-pairs-b64")
-        .should("be.a", "string")
-        .and("have.length.gt", 32);
-    });
-
-    it("then the documented tree still hydrates from embedded pairs when nav JSON is unavailable", () => {
+    it("then the Comment-rayed files list still appears when the nav search index cannot be fetched", () => {
       cy.intercept("GET", "**/commentray-nav-search.json", { statusCode: 503, body: "{}" }).as(
         "navJsonFail",
       );
       cy.visitStaticSiteHome();
-      cy.get("#documented-files-hub").then(($d) => {
-        if (!$d.attr("open")) cy.wrap($d).find("summary").click();
-      });
-      cy.get("#documented-files-tree").contains("README.md");
+      cy.contains("#documented-files-hub summary", "Comment-rayed files").click();
+      cy.get("#documented-files-tree a.tree-file-link", { timeout: 15000 }).contains("README.md");
     });
 
     it("then Escape clears in-page search and hides hit results", () => {
       cy.visitStaticSiteHome();
       cy.get("#search-q").type("commentray");
-      cy.get("#search-results").should("not.have.attr", "hidden");
-      cy.get("body").type("{esc}");
+      cy.get("#search-results").should("be.visible");
+      cy.get("#search-q").type("{esc}");
       cy.get("#search-q").should("have.value", "");
-      cy.get("#search-results").should("have.attr", "hidden");
+      cy.get("#search-results").should("not.be.visible");
     });
 
     it("then search hit snippets highlight matched query tokens", () => {
       cy.visitStaticSiteHome();
       cy.get("#search-q").type("commentray");
-      cy.get("#search-results").should("not.have.attr", "hidden");
+      cy.get("#search-results").should("be.visible");
       cy.get("#search-results mark.search-hit").should("have.length.at.least", 1);
     });
 
     it("then ArrowDown on an empty search shows a capped list of indexed source files", () => {
       cy.visitStaticSiteHome();
       cy.get("#search-q").focus().type("{downarrow}");
-      cy.get("#search-results").should("not.have.attr", "hidden");
+      cy.get("#search-results").should("be.visible");
       cy.get("#search-results .hint").first().should("contain", "Indexed source files");
       cy.get("#search-results button.hit[data-kind='path']").should("have.length.at.least", 1);
     });
@@ -113,10 +103,10 @@ describe("Commentray static site (GitHub Pages build)", () => {
     it("then switching Angle clears the in-page search field and hides results", () => {
       cy.visitStaticSiteHome();
       cy.get("#search-q").type("quickstart");
-      cy.get("#search-results").should("not.have.attr", "hidden");
+      cy.get("#search-results").should("be.visible");
       cy.get("#angle-select").select("architecture");
       cy.get("#search-q").should("have.value", "");
-      cy.get("#search-results").should("have.attr", "hidden");
+      cy.get("#search-results").should("not.be.visible");
     });
   });
 });

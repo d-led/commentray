@@ -29,9 +29,9 @@ describe("siteRootPathnameFromPathname", () => {
 describe("resolveStaticBrowseHref", () => {
   it("should prefix ./browse/ from the site root, not double /browse/ when already under browse", () => {
     const origin = "https://pages.github.io";
-    expect(
-      resolveStaticBrowseHref("./browse/slug.html", "/repo/browse/current.html", origin),
-    ).toBe("https://pages.github.io/repo/browse/slug.html");
+    expect(resolveStaticBrowseHref("./browse/slug.html", "/repo/browse/current.html", origin)).toBe(
+      "https://pages.github.io/repo/browse/slug.html",
+    );
     expect(resolveStaticBrowseHref("./browse/slug.html", "/repo/index.html", origin)).toBe(
       "https://pages.github.io/repo/browse/slug.html",
     );
@@ -70,11 +70,7 @@ describe("isSameDocumentedPair", () => {
       commentrayPath: ".commentray/source/README.md/main.md",
       commentrayOnGithub: "x",
     };
-    expect(isSameDocumentedPair(p, "README.md", ".commentray/source/README.md/main.md")).toBe(
-      true,
-    );
-    expect(isSameDocumentedPair(p, "other.md", ".commentray/source/README.md/main.md")).toBe(
-      false,
-    );
+    expect(isSameDocumentedPair(p, "README.md", ".commentray/source/README.md/main.md")).toBe(true);
+    expect(isSameDocumentedPair(p, "other.md", ".commentray/source/README.md/main.md")).toBe(false);
   });
 });

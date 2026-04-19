@@ -22,16 +22,19 @@ import { decodeBase64Utf8 } from "./code-browser-encoding.js";
 import { readEmbeddedRawB64Strings } from "./code-browser-embedded-payload.js";
 import {
   escapeHtmlHighlightingSearchTokens,
+  filterPairsByDocumentedTreeQuery,
   findOrderedTokenSpans,
   lineAtIndex,
   offsetToLineIndex,
   pathRowsFromDocumentedPairs,
+  tokenizeQuery,
   uniqueSourceFilePreviewRows,
   type SourceFilePreviewRow,
 } from "./code-browser-search.js";
 import {
   findDocumentedPair,
   isSameDocumentedPair,
+  normPosixPath,
   resolveStaticBrowseHref,
 } from "./code-browser-pair-nav.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
@@ -50,10 +53,6 @@ type Hit = {
   crPath?: string;
   spPath?: string;
 };
-
-function tokenizeQuery(q: string): string[] {
-  return q.trim().split(/\s+/).filter(Boolean);
-}
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
@@ -445,10 +444,7 @@ function handlePathSearchHit(button: HTMLElement, deps: SearchHitClickDeps): voi
   const hitCr = (button.getAttribute("data-cr-path") ?? "").trim();
   const hitSp = (button.getAttribute("data-sp-path") ?? "").trim();
   const pair = findDocumentedPair(deps.mutable.documentedPairs, hitCr, hitSp);
-  if (
-    pair &&
-    isSameDocumentedPair(pair, deps.filePathLabel, deps.mutable.commentrayPathLabel)
-  ) {
+  if (pair && isSameDocumentedPair(pair, deps.filePathLabel, deps.mutable.commentrayPathLabel)) {
     deps.docScrollEl.scrollTo({ top: 0, behavior: "smooth" });
     return;
   }
@@ -456,9 +452,14 @@ function handlePathSearchHit(button: HTMLElement, deps: SearchHitClickDeps): voi
 }
 
 function handleMdSearchHit(line: number, crHit: string, deps: SearchHitClickDeps): void {
-  if (crHit.length > 0 && crHit !== deps.mutable.commentrayPathLabel) {
-    const pair = findDocumentedPair(deps.mutable.documentedPairs, crHit, "");
-    if (pair) navigateToDocumentedPair(pair, line);
+  const curCr = deps.mutable.commentrayPathLabel.trim();
+  const cr = crHit.trim();
+  if (cr.length > 0 && normPosixPath(cr) !== normPosixPath(curCr)) {
+    const pair = findDocumentedPair(deps.mutable.documentedPairs, cr, "");
+    if (pair) {
+      navigateToDocumentedPair(pair, line);
+      return;
+    }
     return;
   }
   scrollDocToMarkdownLine0(deps.docScrollEl, line, deps.mutable.mdLines.length);
@@ -477,6 +478,39 @@ function handleSearchHitButtonClick(button: HTMLElement, deps: SearchHitClickDep
     return;
   }
   handleMdSearchHit(line, crHit, deps);
+}
+
+/** Empty query + ArrowDown: browse preview HTML, or null when there is nothing to show. */
+function emptyBrowsePreviewInnerHtml(
+  scope: SearchScope,
+  filePathLabel: string,
+  mutable: MutableSearchFields,
+): string | null {
+  const hitCtx: SearchHitRenderContext = {
+    currentCommentrayPath: mutable.commentrayPathLabel,
+    currentSourcePath: filePathLabel,
+  };
+  if (scope === "full") {
+    const sp = filePathLabel.trim();
+    if (sp.length === 0) return null;
+    const rows: SourceFilePreviewRow[] = [
+      { sourcePath: sp, commentrayPath: mutable.commentrayPathLabel.trim() },
+    ];
+    const hint = emptyBrowsePreviewHint("full", rows.length, rows.length, false);
+    return emptySearchBrowsePreviewInnerHtml(hint, rows, hitCtx);
+  }
+  const { rows, totalUnique } = uniqueSourceFilePreviewRows(mutable.documentedPairs);
+  if (rows.length > 0) {
+    const hint = emptyBrowsePreviewHint("commentray-and-paths", rows.length, totalUnique, false);
+    return emptySearchBrowsePreviewInnerHtml(hint, rows, hitCtx);
+  }
+  const sp = filePathLabel.trim();
+  if (sp.length === 0) return null;
+  const fb: SourceFilePreviewRow[] = [
+    { sourcePath: sp, commentrayPath: mutable.commentrayPathLabel.trim() },
+  ];
+  const hint = emptyBrowsePreviewHint("commentray-and-paths", fb.length, fb.length, true);
+  return emptySearchBrowsePreviewInnerHtml(hint, fb, hitCtx);
 }
 
 function wireSearchUi(ctx: SearchUiContext): void {
@@ -502,36 +536,10 @@ function wireSearchUi(ctx: SearchUiContext): void {
   }
 
   function renderEmptyBrowsePreview(): void {
-    const ctx: SearchHitRenderContext = {
-      currentCommentrayPath: mutable.commentrayPathLabel,
-      currentSourcePath: filePathLabel,
-    };
-    if (scope === "full") {
-      const sp = filePathLabel.trim();
-      if (sp.length === 0) return;
-      const rows: SourceFilePreviewRow[] = [
-        { sourcePath: sp, commentrayPath: mutable.commentrayPathLabel.trim() },
-      ];
-      const hint = emptyBrowsePreviewHint("full", rows.length, rows.length, false);
-      searchResults.hidden = false;
-      searchResults.innerHTML = emptySearchBrowsePreviewInnerHtml(hint, rows, ctx);
-      return;
-    }
-    const { rows, totalUnique } = uniqueSourceFilePreviewRows(mutable.documentedPairs);
-    if (rows.length > 0) {
-      const hint = emptyBrowsePreviewHint("commentray-and-paths", rows.length, totalUnique, false);
-      searchResults.hidden = false;
-      searchResults.innerHTML = emptySearchBrowsePreviewInnerHtml(hint, rows, ctx);
-      return;
-    }
-    const sp = filePathLabel.trim();
-    if (sp.length === 0) return;
-    const fb: SourceFilePreviewRow[] = [
-      { sourcePath: sp, commentrayPath: mutable.commentrayPathLabel.trim() },
-    ];
-    const hint = emptyBrowsePreviewHint("commentray-and-paths", fb.length, fb.length, true);
+    const html = emptyBrowsePreviewInnerHtml(scope, filePathLabel, mutable);
+    if (html === null) return;
     searchResults.hidden = false;
-    searchResults.innerHTML = emptySearchBrowsePreviewInnerHtml(hint, fb, ctx);
+    searchResults.innerHTML = html;
   }
 
   function runSearch(): void {
@@ -815,7 +823,8 @@ function centerYInViewport(el: Element): number {
  */
 function codeLineHighlightCenterYViewport(lineEl: HTMLElement): number {
   const code =
-    lineEl.querySelector<HTMLElement>("pre code.hljs") ?? lineEl.querySelector<HTMLElement>("pre code");
+    lineEl.querySelector<HTMLElement>("pre code.hljs") ??
+    lineEl.querySelector<HTMLElement>("pre code");
   if (code) return centerYInViewport(code);
   const pre = lineEl.querySelector<HTMLElement>("pre");
   if (pre) return centerYInViewport(pre);
@@ -1099,6 +1108,27 @@ function treeFileLinkLabel(pr: DocumentedPairNav, disambiguate: boolean): string
   return stem !== "" && stem !== base ? `${base} · ${stem}` : base;
 }
 
+/** Prefer static hub browse page; GitHub only when the export has no `staticBrowseUrl`. */
+function treeFileLinkHref(pr: DocumentedPairNav): string {
+  const browse = (pr.staticBrowseUrl ?? "").trim();
+  if (browse.length > 0) {
+    return resolveStaticBrowseHref(
+      browse,
+      globalThis.location.pathname,
+      globalThis.location.origin,
+    );
+  }
+  return pr.commentrayOnGithub;
+}
+
+function treeFileLinkTitle(pr: DocumentedPairNav): string {
+  const browse = (pr.staticBrowseUrl ?? "").trim();
+  if (browse.length > 0) {
+    return `${pr.sourcePath} — open this pair in the site viewer`;
+  }
+  return `${pr.sourcePath} — open companion commentray on GitHub`;
+}
+
 function renderDocumentedTreeHtml(node: TrieNode): string {
   const keys = [...node.children.keys()].sort((a, b) => a.localeCompare(b));
   if (keys.length === 0) return "";
@@ -1114,10 +1144,13 @@ function renderDocumentedTreeHtml(node: TrieNode): string {
       const multi = ch.pairs.length > 1;
       for (const pr of ch.pairs) {
         const label = escapeHtmlText(treeFileLinkLabel(pr, multi));
-        const title = escapeHtmlText(`${pr.sourcePath} — open companion on GitHub`);
+        const title = escapeHtmlText(treeFileLinkTitle(pr));
+        const href = escapeHtmlText(treeFileLinkHref(pr));
+        const useSiteBrowse = (pr.staticBrowseUrl?.trim() ?? "").length > 0;
+        const external = useSiteBrowse ? "" : ' target="_blank" rel="noopener noreferrer"';
         lis.push(
           `<li><div class="tree-file">` +
-            `<a class="tree-file-link" href="${escapeHtmlText(pr.commentrayOnGithub)}" target="_blank" rel="noopener noreferrer" title="${title}">${label}</a>` +
+            `<a class="tree-file-link" href="${href}"${external} title="${title}">${label}</a>` +
             `</div></li>`,
         );
       }
@@ -1126,10 +1159,15 @@ function renderDocumentedTreeHtml(node: TrieNode): string {
   return `<ul>${lis.join("")}</ul>`;
 }
 
-function renderDocumentedPairsIntoHost(treeHost: HTMLElement, pairs: DocumentedPairNav[]): void {
+function renderDocumentedPairsIntoHost(
+  treeHost: HTMLElement,
+  pairs: DocumentedPairNav[],
+  emptyBecauseFilter?: boolean,
+): void {
   if (pairs.length === 0) {
-    treeHost.innerHTML =
-      '<p class="nav-rail__doc-hub-hint" role="status">No documented pairs in this export.</p>';
+    treeHost.innerHTML = emptyBecauseFilter
+      ? '<p class="nav-rail__doc-hub-hint" role="status">No paths match this filter.</p>'
+      : '<p class="nav-rail__doc-hub-hint" role="status">No documented pairs in this export.</p>';
     return;
   }
   const root: TrieNode = { children: new Map(), pairs: [] };
@@ -1169,6 +1207,7 @@ function loadDocumentedPairs(
 function wireDocumentedFilesTree(): void {
   const hub = document.getElementById("documented-files-hub");
   const treeHost = document.getElementById("documented-files-tree");
+  const filterInput = document.getElementById("documented-files-filter");
   const shell = document.getElementById("shell");
   if (!(hub instanceof HTMLDetailsElement) || !(treeHost instanceof HTMLElement)) {
     return;
@@ -1181,12 +1220,27 @@ function wireDocumentedFilesTree(): void {
   if (jsonUrl.length === 0 && embeddedB64.length === 0) return;
 
   const ensureLoaded = loadDocumentedPairs(jsonUrl, embeddedB64);
+  let cachedPairs: DocumentedPairNav[] | null = null;
+
+  function applyFilterAndRender(): void {
+    if (cachedPairs === null) return;
+    const q = filterInput instanceof HTMLInputElement ? filterInput.value : "";
+    const pairs = filterPairsByDocumentedTreeQuery(cachedPairs, q);
+    const filterActive = q.trim().length > 0;
+    renderDocumentedPairsIntoHost(
+      treeMount,
+      pairs,
+      filterActive && cachedPairs.length > 0 && pairs.length === 0,
+    );
+  }
 
   async function hydrateTree(): Promise<void> {
     try {
       const pairs = await ensureLoaded();
-      renderDocumentedPairsIntoHost(treeMount, pairs);
+      cachedPairs = pairs;
+      applyFilterAndRender();
     } catch {
+      cachedPairs = null;
       treeMount.innerHTML =
         '<p class="nav-rail__doc-hub-hint" role="alert">Could not load the file list.</p>';
     }
@@ -1196,6 +1250,13 @@ function wireDocumentedFilesTree(): void {
     if (!hub.open) return;
     void hydrateTree();
   });
+
+  if (filterInput instanceof HTMLInputElement) {
+    filterInput.addEventListener("input", () => {
+      if (!hub.open || cachedPairs === null) return;
+      applyFilterAndRender();
+    });
+  }
 }
 
 function wireSplitter(
@@ -1360,13 +1421,52 @@ type DualPaneSearchIndexState = {
   pathRowsForOrdering: Row[];
 };
 
+/**
+ * Fetched `commentray-nav-search.json` sometimes omits `staticBrowseUrl` on pairs; the hub embed
+ * carries browse URLs from the same build — merge so search hits open `_site/browse/…`, not GitHub.
+ */
+function mergeFetchedDocumentedPairsWithEmbeddedBrowse(
+  embedded: DocumentedPairNav[],
+  fetched: DocumentedPairNav[],
+): DocumentedPairNav[] {
+  if (fetched.length === 0) return embedded;
+  if (embedded.length === 0) return fetched;
+  const browseByCr = new Map<string, string>();
+  for (const p of embedded) {
+    const b = (p.staticBrowseUrl ?? "").trim();
+    if (b.length === 0) continue;
+    browseByCr.set(normPosixPath(p.commentrayPath), b);
+  }
+  return fetched.map((p) => {
+    const have = (p.staticBrowseUrl ?? "").trim();
+    if (have.length > 0) return p;
+    const fromEmb = browseByCr.get(normPosixPath(p.commentrayPath));
+    if (fromEmb !== undefined && fromEmb.length > 0) {
+      return { ...p, staticBrowseUrl: fromEmb };
+    }
+    return p;
+  });
+}
+
+function resolvedNavSearchJsonUrl(shell: HTMLElement): string {
+  const raw = shell.getAttribute("data-nav-search-json-url")?.trim() ?? "";
+  if (raw.length === 0) return "";
+  try {
+    return new URL(raw, globalThis.location.href).href;
+  } catch {
+    return raw;
+  }
+}
+
 function wireDualPaneNavSearchFetch(
-  navSearchUrl: string,
+  shell: HTMLElement,
+  embeddedPairs: DocumentedPairNav[],
   indexState: DualPaneSearchIndexState,
   mutable: MutableSearchFields,
   rebuildSearcher: () => void,
   searchInput: HTMLInputElement,
 ): void {
+  const navSearchUrl = resolvedNavSearchJsonUrl(shell);
   if (navSearchUrl.length === 0) return;
   void (async () => {
     try {
@@ -1374,9 +1474,10 @@ function wireDualPaneNavSearchFetch(
       if (!res.ok) return;
       const doc = (await res.json()) as NavJsonDoc;
       const fetched = pairsFromJsonArray(doc.documentedPairs);
-      if (fetched.length > 0) {
-        indexState.documentedPairs = fetched;
-        mutable.documentedPairs = fetched;
+      const mergedPairs = mergeFetchedDocumentedPairsWithEmbeddedBrowse(embeddedPairs, fetched);
+      if (mergedPairs.length > 0) {
+        indexState.documentedPairs = mergedPairs;
+        mutable.documentedPairs = mergedPairs;
       }
       const nr = rowsFromNavSearchJson(doc);
       if (nr.length === 0) return;
@@ -1538,8 +1639,14 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     docScrollEl,
   });
 
-  const navSearchUrl = shell.getAttribute("data-nav-search-json-url")?.trim() ?? "";
-  wireDualPaneNavSearchFetch(navSearchUrl, indexState, mutable, rebuildSearcher, searchInput);
+  wireDualPaneNavSearchFetch(
+    shell,
+    pathInit.documentedPairs,
+    indexState,
+    mutable,
+    rebuildSearcher,
+    searchInput,
+  );
 
   const pct0 = parseFloat(readWebStorageItem(localStorage, STORAGE_SPLIT_PCT) || "50");
   const pct = clamp(Number.isFinite(pct0) ? pct0 : 50, 15, 85);

@@ -128,6 +128,7 @@ describe("Code browser page — toolbar chrome", () => {
     expect(html).toContain('class="nav-rail__pair-gh"');
     expect(html).toContain('href="https://github.com/acme/demo/blob/main/README.md"');
     expect(html).toContain('id="documented-files-hub"');
+    expect(html).toContain('id="documented-files-filter"');
     expect(html).toContain('data-nav-json-url="./commentray-nav-search.json"');
     expect(html).toContain('data-nav-search-json-url="./commentray-nav-search.json"');
     expect(html).toContain('data-documented-pairs-b64="');
@@ -153,6 +154,7 @@ describe("Code browser page — toolbar chrome", () => {
       documentedPairsEmbeddedB64: pairsB64,
     });
     expect(html).toContain('id="documented-files-hub"');
+    expect(html).toContain('id="documented-files-filter"');
     expect(html).toContain('data-nav-json-url=""');
     expect(html).toContain('data-documented-pairs-b64="');
   });

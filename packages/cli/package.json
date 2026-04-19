@@ -15,7 +15,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -b tsconfig.build.json",
     "build:bundle": "npm run build && node ./esbuild.cli.mjs",
     "clean": "rm -rf dist",
     "commentray": "node ./dist/cli.js"

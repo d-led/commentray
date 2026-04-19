@@ -6,13 +6,9 @@ describe("given the E2E dual-scroll fixture page", () => {
     cy.viewport(1280, 720);
   });
 
-  it("then #shell uses dual layout and ships base64 block scroll links", () => {
+  it("then the fixture loads as a dual-pane code browser", () => {
     cy.visitE2eDualScrollSync();
     cy.get("#shell").should("have.attr", "data-layout", "dual");
-    cy.get("#shell")
-      .invoke("attr", "data-scroll-block-links-b64")
-      .should("be.a", "string")
-      .and("have.length.gt", 16);
   });
 
   it("then the gutter draws two Bézier splines per block (rays) with one active pair", () => {
@@ -36,7 +32,8 @@ describe("given the E2E dual-scroll fixture page", () => {
     cy.visitE2eDualScrollSync();
     cy.get("#doc-pane-body").invoke("scrollTop").should("eq", 0);
     cy.get("#code-pane").invoke("scrollTop").should("eq", 0);
-    cy.get("#code-pane").scrollTo("bottom");
+    /** Bring the last source line into view — same gesture a reader uses to reach the end of the file. */
+    cy.get("#code-pane .code-line").last().scrollIntoView();
     cy.get("#doc-pane-body").invoke("scrollTop").should("be.gt", 80);
   });
 
@@ -44,7 +41,7 @@ describe("given the E2E dual-scroll fixture page", () => {
     cy.visitE2eDualScrollSync();
     cy.get("#doc-pane-body").invoke("scrollTop").should("eq", 0);
     cy.get("#code-pane").invoke("scrollTop").should("eq", 0);
-    cy.get("#doc-pane-body").scrollTo("bottom");
+    cy.get("#doc-pane-body").contains("Second-block commentary line 45").scrollIntoView();
     cy.get("#code-pane").invoke("scrollTop").should("be.gt", 80);
   });
 });

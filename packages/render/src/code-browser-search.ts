@@ -89,6 +89,27 @@ export function lineAtIndex(text: string, lineIndex: number): string {
   return lines[lineIndex] ?? "";
 }
 
+/** Same whitespace tokenization as the hub search field. */
+export function tokenizeQuery(q: string): string[] {
+  return q.trim().split(/\s+/).filter(Boolean);
+}
+
+/**
+ * Documented-files tree filter: ordered case-insensitive substring tokens on normalized `sourcePath`
+ * (forward slashes), matching hub path search behavior.
+ */
+export function filterPairsByDocumentedTreeQuery<T extends { sourcePath: string }>(
+  pairs: T[],
+  query: string,
+): T[] {
+  const tokens = tokenizeQuery(query);
+  if (tokens.length === 0) return [...pairs];
+  return pairs.filter((p) => {
+    const pathText = p.sourcePath.replace(/\\/g, "/");
+    return findOrderedTokenSpans(pathText, tokens).length > 0;
+  });
+}
+
 /** Hub path search row: `text` is shown; `spPath` / `crPath` tie hits to a documented pair. */
 export type HubPathSearchRow = {
   kind: "path";

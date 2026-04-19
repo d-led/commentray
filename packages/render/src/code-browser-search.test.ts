@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   escapeHtmlHighlightingSearchTokens,
+  filterPairsByDocumentedTreeQuery,
   findOrderedTokenSpans,
   lineAtIndex,
   offsetToLineIndex,
@@ -37,6 +38,32 @@ describe("Ordered in-line search token matching", () => {
   it("should match ASCII tokens without regard to letter case", () => {
     const spans = findOrderedTokenSpans("# Commentray quick-start\n", ["commentray"]);
     expect(spans.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Documented-files tree path filter", () => {
+  const pairs = [
+    { sourcePath: "packages/foo/src/a.ts", commentrayPath: "c1" },
+    { sourcePath: "packages/bar/b.ts", commentrayPath: "c2" },
+  ];
+
+  it("should return all pairs when the filter is empty or whitespace", () => {
+    expect(filterPairsByDocumentedTreeQuery(pairs, "").length).toBe(2);
+    expect(filterPairsByDocumentedTreeQuery(pairs, "   ").length).toBe(2);
+  });
+
+  it("should keep paths where every token appears in order as case-insensitive substrings", () => {
+    expect(
+      filterPairsByDocumentedTreeQuery(pairs, "packages foo").map((p) => p.sourcePath),
+    ).toEqual(["packages/foo/src/a.ts"]);
+    expect(filterPairsByDocumentedTreeQuery(pairs, "bar b").map((p) => p.sourcePath)).toEqual([
+      "packages/bar/b.ts",
+    ]);
+  });
+
+  it("should normalize backslashes before matching", () => {
+    const mixed = [{ sourcePath: "pkg\\x\\y.ts", commentrayPath: "c" }];
+    expect(filterPairsByDocumentedTreeQuery(mixed, "pkg x").length).toBe(1);
   });
 });
 

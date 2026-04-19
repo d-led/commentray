@@ -114,7 +114,7 @@ export type CodeBrowserPageOptions = {
   commentrayOnGithubUrl?: string;
   /**
    * Relative URL to a nav JSON document (e.g. `./commentray-nav-search.json`) that includes
-   * `documentedPairs` — enables the **All commentray files** tree in the toolbar.
+   * `documentedPairs` — enables the **Comment-rayed files** tree in the toolbar.
    */
   documentedNavJsonUrl?: string;
   /**
@@ -324,8 +324,12 @@ function renderToolbarDocHubHtml(opts: {
   const navAttr = escapeHtml(nav ?? "");
   const navRailDocumentedHtml = showDocumentedTree
     ? `<details class="nav-rail__doc-hub" id="documented-files-hub" data-nav-json-url="${navAttr}">
-        <summary class="nav-rail__doc-hub-summary">Documented files</summary>
+        <summary class="nav-rail__doc-hub-summary">Comment-rayed files</summary>
         <div class="nav-rail__doc-hub-inner">
+          <div class="nav-rail__doc-hub-filter-row">
+            <label class="nav-rail__doc-hub-filter-label" for="documented-files-filter">Filter</label>
+            <input type="search" id="documented-files-filter" class="nav-rail__doc-hub-filter" placeholder="Filter by path…" autocomplete="off" spellcheck="false" />
+          </div>
           <div id="documented-files-tree" class="documented-files-tree" role="tree"></div>
         </div>
       </details>`
@@ -571,13 +575,43 @@ const CODE_BROWSER_STYLES = `
         min-width: min(280px, 78vw);
         max-width: min(440px, 94vw);
         max-height: min(52vh, 400px);
-        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow: hidden;
         padding: 8px 10px;
         font-size: 12px;
         border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
         border-radius: 8px;
         background: Canvas;
         box-shadow: 0 8px 28px color-mix(in oklab, CanvasText 12%, transparent);
+      }
+      .nav-rail__doc-hub-filter-row {
+        flex: 0 0 auto;
+      }
+      .nav-rail__doc-hub-filter-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        opacity: 0.78;
+        margin-bottom: 4px;
+      }
+      .nav-rail__doc-hub-filter {
+        width: 100%;
+        box-sizing: border-box;
+        font: inherit;
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+        background: color-mix(in oklab, CanvasText 4%, Canvas);
+        color: CanvasText;
+      }
+      .nav-rail__doc-hub-filter:focus {
+        outline: 2px solid color-mix(in oklab, CanvasText 40%, Canvas);
+        outline-offset: 1px;
       }
       .nav-rail__doc-hub-hint {
         margin: 0 0 8px;
@@ -659,6 +693,11 @@ const CODE_BROWSER_STYLES = `
         word-break: break-word;
       }
       .toolbar-related__sep { opacity: 0.55; user-select: none; }
+      #documented-files-tree {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+      }
       .documented-files-tree ul { list-style: none; margin: 0; padding-left: 12px; }
       .documented-files-tree > ul { padding-left: 0; }
       .documented-files-tree li { margin: 2px 0; line-height: 1.35; }
@@ -1163,9 +1202,7 @@ async function buildCodeBrowserShell(
     });
     if (stretched) {
       layout = "stretch";
-      shellInner =
-        `        ${stretched.preambleHtml}\n` +
-        `        ${stretched.tableInnerHtml}\n`;
+      shellInner = `        ${stretched.preambleHtml}\n` + `        ${stretched.tableInnerHtml}\n`;
     }
   }
 

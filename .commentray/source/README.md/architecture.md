@@ -7,16 +7,16 @@ This **angle** is a second voice on the same `README.md` source: high-level map 
 ```mermaid
 flowchart TB
   core["commentray/core"]
-  render["commentray/render"]
+  pkgRender["commentray/render"]
   ccStatic["commentray/code-commentray-static"]
   cli["commentray/cli"]
   vscode["commentray-vscode"]
 
-  core --> render
+  core --> pkgRender
   core --> ccStatic
-  render --> ccStatic
+  pkgRender --> ccStatic
   core --> cli
-  render --> cli
+  pkgRender --> cli
   ccStatic --> cli
   core --> vscode
 ```

@@ -57,10 +57,10 @@
     "serve": "bash scripts/serve.sh",
     "e2e:server": "node scripts/e2e-static-serve.mjs",
     "pree2e": "npm run pages:build",
-    "e2e": "start-server-and-test e2e:server http://127.0.0.1:4173 \"cypress run --e2e --browser chrome\"",
+    "e2e": "start-server-and-test e2e:server http://127.0.0.1:14173 \"cypress run --e2e --browser chrome\"",
     "e2e:ci": "CYPRESS_CI=true npm run e2e",
     "precy": "npm run pages:build",
-    "cy": "start-server-and-test e2e:server http://127.0.0.1:4173 \"cypress open --e2e --browser chrome\""
+    "cy": "start-server-and-test e2e:server http://127.0.0.1:14173 \"cypress open --e2e --browser chrome\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

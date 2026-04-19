@@ -1,5 +1,8 @@
 import { defineConfig } from "cypress";
 
+/** Keep in sync with `scripts/e2e-static-serve.mjs` (override with `COMMENTRAY_E2E_PORT`). */
+const commentrayE2ePort = (process.env.COMMENTRAY_E2E_PORT ?? "14173").trim();
+
 export default defineConfig({
   reporter: "mocha-junit-reporter",
   reporterOptions: {
@@ -11,7 +14,7 @@ export default defineConfig({
     CI: `${process.env.CYPRESS_CI}` === "true",
   },
   e2e: {
-    baseUrl: "http://127.0.0.1:4173",
+    baseUrl: `http://127.0.0.1:${commentrayE2ePort}`,
     supportFile: "cypress/support/e2e.ts",
     specPattern: "cypress/e2e/**/*.cy.ts",
     excludeSpecPattern: "**/screenshot*.cy.ts",

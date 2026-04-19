@@ -109,7 +109,7 @@ if [[ "$do_push" == true ]]; then
   log_step "Step 3/4: git push (branch + tags)"
   git push
   git push --tags
-  log_ok "Pushed. Binary-build workflow will trigger on the tag."
+  log_ok "Pushed. The binaries workflow will build standalone CLIs, package the VS Code extension (.vsix), and attach them to the GitHub release for the tag."
 else
   log_step "Step 3/4: git push (skipped via --no-push)"
 fi

@@ -59,7 +59,7 @@ npm run test:coverage
 npm run test:coverage:all
 ```
 
-**Static site E2E:** builds `_site`, serves it on port **4173**, then runs the browser test suite. **Google Chrome** must be installed.
+**Static site E2E:** builds `_site`, serves it on port **14173** (not the dev-server **4173**, so both can run), then runs the browser test suite. **Google Chrome** must be installed. Override with **`COMMENTRAY_E2E_PORT`**.
 
 ```bash
 npm run e2e       # headless

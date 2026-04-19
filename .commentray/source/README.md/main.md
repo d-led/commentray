@@ -48,25 +48,19 @@ Do not duplicate the README’s package list here—that list is canonical. The 
 
 ```mermaid
 flowchart TB
-  subgraph libs["Libraries (shared implementation)"]
-    core["Core: paths, index, config, SCM"]
-    render["Render: Markdown to safe HTML, code-browser shell"]
-  end
+  nCore["Core library paths index config"]
+  nHtml["HTML pipeline and code-browser shell"]
+  nSsg["Static site one-page HTML"]
+  nCli["CLI init validate pages serve"]
+  nExt["Editor paired files scroll sync"]
 
-  subgraph surfaces["Tooling (how you work in-repo)"]
-    cli["CLI: init, validate, render, serve, pages"]
-    ext["Editor extension: paired files, scroll sync"]
-  end
-
-  siteGen["Static site generator: one-file HTML for Pages"]
-
-  core --> render
-  core --> siteGen
-  render --> siteGen
-  core --> cli
-  render --> cli
-  siteGen --> cli
-  core --> ext
+  nCore --> nHtml
+  nCore --> nSsg
+  nHtml --> nSsg
+  nCore --> nCli
+  nHtml --> nCli
+  nSsg --> nCli
+  nCore --> nExt
 ```
 
 In one line: **core** holds paths and index truth; **render** holds safe HTML; **cli** and the extension are **surfaces**; the static-site package is the thinnest **consumer** of render for publishing. Change the HTML contract, then walk that chain backward before you tag.
