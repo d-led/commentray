@@ -1,23 +1,16 @@
 # VS Code extension integration tests (@vscode/test-cli + Extension Development Host).
-# Kept separate from the main CI workflow so Electron + xvfb stays optional and fast
-# enough to run on every PR; narrow triggers here if this job grows too heavy.
+# Separate workflow (Electron + xvfb); triggers match main CI so extension tests always
+# run with other checks. Revisit path filters only if this job becomes a bottleneck.
 
 name: vscode-extension
+
+permissions:
+  contents: read
 
 on:
   push:
     branches: [main]
-    paths: &vscode-extension-paths
-      - ".github/workflows/ci-vscode-extension.yml"
-      - "package.json"
-      - "package-lock.json"
-      - "tsconfig.base.json"
-      - "tsconfig.json"
-      - "scripts/test-vscode-extension.sh"
-      - "packages/core/**"
-      - "packages/vscode/**"
   pull_request:
-    paths: *vscode-extension-paths
 
 concurrency:
   group: vscode-extension-${{ github.workflow }}-${{ github.ref }}

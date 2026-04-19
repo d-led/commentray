@@ -1,5 +1,9 @@
 name: ci
 
+permissions:
+  contents: read
+  actions: write # e2e-static uploads the JUnit / Cypress artifact bundle
+
 on:
   push:
     branches: [main]
