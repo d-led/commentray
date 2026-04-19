@@ -1,7 +1,11 @@
 import { readFile } from "node:fs/promises";
-import path from "node:path";
 
-import { discoverCommentrayPairsOnDisk, githubRepoBlobFileUrl, readIndex } from "@commentray/core";
+import {
+  discoverCommentrayPairsOnDisk,
+  githubRepoBlobFileUrl,
+  readIndex,
+  resolvePathUnderRepoRoot,
+} from "@commentray/core";
 
 export const COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION = 1 as const;
 
@@ -23,6 +27,12 @@ export type DocumentedPairNav = {
   commentrayPath: string;
   sourceOnGithub: string;
   commentrayOnGithub: string;
+  /**
+   * When the static Pages build emits per-pair browse HTML (e.g. `_site/browse/…html`), a URL
+   * relative to the site root `index.html` (e.g. `./browse/x.html`) so the hub can open the same
+   * Commentray UI for other files without leaving the site.
+   */
+  staticBrowseUrl?: string;
 };
 
 export type CommentrayNavSearchDocument = {
@@ -106,7 +116,7 @@ function markdownAbsForMergedPair(
   ) {
     return fallback.markdownAbs;
   }
-  return path.join(repoRoot, pair.commentrayPath);
+  return resolvePathUnderRepoRoot(repoRoot, pair.commentrayPath);
 }
 
 async function appendPairRowsSync(

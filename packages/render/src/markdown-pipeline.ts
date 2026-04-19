@@ -179,7 +179,7 @@ sanitizeSchema.attributes = {
     "className",
     "id",
     "ariaHidden",
-    /** Block scroll sync markers from `injectCommentrayBlockAnchors` (hast property names). */
+    /** Block scroll sync markers from `injectCommentrayDocAnchors` (hast property names). */
     "dataSourceStart",
     "dataCommentrayLine",
   ],

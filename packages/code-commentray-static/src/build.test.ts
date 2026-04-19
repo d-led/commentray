@@ -43,7 +43,7 @@ describe("buildCommentrayStatic — HTML shell", () => {
     expect(html).not.toContain('<meta name="generator"');
   });
 
-  it("surfaces the repo-relative file path in the toolbar when provided", async () => {
+  it("surfaces the repo-relative file path in the left nav rail when provided", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const outHtml = path.join(outDir, "index.html");
     await buildCommentrayStatic({
@@ -53,13 +53,11 @@ describe("buildCommentrayStatic — HTML shell", () => {
       filePath: "packages/code-commentray-static/fixtures/sample.ts",
     });
     const html = await readFile(outHtml, "utf8");
-    expect(html).toContain('<span class="file-path__base">sample.ts</span>');
-    expect(html).toContain(
-      '<span class="file-path__dir">packages/code-commentray-static/fixtures/</span>',
-    );
+    expect(html).toContain("nav-rail__context");
+    expect(html).toContain("packages/code-commentray-static/fixtures/sample.ts");
   });
 
-  it("falls back to the source basename when no filePath is given", async () => {
+  it("falls back to the source basename in the nav rail when no filePath is given", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const outHtml = path.join(outDir, "index.html");
     await buildCommentrayStatic({
@@ -68,8 +66,8 @@ describe("buildCommentrayStatic — HTML shell", () => {
       outHtml,
     });
     const html = await readFile(outHtml, "utf8");
-    expect(html).toContain("file-path__dir--root");
-    expect(html).toContain('<span class="file-path__base">sample.ts</span>');
+    expect(html).toContain("nav-rail__context-path");
+    expect(html).toContain("sample.ts");
   });
 });
 

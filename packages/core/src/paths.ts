@@ -28,6 +28,22 @@ export function normalizeRepoRelativePath(relativePath: string): string {
   return segments.join("/");
 }
 
+/**
+ * Resolve `repoRelative` under `repoRootAbs` after {@link normalizeRepoRelativePath} validation,
+ * then assert the absolute path cannot escape `repoRootAbs` (defense in depth for index or
+ * nav-derived paths, not only hand-edited config).
+ */
+export function resolvePathUnderRepoRoot(repoRootAbs: string, repoRelative: string): string {
+  const rel = normalizeRepoRelativePath(repoRelative);
+  const root = path.resolve(repoRootAbs);
+  const resolved = path.resolve(root, rel);
+  const back = path.relative(root, resolved);
+  if (back.startsWith("..") || path.isAbsolute(back)) {
+    throw new Error(`Resolved path leaves repository root: ${repoRelative}`);
+  }
+  return resolved;
+}
+
 /** Commentray Markdown path for a repo-relative source file (implicit default angle, flat layout). */
 export function commentrayMarkdownPath(
   sourceRepoRelativePath: string,

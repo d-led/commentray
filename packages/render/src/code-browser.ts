@@ -142,21 +142,30 @@ const BLOCK_MARKER_HTML_LINE = new RegExp(
   "i",
 );
 
-/** Inserts thin separator anchors after each `<!-- commentray:block … -->` line (optional index attrs for scroll sync). */
-function injectCommentrayBlockAnchors(markdown: string, links?: BlockScrollLink[]): string {
+/**
+ * Inserts a zero-height anchor before every source Markdown line (for search / hash jumps) and
+ * block separator anchors after each `<!-- commentray:block … -->` line (optional index attrs).
+ */
+function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[]): string {
   const byId = links ? new Map(links.map((l) => [l.id, l])) : undefined;
-  return markdown
-    .split("\n")
-    .map((line) => {
+  const lines = markdown.split("\n");
+  return lines
+    .map((line, i) => {
+      const mdLine = String(i);
+      /** Inline so the first line still parses as Markdown (a leading block `<div>` breaks link rewriting). */
+      const lineAnchor = `<span class="commentray-line-anchor" data-commentray-md-line="${mdLine}" id="commentray-md-line-${mdLine}" aria-hidden="true"></span>`;
       const m = BLOCK_MARKER_HTML_LINE.exec(line);
-      if (!m?.[1]) return line;
+      if (!m?.[1]) return lineAnchor + line;
       const id = m[1];
       const link = byId?.get(id);
       const attrs =
         link !== undefined
           ? ` data-source-start="${String(link.sourceStart)}" data-commentray-line="${String(link.commentrayLine)}"`
           : "";
-      return `${line}\n\n<div id="commentray-block-${escapeHtml(id)}" class="commentray-block-anchor" aria-hidden="true"${attrs}></div>`;
+      return (
+        lineAnchor +
+        `${line}\n\n<div id="commentray-block-${escapeHtml(id)}" class="commentray-block-anchor" aria-hidden="true"${attrs}></div>`
+      );
     })
     .join("\n");
 }
@@ -180,31 +189,6 @@ async function renderCodeLineBlocks(code: string, language: string): Promise<str
     );
   }
   return parts.join("\n");
-}
-
-/** Split a repo-relative path into its directory prefix (with trailing slash) and basename. */
-function splitFilePath(p: string): { dir: string; base: string } {
-  const normalized = p.replaceAll("\\", "/").replace(/^\/+/, "");
-  const idx = normalized.lastIndexOf("/");
-  if (idx < 0) return { dir: "", base: normalized };
-  return { dir: normalized.slice(0, idx + 1), base: normalized.slice(idx + 1) };
-}
-
-function renderFilePathLabel(filePath: string | undefined, fallbackTitle: string): string {
-  const shown = (filePath ?? "").trim();
-  if (!shown) {
-    return `<strong class="file-path file-path--title">${escapeHtml(fallbackTitle)}</strong>`;
-  }
-  const { dir, base } = splitFilePath(shown);
-  const dirHtml = dir
-    ? `<span class="file-path__dir">${escapeHtml(dir)}</span>`
-    : `<span class="file-path__dir file-path__dir--root" title="Repository root">/ </span>`;
-  return (
-    `<strong class="file-path" title="${escapeHtml(shown)}">` +
-    dirHtml +
-    `<span class="file-path__base">${escapeHtml(base)}</span>` +
-    `</strong>`
-  );
 }
 
 /** GitHub “mark” glyph (Octicons-style path), MIT-licensed silhouette. */
@@ -262,7 +246,7 @@ function renderToolbarDocHubHtml(opts: {
   commentrayOnGithubUrl?: string;
   documentedNavJsonUrl?: string;
   documentedPairsEmbeddedB64?: string;
-}): { toolbarDocHubHtml: string; documentedPanelHtml: string } {
+}): { toolbarDocHubHtml: string; navRailDocumentedHtml: string } {
   const parts: string[] = [];
   const src = safeExternalHttpUrl(opts.sourceOnGithubUrl);
   const cr = safeExternalHttpUrl(opts.commentrayOnGithubUrl);
@@ -279,25 +263,36 @@ function renderToolbarDocHubHtml(opts: {
       `<a class="toolbar-blob-link" id="toolbar-commentray-github" href="${escapeHtml(cr)}" target="_blank" rel="noopener noreferrer">Commentray on GitHub</a>`,
     );
   }
-  if (showDocumentedTree) {
-    const navAttr = nav ? escapeHtml(nav) : "";
-    parts.push(
-      `<button type="button" class="toolbar-tree-toggle" id="documented-files-toggle" aria-expanded="true" aria-controls="documented-files-panel" data-nav-json-url="${navAttr}">All commentray files</button>`,
-    );
-  }
   const toolbarDocHubHtml =
     parts.length > 0
       ? `<div class="toolbar-doc-hub">${parts.join('<span class="toolbar-doc-hub__sep" aria-hidden="true"> · </span>')}</div>`
       : "";
-  const documentedPanelHtml = showDocumentedTree
-    ? `<div id="documented-files-panel" class="documented-files-panel">
-        <div class="documented-files-panel__inner">
-          <p class="documented-files-panel__hint">Companion Markdown under the storage <code class="documented-files-panel__code">source</code> tree (merged with <code class="documented-files-panel__code">index.json</code> when present). Embedded when the build provides it; otherwise loaded from the nav JSON. Links open on GitHub.</p>
+  const navAttr = escapeHtml(nav ?? "");
+  const navRailDocumentedHtml = showDocumentedTree
+    ? `<details class="nav-rail__doc-hub" id="documented-files-hub" data-nav-json-url="${navAttr}">
+        <summary class="nav-rail__doc-hub-summary">Browse files (GitHub)</summary>
+        <div class="nav-rail__doc-hub-inner">
+          <p class="nav-rail__doc-hub-hint">Paths only—open a companion on GitHub. Use <strong>Search</strong> above to jump by filename or words across indexed commentray.</p>
           <div id="documented-files-tree" class="documented-files-tree" role="tree"></div>
         </div>
-      </div>`
+      </details>`
     : "";
-  return { toolbarDocHubHtml, documentedPanelHtml };
+  return { toolbarDocHubHtml, navRailDocumentedHtml };
+}
+
+function renderNavRailContextHtml(
+  filePath: string | undefined,
+  commentrayPath: string | undefined,
+): string {
+  const fp = escapeHtml((filePath ?? "").trim());
+  const cr = escapeHtml((commentrayPath ?? "").trim());
+  if (fp.length === 0 && cr.length === 0) return "";
+  return `<div class="nav-rail__context" aria-label="Current documentation pair">
+    <div class="nav-rail__context-label">Source</div>
+    <div class="nav-rail__context-path" title="${fp}">${fp.length > 0 ? fp : "—"}</div>
+    <div class="nav-rail__context-label">Commentray</div>
+    <div class="nav-rail__context-path nav-rail__context-path--secondary" title="${cr}">${cr.length > 0 ? cr : "—"}</div>
+  </div>`;
 }
 
 /** IIFE produced by `npm run build -w @commentray/render` (esbuild of `code-browser-client.ts`). */
@@ -319,6 +314,133 @@ const CODE_BROWSER_STYLES = `
       :root { color-scheme: light dark; }
       * { box-sizing: border-box; }
       body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      .app {
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        height: 100vh;
+        width: 100%;
+        overflow: hidden;
+      }
+      .app__nav {
+        flex: 0 0 min(300px, 32vw);
+        max-width: 360px;
+        min-width: 220px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px 12px 12px;
+        border-right: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
+        background: color-mix(in oklab, CanvasText 5%, Canvas);
+        min-height: 0;
+      }
+      .nav-rail__context {
+        flex: 0 0 auto;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
+        background: Canvas;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .nav-rail__context-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        opacity: 0.72;
+        margin-top: 6px;
+      }
+      .nav-rail__context-label:first-child { margin-top: 0; }
+      .nav-rail__context-path {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        font-size: 12px;
+        word-break: break-all;
+        color: CanvasText;
+      }
+      .nav-rail__context-path--secondary { opacity: 0.88; }
+      .nav-rail__search {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        flex: 0 0 auto;
+      }
+      .nav-rail__search-label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        opacity: 0.8;
+      }
+      .nav-rail__search input[type="search"] {
+        width: 100%;
+        padding: 8px 10px;
+        font: inherit;
+        font-size: 14px;
+        border-radius: 8px;
+        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+        background: Canvas;
+        color: CanvasText;
+      }
+      .nav-rail__search #search-clear {
+        align-self: flex-start;
+        font: inherit;
+        padding: 5px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+        background: color-mix(in oklab, CanvasText 6%, Canvas);
+        color: CanvasText;
+      }
+      .nav-rail__search-hint {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.4;
+        opacity: 0.78;
+      }
+      .nav-rail__code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        font-size: 10px;
+      }
+      .nav-rail__doc-hub {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        border-radius: 8px;
+        border: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
+        background: Canvas;
+        overflow: hidden;
+      }
+      .nav-rail__doc-hub-summary {
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 8px 10px;
+        list-style: none;
+        user-select: none;
+      }
+      .nav-rail__doc-hub-summary::-webkit-details-marker { display: none; }
+      .nav-rail__doc-hub-inner {
+        padding: 0 10px 10px;
+        overflow: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+        font-size: 12px;
+      }
+      .nav-rail__doc-hub-hint {
+        margin: 0 0 8px;
+        opacity: 0.78;
+        line-height: 1.4;
+      }
+      .app__main {
+        flex: 1 1 auto;
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
       .toolbar {
         display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 8px 12px;
         border-bottom: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
@@ -326,7 +448,7 @@ const CODE_BROWSER_STYLES = `
       }
       .toolbar__main {
         display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
-        flex: 1 1 280px;
+        flex: 1 1 200px;
         min-width: 0;
       }
       .toolbar__end {
@@ -385,44 +507,46 @@ const CODE_BROWSER_STYLES = `
         color: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 2px;
         white-space: nowrap;
       }
-      .toolbar-tree-toggle {
-        font: inherit; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; cursor: pointer;
-        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
-        background: color-mix(in oklab, CanvasText 6%, Canvas); color: CanvasText;
-      }
-      .toolbar-tree-toggle:hover { background: color-mix(in oklab, CanvasText 11%, Canvas); }
-      .documented-files-panel {
-        flex: 0 0 auto; max-height: min(52vh, 480px); overflow: auto;
-        border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
-        background: color-mix(in oklab, CanvasText 4%, Canvas);
-      }
-      .documented-files-panel__inner { padding: 10px 14px 14px; font-size: 13px; }
-      .documented-files-panel__hint { margin: 0 0 10px; opacity: 0.82; line-height: 1.4; }
-      .documented-files-panel__code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 12px; }
-      .documented-files-tree ul { list-style: none; margin: 0; padding-left: 14px; }
+      .documented-files-tree ul { list-style: none; margin: 0; padding-left: 12px; }
       .documented-files-tree > ul { padding-left: 0; }
-      .documented-files-tree li { margin: 2px 0; line-height: 1.4; }
-      .documented-files-tree .tree-dir { font-weight: 600; margin-top: 6px; }
-      .documented-files-tree .tree-file { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin: 4px 0; }
-      .documented-files-tree .tree-file-name { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 12px; }
-      .documented-files-tree .tree-file-links { display: inline-flex; flex-wrap: wrap; gap: 6px 10px; font-size: 11px; }
-      .documented-files-tree .tree-file-links a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
-      .toolbar .search-field {
-        display: inline-flex; align-items: center; gap: 6px; flex: 1 1 220px; min-width: 160px;
+      .documented-files-tree li { margin: 2px 0; line-height: 1.35; }
+      .documented-files-tree .tree-dir { font-weight: 600; margin-top: 4px; font-size: 12px; }
+      .documented-files-tree .tree-file {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 8px;
+        margin: 3px 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        font-size: 11px;
       }
-      .toolbar .search-field input[type="search"] {
-        flex: 1; min-width: 0; padding: 4px 8px; font: inherit; border-radius: 6px;
-        border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas); background: Canvas;
-        color: CanvasText;
+      .documented-files-tree .tree-file-name { flex: 1 1 auto; min-width: 0; word-break: break-all; }
+      .documented-files-tree .tree-file-gh {
+        flex: 0 0 auto;
+        font-size: 10px;
+        font-weight: 600;
+        text-decoration: none;
+        opacity: 0.75;
+        border: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: inherit;
       }
+      .documented-files-tree .tree-file-gh:hover { opacity: 1; background: color-mix(in oklab, CanvasText 7%, Canvas); }
       .toolbar button {
         font: inherit; padding: 4px 10px; border-radius: 6px; cursor: pointer;
         border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas); background: color-mix(in oklab, CanvasText 6%, Canvas);
         color: CanvasText;
       }
       .search-results {
-        flex: 0 0 auto; max-height: min(42vh, 420px); overflow: auto; padding: 8px 14px 10px;
-        border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+        flex: 1 1 auto;
+        min-height: 120px;
+        max-height: 38vh;
+        overflow: auto;
+        padding: 8px 8px 10px;
+        border-radius: 8px;
+        border: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+        background: Canvas;
         font-size: 13px;
       }
       .search-results[hidden] { display: none !important; }
@@ -453,6 +577,7 @@ const CODE_BROWSER_STYLES = `
         }
       }
       .shell { display: flex; flex-direction: row; flex: 1; min-height: 0; }
+      .app__main .shell { flex: 1 1 auto; }
       .pane--code {
         flex: 0 0 50%;
         min-width: 120px; overflow: auto; padding: 12px 16px;
@@ -527,6 +652,11 @@ const CODE_BROWSER_STYLES = `
       }
       .pane--doc { font-size: 15px; line-height: 1.45; }
       .pane--doc img { max-width: 100%; height: auto; }
+      .pane--doc .commentray-line-anchor {
+        display: inline;
+        vertical-align: baseline;
+        scroll-margin-top: 10px;
+      }
       .pane--doc .commentray-block-anchor {
         display: block;
         height: 0;
@@ -630,10 +760,10 @@ const CODE_BROWSER_STYLES = `
 type CodeBrowserPageParts = {
   title: string;
   generatorMetaHtml: string;
-  filePathHtml: string;
+  navRailContextHtml: string;
   angleSelectHtml: string;
   toolbarDocHubHtml: string;
-  documentedPanelHtml: string;
+  navRailDocumentedHtml: string;
   relatedNavHtml: string;
   toolbarEndHtml: string;
   /** `dual`: resizable panes; `stretch`: rowspan table aligned to index blocks. */
@@ -674,25 +804,30 @@ ${CODE_BROWSER_STYLES}
   </head>
   <body>
     <div class="app">
-      <header class="toolbar" aria-label="View options">
-        <div class="toolbar__main">
-          ${p.filePathHtml}
-          ${p.angleSelectHtml}
-          ${p.toolbarDocHubHtml}
-          <span class="search-field">
-            <label for="search-q">Search</label>
-            <input type="search" id="search-q" placeholder="${escapeHtml(p.searchPlaceholder)}" autocomplete="off" spellcheck="false" />
-            <button type="button" id="search-clear" title="Clear search">Clear</button>
-          </span>
-          ${p.relatedNavHtml}
-          <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
+      <aside class="app__nav" aria-label="Search and navigation">
+        ${p.navRailContextHtml}
+        <div class="nav-rail__search">
+          <label class="nav-rail__search-label" for="search-q">Search</label>
+          <input type="search" id="search-q" placeholder="${escapeHtml(p.searchPlaceholder)}" autocomplete="off" spellcheck="false" />
+          <button type="button" id="search-clear" title="Clear search">Clear</button>
+          <p class="nav-rail__search-hint">Filename, path segment, or words. Matches this pair first; merges <code class="nav-rail__code">commentray-nav-search.json</code> when the build ships it (indexed commentray lines + paths).</p>
         </div>
-        ${p.toolbarEndHtml}
-      </header>
-      ${p.documentedPanelHtml}
-      <div class="search-results" id="search-results" hidden aria-live="polite"></div>
-      <div class="${shellClass}" id="shell" data-layout="${p.layout}" data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}>
+        <div class="search-results" id="search-results" hidden aria-live="polite"></div>
+        ${p.navRailDocumentedHtml}
+      </aside>
+      <div class="app__main">
+        <header class="toolbar" aria-label="View options">
+          <div class="toolbar__main">
+            ${p.angleSelectHtml}
+            ${p.toolbarDocHubHtml}
+            ${p.relatedNavHtml}
+            <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
+          </div>
+          ${p.toolbarEndHtml}
+        </header>
+        <div class="${shellClass}" id="shell" data-layout="${p.layout}" data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}>
 ${p.shellInner}
+        </div>
       </div>
     </div>
     <script type="text/plain" id="commentray-multi-angle-b64">${p.multiAngleScriptBlock}</script>
@@ -762,7 +897,7 @@ async function buildMultiAngleDualPaneShell(
             opts.code,
           )
         : [];
-    const mdForDoc = injectCommentrayBlockAnchors(
+    const mdForDoc = injectCommentrayDocAnchors(
       spec.markdown,
       links.length > 0 ? links : undefined,
     );
@@ -883,7 +1018,7 @@ async function buildCodeBrowserShell(
             opts.code,
           )
         : [];
-    const mdForDoc = injectCommentrayBlockAnchors(
+    const mdForDoc = injectCommentrayDocAnchors(
       opts.commentrayMarkdown,
       links.length > 0 ? links : undefined,
     );
@@ -929,14 +1064,14 @@ function searchChromeFromOptions(
   const crPath = (commentrayPathOverride ?? opts.commentrayPathForSearch ?? "").trim();
   if (opts.staticSearchScope === "commentray-and-paths") {
     return {
-      searchPlaceholder: "Commentray + file paths (ordered tokens + fuzzy lines)…",
+      searchPlaceholder: "Filename, path, or keywords…",
       shellSearchAttrs: ` data-search-scope="commentray-and-paths" data-search-file-path="${escapeHtml(
         opts.filePath ?? "",
       )}" data-search-commentray-path="${escapeHtml(crPath)}"`,
     };
   }
   return {
-    searchPlaceholder: "Whole source (ordered tokens + fuzzy lines)…",
+    searchPlaceholder: "Filename, path, or keywords…",
     shellSearchAttrs: "",
   };
 }
@@ -947,6 +1082,50 @@ function shellDocumentedPairsAttrFromOptions(opts: CodeBrowserPageOptions): stri
   return ` data-documented-pairs-b64="${escapeHtml(emb)}"`;
 }
 
+function codeBrowserPageTitle(opts: CodeBrowserPageOptions): string {
+  return opts.title ?? opts.filePath ?? "Commentray";
+}
+
+function codeBrowserHljsThemes(opts: CodeBrowserPageOptions): { hljs: string; hljsDark: string } {
+  const hljs = opts.hljsTheme ?? "github";
+  const hljsDark = opts.hljsTheme?.includes("dark") ? opts.hljsTheme : "github-dark";
+  return { hljs, hljsDark };
+}
+
+function toolbarCommentrayGithubFromShell(
+  shell: CodeBrowserShell,
+  opts: CodeBrowserPageOptions,
+): string | undefined {
+  return shell.multiShell?.commentrayOnGithubUrl ?? opts.commentrayOnGithubUrl;
+}
+
+function rawMdB64FromShell(shell: CodeBrowserShell, opts: CodeBrowserPageOptions): string {
+  return (
+    shell.multiShell?.rawMdB64 ?? Buffer.from(opts.commentrayMarkdown, "utf8").toString("base64")
+  );
+}
+
+function navRailCommentrayPathFromShell(
+  shell: CodeBrowserShell,
+  opts: CodeBrowserPageOptions,
+): string | undefined {
+  const trimmed = (
+    shell.multiShell?.commentrayPathForSearch ??
+    opts.commentrayPathForSearch ??
+    ""
+  ).trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function shellSearchAttrsWithNavJson(
+  shellSearchAttrsBase: string,
+  documentedNavJsonUrl?: string,
+): string {
+  const navJson = documentedNavJsonUrl?.trim() ?? "";
+  if (navJson.length === 0) return shellSearchAttrsBase;
+  return `${shellSearchAttrsBase} data-nav-search-json-url="${escapeHtml(navJson)}"`;
+}
+
 /**
  * Static HTML shell for a minimal “code browser”: code + rendered commentray,
  * draggable vertical splitter, togglable line wrap for the code pane, and
@@ -955,11 +1134,9 @@ function shellDocumentedPairsAttrFromOptions(opts: CodeBrowserPageOptions): stri
 export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promise<string> {
   const rawCodeB64 = Buffer.from(opts.code, "utf8").toString("base64");
 
-  const title = opts.title ?? opts.filePath ?? "Commentray";
-  const filePathHtml = renderFilePathLabel(opts.filePath, title);
+  const title = codeBrowserPageTitle(opts);
   const toolbarEndHtml = buildToolbarEndHtml(opts.githubRepoUrl, opts.toolHomeUrl);
-  const hljs = opts.hljsTheme ?? "github";
-  const hljsDark = opts.hljsTheme?.includes("dark") ? opts.hljsTheme : "github-dark";
+  const { hljs, hljsDark } = codeBrowserHljsThemes(opts);
 
   const mermaidScript = mermaidRuntimeScriptHtml(opts.includeMermaidRuntime);
 
@@ -969,32 +1146,37 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const layoutPref = opts.codeBrowserLayout ?? "auto";
   const shell = await buildCodeBrowserShell(opts, layoutPref);
 
-  const commentrayBlobForToolbar =
-    shell.multiShell?.commentrayOnGithubUrl ?? opts.commentrayOnGithubUrl;
-  const { toolbarDocHubHtml, documentedPanelHtml } = renderToolbarDocHubHtml({
+  const { toolbarDocHubHtml, navRailDocumentedHtml } = renderToolbarDocHubHtml({
     sourceOnGithubUrl: opts.sourceOnGithubUrl,
-    commentrayOnGithubUrl: commentrayBlobForToolbar,
+    commentrayOnGithubUrl: toolbarCommentrayGithubFromShell(shell, opts),
     documentedNavJsonUrl: opts.documentedNavJsonUrl,
     documentedPairsEmbeddedB64: opts.documentedPairsEmbeddedB64,
   });
 
-  const rawMdB64 =
-    shell.multiShell?.rawMdB64 ?? Buffer.from(opts.commentrayMarkdown, "utf8").toString("base64");
+  const rawMdB64 = rawMdB64FromShell(shell, opts);
   const scrollBlockLinksB64 = shell.scrollBlockLinksB64;
 
-  const { searchPlaceholder, shellSearchAttrs } = searchChromeFromOptions(
+  const { searchPlaceholder, shellSearchAttrs: shellSearchAttrsBase } = searchChromeFromOptions(
     opts,
     shell.multiShell?.commentrayPathForSearch,
   );
   const shellDocumentedPairsAttr = shellDocumentedPairsAttrFromOptions(opts);
+  const shellSearchAttrs = shellSearchAttrsWithNavJson(
+    shellSearchAttrsBase,
+    opts.documentedNavJsonUrl,
+  );
+  const navRailContextHtml = renderNavRailContextHtml(
+    opts.filePath,
+    navRailCommentrayPathFromShell(shell, opts),
+  );
 
   return buildCodeBrowserPageHtml({
     title,
     generatorMetaHtml,
-    filePathHtml,
+    navRailContextHtml,
     angleSelectHtml: shell.angleSelectHtml,
     toolbarDocHubHtml,
-    documentedPanelHtml,
+    navRailDocumentedHtml,
     relatedNavHtml,
     toolbarEndHtml,
     layout: shell.layout,

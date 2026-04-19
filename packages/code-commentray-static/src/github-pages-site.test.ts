@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -21,6 +21,7 @@ describe("buildGithubPagesStaticSite", () => {
         'title = "Demo"',
         'source_file = "src/x.ts"',
         'commentray_markdown = ".commentray/source/src/x.ts.md"',
+        'github_url = "https://github.com/acme/demo"',
         "",
         "[render]",
         "mermaid = false",
@@ -39,7 +40,13 @@ describe("buildGithubPagesStaticSite", () => {
     expect(html).toMatch(/hljs language-ts/);
     expect(html).toContain("x =");
     expect(html).toContain("Doc");
-    const nav = JSON.parse(await readFile(navSearchPath, "utf8")) as { rows?: unknown[] };
+    const nav = JSON.parse(await readFile(navSearchPath, "utf8")) as {
+      rows?: unknown[];
+      documentedPairs?: { staticBrowseUrl?: string }[];
+    };
     expect(Array.isArray(nav.rows)).toBe(true);
+    expect(nav.documentedPairs?.[0]?.staticBrowseUrl).toMatch(/^\.\/browse\/.+\.html$/);
+    const browseFiles = await readdir(path.join(repo, "_site", "browse"));
+    expect(browseFiles.some((f) => f.endsWith(".html"))).toBe(true);
   });
 });

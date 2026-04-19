@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -37,3 +37,55 @@ jobs:
 
       - name: Integration tests
         run: npm run test:integration
+
+  # Cypress + static site (unprivileged). JUnit → GitHub Checks runs in e2e-publish-checks.yml (workflow_run, no PR SHA checkout).
+  e2e-static:
+    name: E2E static site
+    needs: quick
+    runs-on: ubuntu-latest
+    container:
+      image: cypress/included:latest
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --progress=false
+
+      - name: Build static site
+        run: npm run pages:build
+
+      - name: Start static server
+        run: |
+          mkdir -p test-results
+          nohup npm run e2e:server > /tmp/e2e-serve.log 2>&1 &
+          echo $! > /tmp/e2e-serve.pid
+
+      - name: Wait for server
+        run: |
+          n=0
+          until node -e "require('http').get('http://127.0.0.1:4173/', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"; do
+            n=$((n+1))
+            [ "$n" -ge 60 ] && exit 1
+            sleep 1
+          done
+
+      - name: Run E2E tests (with JUnit reporter)
+        run: |
+          npx cypress run --e2e --browser electron --config-file cypress.config.ts --config baseUrl=http://127.0.0.1:4173
+        env:
+          CYPRESS_CI: true
+          NODE_OPTIONS: --dns-result-order=ipv4first
+
+      - name: Upload E2E bundle for Checks workflow
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-ci-bundle
+          path: |
+            test-results
+            cypress/videos
+            cypress/screenshots

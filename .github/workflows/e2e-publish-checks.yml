@@ -1,0 +1,39 @@
+# Publishes Cypress JUnit from the completed `ci` run to GitHub Checks.
+# Runs only on workflow_run (base-repo token + checks:write) and must NOT checkout PR/fork SHAs — see e2e-static job in ci.yml.
+name: e2e-publish-checks
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+
+concurrency:
+  group: e2e-publish-checks-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Download E2E artifacts from CI run
+        uses: actions/download-artifact@v5
+        with:
+          name: e2e-ci-bundle
+          path: .
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Publish JUnit to GitHub Checks
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: Test reports
+          path: test-results/*.xml
+          reporter: java-junit

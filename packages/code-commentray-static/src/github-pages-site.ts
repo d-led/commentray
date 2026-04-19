@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -7,6 +8,7 @@ import {
   type ResolvedStaticSite,
   loadCommentrayConfig,
   readIndex,
+  resolvePathUnderRepoRoot,
 } from "@commentray/core";
 import {
   type CodeBrowserMultiAngleBrowsing,
@@ -28,6 +30,78 @@ import {
 import { pathExists } from "./github-pages-site-shared.js";
 
 const DEFAULT_TOOL_HOME = "https://github.com/d-led/commentray";
+
+function browsePageSlug(pair: { sourcePath: string; commentrayPath: string }): string {
+  return createHash("sha256")
+    .update(`${pair.commentrayPath}\0${pair.sourcePath}`, "utf8")
+    .digest("base64url")
+    .slice(0, 28);
+}
+
+/**
+ * Emits one static code browser HTML per documented pair under `_site/browse/*.html` and adds
+ * `staticBrowseUrl` on each pair so the hub search can open the same Commentray UI for other files.
+ */
+async function writePerPairBrowseHtmlPages(input: {
+  repoRoot: string;
+  outDir: string;
+  navDoc: CommentrayNavSearchDocument;
+  ghNavBase: GithubNavBase;
+  cfg: ResolvedCommentrayConfig;
+  ss: ResolvedStaticSite;
+  toolHomeUrl: string;
+}): Promise<CommentrayNavSearchDocument> {
+  const pairs = input.navDoc.documentedPairs;
+  if (!pairs?.length) return input.navDoc;
+
+  const augmented = pairs.map((p) => ({
+    ...p,
+    staticBrowseUrl: `./browse/${browsePageSlug(p)}.html`,
+  }));
+  const navWithUrls: CommentrayNavSearchDocument = { ...input.navDoc, documentedPairs: augmented };
+  const emb = documentedPairsEmbeddedB64FromNav(navWithUrls, input.ghNavBase);
+
+  const browseDir = path.join(input.outDir, "browse");
+  await mkdir(browseDir, { recursive: true });
+
+  for (const p of augmented) {
+    const slug = browsePageSlug(p);
+    const outPath = path.join(browseDir, `${slug}.html`);
+    const sourceAbs = resolvePathUnderRepoRoot(input.repoRoot, p.sourcePath);
+    const mdAbs = resolvePathUnderRepoRoot(input.repoRoot, p.commentrayPath);
+    if (!(await pathExists(mdAbs)) || !(await pathExists(sourceAbs))) continue;
+
+    const markdownUrlBaseDirAbs = path.dirname(mdAbs);
+    const commentrayOutputUrls = {
+      repoRootAbs: input.repoRoot,
+      htmlOutputFileAbs: outPath,
+      markdownUrlBaseDirAbs,
+    };
+
+    await buildCommentrayStatic({
+      sourceFile: sourceAbs,
+      markdownFile: mdAbs,
+      outHtml: outPath,
+      title: p.sourcePath,
+      filePath: p.sourcePath,
+      includeMermaidRuntime: input.cfg.render.mermaid,
+      hljsTheme: input.cfg.render.syntaxTheme,
+      githubRepoUrl: input.ss.githubUrl ?? undefined,
+      toolHomeUrl: input.toolHomeUrl,
+      commentrayOutputUrls,
+      relatedGithubNav:
+        input.ss.relatedGithubNav.length > 0 ? input.ss.relatedGithubNav : undefined,
+      staticSearchScope: "commentray-and-paths",
+      commentrayPathForSearch: p.commentrayPath,
+      sourceOnGithubUrl: p.sourceOnGithub,
+      commentrayOnGithubUrl: p.commentrayOnGithub,
+      documentedNavJsonUrl: "../commentray-nav-search.json",
+      ...(emb ? { documentedPairsEmbeddedB64: emb } : {}),
+    });
+  }
+
+  return navWithUrls;
+}
 
 function documentedPairsEmbeddedB64FromNav(
   navDoc: CommentrayNavSearchDocument,
@@ -146,7 +220,7 @@ export async function buildGithubPagesStaticSite(
   const ghToolbar = sourceAndCommentrayGithubUrls(ghNavBase, ss, defaultCommentrayRel);
 
   const navSearchPath = path.join(outDir, "commentray-nav-search.json");
-  const navDoc = await buildCommentrayNavSearchDocument(
+  let navDoc = await buildCommentrayNavSearchDocument(
     repoRoot,
     defaultCommentrayRel
       ? {
@@ -158,25 +232,41 @@ export async function buildGithubPagesStaticSite(
     ghNavBase ?? undefined,
     cfg.storageDir,
   );
-  const documentedPairsEmbeddedB64 = documentedPairsEmbeddedB64FromNav(navDoc, ghNavBase);
-
-  const staticOpts = staticRenderOptions({
-    sourceAbs,
-    tmpMd,
-    outHtml,
-    ss,
-    cfg,
-    toolHomeUrl,
-    commentrayOutputUrls,
-    blockStretchRows,
-    multiAngleBrowsing,
-    ghToolbar,
-    defaultCommentrayRel,
-    documentedPairsEmbeddedB64,
-  });
 
   try {
     await mkdir(outDir, { recursive: true });
+    if (
+      ghNavBase !== null &&
+      Array.isArray(navDoc.documentedPairs) &&
+      navDoc.documentedPairs.length > 0
+    ) {
+      navDoc = await writePerPairBrowseHtmlPages({
+        repoRoot,
+        outDir,
+        navDoc,
+        ghNavBase,
+        cfg,
+        ss,
+        toolHomeUrl,
+      });
+    }
+    const documentedPairsEmbeddedB64 = documentedPairsEmbeddedB64FromNav(navDoc, ghNavBase);
+
+    const staticOpts = staticRenderOptions({
+      sourceAbs,
+      tmpMd,
+      outHtml,
+      ss,
+      cfg,
+      toolHomeUrl,
+      commentrayOutputUrls,
+      blockStretchRows,
+      multiAngleBrowsing,
+      ghToolbar,
+      defaultCommentrayRel,
+      documentedPairsEmbeddedB64,
+    });
+
     await buildCommentrayStatic(staticOpts);
     await writeFile(navSearchPath, `${JSON.stringify(navDoc, null, 2)}\n`, "utf8");
   } finally {

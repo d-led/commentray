@@ -63,13 +63,13 @@ npm run test:coverage:all
 
 ```bash
 npm run e2e       # headless
-npm run e2e:ci    # same with CYPRESS_CI=true (matches GitHub `e2e` workflow / typical CI)
+npm run e2e:ci    # same with CYPRESS_CI=true (matches GitHub `ci` job `e2e-static` / typical CI)
 npm run cy        # interactive
 ```
 
 Tests live under `cypress/e2e/`. Custom assertions live in [`cypress/support/commands.ts`](cypress/support/commands.ts). JUnit output is written to `test-results/`.
 
-**GitHub Actions:** [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) runs Cypress after a successful [`ci`](.github/workflows/ci.yml) run (and on `workflow_dispatch`), using the `cypress/included` image; uploads JUnit plus Cypress videos/screenshots as workflow artifacts.
+**GitHub Actions:** Cypress runs in the **`e2e-static`** job inside [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (`cypress/included`, JUnit + artifacts). After each successful **`ci`** run, [`.github/workflows/e2e-publish-checks.yml`](.github/workflows/e2e-publish-checks.yml) downloads that bundle and publishes **GitHub Checks** (no checkout of PR SHAs). [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) is **`workflow_dispatch` only** for ad-hoc runs.
 
 ## Standalone CLI binaries
 
@@ -171,4 +171,4 @@ Reload the editor window if that workspace was already open so it picks up the n
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) (short contract) and [`docs/development.md`](docs/development.md) (commands, workflows, releases).

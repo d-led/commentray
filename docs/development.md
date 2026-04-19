@@ -31,7 +31,37 @@ npm run ci:full
 ```
 
 If a check is failing, fix the root cause. Do not widen ignore lists or
-raise thresholds to hide it. See `CONTRIBUTING.md` for the reasoning.
+raise thresholds to hide it. `CONTRIBUTING.md` states the social contract;
+the bullets below are the day-to-day detail.
+
+## Contributor expectations
+
+- **Slow lane:** `npm run ci:full` — quality gate, integration tests, then expensive tests (no Cypress).
+- **Tests:** run `npm run test:unit` before every PR; add `npm run test:integration` when you touch the Git SCM adapter, `.commentray/` layout, or fixture-backed behavior; use `npm run test:expensive` for fuzzed / large-repo suites when relevant. Never silence failures with `.skip`, swallowed errors, or widened thresholds — fix code or fix tests.
+- **Lint / dupes:** `npm run lint` (ESLint + shellcheck on `scripts/` + refactor metrics); `npm run dupes` (`jscpd`); `npm run quality` runs lint + dupes. Treat findings as design feedback.
+- **Dependencies:** preview with `npm run deps:upgrade -- --check`; apply with `npm run deps:upgrade` (`patch` / `minor` / `major` / `latest`). The script re-pins `@commentray/*` via `scripts/sync-workspace-deps.mjs` and refreshes the lockfile — then run `npm run quality:gate`. Triage `npm audit` seriously; avoid blanket `--force`.
+- **Format:** `npm run format` (write) or `npm run format:check` (verify).
+- **Coverage (discovery, not a score chase):** `npm run test:coverage` (unit) and `npm run test:coverage:all` (unit + integration) emit HTML + `lcov` under `./coverage/` (gitignored). Set `COMMENTRAY_COVERAGE_OPEN=0` to skip opening a browser.
+- **Tests read like behavior:** prefer given / when / then; avoid asserting private implementation details.
+- **Small, reversible PRs** where practical; land behavior-neutral refactors separately when it keeps review honest.
+
+## Package managers
+
+The repo is developed with **npm**. **Yarn** is an alternative path via `.yarnrc.yml` (`nodeLinker: node-modules`); if you use Yarn, keep `yarn.lock` policy explicit in PRs.
+
+## CLI, binaries, and Pages
+
+- **Init:** `npm run commentray -- init` is idempotent (storage, seed `index.json` / `.commentray.toml` when missing). Use `npm run commentray -- init config` for TOML defaults, or `init config --force` to replace. `npm run commentray -- init scm` refreshes the marked `pre-commit` block that runs `commentray validate` when the linked CLI exists at the repo root.
+- **Standalone binaries:** `npm run binary:build` then `npm run binary:smoke` (README **Standalone CLI binaries**). CI: [`.github/workflows/binaries.yml`](../.github/workflows/binaries.yml); workflow artifacts expire; **`v*`** tags attach builds to [GitHub Releases](https://github.com/d-led/commentray/releases). On macOS with Homebrew Node, point `COMMENTRAY_SEA_NODE` at an official `node` binary for local SEA builds.
+- **GitHub Pages:** set `[static_site]` in `.commentray.toml`; `npm run pages:build` writes `_site/`. [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) deploys on `main` when **Settings → Pages → Build: GitHub Actions** is enabled.
+
+## Expensive CI
+
+[`.github/workflows/ci-expensive.yml`](../.github/workflows/ci-expensive.yml) runs on **`workflow_dispatch`** and on pull requests labeled **`run-expensive-ci`**. Maintainers may later gate it with a GitHub Environment.
+
+## GitHub CI (Cypress static site)
+
+On push/PR, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs job **`e2e-static`** after **`quick`**: `pages:build`, Cypress in `cypress/included`, artifact **`e2e-ci-bundle`**. [`.github/workflows/e2e-publish-checks.yml`](../.github/workflows/e2e-publish-checks.yml) (`workflow_run` on **`ci`**) downloads that bundle and publishes JUnit to **GitHub Checks** without checking out fork PR SHAs. Ad-hoc runs: [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml) (**workflow_dispatch** only). See the top-level README **GitHub Actions**; locally use `npm run e2e` or `npm run e2e:ci`.
 
 ## Editor extension workflows
 
@@ -156,10 +186,25 @@ Rough mental map for new contributors:
   posture; read `SECURITY.md` first.
 - Extension behavior → `packages/vscode/src/extension.ts`.
 
-## Releasing
+## Publishing to npm (maintainers)
 
-See `CONTRIBUTING.md → Publishing to npm (maintainers)` for the
-`scripts/bump-version.sh` (version files only), `scripts/tag-version.sh`
-(annotated tag after commit), and `scripts/publish.sh` workflow. Do not
-hand-edit individual `package.json` versions; `scripts/sync-workspace-deps.mjs`
-keeps intra-monorepo pins in lockstep.
+Release is split so **bumping** and **tagging** stay separate from **publish**.
+
+| Script                    | Role                                                                                                                                                                                                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/bump-version.sh` | Bumps every workspace `package.json`, runs `scripts/sync-workspace-deps.mjs`, refreshes `package-lock.json`, updates `CHANGELOG.md` when `[Unreleased]` exists. Supports `patch`, `minor`, `major`, `rc`, `release`, `set <version>`, `--dry-run`. Does **not** touch git — safe on a dirty tree. |
+| `scripts/tag-version.sh`  | Reads `packages/core/package.json`, requires a **clean** tree, creates annotated `v<version>` at `HEAD`. Run after the bump commit.                                                                                                                                                               |
+| `scripts/publish.sh`      | Clean tree + `HEAD` tagged with the canonical version → reproducible `npm ci`, build all workspaces, unit tests, then `npm publish --access public` per public workspace in dependency order. Flags: `--dry-run`, `--otp=…`, `--tag=next` (RCs).                                                  |
+| `scripts/release.sh`      | From a **clean** tree: bump → `git commit` → tag (same as `tag-version.sh`) → `git push` / `git push --tags` → `publish.sh`.                                                                                                                                                                      |
+
+Root shortcuts: `npm run version:bump`, `version:tag`, `version:sync`, `publish:all`, `release`.
+
+**All-in-one (clean tree):** `npm run release -- minor` — bump, commit, tag, push, publish.
+
+**Stepwise** (e.g. wait for CI binaries before npm): `npm run version:bump -- minor` → commit → `npm run version:tag` → `git push && git push --tags` → `npm run publish:all`.
+
+The **`commentray-vscode`** package is **private** on npm; ship it with `npm run extension:package` and upload the `.vsix`.
+
+Publishing is **manual** from a maintainer machine with **2FA** / OTP — not from GitHub Actions today. Prefer **OIDC trusted publishing** and **npm provenance** when automation lands: [npm trusted publishers](https://docs.npmjs.com/trusted-publishers), [GitHub OIDC](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect). Avoid long-lived npm tokens in repo secrets unless there is no alternative.
+
+Do not hand-edit `@commentray/*` version pins; `scripts/sync-workspace-deps.mjs` keeps them aligned with `packages/core/package.json`.

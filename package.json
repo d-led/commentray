@@ -61,9 +61,6 @@
     "cy": "start-server-and-test e2e:server http://127.0.0.1:4173 \"cypress open --e2e --browser chrome\""
   },
   "devDependencies": {
-    "@commentray/code-commentray-static": "0.0.4",
-    "@commentray/core": "0.0.4",
-    "@commentray/render": "0.0.4",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
@@ -72,7 +69,6 @@
     "jscpd": "^4.0.9",
     "mocha-junit-reporter": "^2.2.1",
     "prettier": "^3.8.3",
-    "serve": "^14.2.6",
     "start-server-and-test": "^3.0.2",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.58.2",

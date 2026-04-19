@@ -10,6 +10,7 @@ import {
   commentrayMarkdownPath,
   commentrayMarkdownPathForAngle,
   normalizeRepoRelativePath,
+  resolvePathUnderRepoRoot,
 } from "./paths.js";
 
 describe("normalizeRepoRelativePath", () => {
@@ -38,6 +39,19 @@ describe("normalizeRepoRelativePath", () => {
 
   it("collapses redundant current-directory segments", () => {
     expect(normalizeRepoRelativePath("./src/./a.ts")).toBe("src/a.ts");
+  });
+});
+
+describe("resolvePathUnderRepoRoot", () => {
+  const root = path.join(os.tmpdir(), `commentray-root-${process.pid}`);
+
+  it("resolves a safe repo-relative path under the root", () => {
+    const got = resolvePathUnderRepoRoot(root, "src/a.ts");
+    expect(got).toBe(path.resolve(root, "src", "a.ts"));
+  });
+
+  it("rejects traversal even when segments look plausible", () => {
+    expect(() => resolvePathUnderRepoRoot(root, "src/../../etc/passwd")).toThrow(/escapes/);
   });
 });
 

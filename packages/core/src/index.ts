@@ -35,6 +35,7 @@ export {
   commentrayMarkdownPathForAngle,
   defaultMetadataIndexPath,
   normalizeRepoRelativePath,
+  resolvePathUnderRepoRoot,
 } from "./paths.js";
 export {
   discoverCommentrayPairsOnDisk,

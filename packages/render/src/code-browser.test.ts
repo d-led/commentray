@@ -34,7 +34,8 @@ describe("renderCodeBrowserHtml — layout shell and search", () => {
     expect(html).toContain('data-search-scope="commentray-and-paths"');
     expect(html).toContain('data-search-file-path="src/a.ts"');
     expect(html).toContain('data-search-commentray-path=".commentray/source/src/a.ts.md"');
-    expect(html).toContain("Commentray + file paths (ordered tokens + fuzzy lines)");
+    expect(html).toContain("nav-rail__search-hint");
+    expect(html).toContain("commentray-nav-search.json");
   });
 
   it("includes resizable gutter, wrap toggle, and rendered regions", async () => {
@@ -47,7 +48,7 @@ describe("renderCodeBrowserHtml — layout shell and search", () => {
     expect(html).toContain('id="gutter"');
     expect(html).toContain('id="wrap-lines"');
     expect(html).toContain('id="search-q"');
-    expect(html).toContain("Whole source (ordered tokens + fuzzy lines)");
+    expect(html).toContain("nav-rail__search-hint");
     expect(html).toContain('id="code-line-0"');
     expect(html).toContain("Wrap code lines");
     expect(html).toMatch(/hljs|language-ts/);
@@ -113,9 +114,9 @@ describe("renderCodeBrowserHtml — toolbar chrome in layout", () => {
     expect(html).toContain("Source on GitHub");
     expect(html).toContain("Commentray on GitHub");
     expect(html).toContain('href="https://github.com/acme/demo/blob/main/README.md"');
-    expect(html).toContain('id="documented-files-toggle"');
+    expect(html).toContain('id="documented-files-hub"');
     expect(html).toContain('data-nav-json-url="./commentray-nav-search.json"');
-    expect(html).toContain('id="documented-files-panel"');
+    expect(html).toContain('data-nav-search-json-url="./commentray-nav-search.json"');
     expect(html).toContain('data-documented-pairs-b64="');
   });
 
@@ -138,7 +139,7 @@ describe("renderCodeBrowserHtml — toolbar chrome in layout", () => {
       commentrayMarkdown: "body",
       documentedPairsEmbeddedB64: pairsB64,
     });
-    expect(html).toContain('id="documented-files-toggle"');
+    expect(html).toContain('id="documented-files-hub"');
     expect(html).toContain('data-nav-json-url=""');
     expect(html).toContain('data-documented-pairs-b64="');
   });
@@ -160,27 +161,26 @@ describe("renderCodeBrowserHtml — source line chrome", () => {
 });
 
 describe("renderCodeBrowserHtml — file path display", () => {
-  it("shows the repo-relative file path in the toolbar with the basename emphasized", async () => {
+  it("shows the repo-relative source path in the left nav rail context", async () => {
     const html = await renderCodeBrowserHtml({
       filePath: "packages/render/src/code-browser.ts",
       code: "export {};",
       language: "ts",
       commentrayMarkdown: "body",
     });
-    expect(html).toContain('<span class="file-path__dir">packages/render/src/</span>');
-    expect(html).toContain('<span class="file-path__base">code-browser.ts</span>');
-    expect(html).toContain('title="packages/render/src/code-browser.ts"');
+    expect(html).toContain("nav-rail__context");
+    expect(html).toContain("packages/render/src/code-browser.ts");
   });
 
-  it("treats a basename-only path as living at the repository root", async () => {
+  it("shows a basename-only path in the nav rail context block", async () => {
     const html = await renderCodeBrowserHtml({
       filePath: "README.md",
       code: "# hi\n",
       language: "md",
       commentrayMarkdown: "body",
     });
-    expect(html).toContain("file-path__dir--root");
-    expect(html).toContain('<span class="file-path__base">README.md</span>');
+    expect(html).toContain("nav-rail__context-path");
+    expect(html).toContain("README.md");
   });
 
   it("escapes HTML in file paths to prevent injection", async () => {

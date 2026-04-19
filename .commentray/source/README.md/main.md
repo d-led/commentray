@@ -54,7 +54,7 @@ Do not duplicate the README’s package list here—that list is canonical. In o
 - Roadmap: [`docs/plan/plan.md`](https://github.com/d-led/commentray/blob/main/docs/plan/plan.md)
 - Debugging the extension: [`docs/development.md`](https://github.com/d-led/commentray/blob/main/docs/development.md)
 - Trust model & parsing guarantees: [`SECURITY.md`](https://github.com/d-led/commentray/blob/main/SECURITY.md)
-- Quality gate & contribution flow: [`CONTRIBUTING.md`](https://github.com/d-led/commentray/blob/main/CONTRIBUTING.md)
+- Contributing contract: [`CONTRIBUTING.md`](https://github.com/d-led/commentray/blob/main/CONTRIBUTING.md); day-to-day commands & releases: [`docs/development.md`](https://github.com/d-led/commentray/blob/main/docs/development.md)
 
 ## What Commentray is not (one beat each)
 
