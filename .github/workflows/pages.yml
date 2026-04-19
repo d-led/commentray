@@ -43,6 +43,11 @@ jobs:
       - name: Build static site
         run: npm run pages:build
 
+      - name: Validate Pages GitHub/blob + browse link shapes
+        run: node scripts/validate-pages-github-links.mjs
+        env:
+          COMMENTRAY_VALIDATE_PAGES_LIVE: "1"
+
       - name: Remove stale github-pages artifacts from earlier attempts
         env:
           GH_TOKEN: ${{ github.token }}

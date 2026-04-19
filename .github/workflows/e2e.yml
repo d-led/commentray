@@ -16,7 +16,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     container:
-      image: cypress/included:latest
+      # Pin to lockfile Cypress (see ci.yml e2e-static job).
+      image: cypress/included:15.14.0
       options: --ipc=host
     steps:
       - uses: actions/checkout@v5
@@ -29,6 +30,11 @@ jobs:
 
       - name: Build static site
         run: npm run pages:build
+
+      - name: Validate Pages GitHub/blob + browse link shapes
+        run: node scripts/validate-pages-github-links.mjs
+        env:
+          COMMENTRAY_VALIDATE_PAGES_LIVE: "1"
 
       - name: Start static server
         run: |
@@ -54,7 +60,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: test-results
           path: |
