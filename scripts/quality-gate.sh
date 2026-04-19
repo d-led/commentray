@@ -15,9 +15,79 @@ set -euo pipefail
 #
 # Slow-lane checks (integration, expensive tests, binary smoke) live in
 # scripts/ci-full.sh, which is this gate plus those extras.
+#
+# Prerequisites (tools not vendored via npm) are verified up front — see
+# quality_gate_require_external_tools.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+
+quality_gate_require_external_tools() {
+  local failed=0
+  local al_version="${ACTIONLINT_VERSION:-1.7.7}"
+
+  if [[ ! -d "${REPO_ROOT}/node_modules" ]]; then
+    echo "" >&2
+    echo "Missing npm dependencies (there is no node_modules/ directory)." >&2
+    echo "  Install:" >&2
+    echo "    cd \"${REPO_ROOT}\" && npm ci" >&2
+    failed=1
+  fi
+
+  if ! command -v node >/dev/null 2>&1; then
+    echo "" >&2
+    echo "Missing: node (Node.js 20+ is required; see package.json engines)." >&2
+    echo "  Install: https://nodejs.org/  or use nvm / fnm / your OS package manager." >&2
+    failed=1
+  fi
+
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "" >&2
+    echo "Missing: npm (comes with a normal Node.js install)." >&2
+    failed=1
+  fi
+
+  if ! command -v shellcheck >/dev/null 2>&1; then
+    echo "" >&2
+    echo "Missing: shellcheck (required for npm run lint → scripts/shellcheck.sh)." >&2
+    echo "  macOS:   brew install shellcheck" >&2
+    echo "  Debian:  sudo apt install shellcheck" >&2
+    echo "  Fedora:  sudo dnf install ShellCheck" >&2
+    echo "  More:    https://github.com/koalaman/shellcheck#installing" >&2
+    failed=1
+  fi
+
+  local have_actionlint=0
+  if [[ -n "${ACTIONLINT:-}" ]]; then
+    if [[ -x "${ACTIONLINT}" ]] || command -v "${ACTIONLINT}" >/dev/null 2>&1; then
+      have_actionlint=1
+    fi
+  elif command -v actionlint >/dev/null 2>&1; then
+    have_actionlint=1
+  elif [[ -x "${REPO_ROOT}/.cache/actionlint/actionlint" && -f "${REPO_ROOT}/.cache/actionlint/version.txt" && "$(cat "${REPO_ROOT}/.cache/actionlint/version.txt")" == "${al_version}" ]]; then
+    have_actionlint=1
+  fi
+
+  if [[ "${have_actionlint}" -eq 0 ]] && ! command -v curl >/dev/null 2>&1; then
+    echo "" >&2
+    echo "Missing: curl, and no actionlint binary available yet." >&2
+    echo "  scripts/actionlint.sh downloads a pinned release when actionlint is not on PATH;" >&2
+    echo "  that requires curl, or install actionlint yourself:" >&2
+    echo "    macOS:  brew install actionlint" >&2
+    echo "    Or set:  export ACTIONLINT=/path/to/actionlint" >&2
+    echo "    Upstream: https://github.com/rhysd/actionlint" >&2
+    failed=1
+  fi
+
+  if [[ "${failed}" -ne 0 ]]; then
+    echo "" >&2
+    echo "Fix the prerequisites above, then re-run:" >&2
+    echo "  bash scripts/quality-gate.sh" >&2
+    exit 1
+  fi
+}
+
+quality_gate_require_external_tools
 
 run_step() {
   local name="$1"

@@ -3,6 +3,8 @@
  * other repos — keep specs thin, reuse assertions here).
  */
 
+import { shellA11y } from "./shell-a11y";
+
 declare global {
   namespace Cypress {
     interface Chainable {
@@ -17,6 +19,11 @@ declare global {
       shouldDisplayCodeBrowserShell(): Chainable<void>;
       /** GET `/commentray-nav-search.json` and assert shape. */
       shouldExposeNavSearchArtifact(): Chainable<void>;
+      /**
+       * Assert icon links in the “current pair” toolbar cluster use `aria-hidden` SVG
+       * (decorative). Selector lives in {@link ./shell-a11y.ts}.
+       */
+      shouldHideDecorativeSvgsInDocPairLinks(): Chainable<void>;
     }
   }
 }
@@ -31,9 +38,9 @@ Cypress.Commands.add("visitE2eDualScrollSync", () => {
 
 Cypress.Commands.add("shouldDisplayCodeBrowserShell", () => {
   cy.get(".shell").should("exist").and("have.attr", "data-layout");
-  cy.get('[aria-label="Source code"]').should("be.visible");
-  cy.get('[aria-label="Commentray"]').should("be.visible");
-  cy.get('[role="region"][aria-label="Search"]').within(() => {
+  cy.get(shellA11y.panes.source).should("be.visible");
+  cy.get(shellA11y.panes.commentray).should("be.visible");
+  cy.get(shellA11y.search.region).within(() => {
     cy.get('input[type="search"]').should("be.visible");
   });
   cy.contains("HTML generated").should("be.visible");
@@ -43,6 +50,12 @@ Cypress.Commands.add("shouldExposeNavSearchArtifact", () => {
   cy.request("/commentray-nav-search.json").then((res) => {
     expect(res.status).to.eq(200);
     expect(res.body).to.have.property("schemaVersion");
+  });
+});
+
+Cypress.Commands.add("shouldHideDecorativeSvgsInDocPairLinks", () => {
+  cy.get(`${shellA11y.documentationPairLandmark} a[aria-label]`).each(($a) => {
+    cy.wrap($a).find('svg[aria-hidden="true"]').should("exist");
   });
 });
 
