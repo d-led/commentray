@@ -18,8 +18,8 @@ The user-facing README should remain **terse and skimmable**, in the spirit of [
 
 ## Product principles (navigation and linking)
 
-- **Navigation:** We strive to make moving around the system—as an author or reader in the extension, rendered views, static hub and browse tree, and repo documentation—as **easy and understandable** as possible: predictable entry points and clear mental models over cleverness. Concrete URL and in-site navigation policy lives under [§ Permalinks and stable URLs (design intent)](#permalinks-and-stable-urls-design-intent) below.
-- **Cross-linking:** **Cross-linking must be very easy.** Authors should rely on ordinary Markdown links and repo-relative paths wherever practical; normative authoring rules are in [`docs/spec/anchors.md` § Cross references](../spec/anchors.md#cross-references). Optional higher-level xref syntax, if added later, stays optional—the common case must stay plain links.
+- **Navigation:** We strive to make moving around the system—as an author or reader in the extension, rendered views, static hub and browse tree, and repo documentation—as **easy and understandable** as possible: **consistent mental models**, predictable entry points, and clarity over cleverness. Concrete URL and in-site navigation policy lives under [§ Permalinks and stable URLs (design intent)](#permalinks-and-stable-urls-design-intent) below.
+- **Cross-linking:** **Cross-linking must be very easy** for authors and readers: ordinary Markdown links, repo-relative paths wherever practical, stable public URLs where needed, and tooling that does **not** fight those paths in rendered and static output (see [`docs/spec/storage.md`](../spec/storage.md) for static-site link rewriting). Normative authoring conventions are in [`docs/spec/anchors.md` § Cross references](../spec/anchors.md#cross-references). Optional higher-level xref syntax, if added later, stays optional—the common case must stay plain links.
 
 ## Goals (v0)
 
