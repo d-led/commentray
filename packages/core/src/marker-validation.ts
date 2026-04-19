@@ -1,7 +1,9 @@
 import { parseAnchor } from "./anchors.js";
 import { assertValidMarkerId } from "./marker-ids.js";
 import type { CommentrayIndex } from "./model.js";
-import { parseCommentrayRegionBoundary } from "./source-markers.js";
+import { normalizeRepoRelativePath } from "./paths.js";
+import { findCommentrayMarkerPairs } from "./region-marker-convert.js";
+import { parseCommentrayRegionBoundary, sourceLineRangeForMarkerId } from "./source-markers.js";
 
 export type MarkerValidationIssue = { level: "error" | "warn"; message: string };
 
@@ -62,6 +64,88 @@ export function validateMarkerBoundariesInSource(
       level: "error",
       message: `${sourcePath}:${line0 + 1}: commentray start for id "${id}" has no matching end in this file.`,
     });
+  }
+
+  return issues;
+}
+
+/**
+ * For each `marker:` block, ensures the primary file contains a well-formed paired
+ * region that resolves to a non-empty span. Warns when a paired region exists in
+ * the primary but no indexed block claims `marker:<id>` (orphan region).
+ */
+export function validateMarkerRegionsAgainstIndexedSources(
+  index: CommentrayIndex,
+  indexedSourceTexts: Map<string, string>,
+): MarkerValidationIssue[] {
+  const issues: MarkerValidationIssue[] = [];
+  const claimedBySourceNorm = new Map<string, Set<string>>();
+
+  for (const entry of Object.values(index.byCommentrayPath)) {
+    const norm = normalizeRepoRelativePath(entry.sourcePath);
+    let set = claimedBySourceNorm.get(norm);
+    if (!set) {
+      set = new Set();
+      claimedBySourceNorm.set(norm, set);
+    }
+    for (const block of entry.blocks) {
+      let parsed;
+      try {
+        parsed = parseAnchor(block.anchor);
+      } catch {
+        continue;
+      }
+      if (parsed.kind === "marker") set.add(parsed.id);
+    }
+  }
+
+  for (const [commentrayPath, entry] of Object.entries(index.byCommentrayPath)) {
+    const norm = normalizeRepoRelativePath(entry.sourcePath);
+    const text = indexedSourceTexts.get(norm);
+    if (text === undefined) continue;
+
+    for (const block of entry.blocks) {
+      let parsed;
+      try {
+        parsed = parseAnchor(block.anchor);
+      } catch {
+        continue;
+      }
+      if (parsed.kind !== "marker") continue;
+      const range = sourceLineRangeForMarkerId(text, parsed.id);
+      if (range !== null) continue;
+      issues.push({
+        level: "error",
+        message:
+          `Block "${block.id}" in ${commentrayPath} uses anchor "marker:${parsed.id}" but ` +
+          `primary "${entry.sourcePath}" has no resolvable paired commentray region for that id ` +
+          `(see docs/spec/blocks.md — e.g. Markdown/HTML: <!-- #region commentray:${parsed.id} --> … <!-- #endregion commentray:${parsed.id} -->).`,
+      });
+    }
+  }
+
+  const orphanWarned = new Set<string>();
+  for (const [norm, text] of indexedSourceTexts) {
+    const pairs = findCommentrayMarkerPairs(text);
+    const claimed = claimedBySourceNorm.get(norm) ?? new Set();
+    const displayPath =
+      Object.values(index.byCommentrayPath).find(
+        (e) => normalizeRepoRelativePath(e.sourcePath) === norm,
+      )?.sourcePath ?? norm;
+    for (const pair of pairs) {
+      if (claimed.has(pair.id)) continue;
+      const dedupe = `${norm}\0${pair.id}`;
+      if (orphanWarned.has(dedupe)) continue;
+      orphanWarned.add(dedupe);
+      issues.push({
+        level: "warn",
+        message:
+          `Primary "${displayPath}" has a commentray region "${pair.id}" (delimiter lines ` +
+          `${pair.startLine0 + 1} and ${pair.endLine0 + 1}) that no indexed block claims ` +
+          `(expected a block with anchor marker:${pair.id} and matching <!-- commentray:block id=${pair.id} -->). ` +
+          `Remove the delimiters or add the block to index.json.`,
+      });
+    }
   }
 
   return issues;

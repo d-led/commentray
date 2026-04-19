@@ -3,6 +3,7 @@ import { CURRENT_SCHEMA_VERSION } from "./model.js";
 import {
   validateIndexMarkerSemantics,
   validateMarkerBoundariesInSource,
+  validateMarkerRegionsAgainstIndexedSources,
 } from "./marker-validation.js";
 
 describe("Region marker boundary validation in source files", () => {
@@ -80,6 +81,76 @@ describe("Index marker semantics versus on-disk source", () => {
     const issues = validateIndexMarkerSemantics(index);
     expect(issues.some((i) => i.level === "warn" && i.message.includes("reused across"))).toBe(
       true,
+    );
+  });
+});
+
+describe("Marker anchors versus regions in indexed primaries", () => {
+  const cr = ".commentray/source/x.md";
+
+  it("errors when a marker anchor does not resolve in the primary", () => {
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [cr]: {
+          sourcePath: "src/p.ts",
+          commentrayPath: cr,
+          blocks: [{ id: "missing", anchor: "marker:missing", markerId: "missing" }],
+        },
+      },
+    };
+    const src = "no markers here\n";
+    const issues = validateMarkerRegionsAgainstIndexedSources(
+      index,
+      new Map([["src/p.ts", src]]),
+    );
+    expect(
+      issues.some((i) => i.level === "error" && i.message.includes("no resolvable paired")),
+    ).toBe(true);
+  });
+
+  it("warns when the primary has a paired region not claimed by any block", () => {
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [cr]: {
+          sourcePath: "src/p.ts",
+          commentrayPath: cr,
+          blocks: [{ id: "only", anchor: "marker:only", markerId: "only" }],
+        },
+      },
+    };
+    const src = [
+      "//#region commentray:only",
+      "a",
+      "//#endregion commentray:only",
+      "//#region commentray:orphan",
+      "b",
+      "//#endregion commentray:orphan",
+    ].join("\n");
+    const issues = validateMarkerRegionsAgainstIndexedSources(
+      index,
+      new Map([["src/p.ts", src]]),
+    );
+    expect(
+      issues.some((i) => i.level === "warn" && i.message.includes("no indexed block claims")),
+    ).toBe(true);
+  });
+
+  it("returns no issues when every region is claimed and resolves", () => {
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [cr]: {
+          sourcePath: "src/p.ts",
+          commentrayPath: cr,
+          blocks: [{ id: "x1", anchor: "marker:x1", markerId: "x1" }],
+        },
+      },
+    };
+    const src = ["//#region commentray:x1", "ok", "//#endregion commentray:x1"].join("\n");
+    expect(validateMarkerRegionsAgainstIndexedSources(index, new Map([["src/p.ts", src]]))).toEqual(
+      [],
     );
   });
 });

@@ -14,7 +14,7 @@ The README’s **Using Commentray** section links short guides under `docs/user/
 
 ## Try scroll sync (why the editor extension exists)
 
-On **[GitHub Pages](https://d-led.github.io/commentray/)** the split is live: **Code** is this repo’s `README.md`; **Commentray** is this file, rendered as HTML. Scroll either pane—the other follows in **lockstep** (**block stretch** when this repo’s `index.json` lists blocks for this pair with matching `<!-- commentray:block … -->` markers; otherwise **proportional** sync). That is the DVD-style commentary metaphor without installing anything.
+On **[GitHub Pages](https://d-led.github.io/commentray/)** the split is live: **Code** is this repo’s `README.md`; **Commentray** is this file, rendered as HTML. Scroll either pane—the other follows in **lockstep** (**block stretch** when `index.json` uses **`marker:`** anchors backed by paired `<!-- #region commentray:… -->` / `<!-- #endregion … -->` delimiters in `README.md`, plus matching `<!-- commentray:block id=… -->` markers here; otherwise **proportional** sync). That is the DVD-style commentary metaphor without installing anything.
 
 The deploy is a **single** HTML file, so in-commentray Markdown links rewritten to repo-relative paths can **404** on Pages; use full `https://github.com/…/blob/…` URLs when the link must work from the static site.
 

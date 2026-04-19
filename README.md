@@ -1,9 +1,12 @@
+<!-- #region commentray:readme-lede -->
 # Commentray — a side-by-side documentation ecosystem
 
 Have you ever wished a “commentary track” for code the way DVD extras let filmmakers talk over a film **without** changing the picture? When looking at code, that might answer the whys, reveal the intent **besides** the code itself.
 
 The **ecosystem** is a few published **`@commentray/*` libraries** (shared config and paths, Markdown → HTML, static “code + commentray” pages), the **`commentray` CLI**, and a **VS Code / Cursor** extension—all agreeing on **`.commentray.toml`** and the **`.commentray/`** tree. **Tooling** keeps companions tied to the source: optional **Git pre-commit**, **`validate`** / **`doctor`**, migrations, **`render`** / **`pages:build`** / **`serve`** for browsable HTML, and (when published) **standalone binaries** for machines without Node. This repo’s own CI runs the **quality gate** (format, lint, typecheck, unit tests, etc.) and **Cypress** against a built static site—it does **not** run `commentray validate` as a separate step unless you add that to your workflow.
 
+<!-- #endregion commentray:readme-lede -->
+<!-- #region commentray:readme-why -->
 ## Why
 
 Inline comments are not always possible (generated files, tight formats, policy). Commentray keeps the primary artifact clean while storing rationale, warnings, and diagrams in **commentray**—Markdown that lives under `.commentray/source/` beside the code it explains. In a meeting you might hear: _“We have to document our architecture **in commentray** so that newcomers can have an effective source code onboarding experience.”_ Same word names the tool and the practice; context disambiguates.
@@ -12,10 +15,12 @@ The same split is useful when you want **rich context for a human or a chatbot**
 
 **Good for:** **developers**, **architects**, and **LLM**-assisted workflows that each need **context-specific** insight into the same codebase with different rationale, warnings, and diagrams beside the source without crowding the primary file. Also onboarding next to the code, pre-commit validation of companion metadata, and publishing a **code + commentray** static site (for example GitHub Pages) with scroll-linked panes.
 
+<!-- #endregion commentray:readme-why -->
 ## Live README + commentray
 
 This repository’s **GitHub Pages** build pairs `README.md` with commentray under [`.commentray/source/README.md/`](.commentray/source/README.md/)—that column is meant as the **voice-over** (trade-offs, cookbook, diagrams) while this file stays the **scannable facts**. Open the [published site](https://d-led.github.io/commentray/) to try block-aware scroll sync without installing anything.
 
+<!-- #region commentray:readme-user-guides -->
 ## Using Commentray
 
 Short, command-first guides (install the CLI or extension, first `.commentray/` setup, validation, and what each layer catches):
@@ -28,6 +33,7 @@ Short, command-first guides (install the CLI or extension, first `.commentray/` 
 - [Configuration](docs/user/config.md) — `.commentray.toml` keys
 - [Troubleshooting](docs/user/troubleshooting.md) — common failures
 
+<!-- #endregion commentray:readme-user-guides -->
 ## Install surfaces
 
 | Surface              | Get it                                                                                                                                                                                                                                               |

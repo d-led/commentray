@@ -111,4 +111,5 @@ export type { MarkerValidationIssue } from "./marker-validation.js";
 export {
   validateIndexMarkerSemantics,
   validateMarkerBoundariesInSource,
+  validateMarkerRegionsAgainstIndexedSources,
 } from "./marker-validation.js";

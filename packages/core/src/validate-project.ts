@@ -10,6 +10,7 @@ import { defaultMetadataIndexPath, normalizeRepoRelativePath } from "./paths.js"
 import {
   validateIndexMarkerSemantics,
   validateMarkerBoundariesInSource,
+  validateMarkerRegionsAgainstIndexedSources,
 } from "./marker-validation.js";
 import { loadGitTrackedSourceTextsOutsideIndex } from "./git-relocation-scan.js";
 import { relocationHintMessages } from "./relocation-hints.js";
@@ -62,6 +63,10 @@ async function collectIssuesForLoadedIndex(
     for (const issue of validateMarkerBoundariesInSource(text, norm)) {
       issues.push({ level: issue.level, message: issue.message });
     }
+  }
+
+  for (const issue of validateMarkerRegionsAgainstIndexedSources(index, indexedSourceTexts)) {
+    issues.push({ level: issue.level, message: issue.message });
   }
 
   if (missingSourcesNorm.size === 0) return issues;
