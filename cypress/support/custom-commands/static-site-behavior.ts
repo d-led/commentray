@@ -23,7 +23,7 @@ Cypress.Commands.add("ShellPairBrowseLinkShouldAdvertiseOnSiteBrowsePage", () =>
     .and("not.include", "github.com");
 });
 
-Cypress.Commands.add("CommentRayedFilesSummaryClick", () => {
+Cypress.Commands.add("OpenCommentRayedFilesDisclosure", () => {
   cy.contains("summary", "Comment-rayed files").click();
 });
 
@@ -35,7 +35,7 @@ Cypress.Commands.add("CommentRayedFilesTreeShouldExposeAtLeastOneFileLink", () =
     .should("be.visible");
 });
 
-Cypress.Commands.add("TreeFirstBrowseFileLinkVisit", () => {
+Cypress.Commands.add("FollowFirstBrowseFileLinkInTree", () => {
   cy.get('[role="tree"]', { timeout: 15000 })
     .find('a.tree-file-link[href*="/browse/"]')
     .first()
@@ -58,7 +58,7 @@ Cypress.Commands.add("ShellPairBrowseLinkShouldAvoidStackedBrowseSegments", () =
     .and("not.contain", "/browse/browse/");
 });
 
-Cypress.Commands.add("NavSearchIndexGetInterceptAsUnavailable", () => {
+Cypress.Commands.add("InterceptNavSearchIndexAsUnavailable", () => {
   cy.intercept("GET", "**/commentray-nav-search.json", { statusCode: 503, body: "{}" }).as(
     "navJsonFail",
   );
@@ -68,7 +68,7 @@ Cypress.Commands.add("CommentRayedFilesTreeShouldContainReadmeLink", () => {
   cy.get('[role="tree"]', { timeout: 15000 }).contains("a", "README.md");
 });
 
-Cypress.Commands.add("SearchFieldType", (text) => {
+Cypress.Commands.add("TypeTextInSearchField", (text) => {
   cy.get(shellA11y.search.region).within(() => {
     cy.get('input[type="search"]').type(text);
   });
@@ -78,7 +78,7 @@ Cypress.Commands.add("SearchResultsPanelShouldBeVisible", () => {
   cy.get("#search-results").should("be.visible");
 });
 
-Cypress.Commands.add("SearchFieldEscapeKeyPress", () => {
+Cypress.Commands.add("PressEscapeInSearchField", () => {
   cy.get(shellA11y.search.region).within(() => {
     cy.get('input[type="search"]').type("{esc}");
   });
@@ -98,7 +98,7 @@ Cypress.Commands.add("SearchResultsHitMarksShouldExist", () => {
   cy.get("#search-results mark").should("have.length.at.least", 1);
 });
 
-Cypress.Commands.add("SearchFieldArrowDownKeyPress", () => {
+Cypress.Commands.add("PressArrowDownInSearchField", () => {
   cy.get(shellA11y.search.input).type("{downarrow}");
 });
 
@@ -110,18 +110,18 @@ Cypress.Commands.add("SearchResultsHitButtonsShouldExist", () => {
   cy.get("#search-results button.hit").should("have.length.at.least", 1);
 });
 
-Cypress.Commands.add("AngleSelectShouldExposeMainAndArchitectureOptions", () => {
+Cypress.Commands.add("OptionsOfAngleSelectShouldIncludeMainAndArchitecture", () => {
   cy.get(shellA11y.angleSelect).should("exist");
   cy.get(`${shellA11y.angleSelect} option`).should("have.length.at.least", 2);
   cy.get(`${shellA11y.angleSelect} option[value="main"]`).should("exist");
   cy.get(`${shellA11y.angleSelect} option[value="architecture"]`).should("exist");
 });
 
-Cypress.Commands.add("AngleSelectShouldHaveValue", (value) => {
+Cypress.Commands.add("DisplayedValueOfAngleSelectShouldBe", (value) => {
   cy.get(shellA11y.angleSelect).should("have.value", value);
 });
 
-Cypress.Commands.add("AngleSelectChooseValue", (value) => {
+Cypress.Commands.add("ChooseValueOfAngleSelect", (value) => {
   cy.get(shellA11y.angleSelect).select(value);
 });
 

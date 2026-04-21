@@ -1,24 +1,24 @@
 describe("E2E dual-scroll fixture — block-aware scroll sync", () => {
   beforeEach(() => {
-    cy.ViewportResizeForDualScrollScenario();
-    cy.VisitE2eDualScrollFixture();
+    cy.ApplyNarrowViewportForDualScrollFixture();
+    cy.GoToE2eDualScrollFixturePage();
   });
 
-  it("Dual-pane chrome and gutter artwork match the fixture’s pair and connector story", () => {
+  it("Fixture renders paired panes with gutter connector visuals", () => {
     cy.CurrentPageShouldDisplayDualPaneCodeBrowserChrome();
     cy.DocumentationPairStripShouldMentionDualScrollSourceFile();
     cy.ResizeSplitterGutterShouldExposeConnectorPaths();
   });
 
-  it("Scrolling the code pane drives the commentray pane once both start at the origin", () => {
+  it("Code scroll couples to the documentation body", () => {
     cy.CodeAndDocPanesScrollTopShouldBeZero();
-    cy.CodePaneScrollToMaxScroll();
+    cy.ScrollCodePaneToMaximum();
     cy.DocPaneBodyScrollTopShouldExceed(80);
   });
 
-  it("Scrolling the commentray pane drives the code pane once both start at the origin", () => {
+  it("Documentation scroll couples back to the code pane", () => {
     cy.CodeAndDocPanesScrollTopShouldBeZero();
-    cy.DocPaneBodyScrollToMaxScroll();
+    cy.ScrollDocPaneBodyToMaximum();
     cy.CodePaneScrollTopShouldExceed(80);
   });
 });

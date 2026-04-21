@@ -3,8 +3,8 @@ export {};
 declare global {
   namespace Cypress {
     interface Chainable {
-      VisitStaticSiteHome(): Chainable<void>;
-      VisitE2eDualScrollFixture(): Chainable<void>;
+      GoToStaticSiteHome(): Chainable<void>;
+      GoToE2eDualScrollFixturePage(): Chainable<void>;
 
       CurrentPageShouldDisplayCodeBrowserShell(): Chainable<void>;
       NavSearchArtifactGetRequestShouldReturnSchemaVersion(): Chainable<void>;
@@ -24,7 +24,7 @@ declare global {
       DualPanesSplitterSearchRegionShouldBeVisible(): Chainable<void>;
 
       SkipNavigationLinkShouldTargetMainContent(): Chainable<void>;
-      SearchFieldFocus(): Chainable<void>;
+      FocusOnSearchField(): Chainable<void>;
       SearchFieldShouldBeFocused(): Chainable<void>;
       SearchFieldOutlineStyleShouldNotBeNone(): Chainable<void>;
 
@@ -34,23 +34,23 @@ declare global {
 
       ColorThemeTriggerShouldAdvertisePopoverMenu(): Chainable<void>;
       ColorThemeMenuShouldStartHidden(): Chainable<void>;
-      ColorThemeTriggerClick(): Chainable<void>;
+      ClickColorThemeTrigger(): Chainable<void>;
       ColorThemeMenuShouldBeVisible(): Chainable<void>;
-      ColorThemePresetLightOptionClick(): Chainable<void>;
+      ClickLightPresetInColorThemeMenu(): Chainable<void>;
       ColorThemeTriggerShouldReportLightMode(): Chainable<void>;
-      MainLandmarkBodyClickTopLeft(): Chainable<void>;
+      ClickTopLeftOfMainLandmarkBody(): Chainable<void>;
       ColorThemeMenuShouldBeHidden(): Chainable<void>;
 
-      AngleSelectShouldExist(): Chainable<void>;
+      AngleSelectControlShouldExist(): Chainable<void>;
       SearchResultsShouldBePoliteLiveRegion(): Chainable<void>;
       BlankTargetLinksShouldIncludeNoopenerInRel(): Chainable<void>;
 
-      ViewportResizeForDualScrollScenario(): Chainable<void>;
+      ApplyNarrowViewportForDualScrollFixture(): Chainable<void>;
       CurrentPageShouldDisplayDualPaneCodeBrowserChrome(): Chainable<void>;
       DocumentationPairStripShouldMentionDualScrollSourceFile(): Chainable<void>;
       ResizeSplitterGutterShouldExposeConnectorPaths(): Chainable<void>;
-      CodePaneScrollToMaxScroll(): Chainable<void>;
-      DocPaneBodyScrollToMaxScroll(): Chainable<void>;
+      ScrollCodePaneToMaximum(): Chainable<void>;
+      ScrollDocPaneBodyToMaximum(): Chainable<void>;
       DocPaneBodyScrollTopShouldExceed(pixels: number): Chainable<void>;
       CodePaneScrollTopShouldExceed(pixels: number): Chainable<void>;
       CodeAndDocPanesScrollTopShouldBeZero(): Chainable<void>;
@@ -61,27 +61,27 @@ declare global {
       CommentrayPaneEmphasisShouldRenderAfterBlocks(): Chainable<void>;
       DocumentationHomeLinkShouldPointToRelativeIndex(): Chainable<void>;
       ShellPairBrowseLinkShouldAdvertiseOnSiteBrowsePage(): Chainable<void>;
-      CommentRayedFilesSummaryClick(): Chainable<void>;
+      OpenCommentRayedFilesDisclosure(): Chainable<void>;
       CommentRayedFilesTreeShouldExposeAtLeastOneFileLink(): Chainable<void>;
-      TreeFirstBrowseFileLinkVisit(): Chainable<void>;
+      FollowFirstBrowseFileLinkInTree(): Chainable<void>;
       ShellPairBrowseLinkShouldAvoidStackedBrowseSegments(): Chainable<void>;
 
-      NavSearchIndexGetInterceptAsUnavailable(): Chainable<void>;
+      InterceptNavSearchIndexAsUnavailable(): Chainable<void>;
       CommentRayedFilesTreeShouldContainReadmeLink(): Chainable<void>;
 
-      SearchFieldType(text: string): Chainable<void>;
+      TypeTextInSearchField(text: string): Chainable<void>;
       SearchResultsPanelShouldBeVisible(): Chainable<void>;
-      SearchFieldEscapeKeyPress(): Chainable<void>;
+      PressEscapeInSearchField(): Chainable<void>;
       SearchFieldValueShouldBeEmpty(): Chainable<void>;
       SearchResultsPanelShouldBeHidden(): Chainable<void>;
       SearchResultsHitMarksShouldExist(): Chainable<void>;
-      SearchFieldArrowDownKeyPress(): Chainable<void>;
+      PressArrowDownInSearchField(): Chainable<void>;
       SearchResultsShouldMentionIndexedSourceFiles(): Chainable<void>;
       SearchResultsHitButtonsShouldExist(): Chainable<void>;
 
-      AngleSelectShouldExposeMainAndArchitectureOptions(): Chainable<void>;
-      AngleSelectShouldHaveValue(value: string): Chainable<void>;
-      AngleSelectChooseValue(value: string): Chainable<void>;
+      OptionsOfAngleSelectShouldIncludeMainAndArchitecture(): Chainable<void>;
+      DisplayedValueOfAngleSelectShouldBe(value: string): Chainable<void>;
+      ChooseValueOfAngleSelect(value: string): Chainable<void>;
       CommentrayPaneShouldContainText(text: string): Chainable<void>;
       ShellPairBrowseLinkShouldMatchRelativeBrowseHtml(): Chainable<void>;
       ShellPairBrowseLinkShouldNotPointAtGithubHost(): Chainable<void>;

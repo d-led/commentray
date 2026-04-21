@@ -1,9 +1,9 @@
 describe("Commentray static site — accessibility", () => {
   beforeEach(() => {
-    cy.VisitStaticSiteHome();
+    cy.GoToStaticSiteHome();
   });
 
-  it("Document chrome exposes language, title, and landmarks for assistive tech", () => {
+  it("Page identity and landmarks support assistive navigation", () => {
     cy.DocumentShouldExposeHtmlLanguage();
     cy.DocumentTitleShouldMatchStaticSitePattern();
     cy.MetaDescriptionShouldMatchStaticSitePattern();
@@ -13,42 +13,42 @@ describe("Commentray static site — accessibility", () => {
     cy.ContentinfoLandmarkShouldExist();
   });
 
-  it("Reading layout wires dual panes, skip link, search labelling, and a polite results region", () => {
+  it("Primary reading surface exposes structure for keyboard and announcements", () => {
     cy.DualPanesSplitterSearchRegionShouldBeVisible();
     cy.SkipNavigationLinkShouldTargetMainContent();
     cy.SearchFieldShouldExposeVisibleLabelText();
     cy.SearchClearButtonShouldBeVisibleWithClearText();
     cy.WrapLinesCheckboxShouldHaveLabeledWrapLinesText();
-    cy.AngleSelectShouldExist();
+    cy.AngleSelectControlShouldExist();
     cy.SearchResultsShouldBePoliteLiveRegion();
   });
 
-  it("Search field shows a non-none outline once it receives focus", () => {
-    cy.SearchFieldFocus();
+  it("Focused search shows a visible focus ring", () => {
+    cy.FocusOnSearchField();
     cy.SearchFieldShouldBeFocused();
     cy.SearchFieldOutlineStyleShouldNotBeNone();
   });
 
-  it("Color theme popover opens, applies light, and dismisses without leaving the menu open", () => {
+  it("Theme picker applies a choice and can be dismissed without leaving the menu open", () => {
     cy.ColorThemeTriggerShouldAdvertisePopoverMenu();
     cy.ColorThemeMenuShouldStartHidden();
-    cy.ColorThemeTriggerClick();
+    cy.ClickColorThemeTrigger();
     cy.ColorThemeMenuShouldBeVisible();
-    cy.ColorThemePresetLightOptionClick();
+    cy.ClickLightPresetInColorThemeMenu();
     cy.ColorThemeTriggerShouldReportLightMode();
-    cy.MainLandmarkBodyClickTopLeft();
+    cy.ClickTopLeftOfMainLandmarkBody();
     cy.ColorThemeMenuShouldBeHidden();
   });
 
-  it("External navigation stays safe and toolbar icons stay decorative", () => {
+  it("External links and toolbar icons follow safe and decorative patterns", () => {
     cy.BlankTargetLinksShouldIncludeNoopenerInRel();
     cy.DocPairGithubToolbarLinksShouldMarkSvgsDecorative();
   });
 });
 
 describe("E2E dual-scroll fixture — accessibility shell", () => {
-  it("Fixture page keeps the same main landmark and skip affordance as the hub", () => {
-    cy.VisitE2eDualScrollFixture();
+  it("Fixture shell matches hub landmark and skip affordances", () => {
+    cy.GoToE2eDualScrollFixturePage();
     cy.CurrentPageShouldDisplayMainLandmarkAndSkipLink();
   });
 });

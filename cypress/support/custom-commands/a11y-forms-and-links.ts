@@ -8,7 +8,7 @@ Cypress.Commands.add("SkipNavigationLinkShouldTargetMainContent", () => {
     });
 });
 
-Cypress.Commands.add("SearchFieldFocus", () => {
+Cypress.Commands.add("FocusOnSearchField", () => {
   cy.get(shellA11y.search.input).focus();
 });
 
@@ -43,7 +43,7 @@ Cypress.Commands.add("ColorThemeMenuShouldStartHidden", () => {
   cy.get(shellA11y.colorThemeMenu).should("have.attr", "hidden");
 });
 
-Cypress.Commands.add("ColorThemeTriggerClick", () => {
+Cypress.Commands.add("ClickColorThemeTrigger", () => {
   cy.get(shellA11y.colorThemeTrigger).click();
 });
 
@@ -51,7 +51,7 @@ Cypress.Commands.add("ColorThemeMenuShouldBeVisible", () => {
   cy.get(shellA11y.colorThemeMenu).should("be.visible");
 });
 
-Cypress.Commands.add("ColorThemePresetLightOptionClick", () => {
+Cypress.Commands.add("ClickLightPresetInColorThemeMenu", () => {
   cy.get(shellA11y.colorThemeMenu).find('[data-commentray-theme-value="light"]').click();
 });
 
@@ -59,7 +59,7 @@ Cypress.Commands.add("ColorThemeTriggerShouldReportLightMode", () => {
   cy.get(shellA11y.colorThemeTrigger).should("have.attr", "data-commentray-trigger-mode", "light");
 });
 
-Cypress.Commands.add("MainLandmarkBodyClickTopLeft", () => {
+Cypress.Commands.add("ClickTopLeftOfMainLandmarkBody", () => {
   cy.get(shellA11y.main).click("topLeft", { force: true });
 });
 
@@ -67,7 +67,7 @@ Cypress.Commands.add("ColorThemeMenuShouldBeHidden", () => {
   cy.get(shellA11y.colorThemeMenu).should("have.attr", "hidden");
 });
 
-Cypress.Commands.add("AngleSelectShouldExist", () => {
+Cypress.Commands.add("AngleSelectControlShouldExist", () => {
   cy.get(shellA11y.angleSelect).should("exist");
 });
 

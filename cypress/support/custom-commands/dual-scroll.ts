@@ -1,6 +1,6 @@
 import { shellA11y } from "../shell-a11y";
 
-Cypress.Commands.add("ViewportResizeForDualScrollScenario", () => {
+Cypress.Commands.add("ApplyNarrowViewportForDualScrollFixture", () => {
   cy.viewport(1280, 480);
 });
 
@@ -19,14 +19,14 @@ Cypress.Commands.add("ResizeSplitterGutterShouldExposeConnectorPaths", () => {
   cy.get(`${shellA11y.resizeSplitter} svg path`).should("have.length.at.least", 4);
 });
 
-Cypress.Commands.add("CodePaneScrollToMaxScroll", () => {
+Cypress.Commands.add("ScrollCodePaneToMaximum", () => {
   cy.get("#code-pane").then(($pane) => {
     const el = $pane[0];
     el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
   });
 });
 
-Cypress.Commands.add("DocPaneBodyScrollToMaxScroll", () => {
+Cypress.Commands.add("ScrollDocPaneBodyToMaximum", () => {
   cy.get("#doc-pane-body").then(($body) => {
     const el = $body[0];
     el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);

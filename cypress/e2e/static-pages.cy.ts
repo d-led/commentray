@@ -1,96 +1,96 @@
 describe("Commentray static site (GitHub Pages build)", () => {
-  it("Published nav search artifact is valid JSON the client can bootstrap from", () => {
+  it("Nav search bootstrap artifact is well-formed", () => {
     cy.NavSearchArtifactGetRequestShouldReturnSchemaVersion();
   });
 
   describe("given the built index is served at /", () => {
     beforeEach(() => {
-      cy.VisitStaticSiteHome();
+      cy.GoToStaticSiteHome();
     });
 
-    it("Hub shell, pair browse metadata, and file tree read as one coherent workspace", () => {
+    it("Index behaves as a coherent documentation hub", () => {
       cy.CurrentPageShouldDisplayCodeBrowserShell();
       cy.CommentrayPaneReadmeLinksShouldUseGithubBlobUrls();
       cy.CommentrayPaneEmphasisShouldRenderAfterBlocks();
       cy.DocumentationHomeLinkShouldPointToRelativeIndex();
       cy.ShellPairBrowseLinkShouldAdvertiseOnSiteBrowsePage();
-      cy.CommentRayedFilesSummaryClick();
+      cy.OpenCommentRayedFilesDisclosure();
       cy.CommentRayedFilesTreeShouldExposeAtLeastOneFileLink();
     });
 
-    it("Opening a browse page from the tree stays on-site without stacking /browse/browse/", () => {
-      cy.CommentRayedFilesSummaryClick();
-      cy.TreeFirstBrowseFileLinkVisit();
+    it("Pair browse stays on-site without path stacking", () => {
+      cy.OpenCommentRayedFilesDisclosure();
+      cy.FollowFirstBrowseFileLinkInTree();
       cy.CurrentPageShouldDisplayCodeBrowserShell();
       cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
     });
 
-    it("Escape clears the query and collapses search hits", () => {
-      cy.SearchFieldType("commentray");
+    it("Search dismisses cleanly from the keyboard", () => {
+      cy.TypeTextInSearchField("commentray");
       cy.SearchResultsPanelShouldBeVisible();
-      cy.SearchFieldEscapeKeyPress();
+      cy.PressEscapeInSearchField();
       cy.SearchFieldValueShouldBeEmpty();
       cy.SearchResultsPanelShouldBeHidden();
     });
 
-    it("Search hits surface mark elements for matched tokens", () => {
-      cy.SearchFieldType("commentray");
+    it("Search results emphasize matched tokens in context", () => {
+      cy.TypeTextInSearchField("commentray");
       cy.SearchResultsPanelShouldBeVisible();
       cy.SearchResultsHitMarksShouldExist();
     });
 
-    it("ArrowDown on an empty field lists indexed sources without typing a query", () => {
-      cy.SearchFieldFocus();
-      cy.SearchFieldArrowDownKeyPress();
+    it("Empty search offers a navigable index hint", () => {
+      cy.FocusOnSearchField();
+      cy.PressArrowDownInSearchField();
       cy.SearchResultsPanelShouldBeVisible();
       cy.SearchResultsShouldMentionIndexedSourceFiles();
       cy.SearchResultsHitButtonsShouldExist();
     });
 
-    it("Angle control swaps rendered bodies and keeps pair browse links on-site", () => {
-      cy.AngleSelectShouldExposeMainAndArchitectureOptions();
-      cy.AngleSelectShouldHaveValue("main");
+    it("Angle switches refresh the pair while keeping browse targets on-site", () => {
+      cy.OptionsOfAngleSelectShouldIncludeMainAndArchitecture();
+      cy.DisplayedValueOfAngleSelectShouldBe("main");
       cy.CommentrayPaneShouldContainText("quick-start");
       cy.ShellPairBrowseLinkShouldMatchRelativeBrowseHtml();
       cy.ShellPairBrowseLinkShouldNotPointAtGithubHost();
 
-      cy.AngleSelectChooseValue("architecture");
-      cy.AngleSelectShouldHaveValue("architecture");
+      cy.ChooseValueOfAngleSelect("architecture");
+      cy.DisplayedValueOfAngleSelectShouldBe("architecture");
       cy.CommentrayPaneShouldContainText("architecture angle");
       cy.ShellPairBrowseLinkShouldMatchRelativeBrowseHtml();
       cy.ShellPairBrowseLinkShouldNotPointAtGithubHost();
 
-      cy.AngleSelectChooseValue("main");
-      cy.AngleSelectShouldHaveValue("main");
+      cy.ChooseValueOfAngleSelect("main");
+      cy.DisplayedValueOfAngleSelectShouldBe("main");
       cy.CommentrayPaneShouldContainText("quick-start");
       cy.ShellPairBrowseLinkShouldMatchRelativeBrowseHtml();
       cy.ShellPairBrowseLinkShouldNotPointAtGithubHost();
     });
 
-    it("Changing angle resets an in-flight search back to a clean slate", () => {
-      cy.SearchFieldType("quickstart");
+    it("Angle change clears stale search state", () => {
+      cy.TypeTextInSearchField("quickstart");
       cy.SearchResultsPanelShouldBeVisible();
-      cy.AngleSelectChooseValue("architecture");
+      cy.ChooseValueOfAngleSelect("architecture");
       cy.SearchFieldValueShouldBeEmpty();
       cy.SearchResultsPanelShouldBeHidden();
     });
 
-    it("Mermaid survives angle changes without syntax-error placeholders", () => {
+    it("Diagrams stay present and clean across angles", () => {
       cy.DocPaneMermaidShouldShowDiagramOrMarkup();
-      cy.AngleSelectChooseValue("architecture");
-      cy.AngleSelectShouldHaveValue("architecture");
+      cy.ChooseValueOfAngleSelect("architecture");
+      cy.DisplayedValueOfAngleSelectShouldBe("architecture");
       cy.DocPaneMermaidShouldShowDiagramOrMarkup();
     });
   });
 
   describe("when the nav search index cannot be fetched", () => {
     beforeEach(() => {
-      cy.NavSearchIndexGetInterceptAsUnavailable();
-      cy.VisitStaticSiteHome();
+      cy.InterceptNavSearchIndexAsUnavailable();
+      cy.GoToStaticSiteHome();
     });
 
-    it("The comment-rayed files disclosure still reaches README in the tree", () => {
-      cy.CommentRayedFilesSummaryClick();
+    it("File tree remains reachable when search bootstrap fails", () => {
+      cy.OpenCommentRayedFilesDisclosure();
       cy.CommentRayedFilesTreeShouldContainReadmeLink();
     });
   });

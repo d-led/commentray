@@ -1,10 +1,10 @@
 import { shellA11y } from "../shell-a11y";
 
-Cypress.Commands.add("VisitStaticSiteHome", () => {
+Cypress.Commands.add("GoToStaticSiteHome", () => {
   cy.visit("/");
 });
 
-Cypress.Commands.add("VisitE2eDualScrollFixture", () => {
+Cypress.Commands.add("GoToE2eDualScrollFixturePage", () => {
   cy.visit("/__e2e__/dual-scroll-sync/");
 });
 
