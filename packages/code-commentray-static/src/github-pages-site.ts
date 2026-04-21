@@ -212,7 +212,7 @@ function staticRenderOptions(input: {
 
 export type BuildGithubPagesStaticSiteOptions = {
   repoRoot: string;
-  /** Toolbar “Rendered with …” link; defaults to the public Commentray repository. */
+  /** Footer “Rendered with …” link; defaults to the public Commentray repository. */
   toolHomeUrl?: string;
 };
 

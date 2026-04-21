@@ -4,6 +4,10 @@ Hands-on notes for working on Commentray itself: building, debugging, and
 observing the editor extension while dogfooding. If you just want to
 install Commentray to use it, see the top-level `README.md`.
 
+## Dogfood: README on GitHub Pages
+
+This repository pairs the root **`README.md`** with longer commentary under **`.commentray/source/README.md/`** for the **`[static_site]`** build (see the root **`.commentray.toml`**). The README stays relatively factual; the commentary file is the voice-over (trade-offs, cookbook, diagrams). Open the **[published site](https://d-led.github.io/commentray/)** to try scroll-linked panes on the static output without installing anything.
+
 ## Layout
 
 - `packages/core` — shared library (`.commentray.toml` parsing, path

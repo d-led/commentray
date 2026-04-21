@@ -1,10 +1,20 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { escapeHtml } from "./html-utils.js";
+import { hljsStylesheetThemes } from "./hljs-stylesheet-themes.js";
 import {
   type CommentrayOutputUrlOptions,
   renderFencedCode,
   renderMarkdownToHtml,
 } from "./markdown-pipeline.js";
 import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
+
+const sideBySideLayoutCss = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "side-by-side-layout.css"),
+  "utf8",
+);
 
 export type SideBySideOptions = {
   title?: string;
@@ -34,8 +44,7 @@ export async function renderSideBySideHtml(opts: SideBySideOptions): Promise<str
   const mermaidScript = mermaidRuntimeScriptHtml(opts.includeMermaidRuntime);
 
   const title = opts.title ?? "Commentray";
-  const hljs = opts.hljsTheme ?? "github";
-  const hljsDark = opts.hljsTheme?.includes("dark") ? opts.hljsTheme : "github-dark";
+  const { hljsLight, hljsDark } = hljsStylesheetThemes(opts.hljsTheme);
   const hljsCdnBase = "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles";
 
   return `<!doctype html>
@@ -44,18 +53,10 @@ export async function renderSideBySideHtml(opts: SideBySideOptions): Promise<str
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title)}</title>
-    <link rel="stylesheet" href="${hljsCdnBase}/${escapeHtml(hljs)}.min.css" media="(prefers-color-scheme: light)" />
+    <link rel="stylesheet" href="${hljsCdnBase}/${escapeHtml(hljsLight)}.min.css" media="(prefers-color-scheme: light)" />
     <link rel="stylesheet" href="${hljsCdnBase}/${escapeHtml(hljsDark)}.min.css" media="(prefers-color-scheme: dark)" />
     <style>
-      :root { color-scheme: light dark; }
-      body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-      .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 100vh; }
-      .pane { overflow: auto; padding: 16px; border-right: 1px solid color-mix(in oklab, CanvasText 20%, Canvas); }
-      .pane:last-child { border-right: none; }
-      .pane h2 { margin-top: 0; font-size: 14px; letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.8; }
-      pre { margin: 0; }
-      .commentray { font-size: 15px; line-height: 1.45; }
-      .commentray img { max-width: 100%; height: auto; }
+${sideBySideLayoutCss}
     </style>
   </head>
   <body>

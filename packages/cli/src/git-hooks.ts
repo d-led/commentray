@@ -10,11 +10,19 @@ export const COMMENTRAY_HOOK_END = "# <<<< commentray-cli-hook v1 END >>>>";
 const LEGACY_HOOK_BEGIN = "# <<<< commentary-cli-hook v1 BEGIN >>>>";
 const LEGACY_HOOK_END = "# <<<< commentary-cli-hook v1 END >>>>";
 
-/** Shell fragment: validate from repo root when CLI is installed under `node_modules/.bin`. */
+/**
+ * Shell fragment: run `validate` from the Git repo root.
+ * In the Commentray monorepo, prefer a built workspace CLI (`packages/cli/dist/cli.js`)
+ * so pre-commit exercises local sources instead of only the `node_modules/.bin` shim.
+ */
 export const COMMENTRAY_PRE_COMMIT_BODY = `root=$(git rev-parse --show-toplevel)
-commentray_bin="$root/node_modules/.bin/commentray"
-if [ -f "$root/.commentray.toml" ] && [ -x "$commentray_bin" ]; then
-  "$commentray_bin" validate || exit $?
+if [ -f "$root/.commentray.toml" ]; then
+  dev_cli="$root/packages/cli/dist/cli.js"
+  if [ -f "$dev_cli" ]; then
+    node "$dev_cli" validate || exit $?
+  elif [ -x "$root/node_modules/.bin/commentray" ]; then
+    "$root/node_modules/.bin/commentray" validate || exit $?
+  fi
 fi`;
 
 export function commentrayManagedHookBlock(): string {

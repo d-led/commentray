@@ -3,6 +3,7 @@ import { Buffer } from "node:buffer";
 import { CURRENT_SCHEMA_VERSION } from "@commentray/core";
 import { describe, expect, it } from "vitest";
 
+import { COMMENTRAY_COLOR_THEME_STORAGE_KEY } from "./code-browser-color-theme.js";
 import { renderCodeBrowserHtml } from "./code-browser.js";
 
 function textContentWithoutTags(html: string): string {
@@ -12,6 +13,12 @@ function textContentWithoutTags(html: string): string {
     if (next === cur) return cur;
     cur = next;
   }
+}
+
+/** First `role="banner"` header — where primary chrome (search, wrap, theme) lives. */
+function bannerRegionHtml(html: string): string {
+  const m = /<header[^>]*role="banner"[^>]*>[\s\S]*?<\/header>/i.exec(html);
+  return m?.[0] ?? "";
 }
 
 describe("Code browser page — layout shell and search", () => {
@@ -41,35 +48,71 @@ describe("Code browser page — layout shell and search", () => {
       staticSearchScope: "commentray-and-paths",
     });
     expect(html).toContain('placeholder="Filename, path, or keywords…"');
-    expect(html).toContain("This pair + merged");
     expect(html).toContain("commentray-nav-search.json");
     expect(html).toContain('data-search-scope="commentray-and-paths"');
     expect(html).toContain('data-search-file-path="src/a.ts"');
     expect(html).toContain('data-search-commentray-path=".commentray/source/src/a.ts.md"');
   });
 
-  it("should ship resizable panes, wrap toggle, search, highlighted source, and rendered Markdown", async () => {
+  it("should expose appearance controls and a head script so the first paint matches saved theme", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "y",
+    });
+    const banner = bannerRegionHtml(html);
+    expect(banner).toMatch(/aria-haspopup="menu"/);
+    expect(banner).toMatch(/role="menu"/);
+    expect(banner).toMatch(/role="menuitemradio"[^>]*>System</);
+    expect(banner).toMatch(/role="menuitemradio"[^>]*>Light</);
+    expect(banner).toMatch(/role="menuitemradio"[^>]*>Dark</);
+    expect(html).toMatch(/<html[^>]*data-commentray-theme="system"/i);
+    expect(html).toContain(COMMENTRAY_COLOR_THEME_STORAGE_KEY);
+  });
+});
+
+describe("Code browser page — document shell and chrome", () => {
+  it("should link github for light and the configured dark theme for dark when syntax theme is github-dark", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "const x = 1;",
+      language: "ts",
+      commentrayMarkdown: "## Notes\n",
+      hljsTheme: "github-dark",
+    });
+    expect(html).toMatch(/github\.min\.css" media="\(prefers-color-scheme: light\)"/);
+    expect(html).toMatch(/github-dark\.min\.css" media="\(prefers-color-scheme: dark\)"/);
+  });
+
+  it("given a TypeScript source and Markdown pair, should publish a navigable reading shell with search, split panes, wrap, and theme", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
       code: "const x = 1;",
       language: "ts",
       commentrayMarkdown: "## Notes\n\nHello.",
     });
+    const banner = bannerRegionHtml(html);
+    const plain = textContentWithoutTags(html);
+
+    expect(banner).toContain('aria-label="View options"');
+    expect(banner).toMatch(/<h1[^>]*>\s*Demo\s*</i);
+    expect(banner).toMatch(/aria-haspopup="menu"/);
+
     expect(html).toContain('aria-label="Resize panes"');
     expect(html).toContain('role="region" aria-label="Search"');
     expect(html).toContain('for="search-q"');
-    expect(html).toContain("Wrap code lines");
-    expect(textContentWithoutTags(html)).toContain("const x = 1;");
+    expect(banner).toContain("Wrap code lines");
+
+    expect(plain).toContain("const x = 1;");
+    expect(plain).toContain("Notes");
     expect(html).toMatch(/hljs|language-ts/);
-    expect(html).toContain("Notes");
-    expect(html).toContain(
-      '<meta name="description" content="Demo — Side-by-side source and commentray documentation." />',
+
+    expect(html).toMatch(
+      /<meta\s+name="description"\s+content="Demo — Side-by-side source and commentray documentation."\s*\/>/,
     );
-    expect(html).toContain('<main id="main-content" class="app__main" tabindex="-1">');
-    expect(html).toContain('<header class="toolbar" role="banner" aria-label="View options">');
-    expect(html).toContain('<h1 class="sr-only">Demo</h1>');
-    expect(html).toContain('class="skip-link" href="#main-content"');
-    expect(html).toContain('role="banner"');
+    expect(html).toMatch(/<main\b[^>]*id="main-content"/);
+    expect(html).toMatch(/<a[^>]+href="#main-content"[^>]*>\s*Skip to main content\s*</i);
   });
 
   it("should use a custom meta description when provided", async () => {
@@ -121,7 +164,7 @@ describe("Code browser page — toolbar chrome", () => {
         { label: "CONTRIBUTING", href: "https://github.com/acme/demo/blob/main/CONTRIBUTING.md" },
       ],
     });
-    expect(html).toContain('class="toolbar-related"');
+    expect(html).toContain('aria-label="Open other repository files on GitHub"');
     expect(html).toContain("Also on GitHub");
     expect(html).toContain('href="https://github.com/acme/demo/blob/main/CONTRIBUTING.md"');
   });
@@ -151,10 +194,14 @@ describe("Code browser page — toolbar chrome", () => {
       documentedNavJsonUrl: "./commentray-nav-search.json",
       documentedPairsEmbeddedB64: pairsB64,
     });
-    expect(html).toContain('aria-label="Source file on GitHub"');
-    expect(html).toContain('aria-label="Companion commentray on GitHub"');
-    expect(html).toContain('href="https://github.com/acme/demo/blob/main/README.md"');
+    expect(html).toContain('aria-label="Current documentation pair"');
+    expect(html).toContain("README.md");
+    expect(html).toContain(".commentray/source/README.md.md");
+    expect(html).toContain(
+      'data-commentray-pair-browse-href="https://github.com/acme/demo/blob/main/.commentray/source/README.md.md"',
+    );
     expect(html).toContain("Comment-rayed files");
+    expect(html).toContain('placeholder="Filename, path, or keywords…"');
     expect(html).toContain('placeholder="Filter by path…"');
     expect(html).toContain('role="tree"');
     expect(html).toContain('data-nav-json-url="./commentray-nav-search.json"');
@@ -210,8 +257,8 @@ describe("Code browser page — source line chrome", () => {
       language: "ts",
       commentrayMarkdown: "body",
     });
-    expect(html).toContain('class="code-line-stack"');
-    expect(html).toContain("--code-ln-min-ch:3");
+    expect(html).toMatch(/>100<\/span>/);
+    expect(html).toMatch(/--code-ln-min-ch:\s*3/);
   });
 });
 
@@ -262,8 +309,7 @@ describe("Code browser page — toolbar link policy", () => {
     expect(html).toContain('aria-label="View repository on GitHub"');
     expect(html).toContain('href="https://github.com/example/demo"');
     expect(html).toContain('href="https://github.com/d-led/commentray"');
-    expect(html).toContain("Rendered with");
-    expect(html).toMatch(/toolbar-attribution__version[^>]*>v\d+\.\d+\.\d+/);
+    expect(html).toMatch(/<footer[\s\S]*Rendered with[\s\S]*v\d+\.\d+\.\d+[\s\S]*<\/footer>/);
   });
 
   it("should prefer same-site documentation home over GitHub when siteHubUrl is set", async () => {
@@ -282,7 +328,7 @@ describe("Code browser page — toolbar link policy", () => {
     expect(html).toContain('href="https://github.com/d-led/commentray"');
   });
 
-  it("should include a footer with ISO and local wall-clock text for HTML generation", async () => {
+  it("should include a footer with ISO and local wall-clock when no tool home URL is set", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
       code: "x",
@@ -292,6 +338,20 @@ describe("Code browser page — toolbar link policy", () => {
     });
     expect(html).toContain("HTML generated");
     expect(html).toContain('datetime="2026-05-01T12:00:00.000Z"');
+  });
+
+  it("should put Commentray attribution in the footer with version and the same build timestamp", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      toolHomeUrl: "https://github.com/d-led/commentray",
+      builtAt: new Date("2026-05-01T12:00:00.000Z"),
+    });
+    expect(html).toMatch(/<footer[\s\S]*Rendered with[\s\S]*v\d+\.\d+\.\d+<\/span>\s*:\s*<time/);
+    expect(html).toContain('datetime="2026-05-01T12:00:00.000Z"');
+    expect(html).not.toContain("HTML generated");
   });
 
   it("should omit executable toolbar links when URLs are not http(s)", async () => {
@@ -442,8 +502,7 @@ describe("Code browser page — block markers and scroll sync payload", () => {
       },
     });
     expect(html).toContain('data-layout="stretch"');
-    expect(html).toContain('class="stretch-code-stack"');
-    expect(html).not.toContain("rowspan");
+    expect(html).toContain("Sync");
     expect(html).not.toContain('id="doc-pane"');
   });
 });

@@ -71,6 +71,26 @@ describe("Commentray static view — accessibility", () => {
       cy.get(shellA11y.wrapLinesLabel).should("contain", "Wrap code lines");
     });
 
+    it("exposes a compact color theme control with a popover menu", () => {
+      cy.get(shellA11y.colorThemeTrigger)
+        .should("be.visible")
+        .and("have.attr", "aria-haspopup", "menu")
+        .and("have.attr", "aria-expanded", "false");
+      cy.get(shellA11y.colorThemeMenu).should("have.attr", "hidden");
+      cy.get(shellA11y.colorThemeTrigger).click();
+      cy.get(shellA11y.colorThemeMenu)
+        .should("be.visible")
+        .find('[data-commentray-theme-value="light"]')
+        .click();
+      cy.get(shellA11y.colorThemeTrigger).should(
+        "have.attr",
+        "data-commentray-trigger-mode",
+        "light",
+      );
+      cy.get(shellA11y.main).click("topLeft", { force: true });
+      cy.get(shellA11y.colorThemeMenu).should("have.attr", "hidden");
+    });
+
     it("exposes the angle selector with a programmatic name", () => {
       cy.get(shellA11y.angleSelect).should("exist");
     });
@@ -90,7 +110,7 @@ describe("Commentray static view — accessibility", () => {
     });
   });
 
-  describe("decorative GitHub icons in the toolbar", () => {
+  describe("decorative icons in the banner toolbar", () => {
     it("marks icon-only control affordances as hidden from assistive tech where used", () => {
       cy.shouldHideDecorativeSvgsInDocPairLinks();
     });

@@ -5,10 +5,11 @@ set -euo pipefail
 # considered done. Runs:
 #   - prettier format check
 #   - actionlint (GitHub Actions workflows; Go binary, see scripts/actionlint.sh)
-#   - ESLint (project + refactor metrics)
+#   - ESLint (project + refactor metrics) and Stylelint (first-party CSS)
 #   - duplicate detection (jscpd)
 #   - tsc -b across the monorepo
-#   - unit tests
+#   - unit tests (includes ArchUnitTS rules under packages/architecture/ vs
+#     tsconfig.archunit.json — see .commentray/source/README.md/architecture.md)
 #
 # Stops at the first failing step and prints which step failed (see messages
 # above the failing tool output — e.g. format:check names the first drifted file).

@@ -67,12 +67,15 @@ async function cmdValidate(): Promise<number> {
 
 async function cmdDoctor(): Promise<number> {
   const code = await cmdValidate();
-  const gitPath = path.join(process.cwd(), ".git");
+  const repoRoot = await repoRootFromCwd();
+  const gitPath = path.join(repoRoot, ".git");
   try {
     await fs.access(gitPath);
     console.log(`OK doctor: Git checkout detected at ${gitPath}`);
   } catch {
-    logCliWarning("[warn] No .git directory detected in cwd; SCM features require a Git checkout.");
+    logCliWarning(
+      `[warn] No .git at resolved project root (${repoRoot}); SCM features require a Git checkout.`,
+    );
   }
   return code;
 }

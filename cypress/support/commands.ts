@@ -43,7 +43,9 @@ Cypress.Commands.add("shouldDisplayCodeBrowserShell", () => {
   cy.get(shellA11y.search.region).within(() => {
     cy.get('input[type="search"]').should("be.visible");
   });
-  cy.contains("HTML generated").should("be.visible");
+  cy.get(shellA11y.colorThemeTrigger).should("exist");
+  cy.get(shellA11y.contentinfo).should("be.visible");
+  cy.get(`${shellA11y.contentinfo} time`).should("be.visible");
 });
 
 Cypress.Commands.add("shouldExposeNavSearchArtifact", () => {
@@ -54,7 +56,7 @@ Cypress.Commands.add("shouldExposeNavSearchArtifact", () => {
 });
 
 Cypress.Commands.add("shouldHideDecorativeSvgsInDocPairLinks", () => {
-  cy.get(`${shellA11y.documentationPairLandmark} a[aria-label]`).each(($a) => {
+  cy.get(`${shellA11y.banner} a.toolbar-github`).each(($a) => {
     cy.wrap($a).find('svg[aria-hidden="true"]').should("exist");
   });
 });

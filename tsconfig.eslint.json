@@ -25,6 +25,7 @@
     "packages/vscode/src/**/*.ts",
     "packages/code-commentray-static/src/**/*.ts",
     "packages/code-commentray-static/fixtures/**/*.ts",
+    "packages/architecture/**/*.ts",
     "scripts/**/*.mjs"
   ],
   "exclude": ["**/node_modules/**", "**/dist/**"]

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * Post-`npm run pages:build` checks for `_site/`:
- * - Toolbar GitHub blob URLs match `https://github.com/<owner>/<repo>/blob/<branch>/…` (no doubled `/blob/`).
- * - Same-site Doc toolbar uses `./browse/<slug>.html` and resolves without `/browse/browse/` stacking.
+ * - Optional GitHub blob URLs match `https://github.com/<owner>/<repo>/blob/<branch>/…` (no doubled `/blob/`).
+ * - `#shell` carries `data-commentray-pair-browse-href` (same-site `./browse/<slug>.html` or GitHub blob) and resolves without `/browse/browse/` stacking.
  *
- * Optional live check (network): `COMMENTRAY_VALIDATE_PAGES_LIVE=1` sends HEAD to the hub source URL.
+ * Optional live check (network): `COMMENTRAY_VALIDATE_PAGES_LIVE=1` sends HEAD to the first GitHub blob URL found in the hub index.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -26,8 +26,19 @@ function fail(msg) {
   process.exit(1);
 }
 
-function hrefFor(html, id) {
-  const m = new RegExp(`id="${id}"[^>]*href="([^"]+)"`).exec(html);
+/** Reads a `name="…"` attribute from the opening tag of `#shell`. */
+function shellAttr(html, attrName) {
+  const m = /<div\b[^>]*\bid="shell"\b[^>]*>/.exec(html);
+  if (!m) return null;
+  const tag = m[0];
+  const am = new RegExp(`\\b${attrName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}="([^"]*)"`).exec(
+    tag,
+  );
+  return am?.[1] ?? null;
+}
+
+function firstGithubBlobHrefIn(html) {
+  const m = /href="(https:\/\/github\.com\/[^"]+\/blob\/[^"]+)"/.exec(html);
   return m?.[1] ?? null;
 }
 
@@ -44,7 +55,7 @@ function assertGithubBlobUrl(label, href) {
   return m.groups;
 }
 
-function assertDocToolbarHref(label, href) {
+function assertDocPairHref(label, href) {
   if (href.startsWith("https://github.com/")) {
     assertGithubBlobUrl(`${label} (GitHub fallback)`, href);
     return;
@@ -87,17 +98,17 @@ async function assertBrowseMatrixResolves(docHubHref, pairNav, origins, pathname
 async function validateHubIndex(indexHtml) {
   assertNoBrowseStack(indexHtml, "hub index.html");
 
-  const srcHref = hrefFor(indexHtml, "toolbar-source-github");
+  const srcHref = firstGithubBlobHrefIn(indexHtml);
   if (srcHref) {
-    assertGithubBlobUrl("hub toolbar-source-github", srcHref);
+    assertGithubBlobUrl("hub (first GitHub blob link in HTML)", srcHref);
     await maybeHeadGithub(srcHref);
   }
 
-  const docHubHref = hrefFor(indexHtml, "toolbar-commentray-github");
+  const docHubHref = shellAttr(indexHtml, "data-commentray-pair-browse-href");
   if (!docHubHref) {
-    fail('hub index.html: missing id="toolbar-commentray-github"');
+    fail('hub index.html: missing data-commentray-pair-browse-href on id="shell"');
   }
-  assertDocToolbarHref("hub toolbar-commentray-github", docHubHref);
+  assertDocPairHref("hub shell data-commentray-pair-browse-href", docHubHref);
 
   const origins = ["https://d-led.github.io", "http://127.0.0.1:14173"];
   const slug = /^\.\/browse\/([^/]+\.html)$/.exec(docHubHref)?.[1];
@@ -110,19 +121,19 @@ async function validateHubIndex(indexHtml) {
 async function validateBrowsePage(name, html) {
   assertNoBrowseStack(html, `browse/${name}`);
 
-  const src = hrefFor(html, "toolbar-source-github");
-  if (src) assertGithubBlobUrl(`browse/${name} toolbar-source-github`, src);
+  const src = firstGithubBlobHrefIn(html);
+  if (src) assertGithubBlobUrl(`browse/${name} (first GitHub blob link)`, src);
 
-  const doc = hrefFor(html, "toolbar-commentray-github");
-  if (!doc) fail(`browse/${name}: missing toolbar-commentray-github`);
-  assertDocToolbarHref(`browse/${name} toolbar-commentray-github`, doc);
+  const doc = shellAttr(html, "data-commentray-pair-browse-href");
+  if (!doc) fail(`browse/${name}: missing data-commentray-pair-browse-href on #shell`);
+  assertDocPairHref(`browse/${name} shell data-commentray-pair-browse-href`, doc);
 
   if (!existsSync(pairNavPath) || !BROWSE_HTML_RE.test(doc)) return;
   const { resolveStaticBrowseHref } = await import(pathToFileURL(pairNavPath).href);
   const slug = /^\.\/browse\/([^/]+\.html)$/.exec(doc)[1];
   const resolved = resolveStaticBrowseHref(doc, `/browse/${slug}`, "http://127.0.0.1:14173");
   if (resolved.includes("/browse/browse/")) {
-    fail(`browse/${name}: resolved Doc toolbar → ${resolved}`);
+    fail(`browse/${name}: resolved pair browse → ${resolved}`);
   }
 }
 

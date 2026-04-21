@@ -1,6 +1,6 @@
 # What Commentray detects (and where)
 
-Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. Each layer catches different failures at different moments. None of them replace the others: use **hooks** and, in **your own** CI, **`commentray validate`** on pull requests when you want blocking checks; run **`validate`** manually or from scripts; use **`doctor`** for troubleshooting; use the **extension** for feedback while you type. (This monorepo’s default GitHub Actions **quick** job runs the **quality gate** and tests—it does not invoke `commentray validate` unless you add a step.)
+Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. Each layer catches different failures at different moments. None of them replace the others: use **hooks** and, in **your own** CI, **`commentray validate`** on pull requests when you want blocking checks; run **`validate`** manually or from scripts; use **`doctor`** for troubleshooting; use the **extension** for feedback while you type. (This monorepo’s default GitHub Actions **quick** job runs the **quality gate** and tests—it does not invoke `commentray validate` unless you add a step. A later job builds the static site and runs Cypress end-to-end checks; that job also does not run `commentray validate` unless you add a step.)
 
 ## Pre-commit hook (`commentray init scm`)
 

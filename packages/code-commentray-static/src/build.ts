@@ -33,7 +33,7 @@ export type BuildCommentrayStaticOptions = {
   githubRepoUrl?: string;
   /** Same-site link to the static hub (`./` on index, `../index.html` from `browse/`). */
   siteHubUrl?: string;
-  /** Toolbar "Rendered with Commentray" link plus semver (`http`/`https` only). */
+  /** Footer "Rendered with Commentray" link plus semver and build time (`http`/`https` only). */
   toolHomeUrl?: string;
   /** When set, rewrites local and GitHub blob links in commentray for static HTML output. */
   commentrayOutputUrls?: CommentrayOutputUrlOptions;

@@ -39,10 +39,10 @@ export const shellA11y = {
   wrapLinesCheckbox: "#wrap-lines",
   /** Label wraps the checkbox in the toolbar. */
   wrapLinesLabel: "label:has(#wrap-lines)",
+  /** System / light / dark: compact trigger + popover (static code browser client bundle). */
+  colorThemeTrigger: "#commentray-theme-trigger",
+  colorThemeMenu: "#commentray-theme-menu",
   angleSelect: '[aria-label="Commentray angle"]',
-  /**
-   * Nav cluster for the current source/commentray pair — holds GitHub / site-browse icon links.
-   * Prefer this landmark over BEM classes like `nav-rail__pair-gh`.
-   */
+  /** Plain-text Src/Doc path strip above the dual panes (inside `#shell`). */
   documentationPairLandmark: '[aria-label="Current documentation pair"]',
 } as const;

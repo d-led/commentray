@@ -13,6 +13,8 @@ import {
 import { tryBuildBlockStretchTableHtml } from "./block-stretch-layout.js";
 import { formatCommentrayBuiltAtLocal } from "./build-stamp.js";
 import { escapeHtml } from "./html-utils.js";
+import { commentrayColorThemeHeadBoot } from "./code-browser-color-theme.js";
+import { hljsStylesheetThemes } from "./hljs-stylesheet-themes.js";
 import { renderHighlightedCodeLineRows } from "./highlighted-code-lines.js";
 import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
 import { type CommentrayOutputUrlOptions, renderMarkdownToHtml } from "./markdown-pipeline.js";
@@ -66,8 +68,8 @@ export type CodeBrowserPageOptions = {
    */
   siteHubUrl?: string;
   /**
-   * Home URL for the Commentray project (toolbar shows "Rendered with Commentray" plus the
-   * package semver, linking here).
+   * Home URL for the Commentray project (footer shows "Rendered with Commentray" plus semver
+   * and build date/time, linking here).
    * Only `http:` / `https:` URLs are emitted.
    */
   toolHomeUrl?: string;
@@ -327,36 +329,42 @@ function buildToolbarSiteHubHtml(siteHubUrl: string | undefined): string {
   return `<a class="toolbar-github" href="${se}" aria-label="Documentation home" title="Back to this site (hub)">${SITE_HOME_SVG}</a>`;
 }
 
+/** GitHub Octocat in the toolbar when a repo URL is set and the hub link does not replace it. */
 function buildToolbarEndHtml(
   githubRepoUrl: string | undefined,
-  toolHomeUrl: string | undefined,
-  commentrayRenderSemver: string,
   siteHubUrl: string | undefined,
 ): string {
   const site = safeToolbarNavigationHref(siteHubUrl);
   const gh = safeExternalHttpUrl(githubRepoUrl);
-  const tool = safeExternalHttpUrl(toolHomeUrl);
-  const bits: string[] = [];
   if (!site && gh) {
     const he = escapeHtml(gh);
-    bits.push(
-      `<a class="toolbar-github" href="${he}" target="_blank" rel="noopener noreferrer" aria-label="View repository on GitHub" title="View repository on GitHub">${GITHUB_MARK_SVG}</a>`,
-    );
+    return `<div class="toolbar__end"><a class="toolbar-github" href="${he}" target="_blank" rel="noopener noreferrer" aria-label="View repository on GitHub" title="View repository on GitHub">${GITHUB_MARK_SVG}</a></div>`;
   }
+  return "";
+}
+
+function renderPageFooterHtml(input: {
+  builtAt: Date;
+  toolHomeUrl: string | undefined;
+  commentrayRenderSemver: string;
+}): string {
+  const { builtAt, toolHomeUrl, commentrayRenderSemver } = input;
+  const iso = builtAt.toISOString();
+  const human = formatCommentrayBuiltAtLocal(builtAt);
+  const tool = safeExternalHttpUrl(toolHomeUrl);
   if (tool) {
     const te = escapeHtml(tool);
     const ver = escapeHtml(commentrayRenderSemver);
-    bits.push(
-      `<span class="toolbar-attribution" role="note">Rendered with <a href="${te}" target="_blank" rel="noopener noreferrer">Commentray</a> <span class="toolbar-attribution__version" translate="no">v${ver}</span></span>`,
+    return (
+      `<footer class="app__footer" role="contentinfo">` +
+      `<p class="app__footer-line app__footer-attribution" role="note">` +
+      `Rendered with <a href="${te}" target="_blank" rel="noopener noreferrer">Commentray</a> ` +
+      `<span class="app__footer-attribution__version" translate="no">v${ver}</span>: ` +
+      `<time datetime="${escapeHtml(iso)}">${escapeHtml(human)}</time>` +
+      `</p>` +
+      `</footer>`
     );
   }
-  if (bits.length === 0) return "";
-  return `<div class="toolbar__end">${bits.join("")}</div>`;
-}
-
-function renderPageFooterHtml(builtAt: Date): string {
-  const iso = builtAt.toISOString();
-  const human = formatCommentrayBuiltAtLocal(builtAt);
   return (
     `<footer class="app__footer" role="contentinfo">` +
     `<p class="app__footer-line">HTML generated <time datetime="${escapeHtml(iso)}">${escapeHtml(human)}</time></p>` +
@@ -402,48 +410,48 @@ function renderToolbarDocHubHtml(opts: {
   return { toolbarDocHubHtml, navRailDocumentedHtml };
 }
 
-function renderNavRailContextHtml(
+function dualPanePanesInnerHtml(codeHtml: string, commentrayHtml: string): string {
+  return (
+    `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
+    `          ${codeHtml}\n` +
+    `        </section>\n` +
+    `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
+    `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
+    `          <div id="doc-pane-body" class="doc-pane-body">\n` +
+    `          ${commentrayHtml}\n` +
+    `          </div>\n` +
+    `        </section>\n`
+  );
+}
+
+/** Plain-text Src/Doc labels above the panes; column widths track the resizable split via `--split-pct`. */
+function renderShellPairContextHtml(
   filePath: string | undefined,
   commentrayPath: string | undefined,
-  opts?: {
-    sourceOnGithubUrl?: string;
-    commentrayOnGithubUrl?: string;
-    commentrayStaticBrowseUrl?: string;
-  },
 ): string {
   const fpRaw = (filePath ?? "").trim();
   const crRaw = (commentrayPath ?? "").trim();
-  const srcUrl = safeExternalHttpUrl(opts?.sourceOnGithubUrl);
-  const crUrl = safeExternalHttpUrl(opts?.commentrayOnGithubUrl);
-  const browseForCr = safeToolbarNavigationHref(opts?.commentrayStaticBrowseUrl);
-  const srcGh =
-    srcUrl !== null
-      ? `<a class="nav-rail__pair-gh" id="toolbar-source-github" href="${escapeHtml(srcUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Source file on GitHub" title="Open source on GitHub">${GITHUB_MARK_SVG}</a>`
-      : "";
-  const crGh =
-    browseForCr !== null
-      ? `<a class="nav-rail__pair-gh" id="toolbar-commentray-github" href="${escapeHtml(browseForCr)}" rel="noopener" aria-label="Open companion pair in the site viewer" title="Open on site">${GITHUB_MARK_SVG}</a>`
-      : crUrl !== null
-        ? `<a class="nav-rail__pair-gh" id="toolbar-commentray-github" href="${escapeHtml(crUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Companion commentray on GitHub" title="Open companion Markdown on GitHub">${GITHUB_MARK_SVG}</a>`
-        : "";
-  if (fpRaw.length === 0 && crRaw.length === 0 && srcGh === "" && crGh === "") {
-    return "";
-  }
+  if (fpRaw.length === 0 && crRaw.length === 0) return "";
   const fp = escapeHtml(fpRaw);
   const cr = escapeHtml(crRaw);
   const fpDisp = fpRaw.length > 0 ? fp : "—";
   const crDisp = crRaw.length > 0 ? cr : "—";
-  return `<div class="nav-rail__context nav-rail__context--compact" aria-label="Current documentation pair">
-    <span class="nav-rail__pair">
-      <span class="nav-rail__pair-lab">Src</span>
-      <span class="nav-rail__pair-path" title="${fp}">${fpDisp}</span>${srcGh}
-    </span>
-    <span class="nav-rail__pair-sep" aria-hidden="true">·</span>
-    <span class="nav-rail__pair">
-      <span class="nav-rail__pair-lab">Doc</span>
-      <span class="nav-rail__pair-path nav-rail__pair-path--secondary" id="nav-rail-doc-path" title="${cr}">${crDisp}</span>${crGh}
-    </span>
+  return `<div class="shell__pair-context" aria-label="Current documentation pair">
+    <div class="shell__pair-cell shell__pair-cell--src">
+      <span class="shell__pair-lab">Src</span>
+      <span class="shell__pair-path" title="${fp}">${fpDisp}</span>
+    </div>
+    <div class="shell__pair-gutter-spacer" aria-hidden="true"></div>
+    <div class="shell__pair-cell shell__pair-cell--doc">
+      <span class="shell__pair-lab">Doc</span>
+      <span class="shell__pair-path shell__pair-path--secondary" id="nav-rail-doc-path" title="${cr}">${crDisp}</span>
+    </div>
   </div>`;
+}
+
+function wrapDualShellInner(pairContextHtml: string, panesHtml: string): string {
+  const row = pairContextHtml.trim().length > 0 ? `        ${pairContextHtml.trim()}\n` : "";
+  return `${row}        <div class="shell__panes">\n${panesHtml}        </div>\n`;
 }
 
 /** IIFE produced by `npm run build -w @commentray/render` (esbuild of `code-browser-client.ts`). */
@@ -462,9 +470,26 @@ function loadCodeBrowserClientBundle(): string {
   );
 }
 
+/**
+ * Compact theme control: primary click opens a menu (readme.io–style), secondary click cycles
+ * system → light → dark. Paired with {@link ./code-browser-color-theme.ts} and the client bundle.
+ */
+const TOOLBAR_COLOR_THEME_HTML = `          <div class="toolbar-theme">
+            <button type="button" id="commentray-theme-trigger" class="toolbar-theme__trigger" data-commentray-trigger-mode="system" aria-haspopup="menu" aria-expanded="false" aria-label="Color theme" title="Appearance: left-click opens the theme menu. Right-click cycles System, Light, and Dark.">
+              <span class="toolbar-theme__icon toolbar-theme__icon--system" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></span>
+              <span class="toolbar-theme__icon toolbar-theme__icon--light" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 6.34L4.93 4.93m12.02 12.02l1.41 1.41M17.66 6.34l1.41-1.41M6.34 17.66l-1.41 1.41"/></svg></span>
+              <span class="toolbar-theme__icon toolbar-theme__icon--dark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
+            </button>
+            <div id="commentray-theme-menu" class="toolbar-theme__menu" role="menu" hidden aria-labelledby="commentray-theme-trigger">
+              <button type="button" role="menuitemradio" class="toolbar-theme__menuitem" data-commentray-theme-value="system" aria-checked="true">System</button>
+              <button type="button" role="menuitemradio" class="toolbar-theme__menuitem" data-commentray-theme-value="light" aria-checked="false">Light</button>
+              <button type="button" role="menuitemradio" class="toolbar-theme__menuitem" data-commentray-theme-value="dark" aria-checked="false">Dark</button>
+            </div>
+          </div>
+`;
+
 const CODE_BROWSER_STYLES = `
       :root {
-        color-scheme: light dark;
         --cr-control-h: 32px;
         --cr-control-radius: 8px;
         --cr-icon-inner: 18px;
@@ -472,8 +497,23 @@ const CODE_BROWSER_STYLES = `
         --cr-label-caps-track: 0.06em;
         --cr-ui-fs: 12px;
       }
+      :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) {
+        color-scheme: light dark;
+      }
+      :root[data-commentray-theme="light"] {
+        color-scheme: light;
+      }
+      :root[data-commentray-theme="dark"] {
+        color-scheme: dark;
+      }
       * { box-sizing: border-box; }
-      body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      html { background: Canvas; color: CanvasText; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: Canvas;
+        color: CanvasText;
+      }
       .skip-link {
         position: absolute;
         left: -9999px;
@@ -579,107 +619,12 @@ const CODE_BROWSER_STYLES = `
         flex: 0 0 auto;
         white-space: nowrap;
       }
-      .nav-rail__context--compact {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 10px;
-        padding: 5px 10px;
-        border-radius: var(--cr-control-radius);
-        border: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
-        background: Canvas;
-        font-size: var(--cr-ui-fs);
-        line-height: 1.3;
-      }
-      .nav-rail__pair {
-        display: inline-flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 6px;
-        min-width: 0;
-        flex: 1 1 140px;
-        max-width: min(48%, 100%);
-      }
-      .nav-rail__pair-lab {
-        flex: 0 0 auto;
-        font-size: var(--cr-label-caps-fs);
-        font-weight: 700;
-        letter-spacing: var(--cr-label-caps-track);
-        text-transform: uppercase;
-        opacity: 0.72;
-      }
-      .nav-rail__pair-path {
-        flex: 1 1 auto;
-        min-width: 0;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-        font-size: var(--cr-ui-fs);
-        color: CanvasText;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .nav-rail__pair-path--secondary { opacity: 0.88; }
-      .nav-rail__pair-sep {
-        flex: 0 0 auto;
-        opacity: 0.45;
-        user-select: none;
-        padding: 0 2px;
-      }
-      .nav-rail__pair-gh {
-        flex: 0 0 auto;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: var(--cr-control-h);
-        height: var(--cr-control-h);
-        border-radius: var(--cr-control-radius);
-        border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas);
-        background: color-mix(in oklab, CanvasText 5%, Canvas);
-        color: CanvasText;
-      }
-      .nav-rail__pair-gh:hover {
-        background: color-mix(in oklab, CanvasText 10%, Canvas);
-      }
-      .nav-rail__pair-gh:focus-visible {
-        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
-        outline-offset: 2px;
-      }
-      .nav-rail__pair-gh svg {
-        width: var(--cr-icon-inner);
-        height: var(--cr-icon-inner);
-        display: block;
-      }
-      .toolbar .nav-rail__context--compact {
-        border: 0;
-        background: transparent;
-        padding: 0;
-        flex: 1 1 200px;
-        min-width: 0;
-        max-width: none;
-        gap: 6px 10px;
-      }
-      .toolbar .nav-rail__pair {
-        flex: 1 1 auto;
-        min-width: 0;
-        max-width: min(44vw, 420px);
-      }
       .nav-rail__search-label {
         font-size: var(--cr-label-caps-fs);
         font-weight: 700;
         letter-spacing: var(--cr-label-caps-track);
         text-transform: uppercase;
         opacity: 0.78;
-      }
-      .nav-rail__search-hint {
-        margin: 0;
-        font-size: 11px;
-        line-height: 1.35;
-        opacity: 0.78;
-      }
-      .nav-rail__code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-        font-size: 10px;
       }
       .nav-rail__doc-hub {
         position: relative;
@@ -777,20 +722,53 @@ const CODE_BROWSER_STYLES = `
       .app__footer time { font-variant-numeric: tabular-nums; }
       .toolbar {
         position: relative;
-        display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 8px 12px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-auto-rows: auto;
+        row-gap: 8px;
+        padding: 10px 12px 10px;
         border-bottom: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
+        background: color-mix(in oklab, CanvasText 4%, Canvas);
         font-size: var(--cr-ui-fs);
         flex: 0 0 auto;
+        min-width: 0;
       }
-      .toolbar__main {
-        display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
-        flex: 0 1 auto;
+      .toolbar__primary {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        /* Top-align trail with the first control line; align-items: center would vertically center
+           in the grid cell when the main strip wraps or grows, which drops the theme switch below the row. */
+        align-items: start;
+        gap: 8px 14px;
+        min-width: 0;
+      }
+      .toolbar__primary-main {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        align-content: flex-start;
+        gap: 8px 14px;
+        min-width: 0;
+      }
+      .toolbar__primary-trail {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        align-content: flex-start;
+        justify-content: flex-end;
+        gap: 8px 12px;
+        justify-self: end;
         min-width: 0;
       }
       .toolbar__end {
-        display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
-        margin-left: auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
         justify-content: flex-end;
+        gap: 10px 14px;
+        min-width: 0;
       }
       .toolbar-github {
         display: inline-flex; align-items: center; justify-content: center;
@@ -808,17 +786,19 @@ const CODE_BROWSER_STYLES = `
       }
       .toolbar-github:hover { background: color-mix(in oklab, CanvasText 11%, Canvas); }
       .toolbar-github:focus-visible { outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas); outline-offset: 2px; }
-      .toolbar-attribution {
-        font-size: var(--cr-ui-fs);
-        line-height: 1.35;
-        opacity: 0.85;
-        max-width: min(360px, 42vw);
-        text-align: right;
+      .app__footer-attribution {
+        margin: 0;
         color: color-mix(in oklab, CanvasText 88%, Canvas);
       }
-      .toolbar-attribution a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+      .app__footer-attribution a {
+        color: inherit;
+        font-weight: 600;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .app__footer-attribution__version { font-weight: 600; }
       .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
-      .toolbar__main > label:has(#wrap-lines) {
+      .toolbar__primary-main > label:has(#wrap-lines) {
         margin: 0;
         min-height: var(--cr-control-h);
         padding: 0 12px 0 10px;
@@ -832,6 +812,93 @@ const CODE_BROWSER_STYLES = `
       .toolbar label input:focus-visible {
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
         outline-offset: 2px;
+      }
+      .toolbar .toolbar-theme {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        margin: 0;
+        padding: 0;
+        min-width: 0;
+        border: 0;
+      }
+      .toolbar-theme__trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--cr-control-h);
+        height: var(--cr-control-h);
+        padding: 0;
+        margin: 0;
+        border-radius: var(--cr-control-radius);
+        border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+        background: color-mix(in oklab, CanvasText 6%, Canvas);
+        color: CanvasText;
+        cursor: pointer;
+      }
+      .toolbar-theme__trigger:hover {
+        background: color-mix(in oklab, CanvasText 14%, Canvas);
+        border-color: color-mix(in oklab, CanvasText 34%, Canvas);
+      }
+      .toolbar-theme__trigger:active {
+        background: color-mix(in oklab, CanvasText 18%, Canvas);
+      }
+      .toolbar-theme__trigger:focus-visible {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
+      }
+      .toolbar-theme__trigger .toolbar-theme__icon {
+        display: none;
+        flex: 0 0 auto;
+      }
+      .toolbar-theme__trigger[data-commentray-trigger-mode="system"] .toolbar-theme__icon--system,
+      .toolbar-theme__trigger[data-commentray-trigger-mode="light"] .toolbar-theme__icon--light,
+      .toolbar-theme__trigger[data-commentray-trigger-mode="dark"] .toolbar-theme__icon--dark {
+        display: block;
+      }
+      .toolbar-theme__menu {
+        position: absolute;
+        left: 0;
+        top: calc(100% + 4px);
+        z-index: 80;
+        min-width: 148px;
+        padding: 4px;
+        margin: 0;
+        list-style: none;
+        border-radius: 8px;
+        border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
+        background: Canvas;
+        color: CanvasText;
+        box-shadow: 0 8px 28px color-mix(in oklab, CanvasText 12%, transparent);
+      }
+      .toolbar-theme__menu[hidden] {
+        display: none !important;
+      }
+      .toolbar-theme__menuitem {
+        display: block;
+        width: 100%;
+        margin: 0;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 6px;
+        font: inherit;
+        font-size: var(--cr-ui-fs);
+        font-weight: 500;
+        text-align: left;
+        cursor: pointer;
+        color: CanvasText;
+        background: transparent;
+      }
+      .toolbar-theme__menuitem:hover {
+        background: color-mix(in oklab, CanvasText 8%, Canvas);
+      }
+      .toolbar-theme__menuitem:focus-visible {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 0;
+      }
+      .toolbar-theme__menuitem[aria-checked="true"] {
+        background: color-mix(in oklab, CanvasText 10%, Canvas);
+        font-weight: 600;
       }
       .toolbar .file-path {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
@@ -932,14 +999,80 @@ const CODE_BROWSER_STYLES = `
         -webkit-box-decoration-break: clone;
       }
       @media (prefers-color-scheme: dark) {
-        .search-results mark.search-hit {
+        :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) .search-results mark.search-hit {
           background: color-mix(in oklab, #c9a227 55%, Canvas);
         }
       }
-      .shell { display: flex; flex-direction: row; flex: 1; min-height: 0; }
+      :root[data-commentray-theme="dark"] .search-results mark.search-hit {
+        background: color-mix(in oklab, #c9a227 55%, Canvas);
+      }
+      .shell:not(.shell--stretch-rows) {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        min-width: 0;
+        --split-pct: 50%;
+      }
       .app__main .shell { flex: 1 1 auto; }
+      .shell__panes {
+        display: flex;
+        flex-direction: row;
+        flex: 1 1 auto;
+        min-height: 0;
+        min-width: 0;
+      }
+      .shell__pair-context {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        padding: 6px 0 8px;
+        border-bottom: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
+        background: color-mix(in oklab, CanvasText 3%, Canvas);
+        font-size: var(--cr-ui-fs);
+        line-height: 1.3;
+      }
+      .shell__pair-cell {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .shell__pair-cell--src {
+        flex: 0 0 var(--split-pct);
+      }
+      .shell__pair-gutter-spacer {
+        flex: 0 0 14px;
+        min-width: 14px;
+        align-self: stretch;
+      }
+      .shell__pair-cell--doc {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .shell__pair-lab {
+        flex: 0 0 auto;
+        font-size: var(--cr-label-caps-fs);
+        font-weight: 700;
+        letter-spacing: var(--cr-label-caps-track);
+        text-transform: uppercase;
+        opacity: 0.72;
+      }
+      .shell__pair-path {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        font-size: var(--cr-ui-fs);
+        color: CanvasText;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .shell__pair-path--secondary { opacity: 0.88; }
       .pane--code {
-        flex: 0 0 50%;
+        flex: 0 0 var(--split-pct, 50%);
         min-width: 120px; overflow: auto; padding: 12px 16px;
         border-right: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
         --code-line-font-size: 13px;
@@ -995,7 +1128,12 @@ const CODE_BROWSER_STYLES = `
         --commentray-ray-accent: #3b7dd8;
       }
       @media (prefers-color-scheme: dark) {
-        .gutter { --commentray-ray-accent: #6eb0ff; }
+        :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) .gutter {
+          --commentray-ray-accent: #6eb0ff;
+        }
+      }
+      :root[data-commentray-theme="dark"] .gutter {
+        --commentray-ray-accent: #6eb0ff;
       }
       .gutter__rays {
         position: absolute; inset: 0; pointer-events: none; z-index: 1;
@@ -1022,6 +1160,8 @@ const CODE_BROWSER_STYLES = `
       .pane--doc {
         flex: 1 1 auto; min-width: 0; min-height: 0;
         display: flex; flex-direction: column; overflow: hidden; padding: 12px 16px;
+        background: Canvas;
+        color: CanvasText;
       }
       .doc-pane-body {
         flex: 1 1 auto; min-height: 0; overflow: auto;
@@ -1163,9 +1303,10 @@ type CodeBrowserPageParts = {
   title: string;
   metaDescriptionHtml: string;
   generatorMetaHtml: string;
-  /** Same-site hub control; first in `toolbar__main` when present. */
+  /** Same-site hub control; first in `toolbar__primary-main` when present. */
   toolbarSiteHubHtml: string;
-  navRailContextHtml: string;
+  /** When non-empty, ` data-commentray-pair-browse-href="…"` on `#shell` (same-site browse or GitHub blob). */
+  shellPairDocDataAttr: string;
   angleSelectHtml: string;
   toolbarDocHubHtml: string;
   navRailDocumentedHtml: string;
@@ -1193,17 +1334,20 @@ type CodeBrowserPageParts = {
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
   const shellClass = p.layout === "stretch" ? "shell shell--stretch-rows" : "shell";
   return `<!doctype html>
-<html lang="en">
+<html lang="en" data-commentray-theme="system">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     ${p.metaDescriptionHtml}${p.generatorMetaHtml}<title>${escapeHtml(p.title)}</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/${escapeHtml(
+    <link rel="stylesheet" id="commentray-hljs-light" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/${escapeHtml(
       p.hljs,
     )}.min.css" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/${escapeHtml(
+    <link rel="stylesheet" id="commentray-hljs-dark" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/${escapeHtml(
       p.hljsDark,
     )}.min.css" media="(prefers-color-scheme: dark)" />
+    <script>
+${commentrayColorThemeHeadBoot()}
+    </script>
     <style>
 ${CODE_BROWSER_STYLES}
     </style>
@@ -1213,16 +1357,20 @@ ${CODE_BROWSER_STYLES}
     <div class="app">
       <header class="toolbar" role="banner" aria-label="View options">
         <h1 class="sr-only">${escapeHtml(p.title)}</h1>
-        <div class="toolbar__main">
+        <div class="toolbar__primary">
+          <div class="toolbar__primary-main">
           ${p.toolbarSiteHubHtml}
-          ${p.navRailContextHtml}
           ${p.navRailDocumentedHtml}
           ${p.angleSelectHtml}
+          <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
           ${p.toolbarDocHubHtml}
           ${p.relatedNavHtml}
-          <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
-        </div>
+          </div>
+          <div class="toolbar__primary-trail">
         ${p.toolbarEndHtml}
+${TOOLBAR_COLOR_THEME_HTML}
+          </div>
+        </div>
       </header>
       <header class="app__chrome" role="region" aria-label="Search">
         <div class="chrome__search-row">
@@ -1231,10 +1379,9 @@ ${CODE_BROWSER_STYLES}
           <button type="button" id="search-clear" title="Clear search">Clear</button>
         </div>
         <div class="search-results" id="search-results" hidden aria-live="polite"></div>
-        <p class="nav-rail__search-hint chrome__search-hint">This pair + merged <code class="nav-rail__code">commentray-nav-search.json</code> when the export ships it.</p>
       </header>
       <main id="main-content" class="app__main" tabindex="-1">
-        <div class="${shellClass}" id="shell" data-layout="${p.layout}" data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}>
+        <div class="${shellClass}" id="shell" data-layout="${p.layout}" data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairDocDataAttr}>
 ${p.shellInner}
         </div>
       </main>
@@ -1359,16 +1506,11 @@ async function buildMultiAngleDualPaneShell(
     .join("");
   const angleSelectHtml = `<span class="toolbar-angle-picker"><label for="angle-select">Angle</label><select id="angle-select" aria-label="Commentray angle">${selOpts}</select></span>`;
 
-  const shellInner =
-    `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
-    `          ${codeHtml}\n` +
-    `        </section>\n` +
-    `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
-    `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
-    `          <div id="doc-pane-body" class="doc-pane-body">\n` +
-    `          ${defaultPaneHtml}\n` +
-    `          </div>\n` +
-    `        </section>\n`;
+  const pairHtml = renderShellPairContextHtml(opts.filePath, defaultPathSearch);
+  const shellInner = wrapDualShellInner(
+    pairHtml,
+    dualPanePanesInnerHtml(codeHtml, defaultPaneHtml),
+  );
 
   const payloadObj = { defaultAngleId: defaultId, angles: jsonAngles };
   const multiAnglePayloadB64 = Buffer.from(JSON.stringify(payloadObj), "utf8").toString("base64");
@@ -1451,16 +1593,11 @@ async function buildCodeBrowserShell(
         commentrayOutputUrls: opts.commentrayOutputUrls,
       }),
     ]);
-    shellInner =
-      `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
-      `          ${codeHtml}\n` +
-      `        </section>\n` +
-      `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
-      `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
-      `          <div id="doc-pane-body" class="doc-pane-body">\n` +
-      `          ${commentrayHtml}\n` +
-      `          </div>\n` +
-      `        </section>\n`;
+    const pairHtml = renderShellPairContextHtml(
+      opts.filePath,
+      (opts.commentrayPathForSearch ?? "").trim(),
+    );
+    shellInner = wrapDualShellInner(pairHtml, dualPanePanesInnerHtml(codeHtml, commentrayHtml));
   }
 
   return {
@@ -1504,29 +1641,11 @@ function codeBrowserPageTitle(opts: CodeBrowserPageOptions): string {
   return opts.title ?? opts.filePath ?? "Commentray";
 }
 
-function codeBrowserHljsThemes(opts: CodeBrowserPageOptions): { hljs: string; hljsDark: string } {
-  const hljs = opts.hljsTheme ?? "github";
-  const hljsDark = opts.hljsTheme?.includes("dark") ? opts.hljsTheme : "github-dark";
-  return { hljs, hljsDark };
-}
-
 function toolbarCommentrayGithubFromShell(
   shell: CodeBrowserShell,
   opts: CodeBrowserPageOptions,
 ): string | undefined {
   return shell.multiShell?.commentrayOnGithubUrl ?? opts.commentrayOnGithubUrl;
-}
-
-function toolbarCommentrayStaticBrowseFromShell(
-  shell: CodeBrowserShell,
-  opts: CodeBrowserPageOptions,
-): string | undefined {
-  const t = (
-    shell.multiShell?.commentrayStaticBrowseUrl ??
-    opts.commentrayStaticBrowseUrl ??
-    ""
-  ).trim();
-  return t.length > 0 ? t : undefined;
 }
 
 function rawMdB64FromShell(shell: CodeBrowserShell, opts: CodeBrowserPageOptions): string {
@@ -1535,16 +1654,25 @@ function rawMdB64FromShell(shell: CodeBrowserShell, opts: CodeBrowserPageOptions
   );
 }
 
-function navRailCommentrayPathFromShell(
-  shell: CodeBrowserShell,
-  opts: CodeBrowserPageOptions,
-): string | undefined {
-  const trimmed = (
-    shell.multiShell?.commentrayPathForSearch ??
-    opts.commentrayPathForSearch ??
+/** Canonical doc target for static validation: same-site `./browse/…` when present, else GitHub blob. */
+function shellPairDocDataAttr(shell: CodeBrowserShell, opts: CodeBrowserPageOptions): string {
+  if (shell.layout !== "dual") return "";
+  const browseRaw = (
+    shell.multiShell?.commentrayStaticBrowseUrl ??
+    opts.commentrayStaticBrowseUrl ??
     ""
   ).trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  if (browseRaw.length > 0) {
+    const href = safeToolbarNavigationHref(browseRaw);
+    if (href !== null) {
+      return ` data-commentray-pair-browse-href="${escapeHtml(href)}"`;
+    }
+  }
+  const gh = safeExternalHttpUrl(toolbarCommentrayGithubFromShell(shell, opts));
+  if (gh !== null) {
+    return ` data-commentray-pair-browse-href="${escapeHtml(gh)}"`;
+  }
+  return "";
 }
 
 function shellSearchAttrsWithNavJson(
@@ -1569,14 +1697,13 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const builtAt = opts.builtAt ?? new Date();
   const renderSemver = commentrayRenderVersion();
   const toolbarSiteHubHtml = buildToolbarSiteHubHtml(opts.siteHubUrl);
-  const toolbarEndHtml = buildToolbarEndHtml(
-    opts.githubRepoUrl,
-    opts.toolHomeUrl,
-    renderSemver,
-    opts.siteHubUrl,
-  );
-  const pageFooterHtml = renderPageFooterHtml(builtAt);
-  const { hljs, hljsDark } = codeBrowserHljsThemes(opts);
+  const toolbarEndHtml = buildToolbarEndHtml(opts.githubRepoUrl, opts.siteHubUrl);
+  const pageFooterHtml = renderPageFooterHtml({
+    builtAt,
+    toolHomeUrl: opts.toolHomeUrl,
+    commentrayRenderSemver: renderSemver,
+  });
+  const { hljsLight, hljsDark } = hljsStylesheetThemes(opts.hljsTheme);
 
   const mermaidScript = mermaidRuntimeScriptHtml(opts.includeMermaidRuntime);
 
@@ -1603,22 +1730,14 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     shellSearchAttrsBase,
     opts.documentedNavJsonUrl,
   );
-  const navRailContextHtml = renderNavRailContextHtml(
-    opts.filePath,
-    navRailCommentrayPathFromShell(shell, opts),
-    {
-      sourceOnGithubUrl: opts.sourceOnGithubUrl,
-      commentrayOnGithubUrl: toolbarCommentrayGithubFromShell(shell, opts),
-      commentrayStaticBrowseUrl: toolbarCommentrayStaticBrowseFromShell(shell, opts),
-    },
-  );
+  const pairDocDataAttr = shellPairDocDataAttr(shell, opts);
 
   return buildCodeBrowserPageHtml({
     title,
     metaDescriptionHtml,
     generatorMetaHtml,
     toolbarSiteHubHtml,
-    navRailContextHtml,
+    shellPairDocDataAttr: pairDocDataAttr,
     angleSelectHtml: shell.angleSelectHtml,
     toolbarDocHubHtml,
     navRailDocumentedHtml,
@@ -1631,7 +1750,7 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     rawMdB64,
     scrollBlockLinksB64,
     shellDocumentedPairsAttr,
-    hljs,
+    hljs: hljsLight,
     hljsDark,
     mermaidScript,
     searchPlaceholder,

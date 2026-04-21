@@ -3,7 +3,9 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # 1) Project ESLint (eslint.config.mjs at repo root).
-# 2) Refactor / maintainability ESLint pass (complexity, depth, size, async hygiene):
+# 2) Stylelint (stylelint.config.mjs; first-party *.css / *.scss).
+# 3) ShellCheck (scripts/*.sh).
+# 4) Refactor / maintainability ESLint pass (complexity, depth, size, async hygiene):
 #    scripts/eslint.refactor-metrics.mjs + scripts/eslint.refactor-metrics.rules.json
 #
 # Environment (refactor pass only):
@@ -23,6 +25,9 @@ fi
 
 echo "== ESLint (project) ==" >&2
 "${ESLINT_BIN}" .
+
+echo "== Stylelint ==" >&2
+bash "${REPO_ROOT}/scripts/stylelint.sh"
 
 echo "== ShellCheck (scripts/) ==" >&2
 bash "${REPO_ROOT}/scripts/shellcheck.sh"

@@ -20,6 +20,7 @@
     "format": "bash scripts/format.sh",
     "format:check": "bash scripts/format-check.sh",
     "lint": "bash scripts/lint.sh",
+    "lint:css": "bash scripts/stylelint.sh",
     "lint:shell": "bash scripts/shellcheck.sh",
     "actionlint": "bash scripts/actionlint.sh",
     "dupes": "bash scripts/find-duplicates.sh",
@@ -67,15 +68,18 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
-    "@vitest/coverage-v8": "^4.1.4",
-    "cypress": "^15.14.0",
+    "@vitest/coverage-v8": "^4.1.5",
+    "archunit": "^2.1.69",
+    "cypress": "^15.14.1",
     "eslint": "^10.2.1",
     "jscpd": "^4.0.9",
     "mocha-junit-reporter": "^2.2.1",
     "prettier": "^3.8.3",
     "start-server-and-test": "^3.0.2",
+    "stylelint": "^17.8.0",
+    "stylelint-config-standard": "^40.0.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.58.2",
-    "vitest": "^4.1.4"
+    "typescript-eslint": "^8.59.0",
+    "vitest": "^4.1.5"
   }
 }

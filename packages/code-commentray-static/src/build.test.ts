@@ -113,7 +113,7 @@ describe("Static browse HTML build — URLs and toolbar", () => {
     expect(html).toContain('href="../docs/guide.md"');
   });
 
-  it("should surface GitHub repo and tool home URLs in the toolbar chrome", async () => {
+  it("should surface GitHub repo in the toolbar and tool home in the footer", async () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const outHtml = path.join(outDir, "index.html");
     await buildCommentrayStatic({

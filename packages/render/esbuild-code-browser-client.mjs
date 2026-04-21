@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,5 +18,9 @@ await esbuild.build({
   legalComments: "none",
   outfile,
 });
+
+for (const name of ["side-by-side-layout.css"]) {
+  copyFileSync(join(pkgRoot, "src", name), join(outDir, name));
+}
 
 console.error("wrote", outfile);

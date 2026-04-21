@@ -38,6 +38,13 @@ import {
   normPosixPath,
   resolveStaticBrowseHref,
 } from "./code-browser-pair-nav.js";
+import {
+  COMMENTRAY_COLOR_THEME_STORAGE_KEY,
+  applyCommentrayColorTheme,
+  nextCommentrayColorThemeMode,
+  parseCommentrayColorThemeMode,
+  type CommentrayColorThemeMode,
+} from "./code-browser-color-theme.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
 /**
@@ -971,6 +978,8 @@ function drawBlockRaysIntoSvg(
  * Splines in the gutter between each block’s source range and its commentary band (dual pane,
  * index-backed blocks). Emphasizes the block aligned with the current source viewport; clamps
  * off-screen endpoints so readers see which way to scroll.
+ *
+ * @returns Request a redraw after DOM changes that do not resize the panes (e.g. multi-angle body swap).
  */
 function wireBlockRayConnectors(args: {
   gutter: HTMLElement;
@@ -978,7 +987,7 @@ function wireBlockRayConnectors(args: {
   docScrollEl: HTMLElement;
   getLinks: () => BlockScrollLink[];
   probeTopSourceLine1Based: () => number;
-}): void {
+}): () => void {
   const { gutter, codePane, docScrollEl, getLinks, probeTopSourceLine1Based } = args;
 
   const svgNs = "http://www.w3.org/2000/svg";
@@ -1006,6 +1015,8 @@ function wireBlockRayConnectors(args: {
     scheduleDraw();
     globalThis.requestAnimationFrame(scheduleDraw);
   });
+
+  return scheduleDraw;
 }
 
 type DocumentedPairNav = {
@@ -1307,6 +1318,7 @@ function wireSplitter(
     const p = clamp((x / rect.width) * 100, 15, 85);
     lastPct = p;
     codePane.style.flex = `0 0 ${p}%`;
+    shell.style.setProperty("--split-pct", `${String(p)}%`);
   }
   function stop(): void {
     dragging = false;
@@ -1539,6 +1551,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
   rebuildSearcher: () => void;
   searchInput: HTMLInputElement;
   searchResults: HTMLElement;
+  requestBlockRayRedraw?: () => void;
 }): void {
   const {
     codePane,
@@ -1551,6 +1564,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
     rebuildSearcher,
     searchInput,
     searchResults,
+    requestBlockRayRedraw,
   } = args;
   if (multiPayload) {
     wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinksRef.current);
@@ -1576,29 +1590,32 @@ function wireDualPaneMultiAngleAndScroll(args: {
           if (path.length > 0) docPathEl.setAttribute("title", path);
           else docPathEl.removeAttribute("title");
         }
-        const gh = document.getElementById("toolbar-commentray-github");
-        if (gh instanceof HTMLAnchorElement) {
-          const browse = a.staticBrowseUrl?.trim() ?? "";
-          if (browse.length > 0) {
-            gh.href = resolveStaticBrowseHref(
-              browse,
-              globalThis.location.pathname,
-              globalThis.location.origin,
-            );
-            gh.removeAttribute("target");
-            gh.setAttribute("rel", "noopener");
+        const browse = a.staticBrowseUrl?.trim() ?? "";
+        if (browse.length > 0) {
+          const resolved = resolveStaticBrowseHref(
+            browse,
+            globalThis.location.pathname,
+            globalThis.location.origin,
+          );
+          shell.setAttribute("data-commentray-pair-browse-href", resolved);
+        } else {
+          const ghu = a.commentrayOnGithubUrl?.trim();
+          if (ghu) {
+            shell.setAttribute("data-commentray-pair-browse-href", ghu);
           } else {
-            const ghu = a.commentrayOnGithubUrl?.trim();
-            if (ghu) {
-              gh.href = ghu;
-              gh.target = "_blank";
-              gh.setAttribute("rel", "noopener noreferrer");
-            }
+            shell.removeAttribute("data-commentray-pair-browse-href");
           }
         }
         searchInput.value = "";
         searchResults.innerHTML = "";
         searchResults.hidden = true;
+        requestBlockRayRedraw?.();
+        globalThis.requestAnimationFrame(() => {
+          requestBlockRayRedraw?.();
+          globalThis.requestAnimationFrame(() => {
+            requestBlockRayRedraw?.();
+          });
+        });
       });
     }
     return;
@@ -1704,12 +1721,23 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
   const pct0 = parseFloat(readWebStorageItem(localStorage, STORAGE_SPLIT_PCT) || "50");
   const pct = clamp(Number.isFinite(pct0) ? pct0 : 50, 15, 85);
   codePane.style.flex = `0 0 ${pct}%`;
+  shell.style.setProperty("--split-pct", `${String(pct)}%`);
 
   wireWrapToggle(STORAGE_WRAP_LINES, codePane, wrapCb);
   wireSplitter(STORAGE_SPLIT_PCT, shell, codePane, gutter, pct);
 
   const multiScript = document.getElementById("commentray-multi-angle-b64");
   const multiPayload = parseMultiAnglePayload(multiScript);
+  const shouldWireBlockRays = multiPayload !== null || scrollLinksRef.current.length > 0;
+  const requestBlockRayRedraw = shouldWireBlockRays
+    ? wireBlockRayConnectors({
+        gutter,
+        codePane,
+        docScrollEl,
+        getLinks: () => scrollLinksRef.current,
+        probeTopSourceLine1Based: () => probeCodeLine1FromViewport(codePane),
+      })
+    : undefined;
   wireDualPaneMultiAngleAndScroll({
     codePane,
     docScrollEl,
@@ -1721,22 +1749,136 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     rebuildSearcher,
     searchInput,
     searchResults,
+    requestBlockRayRedraw,
   });
-
-  if (scrollLinksRef.current.length > 0) {
-    wireBlockRayConnectors({
-      gutter,
-      codePane,
-      docScrollEl,
-      getLinks: () => scrollLinksRef.current,
-      probeTopSourceLine1Based: () => probeCodeLine1FromViewport(codePane),
-    });
-  }
 
   wireDualPaneCommentrayLocationHash(docScrollEl, () => mutable.mdLines.length);
 }
 
+function commentrayThemeModeLabel(mode: CommentrayColorThemeMode): string {
+  if (mode === "light") return "Light";
+  if (mode === "dark") return "Dark";
+  return "System";
+}
+
+function setCommentrayThemeTriggerHints(
+  trigger: HTMLButtonElement,
+  mode: CommentrayColorThemeMode,
+): void {
+  const label = commentrayThemeModeLabel(mode);
+  trigger.setAttribute(
+    "aria-label",
+    `Color theme: ${label}. Left-click opens the menu. Right-click cycles System, Light, and Dark.`,
+  );
+  trigger.title = `Appearance: ${label} — left-click menu, right-click cycle`;
+}
+
+function wireColorThemeToolbar(): void {
+  const wrapEl = document.querySelector(".toolbar-theme");
+  const triggerEl = document.getElementById("commentray-theme-trigger");
+  const menuEl = document.getElementById("commentray-theme-menu");
+  if (!wrapEl || !(triggerEl instanceof HTMLButtonElement) || !(menuEl instanceof HTMLElement))
+    return;
+
+  const themeToolbarWrap: Element = wrapEl;
+  const themeButton: HTMLButtonElement = triggerEl;
+  const themeMenu: HTMLElement = menuEl;
+
+  let currentMode: CommentrayColorThemeMode = parseCommentrayColorThemeMode(
+    readWebStorageItem(localStorage, COMMENTRAY_COLOR_THEME_STORAGE_KEY),
+  );
+  applyCommentrayColorTheme(currentMode);
+
+  let menuOpen = false;
+
+  function syncUi(): void {
+    themeButton.dataset.commentrayTriggerMode = currentMode;
+    themeButton.setAttribute("aria-expanded", menuOpen ? "true" : "false");
+    setCommentrayThemeTriggerHints(themeButton, currentMode);
+    for (const el of themeMenu.querySelectorAll<HTMLButtonElement>(
+      "[data-commentray-theme-value]",
+    )) {
+      const v = parseCommentrayColorThemeMode(el.dataset.commentrayThemeValue ?? "");
+      el.setAttribute("aria-checked", v === currentMode ? "true" : "false");
+    }
+  }
+
+  function openMenu(): void {
+    menuOpen = true;
+    themeMenu.removeAttribute("hidden");
+    syncUi();
+    const checked = themeMenu.querySelector<HTMLElement>(
+      '[role="menuitemradio"][aria-checked="true"]',
+    );
+    (checked ?? themeMenu.querySelector<HTMLElement>('[role="menuitemradio"]'))?.focus();
+  }
+
+  function closeMenu(): void {
+    menuOpen = false;
+    themeMenu.setAttribute("hidden", "");
+    syncUi();
+  }
+
+  function persistAndApply(mode: CommentrayColorThemeMode): void {
+    currentMode = mode;
+    writeWebStorageItem(localStorage, COMMENTRAY_COLOR_THEME_STORAGE_KEY, mode);
+    applyCommentrayColorTheme(mode);
+    syncUi();
+  }
+
+  themeButton.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (menuOpen) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
+  });
+
+  themeButton.addEventListener("contextmenu", (ev) => {
+    ev.preventDefault();
+    if (menuOpen) closeMenu();
+    persistAndApply(nextCommentrayColorThemeMode(currentMode));
+  });
+
+  for (const item of themeMenu.querySelectorAll<HTMLButtonElement>(
+    "[data-commentray-theme-value]",
+  )) {
+    item.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const mode = parseCommentrayColorThemeMode(item.dataset.commentrayThemeValue ?? "");
+      persistAndApply(mode);
+      closeMenu();
+      themeButton.focus();
+    });
+  }
+
+  function onDocumentPointerDown(ev: Event): void {
+    if (!menuOpen) return;
+    const t = ev.target;
+    if (!(t instanceof Node)) return;
+    if (themeToolbarWrap.contains(t)) return;
+    closeMenu();
+  }
+
+  function onDocumentKeydown(ev: KeyboardEvent): void {
+    if (!menuOpen || ev.key !== "Escape") return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    closeMenu();
+    themeButton.focus();
+  }
+
+  document.addEventListener("mousedown", onDocumentPointerDown, true);
+  document.addEventListener("touchstart", onDocumentPointerDown, true);
+  document.addEventListener("keydown", onDocumentKeydown, true);
+
+  syncUi();
+}
+
 function main(): void {
+  wireColorThemeToolbar();
   wireDocumentedFilesTree();
 
   const shell = document.getElementById("shell");

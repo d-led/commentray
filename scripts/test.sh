@@ -10,6 +10,8 @@ export FORCE_COLOR
 
 mode="${COMMENTRAY_TEST_MODE:-unit}"
 case "$mode" in
+  # Unit Vitest suite includes `packages/architecture/architecture.test.ts`
+  # (ArchUnitTS rules vs `tsconfig.archunit.json`).
   unit) exec npm run test:unit ;;
   integration) exec npm run test:integration ;;
   expensive) exec npm run test:expensive ;;

@@ -26,15 +26,12 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.get('[aria-label="Commentray"] em').first().should("contain.text", "You have the main");
     });
 
-    it("then the hub exposes a same-site home link, GitHub source link, same-site Doc browse link, and a collapsible Comment-rayed files tree", () => {
+    it("then the hub exposes a same-site home link, pair doc target on #shell, and a collapsible Comment-rayed files tree", () => {
       cy.visitStaticSiteHome();
       cy.get('a[aria-label="Documentation home"]').should("have.attr", "href", "./");
-      cy.get('a[aria-label="Source file on GitHub"]')
-        .should("have.attr", "href")
-        .and("match", /github\.com/);
-      cy.get("#toolbar-commentray-github")
-        .should("have.attr", "href")
-        .and("match", /\/browse\/[^/]+\.html$/)
+      cy.get("#shell")
+        .should("have.attr", "data-commentray-pair-browse-href")
+        .and("match", /\.\/browse\/[^/]+\.html$/)
         .and("not.include", "github.com");
       cy.contains("summary", "Comment-rayed files").click();
       cy.get('[role="tree"]', { timeout: 15000 })
@@ -58,9 +55,9 @@ describe("Commentray static site (GitHub Pages build)", () => {
           cy.visit(href!);
         });
       cy.shouldDisplayCodeBrowserShell();
-      cy.get("#toolbar-commentray-github")
-        .should("have.attr", "href")
-        .and("match", /\/browse\/[^/]+\.html(\?.*)?$/)
+      cy.get("#shell")
+        .should("have.attr", "data-commentray-pair-browse-href")
+        .and("match", /\.\/browse\/[^/]+\.html(\?.*)?$/)
         .and("not.contain", "/browse/browse/");
     });
 
@@ -118,17 +115,17 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.get('select[aria-label="Commentray angle"]').select("architecture");
       cy.get('select[aria-label="Commentray angle"]').should("have.value", "architecture");
       cy.get('[aria-label="Commentray"]').should("contain", "architecture angle");
-      cy.get("#toolbar-commentray-github")
-        .should("have.attr", "href")
-        .and("match", /\/browse\/[^/]+\.html$/)
+      cy.get("#shell")
+        .should("have.attr", "data-commentray-pair-browse-href")
+        .and("match", /\.\/browse\/[^/]+\.html$/)
         .and("not.include", "github.com");
 
       cy.get('select[aria-label="Commentray angle"]').select("main");
       cy.get('select[aria-label="Commentray angle"]').should("have.value", "main");
       cy.get('[aria-label="Commentray"]').should("contain", "quick-start");
-      cy.get("#toolbar-commentray-github")
-        .should("have.attr", "href")
-        .and("match", /\/browse\/[^/]+\.html$/)
+      cy.get("#shell")
+        .should("have.attr", "data-commentray-pair-browse-href")
+        .and("match", /\.\/browse\/[^/]+\.html$/)
         .and("not.include", "github.com");
     });
 

@@ -92,9 +92,8 @@ describe("Side-by-side static HTML layout", () => {
       hljsTheme: "github-dark",
       includeMermaidRuntime: false,
     });
-    expect(html).toContain(
-      "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.min.css",
-    );
+    expect(html).toMatch(/github\.min\.css" media="\(prefers-color-scheme: light\)"/);
+    expect(html).toMatch(/github-dark\.min\.css" media="\(prefers-color-scheme: dark\)"/);
   });
 
   it("should apply commentrayOutputUrls when rewriting links in the companion column", async () => {

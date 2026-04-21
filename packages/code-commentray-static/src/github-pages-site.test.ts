@@ -65,7 +65,9 @@ async function runWritesSiteAndNavFromFlatCompanions(): Promise<string> {
   const browseHtml = await readFile(path.join(r, "_site", "browse", browseName), "utf8");
   expect(browseHtml).toContain('href="../index.html"');
   expect(browseHtml).toContain('aria-label="Documentation home"');
-  expect(browseHtml).toMatch(/id="toolbar-commentray-github"[^>]*href="\.\/browse\/[^"]+\.html"/);
+  expect(browseHtml).toMatch(
+    /id="shell"[^>]*data-commentray-pair-browse-href="\.\/browse\/[^"]+\.html"/,
+  );
   return r;
 }
 
@@ -134,13 +136,15 @@ async function runGithubToolbarUsesBlobUrlsForRealisticHost(): Promise<string> {
 
   const { outHtml, navSearchPath } = await buildGithubPagesStaticSite({ repoRoot: r });
   const html = await readFile(outHtml, "utf8");
-  expect(html).toContain(
-    'id="toolbar-source-github" href="https://github.com/d-led/commentray/blob/main/src/x.ts"',
-  );
+  /** Hub `index.html` prefers same-site pair browse; GitHub blobs live in `commentray-nav-search.json`. */
+  expect(html).toMatch(/data-commentray-pair-browse-href="\.\/browse\/[^"]+\.html"/);
   expect(html).not.toContain("/browse/browse/");
   const nav = JSON.parse(await readFile(navSearchPath, "utf8")) as {
-    documentedPairs?: { commentrayOnGithub?: string }[];
+    documentedPairs?: { sourceOnGithub?: string; commentrayOnGithub?: string }[];
   };
+  expect(nav.documentedPairs?.[0]?.sourceOnGithub).toBe(
+    "https://github.com/d-led/commentray/blob/main/src/x.ts",
+  );
   expect(nav.documentedPairs?.[0]?.commentrayOnGithub).toBe(
     "https://github.com/d-led/commentray/blob/main/.commentray/source/src/x.ts.md",
   );
@@ -149,9 +153,7 @@ async function runGithubToolbarUsesBlobUrlsForRealisticHost(): Promise<string> {
   expect(browseName).toBeTruthy();
   if (browseName === undefined) throw new Error("expected browse html");
   const browseHtml = await readFile(path.join(r, "_site", "browse", browseName), "utf8");
-  expect(browseHtml).toContain(
-    'id="toolbar-source-github" href="https://github.com/d-led/commentray/blob/main/src/x.ts"',
-  );
+  expect(browseHtml).toMatch(/data-commentray-pair-browse-href="\.\/browse\/[^"]+\.html"/);
   expect(browseHtml).not.toContain("/browse/browse/");
   return r;
 }
