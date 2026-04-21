@@ -37,6 +37,7 @@ import {
   isSameDocumentedPair,
   normPosixPath,
   resolveStaticBrowseHref,
+  staticBrowseHrefForShellDataAttribute,
 } from "./code-browser-pair-nav.js";
 import {
   COMMENTRAY_COLOR_THEME_STORAGE_KEY,
@@ -1651,7 +1652,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
         }
         const browse = a.staticBrowseUrl?.trim() ?? "";
         if (browse.length > 0) {
-          const resolved = resolveStaticBrowseHref(
+          const resolved = staticBrowseHrefForShellDataAttribute(
             browse,
             globalThis.location.pathname,
             globalThis.location.origin,

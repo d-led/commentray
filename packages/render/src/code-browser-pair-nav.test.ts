@@ -7,6 +7,7 @@ import {
   normPosixPath,
   resolveStaticBrowseHref,
   siteRootPathnameFromPathname,
+  staticBrowseHrefForShellDataAttribute,
 } from "./code-browser-pair-nav.js";
 
 describe("normPosixPath", () => {
@@ -48,6 +49,25 @@ describe("resolveStaticBrowseHref", () => {
     );
     expect(resolveStaticBrowseHref("./browse/slug.html", "/repo/index.html", origin)).toBe(
       "https://pages.github.io/repo/browse/slug.html",
+    );
+  });
+});
+
+describe("staticBrowseHrefForShellDataAttribute", () => {
+  it("should keep hub-relative browse URLs as ./browse/… for the shell data attribute", () => {
+    const origin = "http://127.0.0.1:14173";
+    expect(
+      staticBrowseHrefForShellDataAttribute("./browse/Ab.html", "/", origin),
+    ).toBe("./browse/Ab.html");
+    expect(staticBrowseHrefForShellDataAttribute("browse/Xy.html", "/any/path", origin)).toBe(
+      "./browse/Xy.html",
+    );
+  });
+
+  it("should still resolve absolute click targets when the URL is not static browse", () => {
+    const origin = "https://ex.com";
+    expect(staticBrowseHrefForShellDataAttribute("./other.md", "/hub/", origin)).toBe(
+      "https://ex.com/hub/other.md",
     );
   });
 });

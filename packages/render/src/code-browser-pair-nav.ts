@@ -56,6 +56,23 @@ export function resolveStaticBrowseHref(
   return new URL(r, `${origin}${pathname}`).href;
 }
 
+/**
+ * Value for `#shell` `data-commentray-pair-browse-href`: keep portable `./browse/<slug>.html`
+ * when the static site build emits hub-relative URLs (matches server HTML); otherwise resolve
+ * like {@link resolveStaticBrowseHref} for anchors and odd relative forms.
+ */
+export function staticBrowseHrefForShellDataAttribute(
+  staticBrowseUrl: string,
+  pathname: string,
+  origin: string,
+): string {
+  const r = staticBrowseUrl.trim();
+  if (r.length === 0) return "";
+  const m = STATIC_BROWSE_REL.exec(r);
+  if (m?.[1]) return `./browse/${m[1]}`;
+  return resolveStaticBrowseHref(r, pathname, origin);
+}
+
 export function findDocumentedPair<T extends DocumentedPairNavLike>(
   pairs: readonly T[],
   commentrayPath: string,
