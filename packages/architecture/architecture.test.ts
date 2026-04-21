@@ -133,11 +133,7 @@ describe("monorepo package dependency rules", () => {
   it("keeps @commentray/render from reaching static site, CLI, or the VS Code extension", async () => {
     await assertFirstPartyPackageDoesNotImportFolders({
       sourceGlob: "packages/render/**",
-      forbiddenFolders: [
-        "packages/code-commentray-static",
-        "packages/cli",
-        "packages/vscode",
-      ],
+      forbiddenFolders: ["packages/code-commentray-static", "packages/cli", "packages/vscode"],
       failureMessage: (folder) => `@commentray/render must not depend on files under ${folder}`,
     });
   });
