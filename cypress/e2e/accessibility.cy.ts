@@ -1,9 +1,9 @@
-describe("Commentray static site — accessibility", () => {
+describe("The shipped Commentray home page", () => {
   beforeEach(() => {
     cy.GoToStaticSiteHome();
   });
 
-  it("Page identity and landmarks support assistive navigation", () => {
+  it("exposes document language and primary landmarks for assistive tech", () => {
     cy.DocumentShouldExposeHtmlLanguage();
     cy.DocumentTitleShouldMatchStaticSitePattern();
     cy.MetaDescriptionShouldMatchStaticSitePattern();
@@ -13,7 +13,7 @@ describe("Commentray static site — accessibility", () => {
     cy.ContentinfoLandmarkShouldExist();
   });
 
-  it("Primary reading surface exposes structure for keyboard and announcements", () => {
+  it("surfaces labeled controls, skip navigation, and polite search announcements", () => {
     cy.DualPanesSplitterSearchRegionShouldBeVisible();
     cy.SkipNavigationLinkShouldTargetMainContent();
     cy.SearchFieldShouldExposeVisibleLabelText();
@@ -23,13 +23,13 @@ describe("Commentray static site — accessibility", () => {
     cy.SearchResultsShouldBePoliteLiveRegion();
   });
 
-  it("Focused search shows a visible focus ring", () => {
+  it("shows a visible focus ring on the search field after focus", () => {
     cy.FocusOnSearchField();
     cy.SearchFieldShouldBeFocused();
     cy.SearchFieldOutlineStyleShouldNotBeNone();
   });
 
-  it("Theme picker applies a choice and can be dismissed without leaving the menu open", () => {
+  it("lets users pick a theme from a popover and dismiss it without leaving the menu open", () => {
     cy.ColorThemeTriggerShouldAdvertisePopoverMenu();
     cy.ColorThemeMenuShouldStartHidden();
     cy.ClickColorThemeTrigger();
@@ -40,14 +40,14 @@ describe("Commentray static site — accessibility", () => {
     cy.ColorThemeMenuShouldBeHidden();
   });
 
-  it("External links and toolbar icons follow safe and decorative patterns", () => {
+  it("marks external tabs as noopener and hides decorative toolbar SVGs", () => {
     cy.BlankTargetLinksShouldIncludeNoopenerInRel();
     cy.DocPairGithubToolbarLinksShouldMarkSvgsDecorative();
   });
 });
 
-describe("E2E dual-scroll fixture — accessibility shell", () => {
-  it("Fixture shell matches hub landmark and skip affordances", () => {
+describe("The dual-scroll E2E fixture page", () => {
+  it("reuses the main landmark and skip link from the hub shell", () => {
     cy.GoToE2eDualScrollFixturePage();
     cy.CurrentPageShouldDisplayMainLandmarkAndSkipLink();
   });

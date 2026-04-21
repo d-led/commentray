@@ -1,14 +1,16 @@
-describe("Commentray static site (GitHub Pages build)", () => {
-  it("Nav search bootstrap artifact is well-formed", () => {
-    cy.NavSearchArtifactGetRequestShouldReturnSchemaVersion();
+describe("The Commentray GitHub Pages static build", () => {
+  describe("The nav search JSON artifact", () => {
+    it("responds with 200 and a schemaVersion field", () => {
+      cy.NavSearchArtifactGetRequestShouldReturnSchemaVersion();
+    });
   });
 
-  describe("given the built index is served at /", () => {
+  describe("The built site index at /", () => {
     beforeEach(() => {
       cy.GoToStaticSiteHome();
     });
 
-    it("Index behaves as a coherent documentation hub", () => {
+    it("presents a coherent browsable documentation workspace", () => {
       cy.CurrentPageShouldDisplayCodeBrowserShell();
       cy.CommentrayPaneReadmeLinksShouldUseGithubBlobUrls();
       cy.CommentrayPaneEmphasisShouldRenderAfterBlocks();
@@ -18,14 +20,14 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.CommentRayedFilesTreeShouldExposeAtLeastOneFileLink();
     });
 
-    it("Pair browse stays on-site without path stacking", () => {
+    it("keeps pair-browse routes from stacking under repeated /browse/ segments", () => {
       cy.OpenCommentRayedFilesDisclosure();
       cy.FollowFirstBrowseFileLinkInTree();
       cy.CurrentPageShouldDisplayCodeBrowserShell();
       cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
     });
 
-    it("Search dismisses cleanly from the keyboard", () => {
+    it("clears in-page search and hides hits when Escape is pressed", () => {
       cy.TypeTextInSearchField("commentray");
       cy.SearchResultsPanelShouldBeVisible();
       cy.PressEscapeInSearchField();
@@ -33,13 +35,13 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.SearchResultsPanelShouldBeHidden();
     });
 
-    it("Search results emphasize matched tokens in context", () => {
+    it("highlights matched query tokens inside search hit snippets", () => {
       cy.TypeTextInSearchField("commentray");
       cy.SearchResultsPanelShouldBeVisible();
       cy.SearchResultsHitMarksShouldExist();
     });
 
-    it("Empty search offers a navigable index hint", () => {
+    it("lists indexed sources after ArrowDown on an empty search field", () => {
       cy.FocusOnSearchField();
       cy.PressArrowDownInSearchField();
       cy.SearchResultsPanelShouldBeVisible();
@@ -47,7 +49,7 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.SearchResultsHitButtonsShouldExist();
     });
 
-    it("Angle switches refresh the pair while keeping browse targets on-site", () => {
+    it("switches documentation angle while keeping on-site pair-browse targets", () => {
       cy.OptionsOfAngleSelectShouldIncludeMainAndArchitecture();
       cy.DisplayedValueOfAngleSelectShouldBe("main");
       cy.CommentrayPaneShouldContainText("quick-start");
@@ -67,7 +69,7 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.ShellPairBrowseLinkShouldNotPointAtGithubHost();
     });
 
-    it("Angle change clears stale search state", () => {
+    it("resets in-flight search when the angle changes", () => {
       cy.TypeTextInSearchField("quickstart");
       cy.SearchResultsPanelShouldBeVisible();
       cy.ChooseValueOfAngleSelect("architecture");
@@ -75,7 +77,7 @@ describe("Commentray static site (GitHub Pages build)", () => {
       cy.SearchResultsPanelShouldBeHidden();
     });
 
-    it("Diagrams stay present and clean across angles", () => {
+    it("keeps Mermaid output valid when the angle changes", () => {
       cy.DocPaneMermaidShouldShowDiagramOrMarkup();
       cy.ChooseValueOfAngleSelect("architecture");
       cy.DisplayedValueOfAngleSelectShouldBe("architecture");
@@ -83,13 +85,13 @@ describe("Commentray static site (GitHub Pages build)", () => {
     });
   });
 
-  describe("when the nav search index cannot be fetched", () => {
+  context("when nav search JSON cannot be fetched", () => {
     beforeEach(() => {
       cy.InterceptNavSearchIndexAsUnavailable();
       cy.GoToStaticSiteHome();
     });
 
-    it("File tree remains reachable when search bootstrap fails", () => {
+    it("still exposes README through the comment-rayed files tree", () => {
       cy.OpenCommentRayedFilesDisclosure();
       cy.CommentRayedFilesTreeShouldContainReadmeLink();
     });
