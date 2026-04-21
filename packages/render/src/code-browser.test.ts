@@ -22,6 +22,23 @@ function bannerRegionHtml(html: string): string {
 }
 
 describe("Code browser page — layout shell and search", () => {
+  it("should declare a tab favicon without a separate favicon file", async () => {
+    const html = await renderCodeBrowserHtml({
+      code: "x",
+      language: "txt",
+      commentrayMarkdown: "body",
+    });
+    expect(html).toMatch(/<link rel="icon" href="data:image\/svg\+xml,/);
+    const m = /<link rel="icon" href="(data:image\/svg\+xml,[^"]+)"/.exec(html);
+    expect(m).not.toBeNull();
+    if (m === null || m[1] === undefined) {
+      throw new Error("expected favicon data URI");
+    }
+    const raw = decodeURIComponent(m[1].slice("data:image/svg+xml,".length));
+    expect(raw).toContain("M36 20 Q36 14.5 43 14.5");
+    expect(raw).toContain("#fcd34d");
+  });
+
   it("should embed raw payloads on the shell element for the client bundle", async () => {
     const html = await renderCodeBrowserHtml({
       code: "x",
@@ -366,7 +383,7 @@ describe("Code browser page — toolbar link policy", () => {
     expect(html).not.toContain('aria-label="View repository on GitHub"');
     expect(html).not.toContain("Rendered with");
     expect(html).not.toContain("javascript:");
-    expect(html).not.toContain('href="data:');
+    expect(html).not.toContain('href="data:text/html');
   });
 });
 

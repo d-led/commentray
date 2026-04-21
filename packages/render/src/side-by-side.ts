@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { escapeHtml } from "./html-utils.js";
+import { COMMENTRAY_FAVICON_LINK_HTML } from "./inline-favicon.js";
 import { hljsStylesheetThemes } from "./hljs-stylesheet-themes.js";
 import {
   type CommentrayOutputUrlOptions,
@@ -52,6 +53,7 @@ export async function renderSideBySideHtml(opts: SideBySideOptions): Promise<str
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    ${COMMENTRAY_FAVICON_LINK_HTML}
     <title>${escapeHtml(title)}</title>
     <link rel="stylesheet" href="${hljsCdnBase}/${escapeHtml(hljsLight)}.min.css" media="(prefers-color-scheme: light)" />
     <link rel="stylesheet" href="${hljsCdnBase}/${escapeHtml(hljsDark)}.min.css" media="(prefers-color-scheme: dark)" />

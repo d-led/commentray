@@ -16,6 +16,7 @@ import { escapeHtml } from "./html-utils.js";
 import { commentrayColorThemeHeadBoot } from "./code-browser-color-theme.js";
 import { hljsStylesheetThemes } from "./hljs-stylesheet-themes.js";
 import { renderHighlightedCodeLineRows } from "./highlighted-code-lines.js";
+import { COMMENTRAY_FAVICON_LINK_HTML } from "./inline-favicon.js";
 import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
 import { type CommentrayOutputUrlOptions, renderMarkdownToHtml } from "./markdown-pipeline.js";
 import { commentrayRenderVersion } from "./package-version.js";
@@ -1342,6 +1343,7 @@ function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    ${COMMENTRAY_FAVICON_LINK_HTML}
     ${p.metaDescriptionHtml}${p.generatorMetaHtml}<title>${escapeHtml(p.title)}</title>
     <link rel="stylesheet" id="commentray-hljs-light" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/${escapeHtml(
       p.hljs,
