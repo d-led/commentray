@@ -736,6 +736,24 @@ function probeCommentrayLine0FromDoc(docPane: HTMLElement): number {
 
 type SyncPane = "none" | "code" | "doc";
 
+/**
+ * Programmatic `scrollTop` on the partner pane can emit a `scroll` event after the
+ * synchronous `syncing` guard is cleared; that late event would mirror back and
+ * jerk the pane the user is scrolling. We arm a short-lived skip on the partner
+ * before each sync-driven update, and release one skip after two rAFs if no event
+ * consumed it (e.g. `applyScrollTopClamped` no-oped).
+ */
+function armIgnoreNextPaneScrollReaction(armed: { n: number }): void {
+  armed.n++;
+  queueMicrotask(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        armed.n = Math.max(0, armed.n - 1);
+      });
+    });
+  });
+}
+
 function wireBidirectionalScroll(
   codePane: HTMLElement,
   docPane: HTMLElement,
@@ -743,12 +761,19 @@ function wireBidirectionalScroll(
   syncFromDoc: () => void,
 ): void {
   let syncing: SyncPane = "none";
+  const ignoreCodeScrollFromPartnerSync = { n: 0 };
+  const ignoreDocScrollFromPartnerSync = { n: 0 };
 
   codePane.addEventListener(
     "scroll",
     () => {
+      if (ignoreCodeScrollFromPartnerSync.n > 0) {
+        ignoreCodeScrollFromPartnerSync.n--;
+        return;
+      }
       if (syncing === "doc") return;
       syncing = "code";
+      armIgnoreNextPaneScrollReaction(ignoreDocScrollFromPartnerSync);
       syncFromCode();
       syncing = "none";
     },
@@ -758,8 +783,13 @@ function wireBidirectionalScroll(
   docPane.addEventListener(
     "scroll",
     () => {
+      if (ignoreDocScrollFromPartnerSync.n > 0) {
+        ignoreDocScrollFromPartnerSync.n--;
+        return;
+      }
       if (syncing === "code") return;
       syncing = "doc";
+      armIgnoreNextPaneScrollReaction(ignoreCodeScrollFromPartnerSync);
       syncFromDoc();
       syncing = "none";
     },
