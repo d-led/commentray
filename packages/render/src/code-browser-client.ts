@@ -98,6 +98,25 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+/** Y offset in `scrollEl`’s scroll coordinate space to place `child`’s top at the scrollport (CSS px). */
+function scrollTopToAlignChildTop(
+  scrollEl: HTMLElement,
+  child: Element,
+  leadCssPx: number,
+): number {
+  const cr = child.getBoundingClientRect();
+  const sr = scrollEl.getBoundingClientRect();
+  return scrollEl.scrollTop + (cr.top - sr.top) - scrollEl.clientTop - leadCssPx;
+}
+
+/** Avoid feedback loops when sub-pixel math matches the current position (common with browser zoom). */
+function applyScrollTopClamped(scrollEl: HTMLElement, nextTop: number): void {
+  const maxY = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
+  const clamped = clamp(nextTop, 0, maxY);
+  if (Math.abs(scrollEl.scrollTop - clamped) < 0.25) return;
+  scrollEl.scrollTop = clamped;
+}
+
 function escapeHtmlText(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -344,17 +363,15 @@ function scrollDocToMarkdownLine0(
 ): void {
   const el = docScrollEl.querySelector(`#commentray-md-line-${String(line0)}`);
   if (el instanceof HTMLElement) {
-    const top =
-      el.getBoundingClientRect().top -
-      docScrollEl.getBoundingClientRect().top +
-      docScrollEl.scrollTop;
-    docScrollEl.scrollTo({ top: Math.max(0, top - 8), behavior: "smooth" });
+    const top = Math.round(scrollTopToAlignChildTop(docScrollEl, el, 8));
+    const maxY = Math.round(Math.max(0, docScrollEl.scrollHeight - docScrollEl.clientHeight));
+    docScrollEl.scrollTo({ top: clamp(top, 0, maxY), behavior: "smooth" });
     return;
   }
   if (mdLineCount <= 1) return;
   const ratio = line0 / Math.max(1, mdLineCount - 1);
-  const maxScroll = docScrollEl.scrollHeight - docScrollEl.clientHeight;
-  docScrollEl.scrollTo({ top: ratio * Math.max(0, maxScroll), behavior: "smooth" });
+  const maxScroll = Math.max(0, docScrollEl.scrollHeight - docScrollEl.clientHeight);
+  docScrollEl.scrollTo({ top: ratio * maxScroll, behavior: "smooth" });
 }
 
 function navigateToDocumentedPair(pair: DocumentedPairNav, mdLine0: number | null): void {
@@ -689,11 +706,12 @@ function parseScrollBlockLinksFromShell(b64: string): BlockScrollLink[] {
 }
 
 function probeCodeLine1FromViewport(codePane: HTMLElement): number {
-  const y = codePane.getBoundingClientRect().top + 2;
+  const sr = codePane.getBoundingClientRect();
+  const y = sr.top + codePane.clientTop + 2;
   const rows = codePane.querySelectorAll<HTMLElement>('[id^="code-line-"]');
   for (const el of rows) {
     const r = el.getBoundingClientRect();
-    if (r.bottom > y) {
+    if (r.bottom > y - 1e-3) {
       const m = /^code-line-(\d+)$/.exec(el.id);
       if (m) return Number(m[1]) + 1;
       return 1;
@@ -703,13 +721,14 @@ function probeCodeLine1FromViewport(codePane: HTMLElement): number {
 }
 
 function probeCommentrayLine0FromDoc(docPane: HTMLElement): number {
-  const y = docPane.getBoundingClientRect().top + 2;
+  const dr = docPane.getBoundingClientRect();
+  const y = dr.top + docPane.clientTop + 2;
   const anchors = docPane.querySelectorAll<HTMLElement>(".commentray-block-anchor");
   let best = 0;
   for (const a of anchors) {
     const lineAttr = a.getAttribute("data-commentray-line");
     if (lineAttr === null || lineAttr === "") continue;
-    if (a.getBoundingClientRect().top <= y + 1) best = Number(lineAttr);
+    if (a.getBoundingClientRect().top <= y + 1 + 1e-3) best = Number(lineAttr);
     else break;
   }
   return best;
@@ -762,28 +781,30 @@ function wireBlockAwareScrollSync(
       const line1 = probeCodeLine1FromViewport(codePane);
       const mdLine0 = pickCommentrayLineForSourceScroll(links, line1);
       if (mdLine0 === null) {
-        docPane.scrollTop = mirroredScrollTop(
-          codePane.scrollTop,
-          codePane.scrollHeight,
-          codePane.clientHeight,
-          docPane.scrollHeight,
-          docPane.clientHeight,
-        );
-      } else {
-        const anchor = docPane.querySelector(`[data-commentray-line="${String(mdLine0)}"]`);
-        if (anchor instanceof HTMLElement) {
-          const top =
-            anchor.getBoundingClientRect().top -
-            docPane.getBoundingClientRect().top +
-            docPane.scrollTop;
-          docPane.scrollTop = Math.max(0, top - 2);
-        } else {
-          docPane.scrollTop = mirroredScrollTop(
+        applyScrollTopClamped(
+          docPane,
+          mirroredScrollTop(
             codePane.scrollTop,
             codePane.scrollHeight,
             codePane.clientHeight,
             docPane.scrollHeight,
             docPane.clientHeight,
+          ),
+        );
+      } else {
+        const anchor = docPane.querySelector(`[data-commentray-line="${String(mdLine0)}"]`);
+        if (anchor instanceof HTMLElement) {
+          applyScrollTopClamped(docPane, Math.round(scrollTopToAlignChildTop(docPane, anchor, 2)));
+        } else {
+          applyScrollTopClamped(
+            docPane,
+            mirroredScrollTop(
+              codePane.scrollTop,
+              codePane.scrollHeight,
+              codePane.clientHeight,
+              docPane.scrollHeight,
+              docPane.clientHeight,
+            ),
           );
         }
       }
@@ -793,28 +814,30 @@ function wireBlockAwareScrollSync(
       const mdLine0 = probeCommentrayLine0FromDoc(docPane);
       const src0 = pickSourceLine0ForCommentrayScroll(links, mdLine0);
       if (src0 === null) {
-        codePane.scrollTop = mirroredScrollTop(
-          docPane.scrollTop,
-          docPane.scrollHeight,
-          docPane.clientHeight,
-          codePane.scrollHeight,
-          codePane.clientHeight,
-        );
-      } else {
-        const el = document.getElementById(`code-line-${String(src0)}`);
-        if (el) {
-          const top =
-            el.getBoundingClientRect().top -
-            codePane.getBoundingClientRect().top +
-            codePane.scrollTop;
-          codePane.scrollTop = Math.max(0, top - 2);
-        } else {
-          codePane.scrollTop = mirroredScrollTop(
+        applyScrollTopClamped(
+          codePane,
+          mirroredScrollTop(
             docPane.scrollTop,
             docPane.scrollHeight,
             docPane.clientHeight,
             codePane.scrollHeight,
             codePane.clientHeight,
+          ),
+        );
+      } else {
+        const el = codePane.querySelector(`#code-line-${String(src0)}`);
+        if (el) {
+          applyScrollTopClamped(codePane, Math.round(scrollTopToAlignChildTop(codePane, el, 2)));
+        } else {
+          applyScrollTopClamped(
+            codePane,
+            mirroredScrollTop(
+              docPane.scrollTop,
+              docPane.scrollHeight,
+              docPane.clientHeight,
+              codePane.scrollHeight,
+              codePane.clientHeight,
+            ),
           );
         }
       }
@@ -828,21 +851,27 @@ function wireProportionalScrollSync(codePane: HTMLElement, docPane: HTMLElement)
     codePane,
     docPane,
     () => {
-      docPane.scrollTop = mirroredScrollTop(
-        codePane.scrollTop,
-        codePane.scrollHeight,
-        codePane.clientHeight,
-        docPane.scrollHeight,
-        docPane.clientHeight,
+      applyScrollTopClamped(
+        docPane,
+        mirroredScrollTop(
+          codePane.scrollTop,
+          codePane.scrollHeight,
+          codePane.clientHeight,
+          docPane.scrollHeight,
+          docPane.clientHeight,
+        ),
       );
     },
     () => {
-      codePane.scrollTop = mirroredScrollTop(
-        docPane.scrollTop,
-        docPane.scrollHeight,
-        docPane.clientHeight,
-        codePane.scrollHeight,
-        codePane.clientHeight,
+      applyScrollTopClamped(
+        codePane,
+        mirroredScrollTop(
+          docPane.scrollTop,
+          docPane.scrollHeight,
+          docPane.clientHeight,
+          codePane.scrollHeight,
+          codePane.clientHeight,
+        ),
       );
     },
   );

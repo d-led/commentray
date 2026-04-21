@@ -23,6 +23,6 @@ export function mirroredScrollTop(
   const maxSource = Math.max(0, sourceScrollHeight - sourceClientHeight);
   const maxTarget = Math.max(0, targetScrollHeight - targetClientHeight);
   if (maxSource <= 0) return 0;
-  const ratio = sourceScrollTop / maxSource;
+  const ratio = Math.min(1, Math.max(0, sourceScrollTop / maxSource));
   return ratio * maxTarget;
 }

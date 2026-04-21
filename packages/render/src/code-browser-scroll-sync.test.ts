@@ -15,4 +15,8 @@ describe("Proportional scroll position mirroring between panes", () => {
   it("returns 0 when the source pane has nothing to scroll", () => {
     expect(mirroredScrollTop(0, 400, 400, 900, 400)).toBe(0);
   });
+
+  it("clamps the ratio when scrollTop exceeds the computed max (e.g. sub-pixel zoom)", () => {
+    expect(mirroredScrollTop(800, 1000, 400, 500, 400)).toBe(100);
+  });
 });
