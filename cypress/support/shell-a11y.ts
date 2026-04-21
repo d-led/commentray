@@ -2,7 +2,7 @@
  * Selectors and copy hooks for the static code-browser shell used by accessibility E2E.
  *
  * **When the shell markup or static site config changes**, update this module (and the
- * `shouldDisplayCodeBrowserShell` command) rather than hunting through individual specs.
+ * custom commands under `cypress/support/custom-commands/`) rather than hunting through individual specs.
  *
  * Prefer roles and accessible names over class names; a few IDs stay because they are
  * stable in `packages/render/src/code-browser.ts` and easier to scope than long chains.
