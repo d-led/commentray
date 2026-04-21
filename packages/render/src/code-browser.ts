@@ -496,6 +496,8 @@ const CODE_BROWSER_STYLES = `
         --cr-label-caps-fs: 10px;
         --cr-label-caps-track: 0.06em;
         --cr-ui-fs: 12px;
+        /** Matches code/doc pane horizontal padding so pair-context rows line up with pane content (e.g. line nums). */
+        --cr-pane-inline-pad: 12px;
       }
       :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) {
         color-scheme: light dark;
@@ -1042,6 +1044,7 @@ const CODE_BROWSER_STYLES = `
       }
       .shell__pair-cell--src {
         flex: 0 0 var(--split-pct);
+        padding-left: var(--cr-pane-inline-pad);
       }
       .shell__pair-gutter-spacer {
         flex: 0 0 14px;
@@ -1051,6 +1054,7 @@ const CODE_BROWSER_STYLES = `
       .shell__pair-cell--doc {
         flex: 1 1 auto;
         min-width: 0;
+        padding-left: var(--cr-pane-inline-pad);
       }
       .shell__pair-lab {
         flex: 0 0 auto;
@@ -1073,7 +1077,7 @@ const CODE_BROWSER_STYLES = `
       .shell__pair-path--secondary { opacity: 0.88; }
       .pane--code {
         flex: 0 0 var(--split-pct, 50%);
-        min-width: 120px; overflow: auto; padding: 12px 16px;
+        min-width: 120px; overflow: auto; padding: 12px var(--cr-pane-inline-pad);
         border-right: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
         --code-line-font-size: 13px;
         --code-line-height: 1.5;
@@ -1159,7 +1163,7 @@ const CODE_BROWSER_STYLES = `
       }
       .pane--doc {
         flex: 1 1 auto; min-width: 0; min-height: 0;
-        display: flex; flex-direction: column; overflow: hidden; padding: 12px 16px;
+        display: flex; flex-direction: column; overflow: hidden; padding: 12px var(--cr-pane-inline-pad);
         background: Canvas;
         color: CanvasText;
       }
