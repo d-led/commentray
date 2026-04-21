@@ -56,9 +56,9 @@ describe("resolveStaticBrowseHref", () => {
 describe("staticBrowseHrefForShellDataAttribute", () => {
   it("should keep hub-relative browse URLs as ./browse/… for the shell data attribute", () => {
     const origin = "http://127.0.0.1:14173";
-    expect(
-      staticBrowseHrefForShellDataAttribute("./browse/Ab.html", "/", origin),
-    ).toBe("./browse/Ab.html");
+    expect(staticBrowseHrefForShellDataAttribute("./browse/Ab.html", "/", origin)).toBe(
+      "./browse/Ab.html",
+    );
     expect(staticBrowseHrefForShellDataAttribute("browse/Xy.html", "/any/path", origin)).toBe(
       "./browse/Xy.html",
     );

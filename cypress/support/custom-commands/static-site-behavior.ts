@@ -85,30 +85,33 @@ Cypress.Commands.add("shouldListIndexedSourceFilesWhenArrowDownOnEmptySearch", (
   cy.get("#search-results button.hit").should("have.length.at.least", 1);
 });
 
-Cypress.Commands.add("shouldSwapAngleBetweenMainAndArchitectureWithExpectedBodiesAndBrowseHref", () => {
-  cy.get(shellA11y.angleSelect).should("exist");
-  cy.get(`${shellA11y.angleSelect} option`).should("have.length.at.least", 2);
-  cy.get(`${shellA11y.angleSelect} option[value="main"]`).should("exist");
-  cy.get(`${shellA11y.angleSelect} option[value="architecture"]`).should("exist");
-  cy.get(shellA11y.angleSelect).should("have.value", "main");
-  cy.get(shellA11y.panes.commentray).should("contain", "quick-start");
+Cypress.Commands.add(
+  "shouldSwapAngleBetweenMainAndArchitectureWithExpectedBodiesAndBrowseHref",
+  () => {
+    cy.get(shellA11y.angleSelect).should("exist");
+    cy.get(`${shellA11y.angleSelect} option`).should("have.length.at.least", 2);
+    cy.get(`${shellA11y.angleSelect} option[value="main"]`).should("exist");
+    cy.get(`${shellA11y.angleSelect} option[value="architecture"]`).should("exist");
+    cy.get(shellA11y.angleSelect).should("have.value", "main");
+    cy.get(shellA11y.panes.commentray).should("contain", "quick-start");
 
-  cy.get(shellA11y.angleSelect).select("architecture");
-  cy.get(shellA11y.angleSelect).should("have.value", "architecture");
-  cy.get(shellA11y.panes.commentray).should("contain", "architecture angle");
-  cy.get("#shell")
-    .should("have.attr", "data-commentray-pair-browse-href")
-    .and("match", /\.\/browse\/[^/]+\.html$/)
-    .and("not.include", "github.com");
+    cy.get(shellA11y.angleSelect).select("architecture");
+    cy.get(shellA11y.angleSelect).should("have.value", "architecture");
+    cy.get(shellA11y.panes.commentray).should("contain", "architecture angle");
+    cy.get("#shell")
+      .should("have.attr", "data-commentray-pair-browse-href")
+      .and("match", /\.\/browse\/[^/]+\.html$/)
+      .and("not.include", "github.com");
 
-  cy.get(shellA11y.angleSelect).select("main");
-  cy.get(shellA11y.angleSelect).should("have.value", "main");
-  cy.get(shellA11y.panes.commentray).should("contain", "quick-start");
-  cy.get("#shell")
-    .should("have.attr", "data-commentray-pair-browse-href")
-    .and("match", /\.\/browse\/[^/]+\.html$/)
-    .and("not.include", "github.com");
-});
+    cy.get(shellA11y.angleSelect).select("main");
+    cy.get(shellA11y.angleSelect).should("have.value", "main");
+    cy.get(shellA11y.panes.commentray).should("contain", "quick-start");
+    cy.get("#shell")
+      .should("have.attr", "data-commentray-pair-browse-href")
+      .and("match", /\.\/browse\/[^/]+\.html$/)
+      .and("not.include", "github.com");
+  },
+);
 
 Cypress.Commands.add("shouldClearSearchWhenSwitchingAngle", () => {
   cy.get(shellA11y.search.region).within(() => {

@@ -9,9 +9,7 @@ Cypress.Commands.add("shouldHavePageTitleMatching", (pattern) => {
 });
 
 Cypress.Commands.add("shouldHaveMetaDescriptionContentMatching", (pattern) => {
-  cy.get('meta[name="description"]')
-    .should("have.attr", "content")
-    .and("match", pattern);
+  cy.get('meta[name="description"]').should("have.attr", "content").and("match", pattern);
 });
 
 Cypress.Commands.add("shouldHavePageTitleMatchingStaticSitePattern", () => {

@@ -52,6 +52,8 @@ Cypress.Commands.add("shouldMarkSearchResultsAsPoliteLiveRegion", () => {
 
 Cypress.Commands.add("shouldOpenOffSiteLinksInNewTabWithNoopener", () => {
   cy.get('a[target="_blank"]').each(($a) => {
-    cy.wrap($a).invoke("attr", "rel").should("match", /noopener/);
+    cy.wrap($a)
+      .invoke("attr", "rel")
+      .should("match", /noopener/);
   });
 });
