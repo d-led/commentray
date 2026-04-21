@@ -28,7 +28,10 @@ function fail(msg) {
 
 /** Reads a `name="…"` attribute from the opening tag of `#shell`. */
 function shellAttr(html, attrName) {
-  const m = /<div\b[^>]*\bid="shell"\b[^>]*>/.exec(html);
+  // Do not use a trailing `\b` after `id="shell"`: the closing `"` and the next
+  // character are often both non-word (e.g. `"` then space), so `\b` fails and
+  // the whole tag match is lost on long static shells.
+  const m = /<div\b[^>]*\bid="shell"(?=\s|>)[^>]*>/.exec(html);
   if (!m) return null;
   const tag = m[0];
   const am = new RegExp(`\\b${attrName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}="([^"]*)"`).exec(
