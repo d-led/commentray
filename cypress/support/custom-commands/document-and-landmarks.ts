@@ -1,46 +1,46 @@
 import { DOCUMENT_LANG, STATIC_SITE_TITLE_PATTERN, shellA11y } from "../shell-a11y";
 
-Cypress.Commands.add("shouldExposeHtmlLanguage", (expected = DOCUMENT_LANG) => {
+Cypress.Commands.add("DocumentShouldExposeHtmlLanguage", (expected = DOCUMENT_LANG) => {
   cy.get("html").should("have.attr", "lang", expected);
 });
 
-Cypress.Commands.add("shouldHavePageTitleMatching", (pattern) => {
+Cypress.Commands.add("DocumentTitleShouldMatch", (pattern) => {
   cy.title().should("match", pattern);
 });
 
-Cypress.Commands.add("shouldHaveMetaDescriptionContentMatching", (pattern) => {
+Cypress.Commands.add("MetaDescriptionContentShouldMatch", (pattern) => {
   cy.get('meta[name="description"]').should("have.attr", "content").and("match", pattern);
 });
 
-Cypress.Commands.add("shouldHavePageTitleMatchingStaticSitePattern", () => {
-  cy.shouldHavePageTitleMatching(STATIC_SITE_TITLE_PATTERN);
+Cypress.Commands.add("DocumentTitleShouldMatchStaticSitePattern", () => {
+  cy.DocumentTitleShouldMatch(STATIC_SITE_TITLE_PATTERN);
 });
 
-Cypress.Commands.add("shouldHaveMetaDescriptionMatchingStaticSitePattern", () => {
-  cy.shouldHaveMetaDescriptionContentMatching(STATIC_SITE_TITLE_PATTERN);
+Cypress.Commands.add("MetaDescriptionShouldMatchStaticSitePattern", () => {
+  cy.MetaDescriptionContentShouldMatch(STATIC_SITE_TITLE_PATTERN);
 });
 
-Cypress.Commands.add("shouldDisplayBannerLandmark", () => {
+Cypress.Commands.add("BannerLandmarkShouldBeVisible", () => {
   cy.get(shellA11y.banner).should("be.visible");
 });
 
-Cypress.Commands.add("shouldDisplaySrPageHeadingMatching", (pattern) => {
+Cypress.Commands.add("PageHeadingShouldMatch", (pattern) => {
   cy.get(shellA11y.documentTitleHeading).invoke("text").should("match", pattern);
 });
 
-Cypress.Commands.add("shouldDisplaySrPageHeadingMatchingStaticSitePattern", () => {
-  cy.shouldDisplaySrPageHeadingMatching(STATIC_SITE_TITLE_PATTERN);
+Cypress.Commands.add("PageHeadingShouldMatchStaticSitePattern", () => {
+  cy.PageHeadingShouldMatch(STATIC_SITE_TITLE_PATTERN);
 });
 
-Cypress.Commands.add("shouldDisplayPrimaryMainLandmark", () => {
+Cypress.Commands.add("MainLandmarkShouldExist", () => {
   cy.get(shellA11y.main).should("exist");
 });
 
-Cypress.Commands.add("shouldDisplayContentInfoLandmark", () => {
+Cypress.Commands.add("ContentinfoLandmarkShouldExist", () => {
   cy.get(shellA11y.contentinfo).should("exist");
 });
 
-Cypress.Commands.add("shouldLabelDualPanesSplitterAndInPageSearch", () => {
+Cypress.Commands.add("DualPanesSplitterSearchRegionShouldBeVisible", () => {
   cy.get(shellA11y.panes.source).should("be.visible");
   cy.get(shellA11y.panes.commentray).should("be.visible");
   cy.get(shellA11y.resizeSplitter).should("be.visible");

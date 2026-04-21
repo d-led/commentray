@@ -14,9 +14,28 @@ export default tseslint.config(
       "packages/vscode/fixtures/**",
       /** Downloaded VS Code app for @vscode/test-* (contains nested tsconfigs that confuse the parser). */
       "**/.vscode-test/**",
-      "cypress/**",
-      "cypress.config.ts",
     ],
+  },
+  {
+    files: ["cypress/**/*.ts", "cypress.config.ts"],
+    languageOptions: {
+      globals: {
+        afterEach: "readonly",
+        beforeEach: "readonly",
+        cy: "readonly",
+        Cypress: "readonly",
+        describe: "readonly",
+        expect: "readonly",
+        it: "readonly",
+      },
+    },
+  },
+  {
+    files: ["cypress/support/custom-commands/chainable.ts"],
+    rules: {
+      /** Cypress `Chainable` augmentation uses `declare global { namespace Cypress { … } }`. */
+      "@typescript-eslint/no-namespace": "off",
+    },
   },
   {
     files: ["packages/cli/src/**/*.ts", "packages/code-commentray-static/src/**/*.ts"],

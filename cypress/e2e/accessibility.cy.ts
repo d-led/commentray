@@ -1,69 +1,54 @@
 describe("Commentray static site — accessibility", () => {
   beforeEach(() => {
-    cy.visitStaticSiteHome();
+    cy.VisitStaticSiteHome();
   });
 
-  it("should expose html language, page title, and meta description", () => {
-    cy.shouldExposeHtmlLanguage();
-    cy.shouldHavePageTitleMatchingStaticSitePattern();
-    cy.shouldHaveMetaDescriptionMatchingStaticSitePattern();
+  it("Document chrome exposes language, title, and landmarks for assistive tech", () => {
+    cy.DocumentShouldExposeHtmlLanguage();
+    cy.DocumentTitleShouldMatchStaticSitePattern();
+    cy.MetaDescriptionShouldMatchStaticSitePattern();
+    cy.BannerLandmarkShouldBeVisible();
+    cy.PageHeadingShouldMatchStaticSitePattern();
+    cy.MainLandmarkShouldExist();
+    cy.ContentinfoLandmarkShouldExist();
   });
 
-  it("should provide a banner, primary main region, and a screen-reader page heading", () => {
-    cy.shouldDisplayBannerLandmark();
-    cy.shouldDisplaySrPageHeadingMatchingStaticSitePattern();
-    cy.shouldDisplayPrimaryMainLandmark();
-    cy.shouldDisplayContentInfoLandmark();
+  it("Reading layout wires dual panes, skip link, search labelling, and a polite results region", () => {
+    cy.DualPanesSplitterSearchRegionShouldBeVisible();
+    cy.SkipNavigationLinkShouldTargetMainContent();
+    cy.SearchFieldShouldExposeVisibleLabelText();
+    cy.SearchClearButtonShouldBeVisibleWithClearText();
+    cy.WrapLinesCheckboxShouldHaveLabeledWrapLinesText();
+    cy.AngleSelectShouldExist();
+    cy.SearchResultsShouldBePoliteLiveRegion();
   });
 
-  it("should label the dual panes, splitter, and in-page search region", () => {
-    cy.shouldLabelDualPanesSplitterAndInPageSearch();
+  it("Search field shows a non-none outline once it receives focus", () => {
+    cy.SearchFieldFocus();
+    cy.SearchFieldShouldBeFocused();
+    cy.SearchFieldOutlineStyleShouldNotBeNone();
   });
 
-  it("should offer skip navigation to main content", () => {
-    cy.shouldOfferSkipNavigationToMainContent();
+  it("Color theme popover opens, applies light, and dismisses without leaving the menu open", () => {
+    cy.ColorThemeTriggerShouldAdvertisePopoverMenu();
+    cy.ColorThemeMenuShouldStartHidden();
+    cy.ColorThemeTriggerClick();
+    cy.ColorThemeMenuShouldBeVisible();
+    cy.ColorThemePresetLightOptionClick();
+    cy.ColorThemeTriggerShouldReportLightMode();
+    cy.MainLandmarkBodyClickTopLeft();
+    cy.ColorThemeMenuShouldBeHidden();
   });
 
-  it("should show a visible focus indicator on the search field when focused via keyboard", () => {
-    cy.shouldShowVisibleFocusIndicatorOnSearchWhenFocusedViaKeyboard();
-  });
-
-  it("should associate the search field with its visible label", () => {
-    cy.shouldAssociateSearchFieldWithItsVisibleLabel();
-  });
-
-  it("should give the clear-search control an accessible name", () => {
-    cy.shouldGiveClearSearchControlAnAccessibleName();
-  });
-
-  it("should use a labeled checkbox for line wrap", () => {
-    cy.shouldUseLabeledCheckboxForLineWrap();
-  });
-
-  it("should expose a compact color theme control with a popover menu", () => {
-    cy.shouldExposeCompactColorThemeControlWithPopoverMenu();
-  });
-
-  it("should expose the angle selector with a programmatic name", () => {
-    cy.shouldExposeAngleSelectorWithProgrammaticName();
-  });
-
-  it("should mark search results as a polite live region", () => {
-    cy.shouldMarkSearchResultsAsPoliteLiveRegion();
-  });
-
-  it("should open off-site links in a new tab with noopener", () => {
-    cy.shouldOpenOffSiteLinksInNewTabWithNoopener();
-  });
-
-  it("should hide decorative svgs in documentation pair toolbar links", () => {
-    cy.shouldHideDecorativeSvgsInDocPairLinks();
+  it("External navigation stays safe and toolbar icons stay decorative", () => {
+    cy.BlankTargetLinksShouldIncludeNoopenerInRel();
+    cy.DocPairGithubToolbarLinksShouldMarkSvgsDecorative();
   });
 });
 
 describe("E2E dual-scroll fixture — accessibility shell", () => {
-  it("should reuse the same main landmark and skip link as the site root", () => {
-    cy.visitE2eDualScrollSync();
-    cy.shouldDisplayMainLandmarkAndSkipLinkOnCurrentPage();
+  it("Fixture page keeps the same main landmark and skip affordance as the hub", () => {
+    cy.VisitE2eDualScrollFixture();
+    cy.CurrentPageShouldDisplayMainLandmarkAndSkipLink();
   });
 });

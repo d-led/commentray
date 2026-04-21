@@ -3,61 +3,90 @@ export {};
 declare global {
   namespace Cypress {
     interface Chainable {
-      visitStaticSiteHome(): Chainable<void>;
-      visitE2eDualScrollSync(): Chainable<void>;
-      shouldDisplayCodeBrowserShell(): Chainable<void>;
-      shouldExposeNavSearchArtifact(): Chainable<void>;
-      shouldHideDecorativeSvgsInDocPairLinks(): Chainable<void>;
+      VisitStaticSiteHome(): Chainable<void>;
+      VisitE2eDualScrollFixture(): Chainable<void>;
 
-      shouldExposeHtmlLanguage(expected?: string): Chainable<void>;
-      shouldHavePageTitleMatching(pattern: RegExp): Chainable<void>;
-      shouldHaveMetaDescriptionContentMatching(pattern: RegExp): Chainable<void>;
-      shouldHavePageTitleMatchingStaticSitePattern(): Chainable<void>;
-      shouldHaveMetaDescriptionMatchingStaticSitePattern(): Chainable<void>;
+      CurrentPageShouldDisplayCodeBrowserShell(): Chainable<void>;
+      NavSearchArtifactGetRequestShouldReturnSchemaVersion(): Chainable<void>;
+      DocPairGithubToolbarLinksShouldMarkSvgsDecorative(): Chainable<void>;
 
-      shouldDisplayBannerLandmark(): Chainable<void>;
-      shouldDisplaySrPageHeadingMatching(pattern: RegExp): Chainable<void>;
-      shouldDisplaySrPageHeadingMatchingStaticSitePattern(): Chainable<void>;
-      shouldDisplayPrimaryMainLandmark(): Chainable<void>;
-      shouldDisplayContentInfoLandmark(): Chainable<void>;
-      shouldLabelDualPanesSplitterAndInPageSearch(): Chainable<void>;
+      DocumentShouldExposeHtmlLanguage(expected?: string): Chainable<void>;
+      DocumentTitleShouldMatch(pattern: RegExp): Chainable<void>;
+      MetaDescriptionContentShouldMatch(pattern: RegExp): Chainable<void>;
+      DocumentTitleShouldMatchStaticSitePattern(): Chainable<void>;
+      MetaDescriptionShouldMatchStaticSitePattern(): Chainable<void>;
 
-      shouldOfferSkipNavigationToMainContent(): Chainable<void>;
-      shouldShowVisibleFocusIndicatorOnSearchWhenFocusedViaKeyboard(): Chainable<void>;
+      BannerLandmarkShouldBeVisible(): Chainable<void>;
+      PageHeadingShouldMatch(pattern: RegExp): Chainable<void>;
+      PageHeadingShouldMatchStaticSitePattern(): Chainable<void>;
+      MainLandmarkShouldExist(): Chainable<void>;
+      ContentinfoLandmarkShouldExist(): Chainable<void>;
+      DualPanesSplitterSearchRegionShouldBeVisible(): Chainable<void>;
 
-      shouldAssociateSearchFieldWithItsVisibleLabel(): Chainable<void>;
-      shouldGiveClearSearchControlAnAccessibleName(): Chainable<void>;
-      shouldUseLabeledCheckboxForLineWrap(): Chainable<void>;
-      shouldExposeCompactColorThemeControlWithPopoverMenu(): Chainable<void>;
-      shouldExposeAngleSelectorWithProgrammaticName(): Chainable<void>;
+      SkipNavigationLinkShouldTargetMainContent(): Chainable<void>;
+      SearchFieldFocus(): Chainable<void>;
+      SearchFieldShouldBeFocused(): Chainable<void>;
+      SearchFieldOutlineStyleShouldNotBeNone(): Chainable<void>;
 
-      shouldMarkSearchResultsAsPoliteLiveRegion(): Chainable<void>;
-      shouldOpenOffSiteLinksInNewTabWithNoopener(): Chainable<void>;
+      SearchFieldShouldExposeVisibleLabelText(): Chainable<void>;
+      SearchClearButtonShouldBeVisibleWithClearText(): Chainable<void>;
+      WrapLinesCheckboxShouldHaveLabeledWrapLinesText(): Chainable<void>;
 
-      prepareNarrowViewportForDualScrollFixture(): Chainable<void>;
-      shouldDisplayDualPaneCodeBrowserChrome(): Chainable<void>;
-      shouldShowGutterConnectorArtworkBetweenPanesAfterLayout(): Chainable<void>;
-      scrollCodePaneToEnd(): Chainable<void>;
-      scrollDocPaneBodyToEnd(): Chainable<void>;
-      shouldHaveDocPaneBodyScrolledPast(pixels: number): Chainable<void>;
-      shouldHaveCodePaneScrolledPast(pixels: number): Chainable<void>;
-      shouldHaveCodeAndDocPanesAtScrollTopZero(): Chainable<void>;
+      ColorThemeTriggerShouldAdvertisePopoverMenu(): Chainable<void>;
+      ColorThemeMenuShouldStartHidden(): Chainable<void>;
+      ColorThemeTriggerClick(): Chainable<void>;
+      ColorThemeMenuShouldBeVisible(): Chainable<void>;
+      ColorThemePresetLightOptionClick(): Chainable<void>;
+      ColorThemeTriggerShouldReportLightMode(): Chainable<void>;
+      MainLandmarkBodyClickTopLeft(): Chainable<void>;
+      ColorThemeMenuShouldBeHidden(): Chainable<void>;
 
-      shouldLinkCommentrayReadmeToGithubBlobUrls(): Chainable<void>;
-      shouldRenderCommentrayInlineMarkdownEmphasis(): Chainable<void>;
-      shouldExposeHubHomeLinkPairBrowseOnShellAndCollapsibleFileTree(): Chainable<void>;
-      shouldServeBrowsePageWithoutStackedBrowsePathSegments(): Chainable<void>;
-      interceptNavSearchIndexAsUnavailable(): Chainable<void>;
-      shouldShowCommentrayedFilesTreeIncludingReadme(): Chainable<void>;
-      shouldClearInPageSearchAndHideResultsOnEscape(): Chainable<void>;
-      shouldHighlightSearchHitSnippetsWithMark(): Chainable<void>;
-      shouldListIndexedSourceFilesWhenArrowDownOnEmptySearch(): Chainable<void>;
-      shouldSwapAngleBetweenMainAndArchitectureWithExpectedBodiesAndBrowseHref(): Chainable<void>;
-      shouldClearSearchWhenSwitchingAngle(): Chainable<void>;
-      shouldShowMermaidDiagramOrMarkupInDocPaneForCurrentAngle(): Chainable<void>;
-      shouldShowMermaidInCommentrayForMainAndArchitectureAngles(): Chainable<void>;
+      AngleSelectShouldExist(): Chainable<void>;
+      SearchResultsShouldBePoliteLiveRegion(): Chainable<void>;
+      BlankTargetLinksShouldIncludeNoopenerInRel(): Chainable<void>;
 
-      shouldDisplayMainLandmarkAndSkipLinkOnCurrentPage(): Chainable<void>;
+      ViewportResizeForDualScrollScenario(): Chainable<void>;
+      CurrentPageShouldDisplayDualPaneCodeBrowserChrome(): Chainable<void>;
+      DocumentationPairStripShouldMentionDualScrollSourceFile(): Chainable<void>;
+      ResizeSplitterGutterShouldExposeConnectorPaths(): Chainable<void>;
+      CodePaneScrollToMaxScroll(): Chainable<void>;
+      DocPaneBodyScrollToMaxScroll(): Chainable<void>;
+      DocPaneBodyScrollTopShouldExceed(pixels: number): Chainable<void>;
+      CodePaneScrollTopShouldExceed(pixels: number): Chainable<void>;
+      CodeAndDocPanesScrollTopShouldBeZero(): Chainable<void>;
+
+      CurrentPageShouldDisplayMainLandmarkAndSkipLink(): Chainable<void>;
+
+      CommentrayPaneReadmeLinksShouldUseGithubBlobUrls(): Chainable<void>;
+      CommentrayPaneEmphasisShouldRenderAfterBlocks(): Chainable<void>;
+      DocumentationHomeLinkShouldPointToRelativeIndex(): Chainable<void>;
+      ShellPairBrowseLinkShouldAdvertiseOnSiteBrowsePage(): Chainable<void>;
+      CommentRayedFilesSummaryClick(): Chainable<void>;
+      CommentRayedFilesTreeShouldExposeAtLeastOneFileLink(): Chainable<void>;
+      TreeFirstBrowseFileLinkVisit(): Chainable<void>;
+      ShellPairBrowseLinkShouldAvoidStackedBrowseSegments(): Chainable<void>;
+
+      NavSearchIndexGetInterceptAsUnavailable(): Chainable<void>;
+      CommentRayedFilesTreeShouldContainReadmeLink(): Chainable<void>;
+
+      SearchFieldType(text: string): Chainable<void>;
+      SearchResultsPanelShouldBeVisible(): Chainable<void>;
+      SearchFieldEscapeKeyPress(): Chainable<void>;
+      SearchFieldValueShouldBeEmpty(): Chainable<void>;
+      SearchResultsPanelShouldBeHidden(): Chainable<void>;
+      SearchResultsHitMarksShouldExist(): Chainable<void>;
+      SearchFieldArrowDownKeyPress(): Chainable<void>;
+      SearchResultsShouldMentionIndexedSourceFiles(): Chainable<void>;
+      SearchResultsHitButtonsShouldExist(): Chainable<void>;
+
+      AngleSelectShouldExposeMainAndArchitectureOptions(): Chainable<void>;
+      AngleSelectShouldHaveValue(value: string): Chainable<void>;
+      AngleSelectChooseValue(value: string): Chainable<void>;
+      CommentrayPaneShouldContainText(text: string): Chainable<void>;
+      ShellPairBrowseLinkShouldMatchRelativeBrowseHtml(): Chainable<void>;
+      ShellPairBrowseLinkShouldNotPointAtGithubHost(): Chainable<void>;
+
+      DocPaneMermaidShouldShowDiagramOrMarkup(): Chainable<void>;
     }
   }
 }

@@ -1,66 +1,97 @@
 describe("Commentray static site (GitHub Pages build)", () => {
-  it("should expose a valid nav search json artifact", () => {
-    cy.shouldExposeNavSearchArtifact();
+  it("Published nav search artifact is valid JSON the client can bootstrap from", () => {
+    cy.NavSearchArtifactGetRequestShouldReturnSchemaVersion();
   });
 
   describe("given the built index is served at /", () => {
     beforeEach(() => {
-      cy.visitStaticSiteHome();
+      cy.VisitStaticSiteHome();
     });
 
-    it("should serve the code browser shell, panes, and search", () => {
-      cy.shouldDisplayCodeBrowserShell();
+    it("Hub shell, pair browse metadata, and file tree read as one coherent workspace", () => {
+      cy.CurrentPageShouldDisplayCodeBrowserShell();
+      cy.CommentrayPaneReadmeLinksShouldUseGithubBlobUrls();
+      cy.CommentrayPaneEmphasisShouldRenderAfterBlocks();
+      cy.DocumentationHomeLinkShouldPointToRelativeIndex();
+      cy.ShellPairBrowseLinkShouldAdvertiseOnSiteBrowsePage();
+      cy.CommentRayedFilesSummaryClick();
+      cy.CommentRayedFilesTreeShouldExposeAtLeastOneFileLink();
     });
 
-    it("should link the commentray readme to github blob urls, not hub-relative readme paths", () => {
-      cy.shouldLinkCommentrayReadmeToGithubBlobUrls();
+    it("Opening a browse page from the tree stays on-site without stacking /browse/browse/", () => {
+      cy.CommentRayedFilesSummaryClick();
+      cy.TreeFirstBrowseFileLinkVisit();
+      cy.CurrentPageShouldDisplayCodeBrowserShell();
+      cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
     });
 
-    it("should render inline markdown emphasis in the commentray pane after block markers", () => {
-      cy.shouldRenderCommentrayInlineMarkdownEmphasis();
+    it("Escape clears the query and collapses search hits", () => {
+      cy.SearchFieldType("commentray");
+      cy.SearchResultsPanelShouldBeVisible();
+      cy.SearchFieldEscapeKeyPress();
+      cy.SearchFieldValueShouldBeEmpty();
+      cy.SearchResultsPanelShouldBeHidden();
     });
 
-    it("should expose hub home link, pair browse on shell, and a collapsible comment-rayed files tree", () => {
-      cy.shouldExposeHubHomeLinkPairBrowseOnShellAndCollapsibleFileTree();
+    it("Search hits surface mark elements for matched tokens", () => {
+      cy.SearchFieldType("commentray");
+      cy.SearchResultsPanelShouldBeVisible();
+      cy.SearchResultsHitMarksShouldExist();
     });
 
-    it("should serve per-pair browse pages without stacked /browse/browse/ path segments", () => {
-      cy.shouldServeBrowsePageWithoutStackedBrowsePathSegments();
+    it("ArrowDown on an empty field lists indexed sources without typing a query", () => {
+      cy.SearchFieldFocus();
+      cy.SearchFieldArrowDownKeyPress();
+      cy.SearchResultsPanelShouldBeVisible();
+      cy.SearchResultsShouldMentionIndexedSourceFiles();
+      cy.SearchResultsHitButtonsShouldExist();
     });
 
-    it("should clear in-page search and hide results when escape is pressed", () => {
-      cy.shouldClearInPageSearchAndHideResultsOnEscape();
+    it("Angle control swaps rendered bodies and keeps pair browse links on-site", () => {
+      cy.AngleSelectShouldExposeMainAndArchitectureOptions();
+      cy.AngleSelectShouldHaveValue("main");
+      cy.CommentrayPaneShouldContainText("quick-start");
+      cy.ShellPairBrowseLinkShouldMatchRelativeBrowseHtml();
+      cy.ShellPairBrowseLinkShouldNotPointAtGithubHost();
+
+      cy.AngleSelectChooseValue("architecture");
+      cy.AngleSelectShouldHaveValue("architecture");
+      cy.CommentrayPaneShouldContainText("architecture angle");
+      cy.ShellPairBrowseLinkShouldMatchRelativeBrowseHtml();
+      cy.ShellPairBrowseLinkShouldNotPointAtGithubHost();
+
+      cy.AngleSelectChooseValue("main");
+      cy.AngleSelectShouldHaveValue("main");
+      cy.CommentrayPaneShouldContainText("quick-start");
+      cy.ShellPairBrowseLinkShouldMatchRelativeBrowseHtml();
+      cy.ShellPairBrowseLinkShouldNotPointAtGithubHost();
     });
 
-    it("should highlight matched query tokens in search hit snippets", () => {
-      cy.shouldHighlightSearchHitSnippetsWithMark();
+    it("Changing angle resets an in-flight search back to a clean slate", () => {
+      cy.SearchFieldType("quickstart");
+      cy.SearchResultsPanelShouldBeVisible();
+      cy.AngleSelectChooseValue("architecture");
+      cy.SearchFieldValueShouldBeEmpty();
+      cy.SearchResultsPanelShouldBeHidden();
     });
 
-    it("should show a capped list of indexed source files when arrow down is used on an empty search", () => {
-      cy.shouldListIndexedSourceFilesWhenArrowDownOnEmptySearch();
-    });
-
-    it("should list main and architecture angles and swap commentray bodies both ways", () => {
-      cy.shouldSwapAngleBetweenMainAndArchitectureWithExpectedBodiesAndBrowseHref();
-    });
-
-    it("should clear the in-page search field and hide results when switching angle", () => {
-      cy.shouldClearSearchWhenSwitchingAngle();
-    });
-
-    it("should include mermaid diagram blocks or rendered output in commentray for main and architecture", () => {
-      cy.shouldShowMermaidInCommentrayForMainAndArchitectureAngles();
+    it("Mermaid survives angle changes without syntax-error placeholders", () => {
+      cy.DocPaneMermaidShouldShowDiagramOrMarkup();
+      cy.AngleSelectChooseValue("architecture");
+      cy.AngleSelectShouldHaveValue("architecture");
+      cy.DocPaneMermaidShouldShowDiagramOrMarkup();
     });
   });
 
   describe("when the nav search index cannot be fetched", () => {
     beforeEach(() => {
-      cy.interceptNavSearchIndexAsUnavailable();
-      cy.visitStaticSiteHome();
+      cy.NavSearchIndexGetInterceptAsUnavailable();
+      cy.VisitStaticSiteHome();
     });
 
-    it("should still show the comment-rayed files list including readme", () => {
-      cy.shouldShowCommentrayedFilesTreeIncludingReadme();
+    it("The comment-rayed files disclosure still reaches README in the tree", () => {
+      cy.CommentRayedFilesSummaryClick();
+      cy.CommentRayedFilesTreeShouldContainReadmeLink();
     });
   });
 });

@@ -1,6 +1,6 @@
 import { shellA11y } from "../shell-a11y";
 
-Cypress.Commands.add("shouldOfferSkipNavigationToMainContent", () => {
+Cypress.Commands.add("SkipNavigationLinkShouldTargetMainContent", () => {
   cy.get(shellA11y.skipToMainLink)
     .should("have.attr", "href", "#main-content")
     .and(($a) => {
@@ -8,49 +8,74 @@ Cypress.Commands.add("shouldOfferSkipNavigationToMainContent", () => {
     });
 });
 
-Cypress.Commands.add("shouldShowVisibleFocusIndicatorOnSearchWhenFocusedViaKeyboard", () => {
+Cypress.Commands.add("SearchFieldFocus", () => {
   cy.get(shellA11y.search.input).focus();
+});
+
+Cypress.Commands.add("SearchFieldShouldBeFocused", () => {
   cy.get(shellA11y.search.input).should("be.focused");
+});
+
+Cypress.Commands.add("SearchFieldOutlineStyleShouldNotBeNone", () => {
   cy.get(shellA11y.search.input).should("have.css", "outline-style").and("not.eq", "none");
 });
 
-Cypress.Commands.add("shouldAssociateSearchFieldWithItsVisibleLabel", () => {
+Cypress.Commands.add("SearchFieldShouldExposeVisibleLabelText", () => {
   cy.get(shellA11y.search.label).should("contain", "Search");
 });
 
-Cypress.Commands.add("shouldGiveClearSearchControlAnAccessibleName", () => {
+Cypress.Commands.add("SearchClearButtonShouldBeVisibleWithClearText", () => {
   cy.get(shellA11y.search.clearButton).should("be.visible").and("contain", "Clear");
 });
 
-Cypress.Commands.add("shouldUseLabeledCheckboxForLineWrap", () => {
+Cypress.Commands.add("WrapLinesCheckboxShouldHaveLabeledWrapLinesText", () => {
   cy.get(shellA11y.wrapLinesLabel).should("contain", "Wrap code lines");
 });
 
-Cypress.Commands.add("shouldExposeCompactColorThemeControlWithPopoverMenu", () => {
+Cypress.Commands.add("ColorThemeTriggerShouldAdvertisePopoverMenu", () => {
   cy.get(shellA11y.colorThemeTrigger)
     .should("be.visible")
     .and("have.attr", "aria-haspopup", "menu")
     .and("have.attr", "aria-expanded", "false");
-  cy.get(shellA11y.colorThemeMenu).should("have.attr", "hidden");
-  cy.get(shellA11y.colorThemeTrigger).click();
-  cy.get(shellA11y.colorThemeMenu)
-    .should("be.visible")
-    .find('[data-commentray-theme-value="light"]')
-    .click();
-  cy.get(shellA11y.colorThemeTrigger).should("have.attr", "data-commentray-trigger-mode", "light");
-  cy.get(shellA11y.main).click("topLeft", { force: true });
+});
+
+Cypress.Commands.add("ColorThemeMenuShouldStartHidden", () => {
   cy.get(shellA11y.colorThemeMenu).should("have.attr", "hidden");
 });
 
-Cypress.Commands.add("shouldExposeAngleSelectorWithProgrammaticName", () => {
+Cypress.Commands.add("ColorThemeTriggerClick", () => {
+  cy.get(shellA11y.colorThemeTrigger).click();
+});
+
+Cypress.Commands.add("ColorThemeMenuShouldBeVisible", () => {
+  cy.get(shellA11y.colorThemeMenu).should("be.visible");
+});
+
+Cypress.Commands.add("ColorThemePresetLightOptionClick", () => {
+  cy.get(shellA11y.colorThemeMenu).find('[data-commentray-theme-value="light"]').click();
+});
+
+Cypress.Commands.add("ColorThemeTriggerShouldReportLightMode", () => {
+  cy.get(shellA11y.colorThemeTrigger).should("have.attr", "data-commentray-trigger-mode", "light");
+});
+
+Cypress.Commands.add("MainLandmarkBodyClickTopLeft", () => {
+  cy.get(shellA11y.main).click("topLeft", { force: true });
+});
+
+Cypress.Commands.add("ColorThemeMenuShouldBeHidden", () => {
+  cy.get(shellA11y.colorThemeMenu).should("have.attr", "hidden");
+});
+
+Cypress.Commands.add("AngleSelectShouldExist", () => {
   cy.get(shellA11y.angleSelect).should("exist");
 });
 
-Cypress.Commands.add("shouldMarkSearchResultsAsPoliteLiveRegion", () => {
+Cypress.Commands.add("SearchResultsShouldBePoliteLiveRegion", () => {
   cy.get(shellA11y.search.results).should("have.attr", "aria-live", "polite");
 });
 
-Cypress.Commands.add("shouldOpenOffSiteLinksInNewTabWithNoopener", () => {
+Cypress.Commands.add("BlankTargetLinksShouldIncludeNoopenerInRel", () => {
   cy.get('a[target="_blank"]').each(($a) => {
     cy.wrap($a)
       .invoke("attr", "rel")
