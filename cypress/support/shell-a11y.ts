@@ -14,6 +14,12 @@ export const STATIC_SITE_TITLE_PATTERN = /Commentray/i;
 /** Expected primary language of the generated HTML shell. */
 export const DOCUMENT_LANG = "en";
 
+/**
+ * Copy Mermaid surfaces on parse failure — keep aligned with `packages/render/src/markdown-pipeline.ts`
+ * and guarded E2E assertions.
+ */
+export const MERMAID_SYNTAX_ERROR_SNIPPET = "Syntax error in text";
+
 export const shellA11y = {
   main: "main#main-content",
   skipToMainLink: 'a[href="#main-content"]',
@@ -45,4 +51,12 @@ export const shellA11y = {
   angleSelect: '[aria-label="Commentray angle"]',
   /** Plain-text Src/Doc path strip above the dual panes (inside `#shell`). */
   documentationPairLandmark: '[aria-label="Current documentation pair"]',
+  /** Static code-browser root (`code-browser.ts` `#shell`). */
+  shell: "#shell",
+  /** Mobile single-pane flip control (`code-browser.ts` `#mobile-pane-flip`). */
+  mobilePaneFlip: "#mobile-pane-flip",
+  /** Commentary markdown scroll body (`code-browser.ts` `#doc-pane-body`). */
+  docPaneBody: "#doc-pane-body",
+  /** Wrapper class for fenced Mermaid blocks from the render pipeline. */
+  commentrayMermaid: ".commentray-mermaid",
 } as const;

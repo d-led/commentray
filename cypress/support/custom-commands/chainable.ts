@@ -87,6 +87,13 @@ declare global {
       ShellPairBrowseLinkShouldNotPointAtGithubHost(): Chainable<void>;
 
       DocPaneMermaidShouldShowDiagramOrMarkup(): Chainable<void>;
+      DocPaneMermaidSvgShouldExist(): Chainable<void>;
+
+      PrepareStaticSiteHomeAtMobileViewport(): Chainable<void>;
+      MobileStaticSiteCodeBrowserChromeShouldBeReady(): Chainable<void>;
+      MobileSinglePaneLayoutShouldShowCommentaryColumnOnly(): Chainable<void>;
+      MobileSinglePaneLayoutShouldShowSourceColumnOnly(): Chainable<void>;
+      TapMobilePaneFlipControl(): Chainable<void>;
     }
   }
 }

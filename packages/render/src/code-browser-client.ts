@@ -71,13 +71,20 @@ type CommentrayMermaidGlobal = {
 function runMermaidOnFreshDocNodes(docBody: HTMLElement): void {
   if (typeof globalThis.location !== "undefined" && globalThis.location.protocol === "file:")
     return;
-  const nodes = docBody.querySelectorAll(".mermaid");
+  /** Only fenced diagram sources; Mermaid leaves other `.mermaid` nodes in the tree after render. */
+  const allPres = Array.from(docBody.querySelectorAll("pre.mermaid")) as HTMLElement[];
+  /** Do not re-run on wrappers that already have SVG (avoids corrupting output after dual-mobile pane flip). */
+  const nodes = allPres.filter((pre) => {
+    const wrap = pre.closest(".commentray-mermaid");
+    return wrap === null || wrap.querySelector("svg") === null;
+  });
   if (nodes.length === 0) return;
   const m = (globalThis as unknown as { commentrayMermaid?: CommentrayMermaidGlobal })
     .commentrayMermaid;
   if (!m) return;
-  const list = Array.from(nodes) as HTMLElement[];
-  void m.run({ nodes: list }).catch(() => {});
+  void m.run({ nodes }).catch((err: unknown) => {
+    console.error("Commentray: mermaid.run failed", err);
+  });
 }
 
 type HitKind = "code" | "md" | "path";
@@ -656,23 +663,51 @@ function wireSearchUi(ctx: SearchUiContext): void {
   });
 }
 
+/**
+ * After toggling `pre-wrap`, line rows reflow without necessarily resizing the pane’s border box,
+ * so gutter block rays and scroll sync must be nudged explicitly.
+ *
+ * Pass optional `docWrapRoots` (e.g. `#doc-pane` and `#doc-pane-body` in dual layout): the toggle
+ * syncs `wrap` on those nodes so commentary fenced blocks and prose honor the control. `#doc-pane-body`
+ * is targeted in CSS with an id so rules win over `pre code.hljs` from the highlight.js theme.
+ */
 function wireWrapToggle(
   storageWrap: string,
   codePane: HTMLElement,
   wrapCb: HTMLInputElement,
+  onAfterLayout?: () => void,
+  ...docWrapRoots: Array<HTMLElement | null | undefined>
 ): void {
+  const docTargets = docWrapRoots.filter((el): el is HTMLElement => el instanceof HTMLElement);
   const wrap = readWebStorageItem(localStorage, storageWrap) === "1";
   wrapCb.checked = wrap;
-  if (wrap) codePane.classList.add("wrap");
+  if (wrap) {
+    codePane.classList.add("wrap");
+    for (const el of docTargets) el.classList.add("wrap");
+  } else {
+    codePane.classList.remove("wrap");
+    for (const el of docTargets) el.classList.remove("wrap");
+  }
 
   wrapCb.addEventListener("change", () => {
     if (wrapCb.checked) {
       codePane.classList.add("wrap");
+      for (const el of docTargets) el.classList.add("wrap");
       writeWebStorageItem(localStorage, storageWrap, "1");
     } else {
       codePane.classList.remove("wrap");
+      for (const el of docTargets) el.classList.remove("wrap");
       writeWebStorageItem(localStorage, storageWrap, "0");
     }
+    if (!onAfterLayout) return;
+    queueMicrotask(() => {
+      requestAnimationFrame(() => {
+        onAfterLayout();
+        requestAnimationFrame(() => {
+          onAfterLayout();
+        });
+      });
+    });
   });
 }
 
@@ -1307,6 +1342,55 @@ function loadDocumentedPairs(
   };
 }
 
+/**
+ * On narrow viewports the toolbar strip uses horizontal overflow; absolutely positioned
+ * `.nav-rail__doc-hub-inner` is clipped. Pin the panel with `position: fixed` while open.
+ */
+function wireDocumentedFilesTreeMobileFlyout(hub: HTMLDetailsElement): () => void {
+  const innerCandidate = hub.querySelector(".nav-rail__doc-hub-inner");
+  if (!(innerCandidate instanceof HTMLElement)) {
+    return (): void => {};
+  }
+  const flyoutInner: HTMLElement = innerCandidate;
+  const mq = globalThis.matchMedia("(max-width: 767px)");
+
+  function summaryEl(): HTMLElement | null {
+    const s = hub.querySelector("summary");
+    return s instanceof HTMLElement ? s : null;
+  }
+
+  function placeFlyout(): void {
+    if (!hub.open || !mq.matches) {
+      flyoutInner.style.removeProperty("position");
+      flyoutInner.style.removeProperty("top");
+      flyoutInner.style.removeProperty("left");
+      flyoutInner.style.removeProperty("right");
+      flyoutInner.style.removeProperty("width");
+      flyoutInner.style.removeProperty("max-width");
+      flyoutInner.style.removeProperty("max-height");
+      flyoutInner.style.removeProperty("z-index");
+      return;
+    }
+    const sum = summaryEl();
+    if (!sum) return;
+    const r = sum.getBoundingClientRect();
+    const pad = 8;
+    flyoutInner.style.position = "fixed";
+    flyoutInner.style.top = `${String(Math.round(r.bottom + 4))}px`;
+    flyoutInner.style.left = `${String(Math.round(pad))}px`;
+    flyoutInner.style.right = `${String(Math.round(pad))}px`;
+    flyoutInner.style.width = "auto";
+    flyoutInner.style.maxWidth = "none";
+    flyoutInner.style.maxHeight = "min(52vh, 400px)";
+    flyoutInner.style.zIndex = "200";
+  }
+
+  mq.addEventListener("change", placeFlyout);
+  globalThis.addEventListener("resize", placeFlyout);
+  globalThis.addEventListener("scroll", placeFlyout, true);
+  return placeFlyout;
+}
+
 function wireDocumentedFilesTree(): void {
   const hub = document.getElementById("documented-files-hub");
   const treeHost = document.getElementById("documented-files-tree");
@@ -1321,6 +1405,8 @@ function wireDocumentedFilesTree(): void {
   const jsonUrl = hub.getAttribute("data-nav-json-url")?.trim() ?? "";
   const embeddedB64 = shell?.getAttribute("data-documented-pairs-b64")?.trim() ?? "";
   if (jsonUrl.length === 0 && embeddedB64.length === 0) return;
+
+  const placeDocHubFlyout = wireDocumentedFilesTreeMobileFlyout(hub);
 
   const ensureLoaded = loadDocumentedPairs(jsonUrl, embeddedB64);
   let cachedPairs: DocumentedPairNav[] | null = null;
@@ -1350,6 +1436,10 @@ function wireDocumentedFilesTree(): void {
   }
 
   hub.addEventListener("toggle", () => {
+    placeDocHubFlyout();
+    if (hub.open) {
+      globalThis.requestAnimationFrame(placeDocHubFlyout);
+    }
     if (!hub.open) return;
     void hydrateTree();
   });
@@ -1400,11 +1490,67 @@ function wireSplitter(
 
 const STORAGE_SPLIT_PCT = "commentray.codeCommentrayStatic.splitPct";
 const STORAGE_WRAP_LINES = "commentray.codeCommentrayStatic.wrap";
+const STORAGE_DUAL_MOBILE_PANE = "commentray.codeCommentrayStatic.dualMobilePane";
+
+/** Matches `code-browser.ts` `@media (max-width: 767px)` (dual column from 768px up). */
+const DUAL_MOBILE_SINGLE_PANE_MQ = "(max-width: 767px)";
+
+function normalizedDualMobilePane(v: string | null | undefined): "code" | "doc" {
+  return v === "code" ? "code" : "doc";
+}
+
+/** When the commentary pane is visible, (re)run Mermaid so diagrams are not laid out under display:none. */
+function scheduleMermaidWhenDualDocPaneVisible(shell: HTMLElement, mq: MediaQueryList): void {
+  const kick = (): void => {
+    if (shell.getAttribute("data-layout") !== "dual") return;
+    if (!mq.matches) return;
+    if (normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane")) !== "doc") return;
+    const docBody = document.getElementById("doc-pane-body");
+    if (!(docBody instanceof HTMLElement)) return;
+    runMermaidOnFreshDocNodes(docBody);
+  };
+  queueMicrotask(() => {
+    kick();
+    requestAnimationFrame(() => {
+      kick();
+      requestAnimationFrame(kick);
+    });
+  });
+}
+
+function wireDualMobilePaneFlip(shell: HTMLElement, flipBtn: HTMLButtonElement): void {
+  const mq = globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ);
+  function readStoredPane(): "code" | "doc" {
+    return normalizedDualMobilePane(readWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE));
+  }
+  function applyForViewport(): void {
+    if (mq.matches) {
+      shell.setAttribute("data-dual-mobile-pane", readStoredPane());
+    } else {
+      shell.removeAttribute("data-dual-mobile-pane");
+    }
+  }
+  flipBtn.addEventListener("click", () => {
+    if (!mq.matches) return;
+    const cur = normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane"));
+    const next = cur === "code" ? "doc" : "code";
+    shell.setAttribute("data-dual-mobile-pane", next);
+    writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, next);
+    // Only here (not on every viewport apply): avoids redundant Mermaid passes on load/resize for the default commentary-first shell.
+    if (next === "doc") {
+      scheduleMermaidWhenDualDocPaneVisible(shell, mq);
+    }
+  });
+  mq.addEventListener("change", applyForViewport);
+  applyForViewport();
+}
 
 function wireStretchLayoutChrome(codePane: HTMLElement): void {
   const wrapCb = document.getElementById("wrap-lines") as HTMLInputElement | null;
   if (wrapCb) {
-    wireWrapToggle(STORAGE_WRAP_LINES, codePane, wrapCb);
+    wireWrapToggle(STORAGE_WRAP_LINES, codePane, wrapCb, () => {
+      globalThis.dispatchEvent(new Event("resize"));
+    });
   }
 }
 
@@ -1704,12 +1850,23 @@ function wireDualPaneCommentrayLocationHash(
   });
 }
 
-function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): void {
-  const dom = readDualPaneDomBundle();
-  if (!dom) return;
+type DualPaneSearcherBundle = {
+  rawCode: string;
+  rawMd: string;
+  scrollLinksRef: { current: BlockScrollLink[] };
+  scope: SearchScope;
+  filePathLabel: string;
+  commentrayPathLabel: string;
+  pathInit: ReturnType<typeof initialCommentrayScopePathState>;
+  indexState: DualPaneSearchIndexState;
+  mutable: MutableSearchFields;
+  rebuildSearcher: () => void;
+};
 
-  const { docBody, docScrollEl, gutter, wrapCb, searchInput, searchClear, searchResults } = dom;
-
+function buildDualPaneSearcherBundle(
+  shell: HTMLElement,
+  codePane: HTMLElement,
+): DualPaneSearcherBundle {
   const { rawCodeB64, rawMdB64 } = readEmbeddedRawB64Strings(shell, codePane);
   const rawCode = decodeBase64Utf8(rawCodeB64);
   const rawMd = decodeBase64Utf8(rawMdB64);
@@ -1756,13 +1913,35 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
   }
   rebuildSearcher();
 
+  return {
+    rawCode,
+    rawMd,
+    scrollLinksRef,
+    scope,
+    filePathLabel,
+    commentrayPathLabel,
+    pathInit,
+    indexState,
+    mutable,
+    rebuildSearcher,
+  };
+}
+
+function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): void {
+  const dom = readDualPaneDomBundle();
+  if (!dom) return;
+
+  const { docBody, docScrollEl, gutter, wrapCb, searchInput, searchClear, searchResults } = dom;
+
+  const bundle = buildDualPaneSearcherBundle(shell, codePane);
+
   rewriteHubRelativeBrowseAnchorsIn(document);
 
   wireSearchUi({
-    scope,
-    filePathLabel,
-    mutable,
-    rawCode,
+    scope: bundle.scope,
+    filePathLabel: bundle.filePathLabel,
+    mutable: bundle.mutable,
+    rawCode: bundle.rawCode,
     searchInput,
     searchClear,
     searchResults,
@@ -1771,48 +1950,69 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
 
   wireDualPaneNavSearchFetch(
     shell,
-    pathInit.documentedPairs,
-    indexState,
-    mutable,
-    rebuildSearcher,
+    bundle.pathInit.documentedPairs,
+    bundle.indexState,
+    bundle.mutable,
+    bundle.rebuildSearcher,
     searchInput,
   );
 
-  const pct0 = parseFloat(readWebStorageItem(localStorage, STORAGE_SPLIT_PCT) || "50");
-  const pct = clamp(Number.isFinite(pct0) ? pct0 : 50, 15, 85);
+  const pct0 = parseFloat(readWebStorageItem(localStorage, STORAGE_SPLIT_PCT) || "46");
+  const pct = clamp(Number.isFinite(pct0) ? pct0 : 46, 15, 85);
   codePane.style.flex = `0 0 ${pct}%`;
   shell.style.setProperty("--split-pct", `${String(pct)}%`);
 
-  wireWrapToggle(STORAGE_WRAP_LINES, codePane, wrapCb);
+  const docPaneEl = document.getElementById("doc-pane");
+  const docPaneForWrap = docPaneEl instanceof HTMLElement ? docPaneEl : null;
+
+  const blockRayRedraw: { request?: () => void } = {};
+  wireWrapToggle(
+    STORAGE_WRAP_LINES,
+    codePane,
+    wrapCb,
+    () => {
+      blockRayRedraw.request?.();
+      codePane.dispatchEvent(new Event("scroll"));
+      docScrollEl.dispatchEvent(new Event("scroll"));
+    },
+    docPaneForWrap,
+    docBody,
+  );
   wireSplitter(STORAGE_SPLIT_PCT, shell, codePane, gutter, pct);
+
+  const flipBtn = document.getElementById("mobile-pane-flip");
+  if (flipBtn instanceof HTMLButtonElement) {
+    wireDualMobilePaneFlip(shell, flipBtn);
+  }
 
   const multiScript = document.getElementById("commentray-multi-angle-b64");
   const multiPayload = parseMultiAnglePayload(multiScript);
-  const shouldWireBlockRays = multiPayload !== null || scrollLinksRef.current.length > 0;
+  const shouldWireBlockRays = multiPayload !== null || bundle.scrollLinksRef.current.length > 0;
   const requestBlockRayRedraw = shouldWireBlockRays
     ? wireBlockRayConnectors({
         gutter,
         codePane,
         docScrollEl,
-        getLinks: () => scrollLinksRef.current,
+        getLinks: () => bundle.scrollLinksRef.current,
         probeTopSourceLine1Based: () => probeCodeLine1FromViewport(codePane),
       })
     : undefined;
+  blockRayRedraw.request = requestBlockRayRedraw;
   wireDualPaneMultiAngleAndScroll({
     codePane,
     docScrollEl,
     docBody,
     shell,
-    scrollLinksRef,
+    scrollLinksRef: bundle.scrollLinksRef,
     multiPayload,
-    mutable,
-    rebuildSearcher,
+    mutable: bundle.mutable,
+    rebuildSearcher: bundle.rebuildSearcher,
     searchInput,
     searchResults,
     requestBlockRayRedraw,
   });
 
-  wireDualPaneCommentrayLocationHash(docScrollEl, () => mutable.mdLines.length);
+  wireDualPaneCommentrayLocationHash(docScrollEl, () => bundle.mutable.mdLines.length);
 }
 
 function commentrayThemeModeLabel(mode: CommentrayColorThemeMode): string {

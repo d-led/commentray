@@ -308,6 +308,37 @@ const SITE_HOME_SVG =
   '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>' +
   "</svg>";
 
+/** Folder-with-list glyph (file tree / documented pairs hub). */
+const TOOLBAR_ICON_TREE_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M4 20h16a1 1 0 0 0 1-1V9a2 2 0 0 0-2-2h-5.5a2 2 0 0 1-1.6-.8L10.5 4.5a2 2 0 0 0-1.6-.8H5a2 2 0 0 0-2 2v14a1 1 0 0 0 1 1Z"/>' +
+  '<path d="M8 12h8M8 16h6M8 20h4"/>' +
+  "</svg>";
+
+/**
+ * Line wrap — Material "wrap_text" glyph (Apache-2.0), same visual family as
+ * https://www.svgrepo.com/svg/376703/text-wrap-line (filled 24dp path scaled to 18px).
+ */
+const TOOLBAR_ICON_WRAP_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">' +
+  '<path d="M4 19h6v-2H4v2zM20 5H4v2h16V5zm-3 6H4v2h13.25c1.1 0 2 .9 2 2s-.9 2-2 2H15v-2l-3 3 3 3v-2h2c2.21 0 4-1.79 4-4s-1.79-4-4-4z"/>' +
+  "</svg>";
+
+const CHROME_ICON_SEARCH_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="11" cy="11" r="7"/>' +
+  '<path d="m21 21-4.3-4.3"/>' +
+  "</svg>";
+
+/** Swap / flip: circle split by a diameter, one arrow per half (narrow viewports). */
+const TOOLBAR_ICON_FLIP_PANES_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="12" cy="12" r="9"/>' +
+  '<path d="M12 4v16"/>' +
+  '<path d="M10.5 12H6l2.5-2.5M6 12l2.5 2.5"/>' +
+  '<path d="M13.5 12H18l-2.5-2.5M18 12l-2.5 2.5"/>' +
+  "</svg>";
+
 function safeExternalHttpUrl(url: string | undefined): string | null {
   const t = url?.trim();
   if (!t) return null;
@@ -398,7 +429,7 @@ function renderToolbarDocHubHtml(opts: {
   const navAttr = escapeHtml(nav ?? "");
   const navRailDocumentedHtml = showDocumentedTree
     ? `<details class="nav-rail__doc-hub" id="documented-files-hub" data-nav-json-url="${navAttr}">
-        <summary class="nav-rail__doc-hub-summary">Comment-rayed files</summary>
+        <summary class="nav-rail__doc-hub-summary" title="Comment-rayed files" aria-label="Comment-rayed files"><span class="nav-rail__doc-hub-summary__caption">Comment-rayed files</span><span class="nav-rail__doc-hub-summary__glyph" aria-hidden="true">${TOOLBAR_ICON_TREE_SVG}</span></summary>
         <div class="nav-rail__doc-hub-inner">
           <div class="nav-rail__doc-hub-filter-row">
             <label class="nav-rail__doc-hub-filter-label" for="documented-files-filter">Filter</label>
@@ -602,16 +633,23 @@ const CODE_BROWSER_STYLES = `
       }
       .chrome__search-row #search-clear {
         flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--cr-control-h);
+        padding: 0 12px;
         font: inherit;
         font-size: var(--cr-ui-fs);
         font-weight: 500;
-        min-height: var(--cr-control-h);
-        padding: 0 16px;
         border-radius: var(--cr-control-radius);
         cursor: pointer;
         border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
         background: color-mix(in oklab, CanvasText 6%, Canvas);
         color: CanvasText;
+        white-space: nowrap;
+      }
+      .chrome__search-row #search-clear:hover {
+        background: color-mix(in oklab, CanvasText 11%, Canvas);
       }
       .chrome__search-row input[type="search"]:focus-visible,
       .chrome__search-row #search-clear:focus-visible {
@@ -620,7 +658,17 @@ const CODE_BROWSER_STYLES = `
       }
       .chrome__search-label {
         flex: 0 0 auto;
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 6px;
         white-space: nowrap;
+        cursor: default;
+        user-select: none;
+      }
+      /* Wide viewports: same legible caps word as historic Pages shell (icon hidden). */
+      .chrome__search-label__glyph {
+        display: none;
       }
       .nav-rail__search-label {
         font-size: var(--cr-label-caps-fs);
@@ -642,15 +690,32 @@ const CODE_BROWSER_STYLES = `
       .nav-rail__doc-hub-summary {
         cursor: pointer;
         font-size: var(--cr-ui-fs);
-        font-weight: 600;
+        font-weight: 500;
+        color: color-mix(in oklab, CanvasText 88%, Canvas);
         padding: 0 12px;
         min-height: var(--cr-control-h);
         display: inline-flex;
+        flex-direction: row;
         align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
         box-sizing: border-box;
         list-style: none;
         user-select: none;
         line-height: 1.25;
+      }
+      .nav-rail__doc-hub-summary:hover {
+        background: color-mix(in oklab, CanvasText 6%, Canvas);
+      }
+      .nav-rail__doc-hub-summary__caption {
+        white-space: nowrap;
+      }
+      .nav-rail__doc-hub-summary__glyph {
+        display: none;
+      }
+      .nav-rail__doc-hub-summary svg {
+        display: block;
+        flex: 0 0 auto;
       }
       .nav-rail__doc-hub-summary::-webkit-details-marker { display: none; }
       .nav-rail__doc-hub-inner {
@@ -725,11 +790,11 @@ const CODE_BROWSER_STYLES = `
       .app__footer time { font-variant-numeric: tabular-nums; }
       .toolbar {
         position: relative;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        grid-auto-rows: auto;
-        row-gap: 8px;
-        padding: 10px 12px 10px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 14px;
+        padding: 8px 12px;
         border-bottom: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
         background: color-mix(in oklab, CanvasText 4%, Canvas);
         font-size: var(--cr-ui-fs);
@@ -737,12 +802,12 @@ const CODE_BROWSER_STYLES = `
         min-width: 0;
       }
       .toolbar__primary {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        /* Top-align trail with the first control line; align-items: center would vertically center
-           in the grid cell when the main strip wraps or grows, which drops the theme switch below the row. */
-        align-items: start;
-        gap: 8px 14px;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 14px;
+        flex: 1 1 auto;
         min-width: 0;
       }
       .toolbar__primary-main {
@@ -750,8 +815,8 @@ const CODE_BROWSER_STYLES = `
         flex-direction: row;
         flex-wrap: wrap;
         align-items: center;
-        align-content: flex-start;
-        gap: 8px 14px;
+        gap: 10px 14px;
+        flex: 0 1 auto;
         min-width: 0;
       }
       .toolbar__primary-trail {
@@ -759,10 +824,9 @@ const CODE_BROWSER_STYLES = `
         flex-direction: row;
         flex-wrap: wrap;
         align-items: center;
-        align-content: flex-start;
         justify-content: flex-end;
-        gap: 8px 12px;
-        justify-self: end;
+        gap: 10px 14px;
+        margin-left: auto;
         min-width: 0;
       }
       .toolbar__end {
@@ -801,16 +865,123 @@ const CODE_BROWSER_STYLES = `
       }
       .app__footer-attribution__version { font-weight: 600; }
       .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
-      .toolbar__primary-main > label:has(#wrap-lines) {
+      .toolbar-wrap-lines {
+        position: relative;
         margin: 0;
         min-height: var(--cr-control-h);
         padding: 0 12px 0 10px;
         border-radius: var(--cr-control-radius);
         border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
-        background: color-mix(in oklab, CanvasText 4%, Canvas);
+        background: Canvas;
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
         font-size: var(--cr-ui-fs);
         font-weight: 500;
-        gap: 8px;
+        color: color-mix(in oklab, CanvasText 88%, Canvas);
+        cursor: pointer;
+      }
+      .toolbar-wrap-lines:hover {
+        background: color-mix(in oklab, CanvasText 6%, Canvas);
+      }
+      .toolbar-wrap-lines__input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+        opacity: 0;
+      }
+      /** Visible tick box: the real input is visually hidden for a11y; unchecked looked like an empty box with no mark when on. */
+      .toolbar-wrap-lines__box {
+        flex: 0 0 auto;
+        width: 16px;
+        height: 16px;
+        box-sizing: border-box;
+        border: 1.5px solid color-mix(in oklab, CanvasText 38%, Canvas);
+        border-radius: 3px;
+        background: Canvas;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: CanvasText;
+      }
+      .toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) .toolbar-wrap-lines__box {
+        border-color: color-mix(in oklab, CanvasText 52%, Canvas);
+        background: color-mix(in oklab, CanvasText 6%, Canvas);
+      }
+      .toolbar-wrap-lines__box::after {
+        content: "";
+        display: none;
+        width: 4px;
+        height: 9px;
+        margin-top: -2px;
+        border: solid currentColor;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+      }
+      .toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) .toolbar-wrap-lines__box::after {
+        display: block;
+      }
+      .toolbar-wrap-lines__face {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--cr-control-h);
+        min-width: var(--cr-control-h);
+        color: color-mix(in oklab, CanvasText 82%, Canvas);
+      }
+      .toolbar-wrap-lines__caption {
+        white-space: nowrap;
+      }
+      .toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) {
+        color: CanvasText;
+        background: color-mix(in oklab, CanvasText 10%, Canvas);
+      }
+      .toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) .toolbar-wrap-lines__caption {
+        color: CanvasText;
+      }
+      .toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) .toolbar-wrap-lines__face {
+        color: CanvasText;
+        background: color-mix(in oklab, CanvasText 10%, Canvas);
+        border-radius: calc(var(--cr-control-radius) - 1px);
+      }
+      .toolbar-wrap-lines:has(.toolbar-wrap-lines__input:focus-visible) {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
+      }
+      .toolbar-icon-btn {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: var(--cr-control-h);
+        height: var(--cr-control-h);
+        padding: 0;
+        margin: 0;
+        border-radius: var(--cr-control-radius);
+        border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+        background: color-mix(in oklab, CanvasText 6%, Canvas);
+        color: CanvasText;
+        cursor: pointer;
+        flex: 0 0 auto;
+      }
+      .toolbar-icon-btn svg {
+        display: block;
+        flex: 0 0 auto;
+      }
+      .toolbar-icon-btn:hover {
+        background: color-mix(in oklab, CanvasText 14%, Canvas);
+        border-color: color-mix(in oklab, CanvasText 34%, Canvas);
+      }
+      .toolbar-icon-btn:focus-visible {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
       }
       .toolbar label input:focus-visible {
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
@@ -901,7 +1072,7 @@ const CODE_BROWSER_STYLES = `
       }
       .toolbar-theme__menuitem[aria-checked="true"] {
         background: color-mix(in oklab, CanvasText 10%, Canvas);
-        font-weight: 600;
+        font-weight: 500;
       }
       .toolbar .file-path {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
@@ -915,9 +1086,10 @@ const CODE_BROWSER_STYLES = `
       }
       .toolbar .file-path__dir--root { letter-spacing: 0; }
       .toolbar .file-path__base {
-        color: CanvasText; font-weight: 600;
+        color: CanvasText;
+        font-weight: 500;
       }
-      .toolbar .file-path--title { font-weight: 600; }
+      .toolbar .file-path--title { font-weight: 500; }
       .toolbar-related {
         display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
         max-width: min(520px, 90vw);
@@ -925,7 +1097,7 @@ const CODE_BROWSER_STYLES = `
         line-height: 1.35;
         color: color-mix(in oklab, CanvasText 88%, Canvas);
       }
-      .toolbar-related__prefix { font-weight: 600; opacity: 0.85; white-space: nowrap; }
+      .toolbar-related__prefix { font-weight: 500; opacity: 0.88; white-space: nowrap; }
       .toolbar-related__links { min-width: 0; }
       .toolbar-related a {
         color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 500;
@@ -1015,7 +1187,7 @@ const CODE_BROWSER_STYLES = `
         flex: 1;
         min-height: 0;
         min-width: 0;
-        --split-pct: 50%;
+        --split-pct: 46%;
       }
       .app__main .shell { flex: 1 1 auto; }
       .shell__panes {
@@ -1077,7 +1249,7 @@ const CODE_BROWSER_STYLES = `
       }
       .shell__pair-path--secondary { opacity: 0.88; }
       .pane--code {
-        flex: 0 0 var(--split-pct, 50%);
+        flex: 0 0 var(--split-pct, 46%);
         min-width: 120px; overflow: auto; padding: 12px var(--cr-pane-inline-pad);
         border-right: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
         --code-line-font-size: 13px;
@@ -1086,9 +1258,10 @@ const CODE_BROWSER_STYLES = `
       .pane--code .code-line-stack { --code-ln-min-ch: 3; }
       .pane--code .code-line {
         display: grid;
-        grid-template-columns: max-content 1fr;
+        grid-template-columns: max-content minmax(0, 1fr);
         column-gap: 10px;
         align-items: start;
+        min-width: 0;
       }
       .pane--code .code-line pre {
         margin: 0;
@@ -1168,37 +1341,333 @@ const CODE_BROWSER_STYLES = `
         background: Canvas;
         color: CanvasText;
       }
+      /* #doc-pane-body.wrap beats pre code.hljs from the hljs theme so fenced blocks follow the toggle. */
+      #doc-pane-body.wrap pre,
+      #doc-pane-body.wrap pre code {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #doc-pane-body:not(.wrap) pre,
+      #doc-pane-body:not(.wrap) pre code {
+        white-space: pre;
+        word-break: normal;
+      }
       .doc-pane-body {
         flex: 1 1 auto; min-height: 0; overflow: auto;
+      }
+      /** Wide GFM tables: intrinsic width so the doc pane scrolls sideways instead of squeezing columns. */
+      .pane--doc .doc-pane-body :where(table) {
+        width: max-content;
+        max-width: none;
+        border-collapse: collapse;
+      }
+      .pane--doc .doc-pane-body .commentray-mermaid {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      /** Wrap on: break long URLs/words in prose; tables opt out so they stay wide + scroll with the body. */
+      #doc-pane-body.wrap {
+        overflow-wrap: break-word;
+      }
+      #doc-pane-body.wrap :where(table) {
+        overflow-wrap: normal;
+        word-break: normal;
+      }
+      #doc-pane-body:not(.wrap) {
+        overflow-wrap: normal;
+        word-break: normal;
       }
       .toolbar-angle-picker {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         flex: 0 0 auto;
-        color: color-mix(in oklab, CanvasText 88%, Canvas);
       }
-      .toolbar-angle-picker > label {
-        font-size: var(--cr-label-caps-fs);
-        font-weight: 700;
-        letter-spacing: var(--cr-label-caps-track);
-        text-transform: uppercase;
-        opacity: 0.72;
+      /* Angle caption uses the same class as the Search label (.nav-rail__search-label). */
+      .toolbar-angle-picker__lab {
+        display: inline-block;
+        margin: 0;
+        padding: 0;
+        cursor: default;
+        flex: 0 0 auto;
+        white-space: nowrap;
+        user-select: none;
       }
       .toolbar-angle-picker select {
         font: inherit;
         font-size: var(--cr-ui-fs);
+        font-weight: 500;
         min-height: var(--cr-control-h);
         height: var(--cr-control-h);
         padding: 0 10px;
         border-radius: var(--cr-control-radius);
         border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
         background: Canvas;
-        color: CanvasText;
+        color: color-mix(in oklab, CanvasText 88%, Canvas);
       }
       .toolbar-angle-picker select:focus-visible {
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
         outline-offset: 2px;
+      }
+      /* Single-pane + compact chrome below typical tablet / Bootstrap md threshold (768px). */
+      @media (max-width: 767px) {
+        html,
+        body {
+          overflow-x: auto;
+          overflow-y: auto;
+        }
+        .app {
+          height: auto;
+          min-height: 100vh;
+          min-height: 100dvh;
+          min-width: 0;
+          overflow-x: auto;
+          overflow-y: visible;
+        }
+        .app__main {
+          flex: 0 0 auto;
+          width: 100%;
+          min-height: 0;
+        }
+        .app__main > #shell:not(.shell--stretch-rows) {
+          flex: none !important;
+          min-height: auto !important;
+          overflow: visible !important;
+        }
+        .app__main > #shell:not(.shell--stretch-rows) .shell__panes {
+          flex: none !important;
+          min-height: auto !important;
+          min-width: 0;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        .app__main > #shell:not(.shell--stretch-rows) .pane--code,
+        .app__main > #shell:not(.shell--stretch-rows) .pane--doc {
+          flex: none !important;
+          min-height: auto !important;
+          overflow: visible !important;
+          max-height: none !important;
+          /* flex:none + basis:auto otherwise sizes to max-content so line-wrap has no width cap */
+          width: 100%;
+          max-width: 100%;
+          min-width: 0 !important;
+          box-sizing: border-box;
+        }
+        .app__main > #shell:not(.shell--stretch-rows) .pane--doc {
+          display: block;
+        }
+        .app__main > #shell:not(.shell--stretch-rows) .doc-pane-body {
+          flex: none !important;
+          min-height: auto !important;
+          min-width: 0;
+          overflow: visible !important;
+        }
+        .app__footer {
+          margin-top: auto;
+          flex-shrink: 0;
+          padding: 5px 10px 8px;
+          font-size: 10px;
+          line-height: 1.35;
+        }
+        .app__main > #shell.shell--stretch-rows {
+          flex: 1 1 auto;
+          min-height: min(72vh, 720px);
+          min-height: min(72dvh, 720px);
+          overflow: auto;
+        }
+        .toolbar {
+          padding: 5px 8px 5px;
+          row-gap: 4px;
+        }
+        .toolbar__primary {
+          display: flex;
+          flex-direction: row;
+          flex-wrap: nowrap;
+          align-items: center;
+          gap: 6px;
+          min-width: 0;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .toolbar__primary-main {
+          flex: 1 1 auto;
+          min-width: 0;
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          overflow-y: visible;
+          -webkit-overflow-scrolling: touch;
+          gap: 6px;
+          scrollbar-width: thin;
+        }
+        .toolbar__primary-trail {
+          flex: 0 0 auto;
+          flex-wrap: nowrap;
+          align-self: center;
+        }
+        .toolbar-angle-picker {
+          position: relative;
+          flex: 0 1 auto;
+          min-width: 0;
+          max-width: 100%;
+        }
+        .toolbar-angle-picker__lab {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+          opacity: 0;
+          pointer-events: none;
+        }
+        .toolbar-angle-picker select {
+          max-width: min(200px, 52vw);
+          min-width: 0;
+          text-overflow: ellipsis;
+        }
+        .app__chrome {
+          padding: 5px 8px 6px;
+          gap: 5px;
+          max-height: min(36vh, 360px);
+        }
+        /* Compact chrome: avoid heavy rings on inline fields (clear stays a real button). */
+        .chrome__search-row input[type="search"]:focus-visible {
+          outline: none;
+          border-color: color-mix(in oklab, CanvasText 42%, Canvas);
+        }
+        .chrome__search-row #search-clear:focus-visible {
+          outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+          outline-offset: 2px;
+        }
+        .chrome__search-label__caption {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+        }
+        .chrome__search-label__glyph {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 2px;
+          margin: 0;
+          color: color-mix(in oklab, CanvasText 72%, Canvas);
+        }
+        .chrome__search-label__glyph:hover {
+          color: color-mix(in oklab, CanvasText 88%, Canvas);
+        }
+        .chrome__search-label:focus-within {
+          outline: none;
+        }
+        .chrome__search-label__glyph svg {
+          display: block;
+          flex: 0 0 auto;
+        }
+        .toolbar-angle-picker select:focus-visible {
+          outline: none;
+          border-color: color-mix(in oklab, CanvasText 42%, Canvas);
+        }
+        .toolbar-icon-btn--flip-only-narrow {
+          display: inline-flex;
+        }
+        .nav-rail__doc-hub-summary {
+          min-width: var(--cr-control-h);
+          padding: 0 10px;
+          justify-content: center;
+          gap: 0;
+        }
+        .nav-rail__doc-hub-summary__caption {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+        }
+        .nav-rail__doc-hub-summary__glyph {
+          display: inline-flex;
+        }
+        .toolbar-wrap-lines {
+          min-width: var(--cr-control-h);
+          padding: 0;
+          justify-content: center;
+          gap: 0;
+          font-weight: 500;
+        }
+        .toolbar-wrap-lines__caption {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+        }
+        .toolbar-wrap-lines__box {
+          display: none;
+        }
+        .toolbar-wrap-lines__face {
+          display: inline-flex;
+          position: relative;
+          width: 100%;
+          height: 100%;
+          min-height: var(--cr-control-h);
+          min-width: var(--cr-control-h);
+        }
+        .toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) .toolbar-wrap-lines__face::after {
+          content: "✓";
+          position: absolute;
+          right: 1px;
+          bottom: 0;
+          font-size: 11px;
+          line-height: 1;
+          font-weight: 800;
+          color: CanvasText;
+          text-shadow: 0 0 2px Canvas, 0 0 3px Canvas;
+        }
+        .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="code"] .pane--doc,
+        .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="code"] .gutter {
+          display: none !important;
+        }
+        .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="doc"] .pane--code,
+        .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="doc"] .gutter {
+          display: none !important;
+        }
+        .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="code"] .pane--code,
+        .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="doc"] .pane--doc {
+          border-right: 0 !important;
+        }
+        .shell:not(.shell--stretch-rows) .shell__pair-context {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 4px;
+          padding: 4px 0 6px;
+        }
+        .shell:not(.shell--stretch-rows) .shell__pair-gutter-spacer {
+          display: none;
+        }
+        .shell:not(.shell--stretch-rows) .shell__pair-cell--src {
+          flex: 1 1 auto;
+          padding-left: var(--cr-pane-inline-pad);
+        }
+        .shell:not(.shell--stretch-rows) .shell__pair-cell--doc {
+          flex: 1 1 auto;
+          padding-left: var(--cr-pane-inline-pad);
+        }
       }
       .pane--doc { font-size: 15px; line-height: 1.45; }
       .pane--doc img { max-width: 100%; height: auto; }
@@ -1228,8 +1697,15 @@ const CODE_BROWSER_STYLES = `
         border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
         font-size: 15px;
         line-height: 1.45;
+        overflow-x: auto;
+        max-width: 100%;
       }
       .shell--stretch-rows .stretch-preamble img { max-width: 100%; height: auto; }
+      .shell--stretch-rows .stretch-preamble :where(table) {
+        width: max-content;
+        max-width: none;
+        border-collapse: collapse;
+      }
       .block-stretch {
         width: 100%;
         border-collapse: collapse;
@@ -1250,8 +1726,30 @@ const CODE_BROWSER_STYLES = `
       .block-stretch td.stretch-doc .stretch-doc-inner {
         font-size: 15px;
         line-height: 1.45;
+        min-width: 0;
+        overflow-x: auto;
       }
       .block-stretch td.stretch-doc .stretch-doc-inner img { max-width: 100%; height: auto; }
+      .block-stretch td.stretch-doc .stretch-doc-inner :where(table) {
+        width: max-content;
+        max-width: none;
+        border-collapse: collapse;
+      }
+      .block-stretch td.stretch-doc .stretch-doc-inner .commentray-mermaid {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      .block-stretch.wrap td.stretch-doc .stretch-doc-inner {
+        overflow-wrap: break-word;
+      }
+      .block-stretch.wrap td.stretch-doc .stretch-doc-inner :where(table) {
+        overflow-wrap: normal;
+        word-break: normal;
+      }
+      .block-stretch:not(.wrap) td.stretch-doc .stretch-doc-inner {
+        overflow-wrap: normal;
+        word-break: normal;
+      }
       .block-stretch td.stretch-doc--gap {
         color: color-mix(in oklab, CanvasText 38%, Canvas);
         font-size: 13px;
@@ -1298,6 +1796,15 @@ const CODE_BROWSER_STYLES = `
       .block-stretch.wrap .code-line pre code { white-space: pre-wrap; word-break: break-word; }
       .block-stretch:not(.wrap) .code-line pre,
       .block-stretch:not(.wrap) .code-line pre code { white-space: pre; }
+      .block-stretch.wrap .stretch-doc-inner pre,
+      .block-stretch.wrap .stretch-doc-inner pre code {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .block-stretch:not(.wrap) .stretch-doc-inner pre,
+      .block-stretch:not(.wrap) .stretch-doc-inner pre code {
+        white-space: pre;
+      }
 `;
 
 /** Native tooltip on #search-q (short hint is visible under the search row). */
@@ -1338,6 +1845,10 @@ type CodeBrowserPageParts = {
 
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
   const shellClass = p.layout === "stretch" ? "shell shell--stretch-rows" : "shell";
+  const dualFlipControlHtml =
+    p.layout === "dual"
+      ? `<button type="button" id="mobile-pane-flip" class="toolbar-icon-btn toolbar-icon-btn--flip-only-narrow" aria-label="Switch between source code and commentary" title="Switch between source code and commentary">${TOOLBAR_ICON_FLIP_PANES_SVG}</button>`
+      : "";
   return `<!doctype html>
 <html lang="en" data-commentray-theme="system">
   <head>
@@ -1368,7 +1879,13 @@ ${CODE_BROWSER_STYLES}
           ${p.toolbarSiteHubHtml}
           ${p.navRailDocumentedHtml}
           ${p.angleSelectHtml}
-          <label><input type="checkbox" id="wrap-lines" /> Wrap code lines</label>
+          <label class="toolbar-wrap-lines" title="Wrap long lines in the source pane; in commentary, wrap long words and fenced code when on (wide tables and diagrams scroll horizontally).">
+            <input type="checkbox" id="wrap-lines" class="toolbar-wrap-lines__input" />
+            <span class="toolbar-wrap-lines__box" aria-hidden="true"></span>
+            <span class="toolbar-wrap-lines__face" aria-hidden="true">${TOOLBAR_ICON_WRAP_SVG}</span>
+            <span class="toolbar-wrap-lines__caption">Wrap lines</span>
+          </label>
+          ${dualFlipControlHtml}
           ${p.toolbarDocHubHtml}
           ${p.relatedNavHtml}
           </div>
@@ -1380,24 +1897,24 @@ ${TOOLBAR_COLOR_THEME_HTML}
       </header>
       <header class="app__chrome" role="region" aria-label="Search">
         <div class="chrome__search-row">
-          <label class="chrome__search-label nav-rail__search-label" for="search-q">Search</label>
+          <label class="chrome__search-label" for="search-q" aria-label="Search" title="Search"><span class="chrome__search-label__caption nav-rail__search-label">Search</span><span class="chrome__search-label__glyph" aria-hidden="true">${CHROME_ICON_SEARCH_SVG}</span></label>
           <input type="search" id="search-q" placeholder="${escapeHtml(p.searchPlaceholder)}" title="${escapeHtml(CODE_BROWSER_SEARCH_INPUT_TITLE)}" autocomplete="off" spellcheck="false" />
-          <button type="button" id="search-clear" title="Clear search">Clear</button>
+          <button type="button" id="search-clear" aria-label="Clear search" title="Clear search">Clear</button>
         </div>
         <div class="search-results" id="search-results" hidden aria-live="polite"></div>
       </header>
       <main id="main-content" class="app__main" tabindex="-1">
-        <div class="${shellClass}" id="shell" data-layout="${p.layout}" data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairDocDataAttr}>
+        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" ? ' data-dual-mobile-pane="doc"' : ""} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairDocDataAttr}>
 ${p.shellInner}
         </div>
       </main>
       ${p.pageFooterHtml}
     </div>
     <script type="text/plain" id="commentray-multi-angle-b64">${p.multiAngleScriptBlock}</script>
+    ${p.mermaidScript}
     <script>
 ${loadCodeBrowserClientBundle()}
     </script>
-    ${p.mermaidScript}
   </body>
 </html>`;
 }
@@ -1510,7 +2027,7 @@ async function buildMultiAngleDualPaneShell(
       return `<option value="${escapeHtml(a.id)}"${a.id === defaultId ? " selected" : ""}>${lab}</option>`;
     })
     .join("");
-  const angleSelectHtml = `<span class="toolbar-angle-picker"><label for="angle-select">Angle</label><select id="angle-select" aria-label="Commentray angle">${selOpts}</select></span>`;
+  const angleSelectHtml = `<span class="toolbar-angle-picker"><label class="toolbar-angle-picker__lab nav-rail__search-label" for="angle-select">Angle</label><select id="angle-select" aria-label="Commentray angle">${selOpts}</select></span>`;
 
   const pairHtml = renderShellPairContextHtml(opts.filePath, defaultPathSearch);
   const shellInner = wrapDualShellInner(

@@ -27,14 +27,14 @@ Cypress.Commands.add("ScrollCodePaneToMaximum", () => {
 });
 
 Cypress.Commands.add("ScrollDocPaneBodyToMaximum", () => {
-  cy.get("#doc-pane-body").then(($body) => {
+  cy.get(shellA11y.docPaneBody).then(($body) => {
     const el = $body[0];
     el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
   });
 });
 
 Cypress.Commands.add("DocPaneBodyScrollTopShouldExceed", (pixels) => {
-  cy.get("#doc-pane-body").invoke("scrollTop").should("be.gt", pixels);
+  cy.get(shellA11y.docPaneBody).invoke("scrollTop").should("be.gt", pixels);
 });
 
 Cypress.Commands.add("CodePaneScrollTopShouldExceed", (pixels) => {
@@ -42,7 +42,7 @@ Cypress.Commands.add("CodePaneScrollTopShouldExceed", (pixels) => {
 });
 
 Cypress.Commands.add("CodeAndDocPanesScrollTopShouldBeZero", () => {
-  cy.get("#doc-pane-body").invoke("scrollTop").should("eq", 0);
+  cy.get(shellA11y.docPaneBody).invoke("scrollTop").should("eq", 0);
   cy.get("#code-pane").invoke("scrollTop").should("eq", 0);
 });
 

@@ -119,7 +119,10 @@ describe("Code browser page — document shell and chrome", () => {
     expect(html).toContain('aria-label="Resize panes"');
     expect(html).toContain('role="region" aria-label="Search"');
     expect(html).toContain('for="search-q"');
-    expect(banner).toContain("Wrap code lines");
+    expect(banner).toContain("Wrap lines");
+    expect(banner).toContain("toolbar-wrap-lines__box");
+    expect(html).toContain('id="mobile-pane-flip"');
+    expect(html).toContain('aria-label="Switch between source code and commentary"');
 
     expect(plain).toContain("const x = 1;");
     expect(plain).toContain("Notes");
@@ -521,5 +524,6 @@ describe("Code browser page — block markers and scroll sync payload", () => {
     expect(html).toContain('data-layout="stretch"');
     expect(html).toContain("Sync");
     expect(html).not.toContain('id="doc-pane"');
+    expect(html).not.toContain('id="mobile-pane-flip"');
   });
 });

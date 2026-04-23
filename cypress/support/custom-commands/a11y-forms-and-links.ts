@@ -21,15 +21,22 @@ Cypress.Commands.add("SearchFieldOutlineStyleShouldNotBeNone", () => {
 });
 
 Cypress.Commands.add("SearchFieldShouldExposeVisibleLabelText", () => {
-  cy.get(shellA11y.search.label).should("contain", "Search");
+  cy.get(shellA11y.search.label).should("have.attr", "aria-label", "Search");
+  cy.get(shellA11y.search.label)
+    .find(".chrome__search-label__caption")
+    .should("be.visible")
+    .and("contain.text", "Search");
 });
 
 Cypress.Commands.add("SearchClearButtonShouldBeVisibleWithClearText", () => {
-  cy.get(shellA11y.search.clearButton).should("be.visible").and("contain", "Clear");
+  cy.get(shellA11y.search.clearButton)
+    .should("be.visible")
+    .and("have.attr", "aria-label", "Clear search")
+    .and("contain.text", "Clear");
 });
 
 Cypress.Commands.add("WrapLinesCheckboxShouldHaveLabeledWrapLinesText", () => {
-  cy.get(shellA11y.wrapLinesLabel).should("contain", "Wrap code lines");
+  cy.get(shellA11y.wrapLinesLabel).should("contain", "Wrap lines");
 });
 
 Cypress.Commands.add("ColorThemeTriggerShouldAdvertisePopoverMenu", () => {

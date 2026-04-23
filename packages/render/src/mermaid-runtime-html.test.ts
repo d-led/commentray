@@ -12,9 +12,10 @@ describe("Optional Mermaid runtime script injection", () => {
     const html = mermaidRuntimeScriptHtml(true);
     expect(html).toContain('location.protocol==="file:"');
     expect(html).toContain('s.type="module"');
-    expect(html).toContain("cdn.jsdelivr.net/npm/mermaid@11");
+    expect(html).toContain("cdn.jsdelivr.net/npm/mermaid@11.14.0");
     expect(html).toContain("mermaid.initialize");
     expect(html).toContain("globalThis.commentrayMermaid=mermaid");
+    expect(html).toContain("skipInitial");
     expect(html).not.toContain('<script type="module">');
   });
 });

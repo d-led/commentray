@@ -12,6 +12,14 @@ describe("Markdown to HTML pipeline", () => {
     expect(html).toContain("world");
   });
 
+  it("should keep mermaid source as plain text under pre.mermaid so the browser runtime can parse it", async () => {
+    const md = "```mermaid\nflowchart LR\n  A --> B\n```";
+    const html = await renderMarkdownToHtml(md);
+    expect(html).toContain('class="mermaid"');
+    expect(html).toContain("flowchart LR");
+    expect(html).not.toMatch(/<pre[^>]*class="mermaid"[^>]*>[\s\S]*?<code\b/);
+  });
+
   it("should rewrite in-repo GitHub blob links to paths relative to the output HTML file", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-gh-"));
     const repoRoot = path.join(tmp, "repo");

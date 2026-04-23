@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import type { Code, Definition, Html, Image, Link, Root as MdastRoot } from "mdast";
-import type { Element, Root as HastRoot } from "hast";
+import type { Element, Root as HastRoot, Text } from "hast";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -155,12 +155,48 @@ function remarkMermaidPlaceholders() {
       const value = node.value;
       const html: Html = {
         type: "html",
-        /** Diagram text must live directly under `<pre class="mermaid">` (no nested `<code>`); Mermaid 11 can mis-parse or fail when the source is only inside `<code>`. */
+        /** Diagram text must end up as direct text under `<pre class="mermaid">` (see {@link rehypeMermaidUnwrapInnerCode}). */
         value: `<div class="commentray-mermaid"><pre class="mermaid">${escapeHtml(
           value,
         )}</pre></div>`,
       };
       parent.children[index] = html;
+    });
+  };
+}
+
+function hastPlainTextFromElement(node: Element): string {
+  let out = "";
+  for (const c of node.children) {
+    if (c.type === "text") {
+      out += c.value;
+    } else if (c.type === "element") {
+      out += hastPlainTextFromElement(c);
+    }
+  }
+  return out;
+}
+
+/**
+ * `rehype-highlight` may leave (or introduce) `<pre class="mermaid"><code class="language-mermaid">…</code></pre>`.
+ * Mermaid 11's browser runtime expects the diagram source as **text** under `<pre class="mermaid">`, otherwise it
+ * shows "Syntax error in text".
+ */
+function rehypeMermaidUnwrapInnerCode() {
+  return (tree: HastRoot): void => {
+    visit(tree, "element", (node: Element) => {
+      if (node.tagName !== "pre") return;
+      const cls = node.properties?.className;
+      if (!Array.isArray(cls) || !cls.map(String).includes("mermaid")) return;
+
+      const codeChild = node.children.find(
+        (c): c is Element => c.type === "element" && c.tagName === "code",
+      );
+      if (!codeChild) return;
+
+      const value = hastPlainTextFromElement(codeChild);
+      const textNode: Text = { type: "text", value };
+      node.children = [textNode];
     });
   };
 }
@@ -211,7 +247,8 @@ export async function renderMarkdownToHtml(
         rehypeCommentrayOutputUrls(outUrls)(tree);
       };
     })
-    .use(rehypeHighlight)
+    .use(rehypeHighlight, { plainText: ["mermaid"] })
+    .use(rehypeMermaidUnwrapInnerCode)
     .use(rehypeStringify)
     .process(markdown);
   return String(file);
