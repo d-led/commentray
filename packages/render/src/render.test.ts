@@ -2,8 +2,22 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { renderMarkdownToHtml } from "./markdown-pipeline.js";
+import { type MarkdownPipelineOptions, renderMarkdownToHtml } from "./markdown-pipeline.js";
 import { renderSideBySideHtml } from "./side-by-side.js";
+
+function markdownWithAcmeDemoGithubBlob(opts: {
+  repoRootAbs: string;
+  htmlOutputFileAbs: string;
+  markdownUrlBaseDirAbs: string;
+  commentrayStorageRootAbs: string;
+}): MarkdownPipelineOptions {
+  return {
+    commentrayOutputUrls: {
+      ...opts,
+      githubBlobRepo: { owner: "acme", repo: "demo" },
+    },
+  };
+}
 
 describe("Markdown to HTML pipeline", () => {
   it("should turn headings and inline emphasis into semantic HTML", async () => {
@@ -33,15 +47,15 @@ describe("Markdown to HTML pipeline", () => {
     const md =
       "[Storage](https://github.com/acme/demo/blob/main/docs/spec/storage.md) " +
       "and [other](https://github.com/other/repo/blob/main/x.md).";
-    const html = await renderMarkdownToHtml(md, {
-      commentrayOutputUrls: {
+    const html = await renderMarkdownToHtml(
+      md,
+      markdownWithAcmeDemoGithubBlob({
         repoRootAbs: repoRoot,
         htmlOutputFileAbs: outHtml,
         markdownUrlBaseDirAbs: repoRoot,
         commentrayStorageRootAbs: storageRoot,
-        githubBlobRepo: { owner: "acme", repo: "demo" },
-      },
-    });
+      }),
+    );
     expect(html).toContain('href="../docs/spec/storage.md"');
     expect(html).toContain("github.com/other/repo");
   });
@@ -54,15 +68,15 @@ describe("Markdown to HTML pipeline", () => {
     const md = "[x](https://github.com/wrong/repo/blob/main/README.md)";
     const storageRoot = path.join(repoRoot, ".commentray");
     await mkdir(storageRoot, { recursive: true });
-    const html = await renderMarkdownToHtml(md, {
-      commentrayOutputUrls: {
+    const html = await renderMarkdownToHtml(
+      md,
+      markdownWithAcmeDemoGithubBlob({
         repoRootAbs: repoRoot,
         htmlOutputFileAbs: outHtml,
         markdownUrlBaseDirAbs: repoRoot,
         commentrayStorageRootAbs: storageRoot,
-        githubBlobRepo: { owner: "acme", repo: "demo" },
-      },
-    });
+      }),
+    );
     expect(html).toContain("github.com/wrong/repo");
   });
 });
