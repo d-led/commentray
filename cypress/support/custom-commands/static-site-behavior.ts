@@ -144,7 +144,9 @@ Cypress.Commands.add("ShellPairBrowseLinkShouldNotPointAtGithubHost", () => {
 });
 
 Cypress.Commands.add("DocPaneMermaidShouldShowDiagramOrMarkup", () => {
-  cy.get(`${shellA11y.docPaneBody} ${shellA11y.commentrayMermaid}`, { timeout: MERMAID_E2E_TIMEOUT_MS })
+  cy.get(`${shellA11y.docPaneBody} ${shellA11y.commentrayMermaid}`, {
+    timeout: MERMAID_E2E_TIMEOUT_MS,
+  })
     .should("have.length.at.least", 1)
     .each(($block) => {
       cy.wrap($block).find("svg").should("have.length.at.least", 1);
@@ -158,7 +160,9 @@ Cypress.Commands.add("DocPaneMermaidShouldShowDiagramOrMarkup", () => {
 
 /** Asserts diagram SVG is present — use after dual-mobile pane toggles when the stricter `DocPaneMermaidShouldShowDiagramOrMarkup` copy checks are not required. */
 Cypress.Commands.add("DocPaneMermaidSvgShouldExist", () => {
-  cy.get(`${shellA11y.docPaneBody} ${shellA11y.commentrayMermaid}`, { timeout: MERMAID_E2E_TIMEOUT_MS })
+  cy.get(`${shellA11y.docPaneBody} ${shellA11y.commentrayMermaid}`, {
+    timeout: MERMAID_E2E_TIMEOUT_MS,
+  })
     .find("svg")
     .should("have.length.at.least", 1);
 });
