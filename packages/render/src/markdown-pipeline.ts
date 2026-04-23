@@ -170,10 +170,18 @@ function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
       if (next == null) return;
       node.properties ??= {};
       if ("blockedImage" in next) {
-        delete node.properties[key];
+        if (node.tagName === "a") {
+          delete node.properties.href;
+        } else {
+          delete node.properties.src;
+        }
         return;
       }
-      node.properties[key] = next.relativeToHtml;
+      if (node.tagName === "a") {
+        node.properties.href = next.relativeToHtml;
+      } else {
+        node.properties.src = next.relativeToHtml;
+      }
     });
   };
 }
