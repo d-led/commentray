@@ -57,7 +57,7 @@ the bullets below are the day-to-day detail.
 ## Contributor expectations
 
 - **Slow lane:** `npm run ci:full` — quality gate, integration tests, then expensive tests (no Cypress).
-- **Tests:** run `npm run test:unit` before every PR; add `npm run test:integration` when you touch the Git SCM adapter, `.commentray/` layout, or fixture-backed behavior; use `npm run test:expensive` for fuzzed / large-repo suites when relevant. Never silence failures with `.skip`, swallowed errors, or widened thresholds — fix code or fix tests.
+- **Tests:** run `npm run test:unit` before every PR; add `npm run test:integration` when you touch the Git SCM adapter, `.commentray/` layout, or fixture-backed behavior; use `npm run test:expensive` for fuzzed / large-repo suites when relevant. Never silence failures with `.skip`, swallowed errors, or widened thresholds — fix code or fix tests. When you change **`packages/vscode`**, run **`npm run test:vscode-extension`** and keep **`engines.vscode`**, **`@types/vscode`**, and the **minimum** row in [`.github/workflows/ci-vscode-extension.yml`](../.github/workflows/ci-vscode-extension.yml) aligned (see **VS Code engine compatibility** under Editor extension workflows below).
 - **Lint / dupes:** `npm run lint` (ESLint + shellcheck on `scripts/` + refactor metrics); `npm run dupes` (`jscpd`); `npm run quality` runs lint + dupes. Treat findings as design feedback.
 - **Dependencies:** preview with `npm run deps:upgrade -- --check`; apply with `npm run deps:upgrade` (`patch` / `minor` / `major` / `latest`). The script re-pins `@commentray/*` via `scripts/sync-workspace-deps.mjs` and refreshes the lockfile — then run `npm run quality:gate`. Triage `npm audit` seriously; avoid blanket `--force`.
 - **Format:** `npm run format` (write) or `npm run format:check` (verify).
@@ -140,6 +140,67 @@ To set breakpoints in `packages/vscode/src/**`, open the `packages/vscode` folde
 editor and use the **Run and Debug** / **Extension** launch configuration (add
 `launch.json` if your editor has not generated one). That path attaches a debugger;
 `npm run extension:dogfood` installs the packaged extension into your normal editor instead.
+
+### VS Code engine compatibility (Commentray extension)
+
+The extension is a normal VS Code extension: compatibility is a contract between
+**declared minimum**, **TypeScript typings**, **runtime behavior**, and **where
+users install it** (VS Code, VS Code forks, Cursor, etc.).
+
+#### Declare the floor (`engines.vscode`)
+
+In `packages/vscode/package.json`, **`engines.vscode`** is the supported way to
+say “this extension only runs on VS Code at least X”. The host refuses
+incompatible installs when possible, so users see a clear incompatibility instead
+of a random `TypeError` from missing API.
+
+Keep **`@types/vscode`** in that same `package.json` aligned with that minimum
+(typically the same `1.x.y` as the lower bound you support) so the compiler
+matches the API surface you actually guarantee.
+
+#### Avoid opaque runtime errors
+
+`engines.vscode` does not polyfill newer APIs. If you need a capability added in
+a specific release, either **raise the engine** (preferred for this repo) or
+**detect the capability** and show a clear message (output channel / notification)
+instead of dereferencing `undefined`. New commands should reuse the **Commentray**
+output channel where appropriate (see below).
+
+#### Integration tests and VS Code builds
+
+Extension integration tests use **`@vscode/test-cli`** and
+`packages/vscode/.vscode-test.mjs`. By default they download **`stable`**.
+
+- **Local / one-off:** set **`VSCODE_TEST_VERSION`** to `stable`, `insiders`, or
+  an exact version string (for example the same value as `engines.vscode`):
+
+  ```bash
+  VSCODE_TEST_VERSION=1.95.0 npm run test:vscode-extension
+  ```
+
+- **CI:** [`.github/workflows/ci-vscode-extension.yml`](../.github/workflows/ci-vscode-extension.yml)
+  runs the suite against **`stable`** and against the **pinned minimum** that must
+  stay in lockstep with **`engines.vscode`** in `packages/vscode/package.json`.
+
+When you **bump the declared minimum**, update in one go: `engines.vscode`,
+`@types/vscode`, the workflow matrix pin, and re-run `npm run test:vscode-extension`
+with both `VSCODE_TEST_VERSION=stable` and the new minimum.
+
+#### Reference hosts (refresh when verifying compatibility)
+
+Cursor and plain VS Code do not ship the same underlying “VS Code version” string
+in **Help → About**. The table below is a **maintainer snapshot** for smoke
+testing and expectations — refresh the numbers when you verify on newer installs.
+
+| Host                      | VS Code version (About) | Noted      |
+| ------------------------- | ----------------------- | ---------- |
+| Cursor                    | 1.105.1                 | 2026-04-23 |
+| VS Code (macOS Universal) | 1.117.0                 | 2026-04-23 |
+
+Commentray’s declared minimum (`^1.95.0` at the time this section was added) is
+intentionally **below** both reference rows: forks can lag upstream, and the
+extension should keep working on the declared range until you intentionally adopt
+newer-only APIs and raise `engines.vscode`.
 
 ## Scroll sync and paired panes
 

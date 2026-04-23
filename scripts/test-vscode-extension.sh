@@ -7,6 +7,11 @@ set -euo pipefail
 #
 # Usage: bash scripts/test-vscode-extension.sh
 #
+# Optional: VSCODE_TEST_VERSION selects the VS Code build under test (passed
+# through to packages/vscode/.vscode-test.mjs). Examples:
+#   VSCODE_TEST_VERSION=stable bash scripts/test-vscode-extension.sh
+#   VSCODE_TEST_VERSION=1.95.0 bash scripts/test-vscode-extension.sh
+#
 # Linux CI: install a virtual display (e.g. `xvfb`) so Electron can start; when
 # `CI=true` and `xvfb-run` is available, this script uses it automatically.
 

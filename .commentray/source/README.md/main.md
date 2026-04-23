@@ -20,6 +20,14 @@ The deploy is a **single** HTML file, so in-commentray Markdown links rewritten 
 
 **Search:** **Escape** clears the query and hides hit results (same as **Clear**).
 
+## Images next to this file
+
+Keep images **in the same directory as this `.md`** (or a normal subfolder like **`./assets/`**) and reference them with **`./…`** paths—the VS Code Markdown preview and path completions use the same CommonMark rules. Static HTML rules: [`docs/spec/storage.md` § Images](https://github.com/d-led/commentray/blob/main/docs/spec/storage.md#images-and-other-local-assets-static-html) (local **`img`** must resolve under **`.commentray/`**; use **`https://…`** for diagrams outside storage).
+
+![Schematic: paired panes (primary left, commentray right)](./assets/paired-editors.svg)
+
+**Real screenshots:** run **`npm run extension:commentray-screenshots`**, capture the UI, save files under **`./assets/`** here, then **`![](./assets/your.png)`** like any other Markdown project.
+
 The **VS Code / Cursor** extension is for **authoring**: **Commentray: Open commentray beside source**, both editors visible, scroll source and let commentray track. After **Commentray: Add block from selection**, sync can **snap to the block** that owns the visible source lines when `index.json` and `<!-- commentray:block id=… -->` markers agree; otherwise you stay on proportional sync. Same storage model as the site; the extension is where editing stays pleasant.
 
 ## Why this file exists

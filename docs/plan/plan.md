@@ -25,9 +25,9 @@ Commentary on DVDs: optional explanation **without** changing the film. Commentr
 
 ## Normative specs
 
-- [`docs/spec/storage.md`](../spec/storage.md) — paths, Angles layout, static site fields  
-- [`docs/spec/anchors.md`](../spec/anchors.md) — anchor grammar  
-- [`docs/spec/blocks.md`](../spec/blocks.md) — blocks  
+- [`docs/spec/storage.md`](../spec/storage.md) — paths, Angles layout, static site fields
+- [`docs/spec/anchors.md`](../spec/anchors.md) — anchor grammar
+- [`docs/spec/blocks.md`](../spec/blocks.md) — blocks
 
 ## Data flow (high level)
 
@@ -63,15 +63,15 @@ flowchart LR
 
 ## Open engineering work
 
-| Theme | Follow-ups |
-| ----- | ---------- |
-| **VS Code** | Synchronized scroll: bidirectional stability, large `index.json`, long files, wrapped editors, `revealRange` / debounce edge cases (`packages/vscode/src/extension.ts`, `packages/core/src/scroll-sync.ts`). **Extension Host tests:** scroll / visible-range and **Angles** (fixture + scripted quick picks)—`bash scripts/test-vscode-extension.sh`, [`packages/vscode/.vscode-test.mjs`](../../packages/vscode/.vscode-test.mjs). **Webview** parity with `@commentray/render` and richer block gutter UX. |
-| **Angles & hub** | Optional **`commentray` angles add** convenience; when `index.json` is **empty**, Pages build still falls back to **`[static_site]`** only—no discovery scan of `source/{P}/*.md`; richer hub when unindexed angles exist on disk. Optional future: `index.json` keyed by `(sourcePath, angleId)` if metadata needs it. |
-| **Language** | Resolvers beyond minimal anchors: tree-sitter and/or LSP-backed symbol work (Open technical choices §1 below). |
-| **Validate** | Pre-commit / `validate` scan the full repo; **staged-only** (or similar) scope when large trees hurt commit latency. |
-| **Local static dev** | No automatic **browser** livereload on `commentray serve` rebuilds. Watcher does not include `packages/render` sources—after render code edits, run **`npm run build`** (or rely on `scripts/serve.sh` initial builds) before seeing changes. |
-| **Dogfood** | Add `index.json` pairs (marker + Markdown block markers) when new primaries get a Pages or editor spotlight—pattern in [`docs/spec/blocks.md`](../spec/blocks.md). |
-| **Path churn** | **Still out of scope for v0:** auto-mutating the index from heuristics; scanning **untracked** or **non-text** files; cross-file **`symbol:`** resolution without tree-sitter/LSP. Relocation hints today: `git-relocation-scan.ts` and validate/init messaging. |
+| Theme                | Follow-ups                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **VS Code**          | Synchronized scroll: bidirectional stability, large `index.json`, long files, wrapped editors, `revealRange` / debounce edge cases (`packages/vscode/src/extension.ts`, `packages/core/src/scroll-sync.ts`). **Extension Host tests:** scroll / visible-range and **Angles** (fixture + scripted quick picks)—`bash scripts/test-vscode-extension.sh`, [`packages/vscode/.vscode-test.mjs`](../../packages/vscode/.vscode-test.mjs). **Webview** parity with `@commentray/render` and richer block gutter UX. |
+| **Angles & hub**     | Optional **`commentray` angles add** convenience; when `index.json` is **empty**, Pages build still falls back to **`[static_site]`** only—no discovery scan of `source/{P}/*.md`; richer hub when unindexed angles exist on disk. Optional future: `index.json` keyed by `(sourcePath, angleId)` if metadata needs it.                                                                                                                                                                                       |
+| **Language**         | Resolvers beyond minimal anchors: tree-sitter and/or LSP-backed symbol work (Open technical choices §1 below).                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Validate**         | Pre-commit / `validate` scan the full repo; **staged-only** (or similar) scope when large trees hurt commit latency.                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Local static dev** | No automatic **browser** livereload on `commentray serve` rebuilds. Watcher does not include `packages/render` sources—after render code edits, run **`npm run build`** (or rely on `scripts/serve.sh` initial builds) before seeing changes.                                                                                                                                                                                                                                                                 |
+| **Dogfood**          | Add `index.json` pairs (marker + Markdown block markers) when new primaries get a Pages or editor spotlight—pattern in [`docs/spec/blocks.md`](../spec/blocks.md).                                                                                                                                                                                                                                                                                                                                            |
+| **Path churn**       | **Still out of scope for v0:** auto-mutating the index from heuristics; scanning **untracked** or **non-text** files; cross-file **`symbol:`** resolution without tree-sitter/LSP. Relocation hints today: `git-relocation-scan.ts` and validate/init messaging.                                                                                                                                                                                                                                              |
 
 ## Open technical choices (next iterations)
 
@@ -97,20 +97,20 @@ Vitest tiers and coverage live at the repo root (`vitest*.config.ts`, `scripts/t
 
 ### Read first
 
-1. This doc and the gaps table.  
-2. [`docs/spec/storage.md`](../spec/storage.md), [`anchors.md`](../spec/anchors.md), [`blocks.md`](../spec/blocks.md).  
-3. [`CONTRIBUTING.md`](../../CONTRIBUTING.md), [`docs/development.md`](../development.md).  
+1. This doc and the gaps table.
+2. [`docs/spec/storage.md`](../spec/storage.md), [`anchors.md`](../spec/anchors.md), [`blocks.md`](../spec/blocks.md).
+3. [`CONTRIBUTING.md`](../../CONTRIBUTING.md), [`docs/development.md`](../development.md).
 
 ### Commands (non-exhaustive)
 
-| Intent | Command |
-| ------ | ------- |
-| Same unit gate as `ci.yml` **quick** | `bash scripts/quality-gate.sh` or `npm run quality:gate` |
-| Integration / expensive Vitest | `npm run test:integration`, `npm run test:expensive` |
-| Full gate without Cypress | `npm run ci:full` |
-| Pages artifact | `npm run pages:build` |
-| Static browser E2E | `npm run e2e` or `npm run e2e:ci` |
-| VS Code extension tests | `bash scripts/test-vscode-extension.sh` or `npm run test:vscode-extension` |
+| Intent                               | Command                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| Same unit gate as `ci.yml` **quick** | `bash scripts/quality-gate.sh` or `npm run quality:gate`                   |
+| Integration / expensive Vitest       | `npm run test:integration`, `npm run test:expensive`                       |
+| Full gate without Cypress            | `npm run ci:full`                                                          |
+| Pages artifact                       | `npm run pages:build`                                                      |
+| Static browser E2E                   | `npm run e2e` or `npm run e2e:ci`                                          |
+| VS Code extension tests              | `bash scripts/test-vscode-extension.sh` or `npm run test:vscode-extension` |
 
 For the full script list, see **`docs/development.md`**.
 

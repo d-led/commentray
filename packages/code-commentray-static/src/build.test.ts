@@ -89,6 +89,7 @@ describe("Static browse HTML build — URLs and toolbar", () => {
     outDir = await mkdtemp(path.join(tmpdir(), "ccrs-"));
     const repoRoot = path.join(outDir, "repo");
     await mkdir(path.join(repoRoot, "docs"), { recursive: true });
+    await mkdir(path.join(repoRoot, ".commentray"), { recursive: true });
     await writeFile(path.join(repoRoot, "docs", "guide.md"), "# Guide\n", "utf8");
     const mdPath = path.join(outDir, "body.md");
     await writeFile(
@@ -106,6 +107,7 @@ describe("Static browse HTML build — URLs and toolbar", () => {
         repoRootAbs: repoRoot,
         htmlOutputFileAbs: outHtml,
         markdownUrlBaseDirAbs: path.dirname(mdPath),
+        commentrayStorageRootAbs: path.join(repoRoot, ".commentray"),
         githubBlobRepo: { owner: "acme", repo: "demo" },
       },
     });

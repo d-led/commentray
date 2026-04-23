@@ -212,10 +212,12 @@ async function cmdRender(opts: RenderCliOptions & { mermaid: boolean }) {
     cfg.render.relativeGithubBlobLinks && cfg.staticSite.githubUrl
       ? parseGithubRepoWebUrl(cfg.staticSite.githubUrl)
       : null;
+  const commentrayStorageRootAbs = path.resolve(repoRoot, cfg.storageDir);
   const commentrayOutputUrls = {
     repoRootAbs: repoRoot,
     htmlOutputFileAbs: outPath,
     markdownUrlBaseDirAbs: path.dirname(mdAbs),
+    commentrayStorageRootAbs,
     ...(ghParsed ? { githubBlobRepo: { owner: ghParsed.owner, repo: ghParsed.repo } } : {}),
   };
   const html = await renderSideBySideHtml({

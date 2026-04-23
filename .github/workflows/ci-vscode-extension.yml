@@ -20,6 +20,12 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep the pinned version in sync with `engines.vscode` in
+        # packages/vscode/package.json (minimum supported API surface).
+        vscode_version: [stable, "1.95.0"]
     steps:
       - uses: actions/checkout@v5
 
@@ -39,9 +45,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: packages/vscode/.vscode-test
-          key: vscode-test-${{ runner.os }}-${{ hashFiles('package-lock.json', 'packages/vscode/package.json') }}
+          key: vscode-test-${{ runner.os }}-${{ matrix.vscode_version }}-${{ hashFiles('package-lock.json', 'packages/vscode/package.json') }}
 
       - name: Run VS Code extension tests
         run: bash scripts/test-vscode-extension.sh
         env:
           CI: true
+          VSCODE_TEST_VERSION: ${{ matrix.vscode_version }}

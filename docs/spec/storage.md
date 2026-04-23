@@ -81,17 +81,14 @@ The Pages build emits **one** HTML file: one **code** pane (`static_site.source_
 
 ## Images and other local assets (static HTML)
 
-When commentray Markdown is rendered to static HTML (GitHub Pages, `commentray render`), `img[src]` and local `a[href]` are rewritten so links work from the output HTML file. Use normal Markdown URL rules with one extension for the **repository root**:
+Local `a[href]` / `img[src]` in commentray Markdown are rewritten for static HTML (`commentray render`, Pages) to paths **relative to the output file**. **`https:`**, **`mailto:`**, … are unchanged.
 
-| You write (in commentray, `.md` on disk) | Resolves relative to                                             |
-| ---------------------------------------- | ---------------------------------------------------------------- |
-| `![](/docs/diagram.svg)`                 | Repository root (`docs/diagram.svg` from the clone root)         |
-| `![](./figures/diagram.svg)`             | The commentray file’s directory (usually `.commentray/source/…`) |
-| `![](figures/diagram.svg)`               | Same as above (standard Markdown: relative to that file)         |
+- **`a[href]`:** target must stay **inside the repo** (leading **`/`** = repo root; otherwise **CommonMark paths from the `.md`’s directory**—same as the VS Code Markdown preview).
+- **`img[src]`:** target must stay **inside `{storage}/`** (e.g. `.commentray/`). Otherwise static HTML **drops** `src`.
 
-A leading **`/`** means “from the repository root” (POSIX path after the slash). Paths without a leading slash follow **CommonMark**: they are resolved from the directory that contains the commentray file, so assets can live **next to** that file or in subfolders (for example `.commentray/source/README.md.assets/` or `.commentray/source/figures/`).
+Put files **next to the companion `.md`** (e.g. `./assets/diagram.svg`) so editor completions and static output match. Diagrams elsewhere: use **`https://…`**, not **`![](/docs/…)`** as a local image.
 
-**Note:** The built-in VS Code Markdown preview resolves URLs relative to the open `.md` file on disk; it does not run this HTML rewriter. The `/` versus file-relative rules above still match how the preview resolves paths when files exist on disk.
+Dogfood: [`assets/paired-editors.svg`](../../.commentray/source/README.md/assets/paired-editors.svg) beside [`main.md`](../../.commentray/source/README.md/main.md). Maintainer captures: **`npm run extension:commentray-screenshots`**, then save under **`./assets/`** next to that angle’s `.md`.
 
 ## Metadata
 

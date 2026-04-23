@@ -27,6 +27,8 @@ describe("Markdown to HTML pipeline", () => {
     await writeFile(path.join(repoRoot, "docs", "spec", "storage.md"), "# hi\n", "utf8");
     const outHtml = path.join(repoRoot, "_site", "index.html");
     await mkdir(path.dirname(outHtml), { recursive: true });
+    const storageRoot = path.join(repoRoot, ".commentray");
+    await mkdir(storageRoot, { recursive: true });
 
     const md =
       "[Storage](https://github.com/acme/demo/blob/main/docs/spec/storage.md) " +
@@ -36,6 +38,7 @@ describe("Markdown to HTML pipeline", () => {
         repoRootAbs: repoRoot,
         htmlOutputFileAbs: outHtml,
         markdownUrlBaseDirAbs: repoRoot,
+        commentrayStorageRootAbs: storageRoot,
         githubBlobRepo: { owner: "acme", repo: "demo" },
       },
     });
@@ -49,11 +52,14 @@ describe("Markdown to HTML pipeline", () => {
     await mkdir(repoRoot, { recursive: true });
     const outHtml = path.join(repoRoot, "out.html");
     const md = "[x](https://github.com/wrong/repo/blob/main/README.md)";
+    const storageRoot = path.join(repoRoot, ".commentray");
+    await mkdir(storageRoot, { recursive: true });
     const html = await renderMarkdownToHtml(md, {
       commentrayOutputUrls: {
         repoRootAbs: repoRoot,
         htmlOutputFileAbs: outHtml,
         markdownUrlBaseDirAbs: repoRoot,
+        commentrayStorageRootAbs: storageRoot,
         githubBlobRepo: { owner: "acme", repo: "demo" },
       },
     });
@@ -111,6 +117,7 @@ describe("Side-by-side static HTML layout", () => {
     await writeFile(path.join(repoRoot, "a", "b.md"), "x", "utf8");
     const outHtml = path.join(repoRoot, "dist", "x.html");
     await mkdir(path.dirname(outHtml), { recursive: true });
+    await mkdir(path.join(repoRoot, ".commentray"), { recursive: true });
 
     const html = await renderSideBySideHtml({
       title: "Demo",
@@ -122,6 +129,7 @@ describe("Side-by-side static HTML layout", () => {
         repoRootAbs: repoRoot,
         htmlOutputFileAbs: outHtml,
         markdownUrlBaseDirAbs: repoRoot,
+        commentrayStorageRootAbs: path.join(repoRoot, ".commentray"),
         githubBlobRepo: { owner: "o", repo: "r" },
       },
     });
@@ -130,10 +138,11 @@ describe("Side-by-side static HTML layout", () => {
 });
 
 describe("Markdown to HTML — static asset URL rewriting", () => {
-  it("should resolve companion-local and repo-root image paths for static output", async () => {
+  it("should resolve companion-local images and block repo-root images outside Commentray storage", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-img-"));
     const repoRoot = path.join(tmp, "repo");
-    const companionDir = path.join(repoRoot, ".commentray", "source");
+    const storageRoot = path.join(repoRoot, ".commentray");
+    const companionDir = path.join(storageRoot, "source");
     await mkdir(companionDir, { recursive: true });
     await writeFile(path.join(companionDir, "diagram.svg"), "<svg/>", "utf8");
     await mkdir(path.join(repoRoot, "docs"), { recursive: true });
@@ -147,16 +156,21 @@ describe("Markdown to HTML — static asset URL rewriting", () => {
         repoRootAbs: repoRoot,
         htmlOutputFileAbs: outHtml,
         markdownUrlBaseDirAbs: companionDir,
+        commentrayStorageRootAbs: storageRoot,
       },
     });
     expect(html).toContain('src="../.commentray/source/diagram.svg"');
-    expect(html).toContain('src="../docs/logo.svg"');
+    expect(html).not.toContain("docs/logo.svg");
+    const imgTags = [...html.matchAll(/<img[^>]*>/g)].map((m) => m[0]);
+    expect(imgTags.some((t) => t.includes("diagram.svg"))).toBe(true);
+    expect(imgTags.some((t) => t.includes("logo"))).toBe(false);
   });
 
   it("should resolve figures next to the companion file without a leading ./", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-img2-"));
     const repoRoot = path.join(tmp, "repo");
-    const companionDir = path.join(repoRoot, ".commentray", "source");
+    const storageRoot = path.join(repoRoot, ".commentray");
+    const companionDir = path.join(storageRoot, "source");
     await mkdir(path.join(companionDir, "figures"), { recursive: true });
     await writeFile(path.join(companionDir, "figures", "a.svg"), "<svg/>", "utf8");
     const outHtml = path.join(repoRoot, "out", "index.html");
@@ -167,8 +181,32 @@ describe("Markdown to HTML — static asset URL rewriting", () => {
         repoRootAbs: repoRoot,
         htmlOutputFileAbs: outHtml,
         markdownUrlBaseDirAbs: companionDir,
+        commentrayStorageRootAbs: storageRoot,
       },
     });
     expect(html).toContain('src="../.commentray/source/figures/a.svg"');
+  });
+
+  it("should block images that escape storage via relative traversal", async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), "cr-img3-"));
+    const repoRoot = path.join(tmp, "repo");
+    const storageRoot = path.join(repoRoot, ".commentray");
+    const companionDir = path.join(storageRoot, "source", "pkg");
+    await mkdir(companionDir, { recursive: true });
+    await mkdir(path.join(repoRoot, "docs"), { recursive: true });
+    await writeFile(path.join(repoRoot, "docs", "leak.svg"), "<svg/>", "utf8");
+    const outHtml = path.join(repoRoot, "_site", "index.html");
+    await mkdir(path.dirname(outHtml), { recursive: true });
+
+    const html = await renderMarkdownToHtml("![](../../../docs/leak.svg)", {
+      commentrayOutputUrls: {
+        repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: companionDir,
+        commentrayStorageRootAbs: storageRoot,
+      },
+    });
+    expect(html).not.toContain("leak.svg");
+    expect(html).not.toMatch(/<img[^>]*src=/);
   });
 });

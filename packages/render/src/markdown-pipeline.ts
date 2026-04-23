@@ -19,14 +19,28 @@ import { escapeHtml } from "./html-utils.js";
  * so local assets work from the output file location.
  *
  * **URL rules** (same commentray file as in the editor):
- * - **`/path/to/file`** — repository root (leading slash), POSIX-style.
- * - **`./` / `../` / `figures/a.png`** — relative to the commentray file’s directory
- *   (`markdownUrlBaseDirAbs`), i.e. normal Markdown resolution.
+ * - **`/path/to/file`** — resolved from the **repository root** (leading slash), POSIX-style,
+ *   after `..` normalization; must stay **inside** `repoRootAbs`.
+ * - **`./` / `../` / `figures/a.png`** — resolved with `path.resolve(markdownUrlBaseDirAbs, …)`;
+ *   must stay **inside** `repoRootAbs`.
+ *
+ * **Images (`img[src]`)** — resolved path must also lie **inside** `commentrayStorageRootAbs`
+ * (typically `{repo}/.commentray`). Raster or SVG assets for commentray belong next to the
+ * Markdown under storage; repo-root images are **not** emitted (src removed) so static pages
+ * cannot pull arbitrary repo files as image bytes.
+ *
+ * **Links (`a[href]`)** — any in-repo file under `repoRootAbs` may still be linked (e.g. specs
+ * under `docs/`). Only images are restricted to storage.
  */
 export type CommentrayOutputUrlOptions = {
   repoRootAbs: string;
   htmlOutputFileAbs: string;
   markdownUrlBaseDirAbs: string;
+  /**
+   * Absolute path to Commentray storage (e.g. `{repoRoot}/.commentray`). Used to sandbox
+   * **local image** URLs; see package JSDoc above.
+   */
+  commentrayStorageRootAbs: string;
   /** When set, `https://github.com/<owner>/<repo>/blob|tree/<branch>/…` becomes a `/…` repo path. */
   githubBlobRepo?: { owner: string; repo: string };
 };
@@ -104,12 +118,21 @@ function decodeUrlPath(s: string): string {
   }
 }
 
+function isResolvedPathInsideRoot(resolvedAbs: string, rootAbs: string): boolean {
+  const rel = path.relative(path.resolve(rootAbs), path.resolve(resolvedAbs));
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return false;
+  return true;
+}
+
+type LocalUrlRewrite = { relativeToHtml: string } | { blockedImage: true } | null;
+
 function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
   const repoRoot = path.resolve(ctx.repoRootAbs);
+  const storageRoot = path.resolve(ctx.commentrayStorageRootAbs);
   const htmlDir = path.dirname(path.resolve(ctx.htmlOutputFileAbs));
   const baseDir = path.resolve(ctx.markdownUrlBaseDirAbs);
 
-  function resolveTargetAbs(raw: string): string | null {
+  function resolveTargetAbs(raw: string, tagName: "a" | "img"): LocalUrlRewrite {
     const t = raw.trim();
     if (!t || t.startsWith("#")) return null;
     if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/i.test(t)) return null;
@@ -118,20 +141,23 @@ function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
     let resolved: string;
     if (t.startsWith("/")) {
       const rest = decodeUrlPath(t.replace(/^\/+/, ""));
-      const segments = rest.split("/").filter((s) => s && s !== "." && s !== "..");
-      resolved = path.normalize(path.join(repoRoot, ...segments));
+      if (!rest || rest.includes("\0")) return null;
+      resolved = path.normalize(path.join(repoRoot, rest));
     } else {
       const decoded = decodeUrlPath(t);
       resolved = path.normalize(path.resolve(baseDir, decoded));
     }
 
-    const relToRepo = path.relative(repoRoot, resolved);
-    if (relToRepo.startsWith("..") || path.isAbsolute(relToRepo)) return null;
+    if (!isResolvedPathInsideRoot(resolved, repoRoot)) return null;
+
+    if (tagName === "img" && !isResolvedPathInsideRoot(resolved, storageRoot)) {
+      return { blockedImage: true };
+    }
 
     const out = path.relative(htmlDir, resolved);
     if (path.isAbsolute(out)) return null;
 
-    return posixHref(out);
+    return { relativeToHtml: posixHref(out) };
   }
 
   return (tree: HastRoot) => {
@@ -140,10 +166,14 @@ function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
       const key = node.tagName === "a" ? "href" : "src";
       const raw = node.properties?.[key];
       if (typeof raw !== "string") return;
-      const next = resolveTargetAbs(raw);
+      const next = resolveTargetAbs(raw, node.tagName);
       if (next == null) return;
       node.properties ??= {};
-      node.properties[key] = next;
+      if ("blockedImage" in next) {
+        delete node.properties[key];
+        return;
+      }
+      node.properties[key] = next.relativeToHtml;
     });
   };
 }

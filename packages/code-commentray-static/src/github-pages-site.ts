@@ -93,10 +93,15 @@ async function writePerPairBrowseHtmlPages(input: {
     if (!(await pathExists(mdAbs)) || !(await pathExists(sourceAbs))) continue;
 
     const markdownUrlBaseDirAbs = path.dirname(mdAbs);
+    const commentrayStorageRootAbs = path.resolve(
+      input.repoRoot,
+      input.cfg.storageDir.replaceAll("\\", "/"),
+    );
     const commentrayOutputUrls = {
       repoRootAbs: input.repoRoot,
       htmlOutputFileAbs: outPath,
       markdownUrlBaseDirAbs,
+      commentrayStorageRootAbs,
     };
 
     const multiAngleBrowsing = await multiAngleBrowsingForBrowsePair(
@@ -259,10 +264,12 @@ export async function buildGithubPagesStaticSite(
     ? path.join(repoRoot, path.dirname(defaultCommentrayRel))
     : repoRoot;
 
+  const commentrayStorageRootAbs = path.resolve(repoRoot, cfg.storageDir.replaceAll("\\", "/"));
   const commentrayOutputUrls = {
     repoRootAbs: repoRoot,
     htmlOutputFileAbs: outHtml,
     markdownUrlBaseDirAbs,
+    commentrayStorageRootAbs,
   };
 
   const blockStretchRows = flatBlockStretchRows(projectIndex, ss, Boolean(multiAngleBrowsing));

@@ -36,6 +36,16 @@ Palette entries use the **Commentray** category (search `Commentray` or the comm
 **Angles** — **Open paired markdown (choose angle)** and **Add angle to project…**
 use the same workspace-folder rule as validate when picking the repo root.
 
+## Screenshots for commentray docs
+
+To capture the real extension UI for Markdown under **Angles** (for example `.commentray/source/README.md/assets/` next to `main.md`), run from the repo root:
+
+```bash
+npm run extension:commentray-screenshots
+```
+
+That opens an **Extension Development Host** on `packages/vscode/fixtures/dogfood`. Save images in a normal folder next to the angle’s `.md` (e.g. `./assets/`) and reference with **`./assets/file.png`** so VS Code preview and static HTML agree. There is no automated screenshot pipeline in CI—see [`docs/spec/storage.md`](https://github.com/d-led/commentray/blob/main/docs/spec/storage.md) § Images.
+
 ## Integration tests
 
 From the repo root, run extension integration tests (Extension Development Host):

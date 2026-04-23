@@ -43,6 +43,7 @@
     "binary:smoke": "node scripts/smoke-binary.mjs",
     "extension:dogfood": "bash scripts/editor-extension.sh dogfood",
     "extension:dogfood:repo": "bash scripts/editor-extension.sh dogfood .",
+    "extension:commentray-screenshots": "bash scripts/open-vscode-for-commentray-screenshots.sh",
     "extension:install": "bash scripts/install-extension.sh",
     "extension:package": "bash scripts/install-extension.sh --package-only",
     "extension:publish": "bash scripts/install-extension.sh --publish",
