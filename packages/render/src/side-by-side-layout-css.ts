@@ -1,4 +1,9 @@
-:root {
+/**
+ * Inline layout stylesheet for {@link renderSideBySideHtml}.
+ * Kept in TypeScript (not a separate `.css` + emit step) so `tsc` and the CLI’s
+ * bundled CJS build never depend on `import.meta.url` or filesystem layout.
+ */
+export const SIDE_BY_SIDE_LAYOUT_CSS = `:root {
   color-scheme: light dark;
 }
 
@@ -56,3 +61,4 @@ pre {
   max-width: 100%;
   height: auto;
 }
+`;

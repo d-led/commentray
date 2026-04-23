@@ -1,21 +1,13 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { escapeHtml } from "./html-utils.js";
 import { COMMENTRAY_FAVICON_LINK_HTML } from "./inline-favicon.js";
 import { hljsStylesheetThemes } from "./hljs-stylesheet-themes.js";
+import { SIDE_BY_SIDE_LAYOUT_CSS } from "./side-by-side-layout-css.js";
 import {
   type CommentrayOutputUrlOptions,
   renderFencedCode,
   renderMarkdownToHtml,
 } from "./markdown-pipeline.js";
 import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
-
-const sideBySideLayoutCss = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), "side-by-side-layout.css"),
-  "utf8",
-);
 
 export type SideBySideOptions = {
   title?: string;
@@ -58,7 +50,7 @@ export async function renderSideBySideHtml(opts: SideBySideOptions): Promise<str
     <link rel="stylesheet" href="${hljsCdnBase}/${escapeHtml(hljsLight)}.min.css" media="(prefers-color-scheme: light)" />
     <link rel="stylesheet" href="${hljsCdnBase}/${escapeHtml(hljsDark)}.min.css" media="(prefers-color-scheme: dark)" />
     <style>
-${sideBySideLayoutCss}
+${SIDE_BY_SIDE_LAYOUT_CSS}
     </style>
   </head>
   <body>

@@ -7,19 +7,36 @@
  *
  * Steps:
  *   1. Ensure the CLI bundle exists (`npm run build:bundle -w @commentray/cli`).
- *   2. Generate the SEA blob via `node --experimental-sea-config`.
- *   3. Copy the current `node` binary to the output path.
- *   4. Inject the blob via `postject` (with platform-specific options).
- *   5. Re-sign on macOS (ad-hoc) so the loader accepts the patched binary.
+ *   2. Resolve a **SEA-capable** Node binary (see below).
+ *   3. Generate the SEA blob via `node --experimental-sea-config`.
+ *   4. Copy that Node binary to the output path.
+ *   5. Inject the blob via `postject` (with platform-specific options).
+ *   6. Re-sign on macOS (ad-hoc) so the loader accepts the patched binary.
+ *
+ * **SEA-capable Node:** postject needs the fuse string
+ * `NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2` inside the `node` binary.
+ * Homebrew and some other builds omit it. When `process.execPath` lacks the
+ * fuse, this script downloads the matching **official** Node.js build from
+ * `https://nodejs.org/dist/<version>/` (cached under `packages/cli/dist/.official-node/`).
+ *
+ * Override: `COMMENTRAY_SEA_NODE=/path/to/node` (must contain the fuse).
+ * Opt out of download: `COMMENTRAY_SEA_SKIP_OFFICIAL_DOWNLOAD=1` (then you must supply a capable binary).
  *
  * Notes:
- *   - We deliberately do NOT sign on Linux or Windows here; releases can be
- *     signed downstream. The binary is otherwise runnable.
- *   - Windows `signtool remove` is only attempted if it is available.
+ *   - Windows / Linux signing is intentionally minimal; macOS uses ad-hoc codesign.
  */
 
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,6 +48,7 @@ const BUNDLE = join(DIST, "cli.bundle.cjs");
 const BLOB = join(DIST, "sea-prep.blob");
 const SEA_CONFIG = join(CLI_DIR, "sea-config.json");
 const FUSE = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2";
+const FUSE_BYTES = Buffer.from(FUSE, "utf8");
 
 function run(cmd, args, options = {}) {
   const pretty = `${cmd} ${args.map((a) => (a.includes(" ") ? JSON.stringify(a) : a)).join(" ")}`;
@@ -72,10 +90,6 @@ function ensureBundle() {
 }
 
 function generateBlob(nodeBinary) {
-  // The blob must be produced by the same major Node version that will embed
-  // it; V8 code-cache format and module resolution tables move between
-  // majors. We therefore run `--experimental-sea-config` with the exact Node
-  // that will host the SEA.
   if (existsSync(BLOB)) rmSync(BLOB);
   run(nodeBinary, ["--experimental-sea-config", SEA_CONFIG], { cwd: CLI_DIR });
   if (!existsSync(BLOB)) {
@@ -83,19 +97,150 @@ function generateBlob(nodeBinary) {
   }
 }
 
-function resolveSourceNode() {
-  // Allow overriding the source Node binary; some installs (e.g. Homebrew on
-  // Apple Silicon) ship a dynamically-linked shim that postject can't patch.
-  // Official Node builds from nodejs.org (and `actions/setup-node` in CI) are
-  // statically linked and work out of the box.
-  const override = process.env.COMMENTRAY_SEA_NODE;
+/** Official Node dist archive triple, e.g. `darwin-arm64`. */
+function nodeOfficialTriple() {
+  if (process.platform === "darwin") {
+    if (process.arch === "arm64") return "darwin-arm64";
+    if (process.arch === "x64") return "darwin-x64";
+  }
+  if (process.platform === "linux") {
+    if (process.arch === "arm64") return "linux-arm64";
+    if (process.arch === "x64") return "linux-x64";
+  }
+  if (process.platform === "win32" && process.arch === "x64") return "win-x64";
+  throw new Error(
+    `SEA binary build is not scripted for ${process.platform}-${process.arch}. ` +
+      "Use GitHub Actions matrix or extend nodeOfficialTriple() in scripts/build-binary.mjs.",
+  );
+}
+
+function hasSeaSentinel(nodePath) {
+  try {
+    return readFileSync(nodePath).includes(FUSE_BYTES);
+  } catch (e) {
+    throw new Error(
+      `Cannot read Node binary at ${nodePath}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
+function officialArchiveBase() {
+  const v = process.version;
+  return `node-${v}-${nodeOfficialTriple()}`;
+}
+
+function officialDownloadUrl() {
+  const v = process.version;
+  const base = officialArchiveBase();
+  if (process.platform === "win32") {
+    return `https://nodejs.org/dist/${v}/${base}.zip`;
+  }
+  return `https://nodejs.org/dist/${v}/${base}.tar.gz`;
+}
+
+function pathToExtractedOfficialNode(extractDir) {
+  const base = officialArchiveBase();
+  if (process.platform === "win32") {
+    return join(extractDir, base, "node.exe");
+  }
+  return join(extractDir, base, "bin", "node");
+}
+
+function cachedOfficialSeaNodePath() {
+  const cacheDir = join(DIST, ".official-node", process.version, nodeOfficialTriple());
+  const name = process.platform === "win32" ? "node.exe" : "node";
+  return { cacheDir, cachedBin: join(cacheDir, name) };
+}
+
+async function fetchToFile(url, dest) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(
+      `Failed to download official Node (${res.status} ${res.statusText}): ${url}. ` +
+        "Check that this Node version exists on nodejs.org, or set COMMENTRAY_SEA_NODE to a capable binary.",
+    );
+  }
+  writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+}
+
+async function ensureOfficialSeaNodeDownloaded() {
+  if (process.env.COMMENTRAY_SEA_SKIP_OFFICIAL_DOWNLOAD === "1") {
+    throw new Error(
+      `${process.execPath} lacks the SEA fuse (typical for Homebrew). ` +
+        "Set COMMENTRAY_SEA_NODE to an official nodejs.org `node` binary, or unset COMMENTRAY_SEA_SKIP_OFFICIAL_DOWNLOAD " +
+        "to allow downloading one that matches your current Node version.",
+    );
+  }
+
+  const { cacheDir, cachedBin } = cachedOfficialSeaNodePath();
+  if (existsSync(cachedBin) && hasSeaSentinel(cachedBin)) {
+    console.error(`Using cached official Node (SEA-capable): ${cachedBin}`);
+    return cachedBin;
+  }
+
+  const url = officialDownloadUrl();
+  const archiveName =
+    process.platform === "win32"
+      ? `${officialArchiveBase()}.zip`
+      : `${officialArchiveBase()}.tar.gz`;
+  console.error(
+    `Current Node (${process.execPath}) does not include the SEA injection marker (common with Homebrew). ` +
+      `Downloading official ${process.version} from nodejs.org …`,
+  );
+  mkdirSync(cacheDir, { recursive: true });
+  const extractDir = join(cacheDir, "_extract");
+  if (existsSync(extractDir)) rmSync(extractDir, { recursive: true, force: true });
+  mkdirSync(extractDir, { recursive: true });
+
+  const archivePath = join(cacheDir, archiveName);
+  await fetchToFile(url, archivePath);
+
+  if (archivePath.endsWith(".zip")) {
+    run("tar", ["-xf", archivePath, "-C", extractDir]);
+  } else {
+    run("tar", ["-xzf", archivePath, "-C", extractDir]);
+  }
+
+  const extracted = pathToExtractedOfficialNode(extractDir);
+  if (!existsSync(extracted)) {
+    throw new Error(`After extracting ${archivePath}, expected Node at ${extracted}`);
+  }
+  if (existsSync(cachedBin)) rmSync(cachedBin);
+  copyFileSync(extracted, cachedBin);
+  if (process.platform !== "win32") {
+    chmodSync(cachedBin, 0o755);
+  }
+  rmSync(extractDir, { recursive: true, force: true });
+  rmSync(archivePath, { force: true });
+
+  if (!hasSeaSentinel(cachedBin)) {
+    throw new Error(`Downloaded Node at ${cachedBin} still lacks SEA fuse; corrupt download?`);
+  }
+  console.error(`Official SEA-capable Node installed at: ${cachedBin}`);
+  return cachedBin;
+}
+
+async function resolveSeaNodeBinary() {
+  const override = process.env.COMMENTRAY_SEA_NODE?.trim();
   if (override) {
     if (!existsSync(override)) {
       throw new Error(`COMMENTRAY_SEA_NODE=${override} does not exist.`);
     }
+    if (!hasSeaSentinel(override)) {
+      throw new Error(
+        `COMMENTRAY_SEA_NODE=${override} does not contain ${FUSE}. ` +
+          "Use an official Node.js build from nodejs.org (or nvm/fnm default install).",
+      );
+    }
     return override;
   }
-  return process.execPath;
+
+  const exec = process.execPath;
+  if (hasSeaSentinel(exec)) {
+    return exec;
+  }
+
+  return await ensureOfficialSeaNodeDownloaded();
 }
 
 function copyNodeBinary(source, targetPath) {
@@ -103,7 +248,7 @@ function copyNodeBinary(source, targetPath) {
   if (existsSync(targetPath)) rmSync(targetPath);
   copyFileSync(source, targetPath);
   if (process.platform !== "win32") {
-    spawnSync("chmod", ["+x", targetPath], { stdio: "inherit" });
+    chmodSync(targetPath, 0o755);
   }
 }
 
@@ -132,18 +277,20 @@ function finalizeBinary(targetPath) {
 function reportSize(targetPath) {
   const { size } = statSync(targetPath);
   const mb = (size / (1024 * 1024)).toFixed(1);
-  console.log(`Built ${targetPath} (${mb} MiB).`);
+  console.error(`Built ${targetPath} (${mb} MiB).`);
 }
 
-ensureBundle();
-const source = resolveSourceNode();
-console.log(`Using source Node binary: ${source}`);
-generateBlob(source);
+await (async function main() {
+  ensureBundle();
+  const source = await resolveSeaNodeBinary();
+  console.error(`Using source Node binary for SEA: ${source}`);
+  generateBlob(source);
 
-const { name } = binarySuffix();
-const targetPath = join(OUT_DIR, name);
-copyNodeBinary(source, targetPath);
-prepareForInjection(targetPath);
-postjectInject(targetPath);
-finalizeBinary(targetPath);
-reportSize(targetPath);
+  const { name } = binarySuffix();
+  const targetPath = join(OUT_DIR, name);
+  copyNodeBinary(source, targetPath);
+  prepareForInjection(targetPath);
+  postjectInject(targetPath);
+  finalizeBinary(targetPath);
+  reportSize(targetPath);
+})();

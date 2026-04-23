@@ -17,11 +17,20 @@ set -euo pipefail
 # Slow-lane checks (integration, expensive tests, binary smoke) live in
 # scripts/ci-full.sh, which is this gate plus those extras.
 #
+# Parity with GitHub Actions: `.github/workflows/ci.yml` job `quick` runs this
+# script, then a **separate** step `npm run test:integration` — so a full local
+# mirror of that job is: `bash scripts/quality-gate.sh && npm run test:integration`.
+#
 # Prerequisites (tools not vendored via npm) are verified up front — see
 # quality_gate_require_external_tools.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+
+# Prettier / ESLint / Vitest often suppress color without a TTY (e.g. Cursor task
+# output). Same default as scripts/test.sh; `NO_COLOR` or `FORCE_COLOR=0` wins.
+: "${FORCE_COLOR:=1}"
+export FORCE_COLOR
 
 quality_gate_require_external_tools() {
   local failed=0
