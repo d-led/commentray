@@ -22,6 +22,12 @@
           "anchor": "marker:readme-user-guides",
           "markerId": "readme-user-guides",
           "snippet": "commentray-snippet/v1\n ## Using Commentray\n \n Short, command-first guides (install the CLI or extension, first `.commentray/` setup, validation, and what each layer catches):\n \n - [Install](docs/user/install.md) — binaries, `npm i -g @commentray/cli`, editor extension\n - [Quickstart](docs/user/quickstart.md) — `commentray init`, paired Markdown paths, validate\n - [Keeping blocks in sync](docs/user/keeping-blocks-in-sync.md) — index, markers, anchors\n - [What Commentray detects](docs/user/detection.md) — hook, CLI, editor, known gaps\n - [CLI reference](docs/user/cli.md) — commands, exit codes, env vars\n - [Configuration](docs/user/config.md) — `.commentray.toml` keys\n - [Troubleshooting](docs/user/troubleshooting.md) — common failures\n "
+        },
+        {
+          "id": "readme-mobile-flip-check",
+          "anchor": "marker:readme-mobile-flip-check",
+          "markerId": "readme-mobile-flip-check",
+          "snippet": "commentray-snippet/v1\n ## Dogfood: narrow Pages + scroll-linked flip\n \n On [GitHub Pages](https://d-led.github.io/commentray/), use a **narrow** viewport (or a phone), **scroll this README to the bottom**, then use **flip source / commentary**. Scroll should stay **block-linked** with this companion file, and a **second flip control** appears when the toolbar flip scrolls off-screen.\n "
         }
       ]
     }

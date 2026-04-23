@@ -53,4 +53,8 @@ Repository: [github.com/d-led/commentray](https://github.com/d-led/commentray). 
 
 ## Contributing
 
+<!-- #region commentray:readme-mobile-flip-check -->
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [Development](docs/development.md).
+
+<!-- #endregion commentray:readme-mobile-flip-check -->

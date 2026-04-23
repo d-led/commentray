@@ -78,3 +78,11 @@ In one line: **core** holds paths and index truth; **render** holds safe HTML; *
 ## What Commentray is not (one beat each)
 
 Not a substitute for inline comments where the medium allows. Not a hosted blog—**commentray** lives in **git** with the code it explains. Not editor-exclusive—the CLI is the same story without a GUI.
+
+<!-- commentray:block id=readme-mobile-flip-check -->
+
+### Narrow viewport check (README ↔ this angle)
+
+On [GitHub Pages](https://d-led.github.io/commentray/), use a **narrow** viewport (or a phone), **scroll this README to the bottom**, then use **flip source / commentary**. Scroll should stay **block-linked** with this companion file, and a **second flip control** appears when the toolbar flip scrolls off-screen.
+
+The README ends with a **`readme-mobile-flip-check`** region (paired delimiters in `README.md` and this `<!-- commentray:block id=readme-mobile-flip-check -->` section). On **GitHub Pages**, scroll the **Code** column all the way down, flip to **Commentray** and back: the panes should stay aligned with that **tail** block, and the **fixed duplicate flip** should appear once the toolbar control is off-screen—same behavior you get from **`npm run pages:build`** + **`npm run e2e:server`** with the **`mobile-flip-end`** Cypress fixture, but here you are exercising the **real README** pair.
