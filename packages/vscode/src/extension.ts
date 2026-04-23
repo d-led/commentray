@@ -240,6 +240,11 @@ function selectionToRange(editor: vscode.TextEditor): BlockRange {
   return { startLine, endLine: Math.max(startLine, endLine) };
 }
 
+function scrollSyncEnabled(): boolean {
+  const v = vscode.workspace.getConfiguration("commentray").get("scrollSync.enabled");
+  return v !== false;
+}
+
 async function openBesideAndSync(
   sourceEditor: vscode.TextEditor,
   paths: PairedPaths,
@@ -260,15 +265,36 @@ async function openBesideAndSync(
     paths.commentrayPathRel,
     commentrayDoc.getText(),
   );
-  bindScrollSync({
+  const pair: ScrollPair = {
     code: codeEditor,
     commentray: commentrayEditor,
     blocks,
     repoRoot: paths.repoRoot,
     sourceRelative: paths.sourceRelative,
     commentrayPathRel: paths.commentrayPathRel,
-  });
+  };
+  if (scrollSyncEnabled()) {
+    bindScrollSync(pair);
+  }
   return commentrayEditor;
+}
+
+function workspaceFolderContaining(uri: vscode.Uri): vscode.WorkspaceFolder | undefined {
+  return vscode.workspace.getWorkspaceFolder(uri);
+}
+
+async function requireEditorInWorkspaceFolder(editor: vscode.TextEditor): Promise<{
+  editor: vscode.TextEditor;
+  folder: vscode.WorkspaceFolder;
+} | null> {
+  const folder = workspaceFolderContaining(editor.document.uri);
+  if (!folder) {
+    await vscode.window.showWarningMessage(
+      "This file is not inside an open workspace folder. Open the repository root (or a parent folder that contains the project).",
+    );
+    return null;
+  }
+  return { editor, folder };
 }
 
 async function requireActiveEditorInWorkspace(): Promise<{
@@ -280,12 +306,11 @@ async function requireActiveEditorInWorkspace(): Promise<{
     await vscode.window.showWarningMessage("Open a source file first.");
     return null;
   }
-  const folder = vscode.workspace.workspaceFolders?.[0];
-  if (!folder) {
+  if (!vscode.workspace.workspaceFolders?.length) {
     await vscode.window.showWarningMessage("Open a workspace folder first.");
     return null;
   }
-  return { editor, folder };
+  return requireEditorInWorkspaceFolder(editor);
 }
 
 async function replaceDocumentContents(
@@ -329,8 +354,28 @@ async function upsertBlockMetadata(
   await writeIndex(repoRoot, next);
 }
 
-async function openSideBySideCommand(): Promise<void> {
-  const active = await requireActiveEditorInWorkspace();
+function uriFromOpenSideBySideArgs(arg: unknown): vscode.Uri | undefined {
+  if (arg instanceof vscode.Uri) return arg;
+  if (Array.isArray(arg) && arg[0] instanceof vscode.Uri) return arg[0];
+  return undefined;
+}
+
+async function openSideBySideCommand(arg?: unknown): Promise<void> {
+  let editor = vscode.window.activeTextEditor;
+  const fromExplorer = uriFromOpenSideBySideArgs(arg);
+  if (fromExplorer) {
+    const doc = await vscode.workspace.openTextDocument(fromExplorer);
+    editor = await vscode.window.showTextDocument(doc, { preview: false });
+  }
+  if (!editor) {
+    await vscode.window.showWarningMessage("Open a source file first.");
+    return;
+  }
+  if (!vscode.workspace.workspaceFolders?.length) {
+    await vscode.window.showWarningMessage("Open a workspace folder first.");
+    return;
+  }
+  const active = await requireEditorInWorkspaceFolder(editor);
   if (!active) return;
   const paths = await resolvePairedPaths(active.editor, active.folder);
   if (!paths) return;
@@ -383,8 +428,19 @@ async function openCommentrayAngleCommand(): Promise<void> {
   await openBesideAndSync(active.editor, paths);
 }
 
+function pickWorkspaceFolderForRepoWideCommand(): vscode.WorkspaceFolder | undefined {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders?.length) return undefined;
+  const editor = vscode.window.activeTextEditor;
+  if (editor) {
+    const fromDoc = workspaceFolderContaining(editor.document.uri);
+    if (fromDoc) return fromDoc;
+  }
+  return folders[0];
+}
+
 async function addAngleDefinitionCommand(): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = pickWorkspaceFolderForRepoWideCommand();
   if (!folder) {
     await vscode.window.showWarningMessage("Open a workspace folder first.");
     return;
@@ -473,7 +529,7 @@ async function startBlockFromSelectionCommand(): Promise<void> {
 }
 
 async function validateWorkspaceCommand(output: vscode.OutputChannel): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = pickWorkspaceFolderForRepoWideCommand();
   if (!folder) {
     await vscode.window.showWarningMessage("Open a workspace folder first.");
     return;

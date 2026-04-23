@@ -52,6 +52,17 @@ describe("Commentray in VS Code (integration)", () => {
         "Expected default placeholder heading in new paired file.",
       );
     });
+
+    it("Given a primary file URI (as from Explorer), when the user runs open paired with that URI, then the paired Markdown is created the same way.", async () => {
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      const sampleUri = vscode.Uri.joinPath(workspaceRoot, "sample.ts");
+      await vscode.commands.executeCommand("commentray.openSideBySide", sampleUri);
+
+      const pairedUri = vscode.Uri.joinPath(workspaceRoot, ...pairedMarkdownPath.split("/"));
+      const bytes = await vscode.workspace.fs.readFile(pairedUri);
+      const text = new TextDecoder("utf-8").decode(bytes);
+      assert.ok(text.includes("# Commentray"), "Expected paired file from URI-driven open.");
+    });
   });
 
   describe("Validate workspace", () => {

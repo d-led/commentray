@@ -32,33 +32,55 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Commentray",
+      "properties": {
+        "commentray.scrollSync.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When enabled, scrolling the source editor updates the paired commentray editor (and vice versa), using block anchors when available. Reload or reopen the pair after changing this setting."
+        }
+      }
+    },
     "commands": [
       {
         "command": "commentray.openSideBySide",
-        "title": "Commentray: Open paired markdown beside editor"
+        "title": "Open paired markdown beside editor",
+        "category": "Commentray"
       },
       {
         "command": "commentray.openCommentrayAngle",
-        "title": "Commentray: Open paired markdown beside editor (choose angle)"
+        "title": "Open paired markdown (choose angle)",
+        "category": "Commentray"
       },
       {
         "command": "commentray.addAngleDefinition",
-        "title": "Commentray: Add angle to project…"
+        "title": "Add angle to project…",
+        "category": "Commentray"
       },
       {
         "command": "commentray.startBlockFromSelection",
-        "title": "Commentray: Add commentary block from selection"
+        "title": "Add commentary block from selection",
+        "category": "Commentray"
       },
       {
         "command": "commentray.openCommentrayPreview",
-        "title": "Commentray: Open Markdown preview for paired file"
+        "title": "Open Markdown preview for paired file",
+        "category": "Commentray"
       },
       {
         "command": "commentray.validateWorkspace",
-        "title": "Commentray: Validate workspace"
+        "title": "Validate workspace",
+        "category": "Commentray"
       }
     ],
     "keybindings": [
+      {
+        "command": "commentray.openSideBySide",
+        "key": "ctrl+alt+o",
+        "mac": "cmd+alt+o",
+        "when": "editorTextFocus"
+      },
       {
         "command": "commentray.startBlockFromSelection",
         "key": "ctrl+alt+k",
@@ -87,6 +109,13 @@
           "command": "commentray.startBlockFromSelection",
           "group": "commentray@2",
           "when": "editorTextFocus && !editorReadonly"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "commentray.openSideBySide",
+          "group": "commentray@1",
+          "when": "resourceScheme == file"
         }
       ]
     }

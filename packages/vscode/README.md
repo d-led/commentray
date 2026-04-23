@@ -6,24 +6,35 @@ workspace.
 
 ## Commands
 
-- `Commentray: Open paired markdown beside editor` — opens (or creates) the
-  commentray Markdown file that is paired with the active source file,
-  side-by-side. While the pair is active, **scroll sync** keeps the two panes
-  aligned: scrolling the source updates the commentray view, and scrolling
-  the commentray snaps the source to the block you are reading. When you have
+Palette entries use the **Commentray** category (search `Commentray` or the command name).
+
+- **Open paired markdown beside editor** — opens (or creates) the commentray
+  Markdown file paired with the active **primary** source file, side-by-side.
+  While the pair is active, **scroll sync** (toggle under **Settings →
+  Commentray → Scroll Sync: Enabled**) keeps the two panes aligned when enabled:
+  scrolling the source updates the commentray view, and scrolling the
+  commentray snaps the source to the block you are reading. With
   [blocks](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md)
   (metadata index + `<!-- commentray:block id=… -->` markers), sync prefers
   those anchors; otherwise it falls back to a simple proportional map.
-- `Commentray: Add commentary block from selection` — appends a new block for the current
+  **Keybinding:** **Cmd+Alt+O** (macOS) / **Ctrl+Alt+O** (Windows/Linux) when the
+  editor has focus. Also in the **editor** context menu and **Explorer**
+  right-click on a **file** (opens that file, then the pair—useful when the file
+  was not already active).
+- **Add commentary block from selection** — appends a new block for the current
   selection (or current line) to the paired Markdown, updates
   `.commentray/metadata/index.json`, opens the pair, and selects the
   placeholder so you can type immediately. Default keybinding: **Cmd+Alt+K**
-  (macOS) / **Ctrl+Alt+K** (Windows/Linux). Also available from the editor
-  context menu under the same commands as _Open paired markdown beside editor_.
-- `Commentray: Open Markdown preview for paired file` — opens VS Code's
-  built-in Markdown preview for the active `.md` file.
-- `Commentray: Validate workspace` — runs the same validation as
-  `commentray validate` and prints issues to the _Commentray_ output channel.
+  (macOS) / **Ctrl+Alt+K** (Windows/Linux). Also in the editor context menu.
+- **Open Markdown preview for paired file** — opens VS Code's built-in Markdown
+  preview for the active `.md` file.
+- **Validate workspace** — runs the same validation as `commentray validate` and
+  prints issues to the _Commentray_ output channel. Uses the workspace folder
+  that contains the **active editor’s file** when possible (helps in **multi-root**
+  workspaces).
+
+**Angles** — **Open paired markdown (choose angle)** and **Add angle to project…**
+use the same workspace-folder rule as validate when picking the repo root.
 
 ## Integration tests
 
