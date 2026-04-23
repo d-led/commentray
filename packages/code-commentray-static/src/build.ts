@@ -9,6 +9,7 @@ import {
 import {
   type CodeBrowserMultiAngleBrowsing,
   type CommentrayOutputUrlOptions,
+  type CommentrayStaticAssetCopy,
   commentrayRenderVersion,
   renderCodeBrowserHtml,
 } from "@commentray/render";
@@ -98,6 +99,27 @@ function resolveGeneratorLabel(explicit: string | undefined, builtAt: Date): str
   return defaultGeneratorLabel(builtAt);
 }
 
+async function readCommentrayMarkdownForStaticBuild(
+  mdPath: string,
+  multi: BuildCommentrayStaticOptions["multiAngleBrowsing"],
+): Promise<string> {
+  if (!multi || multi.angles.length < 2) {
+    return readFile(mdPath, "utf8");
+  }
+  const pick = multi.angles.find((a) => a.id === multi.defaultAngleId) ?? multi.angles[0];
+  return pick?.markdown ?? readFile(mdPath, "utf8");
+}
+
+async function copyCompanionStaticMirrors(
+  copies: CommentrayStaticAssetCopy[] | undefined,
+): Promise<void> {
+  if (!copies?.length) return;
+  for (const { fromAbs, toAbs } of copies) {
+    await mkdir(path.dirname(toAbs), { recursive: true });
+    await copyFile(fromAbs, toAbs);
+  }
+}
+
 export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions): Promise<void> {
   const sourcePath = path.resolve(opts.sourceFile);
   const mdPath = path.resolve(opts.markdownFile);
@@ -105,12 +127,10 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
   const builtAt = opts.builtAt ?? new Date();
 
   const code = await readFile(sourcePath, "utf8");
-  const multi = opts.multiAngleBrowsing;
-  const commentrayMarkdown =
-    multi && multi.angles.length >= 2
-      ? ((multi.angles.find((a) => a.id === multi.defaultAngleId) ?? multi.angles[0])?.markdown ??
-        (await readFile(mdPath, "utf8")))
-      : await readFile(mdPath, "utf8");
+  const commentrayMarkdown = await readCommentrayMarkdownForStaticBuild(
+    mdPath,
+    opts.multiAngleBrowsing,
+  );
   const ext = path.extname(sourcePath).slice(1) || "txt";
   const language = ext === "ts" ? "ts" : ext === "tsx" ? "tsx" : ext;
 
@@ -141,13 +161,7 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     multiAngleBrowsing: opts.multiAngleBrowsing,
   });
 
-  const copies = opts.commentrayOutputUrls?.companionStaticAssetCopies;
-  if (copies?.length) {
-    for (const { fromAbs, toAbs } of copies) {
-      await mkdir(path.dirname(toAbs), { recursive: true });
-      await copyFile(fromAbs, toAbs);
-    }
-  }
+  await copyCompanionStaticMirrors(opts.commentrayOutputUrls?.companionStaticAssetCopies);
 
   await mkdir(path.dirname(outPath), { recursive: true });
   await writeFile(outPath, html, "utf8");

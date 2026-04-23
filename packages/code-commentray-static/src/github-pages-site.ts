@@ -225,6 +225,69 @@ export type BuildGithubPagesStaticSiteOptions = {
   toolHomeUrl?: string;
 };
 
+async function emitGithubPagesSiteArtifacts(input: {
+  repoRoot: string;
+  outDir: string;
+  tmpMd: string;
+  navDoc: CommentrayNavSearchDocument;
+  cfg: ResolvedCommentrayConfig;
+  ss: ResolvedStaticSite;
+  toolHomeUrl: string;
+  builtAt: Date;
+  projectIndex: CommentrayIndex | null;
+  ghNavBase: GithubNavBase | null;
+  commentrayOutputUrls: NonNullable<BuildCommentrayStaticOptions["commentrayOutputUrls"]>;
+  blockStretchRows: BuildCommentrayStaticOptions["blockStretchRows"];
+  multiAngleBrowsing: CodeBrowserMultiAngleBrowsing | undefined;
+  ghToolbar: ReturnType<typeof sourceAndCommentrayGithubUrls>;
+  defaultCommentrayRel: string;
+  sourceAbs: string;
+  outHtml: string;
+  navSearchPath: string;
+}): Promise<CommentrayNavSearchDocument> {
+  let { navDoc } = input;
+  await mkdir(input.outDir, { recursive: true });
+  if (Array.isArray(navDoc.documentedPairs) && navDoc.documentedPairs.length > 0) {
+    navDoc = await writePerPairBrowseHtmlPages({
+      repoRoot: input.repoRoot,
+      outDir: input.outDir,
+      navDoc,
+      cfg: input.cfg,
+      ss: input.ss,
+      toolHomeUrl: input.toolHomeUrl,
+      builtAt: input.builtAt,
+      projectIndex: input.projectIndex,
+      ghNavBase: input.ghNavBase,
+    });
+  }
+  const documentedPairsEmbeddedB64 = documentedPairsEmbeddedB64FromNav(navDoc);
+  const hubStaticBrowseUrl =
+    input.defaultCommentrayRel.length > 0
+      ? staticBrowseUrlForConfiguredPair(navDoc, input.ss.sourceFile, input.defaultCommentrayRel)
+      : undefined;
+
+  const staticOpts = staticRenderOptions({
+    sourceAbs: input.sourceAbs,
+    tmpMd: input.tmpMd,
+    outHtml: input.outHtml,
+    ss: input.ss,
+    cfg: input.cfg,
+    toolHomeUrl: input.toolHomeUrl,
+    builtAt: input.builtAt,
+    commentrayOutputUrls: input.commentrayOutputUrls,
+    blockStretchRows: input.blockStretchRows,
+    multiAngleBrowsing: input.multiAngleBrowsing,
+    ghToolbar: input.ghToolbar,
+    defaultCommentrayRel: input.defaultCommentrayRel,
+    documentedPairsEmbeddedB64,
+    commentrayStaticBrowseUrl: hubStaticBrowseUrl,
+  });
+
+  await buildCommentrayStatic(staticOpts);
+  await writeFile(input.navSearchPath, `${JSON.stringify(navDoc, null, 2)}\n`, "utf8");
+  return navDoc;
+}
+
 /**
  * Builds `_site/index.html` and `commentray-nav-search.json` from `.commentray.toml` `[static_site]`
  * (same behaviour as `scripts/build-static-pages.mjs`).
@@ -283,7 +346,7 @@ export async function buildGithubPagesStaticSite(
   const ghToolbar = sourceAndCommentrayGithubUrls(ghNavBase, ss, defaultCommentrayRel);
 
   const navSearchPath = path.join(outDir, "commentray-nav-search.json");
-  let navDoc = await buildCommentrayNavSearchDocument(
+  const navDoc = await buildCommentrayNavSearchDocument(
     repoRoot,
     defaultCommentrayRel
       ? {
@@ -297,46 +360,26 @@ export async function buildGithubPagesStaticSite(
   );
 
   try {
-    await mkdir(outDir, { recursive: true });
-    if (Array.isArray(navDoc.documentedPairs) && navDoc.documentedPairs.length > 0) {
-      navDoc = await writePerPairBrowseHtmlPages({
-        repoRoot,
-        outDir,
-        navDoc,
-        cfg,
-        ss,
-        toolHomeUrl,
-        builtAt,
-        projectIndex,
-        ghNavBase,
-      });
-    }
-    const documentedPairsEmbeddedB64 = documentedPairsEmbeddedB64FromNav(navDoc);
-
-    const hubStaticBrowseUrl =
-      defaultCommentrayRel.length > 0
-        ? staticBrowseUrlForConfiguredPair(navDoc, ss.sourceFile, defaultCommentrayRel)
-        : undefined;
-
-    const staticOpts = staticRenderOptions({
-      sourceAbs,
+    await emitGithubPagesSiteArtifacts({
+      repoRoot,
+      outDir,
       tmpMd,
-      outHtml,
-      ss,
+      navDoc,
       cfg,
+      ss,
       toolHomeUrl,
       builtAt,
+      projectIndex,
+      ghNavBase,
       commentrayOutputUrls,
       blockStretchRows,
       multiAngleBrowsing,
       ghToolbar,
       defaultCommentrayRel,
-      documentedPairsEmbeddedB64,
-      commentrayStaticBrowseUrl: hubStaticBrowseUrl,
+      sourceAbs,
+      outHtml,
+      navSearchPath,
     });
-
-    await buildCommentrayStatic(staticOpts);
-    await writeFile(navSearchPath, `${JSON.stringify(navDoc, null, 2)}\n`, "utf8");
   } finally {
     await unlink(tmpMd).catch(() => {});
   }

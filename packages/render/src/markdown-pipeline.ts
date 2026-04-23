@@ -148,6 +148,54 @@ function isResolvedPathInsideRoot(resolvedAbs: string, rootAbs: string): boolean
 
 type LocalUrlRewrite = { relativeToHtml: string } | { blockedImage: true } | null;
 
+function skipNonFilesystemLocalUrl(raw: string): boolean {
+  const t = raw.trim();
+  return !t || t.startsWith("#") || /^[a-zA-Z][a-zA-Z0-9+.-]*:/i.test(t) || t.startsWith("//");
+}
+
+function resolveRepoLocalFilesystemTarget(
+  raw: string,
+  repoRoot: string,
+  baseDir: string,
+): string | null {
+  if (skipNonFilesystemLocalUrl(raw)) return null;
+  const t = raw.trim();
+  let resolved: string;
+  if (t.startsWith("/")) {
+    const rest = decodeUrlPath(t.replace(/^\/+/, ""));
+    if (!rest || rest.includes("\0")) return null;
+    resolved = path.normalize(path.join(repoRoot, rest));
+  } else {
+    resolved = path.normalize(path.resolve(baseDir, decodeUrlPath(t)));
+  }
+  if (!isResolvedPathInsideRoot(resolved, repoRoot)) return null;
+  return resolved;
+}
+
+type MirrorCopyList = NonNullable<CommentrayOutputUrlOptions["companionStaticAssetCopies"]>;
+
+/** When publishing under `siteRootAbs`, storage-only images outside the site tree map into {@link COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT}. */
+function mirroredAbsoluteTargetForSitePublish(
+  resolved: string,
+  storageRoot: string,
+  siteRootAbs: string,
+  mirrorCopies: MirrorCopyList,
+  mirroredToAbs: Set<string>,
+): string | "blocked" {
+  if (isResolvedPathInsideRoot(resolved, siteRootAbs)) return resolved;
+  const mirrorRel = path.relative(storageRoot, resolved);
+  if (mirrorRel.startsWith("..") || path.isAbsolute(mirrorRel)) return "blocked";
+  const toAbs = path.normalize(
+    path.join(siteRootAbs, COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT, mirrorRel),
+  );
+  if (!isResolvedPathInsideRoot(toAbs, siteRootAbs)) return "blocked";
+  if (!mirroredToAbs.has(toAbs)) {
+    mirroredToAbs.add(toAbs);
+    mirrorCopies.push({ fromAbs: resolved, toAbs });
+  }
+  return toAbs;
+}
+
 function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
   const repoRoot = path.resolve(ctx.repoRootAbs);
   const storageRoot = path.resolve(ctx.commentrayStorageRootAbs);
@@ -158,50 +206,24 @@ function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
   const mirroredToAbs = new Set<string>();
 
   function resolveTargetAbs(raw: string, tagName: "a" | "img"): LocalUrlRewrite {
-    const t = raw.trim();
-    if (!t || t.startsWith("#")) return null;
-    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/i.test(t)) return null;
-    if (t.startsWith("//")) return null;
-
-    let resolved: string;
-    if (t.startsWith("/")) {
-      const rest = decodeUrlPath(t.replace(/^\/+/, ""));
-      if (!rest || rest.includes("\0")) return null;
-      resolved = path.normalize(path.join(repoRoot, rest));
-    } else {
-      const decoded = decodeUrlPath(t);
-      resolved = path.normalize(path.resolve(baseDir, decoded));
-    }
-
-    if (!isResolvedPathInsideRoot(resolved, repoRoot)) return null;
+    const resolved = resolveRepoLocalFilesystemTarget(raw, repoRoot, baseDir);
+    if (resolved == null) return null;
 
     if (tagName === "img" && !isResolvedPathInsideRoot(resolved, storageRoot)) {
       return { blockedImage: true };
     }
 
     let targetAbsForUrl = resolved;
-    if (
-      tagName === "img" &&
-      siteRootAbs &&
-      mirrorCopies &&
-      isResolvedPathInsideRoot(resolved, storageRoot) &&
-      !isResolvedPathInsideRoot(resolved, siteRootAbs)
-    ) {
-      const mirrorRel = path.relative(storageRoot, resolved);
-      if (mirrorRel.startsWith("..") || path.isAbsolute(mirrorRel)) {
-        return { blockedImage: true };
-      }
-      const toAbs = path.normalize(
-        path.join(siteRootAbs, COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT, mirrorRel),
+    if (tagName === "img" && siteRootAbs && mirrorCopies) {
+      const mirrored = mirroredAbsoluteTargetForSitePublish(
+        resolved,
+        storageRoot,
+        siteRootAbs,
+        mirrorCopies,
+        mirroredToAbs,
       );
-      if (!isResolvedPathInsideRoot(toAbs, siteRootAbs)) {
-        return { blockedImage: true };
-      }
-      targetAbsForUrl = toAbs;
-      if (!mirroredToAbs.has(toAbs)) {
-        mirroredToAbs.add(toAbs);
-        mirrorCopies.push({ fromAbs: resolved, toAbs });
-      }
+      if (mirrored === "blocked") return { blockedImage: true };
+      targetAbsForUrl = mirrored;
     }
 
     const out = path.relative(htmlDir, targetAbsForUrl);

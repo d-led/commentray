@@ -155,7 +155,7 @@ describe("Side-by-side static HTML layout", () => {
   });
 });
 
-describe("Markdown to HTML — static asset URL rewriting", () => {
+describe("Markdown to HTML — static asset URL rewriting (storage sandbox)", () => {
   it("should resolve companion-local images and block repo-root images outside Commentray storage", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "cr-img-"));
     const repoRoot = path.join(tmp, "repo");
@@ -228,7 +228,9 @@ describe("Markdown to HTML — static asset URL rewriting", () => {
     expect(html).not.toContain("leak.svg");
     expect(html).not.toMatch(/<img[^>]*src=/);
   });
+});
 
+describe("Markdown to HTML — static asset URL rewriting (site mirror)", () => {
   it("should mirror storage images into the static site segment when staticSiteOutDirAbs is set", async () => {
     const tmpRoot = await mkdtemp(path.join(tmpdir(), "cr-img-mirror-"));
     const repoRoot = path.join(tmpRoot, "repo");
