@@ -13,6 +13,7 @@ import {
 import {
   type CodeBrowserMultiAngleBrowsing,
   type CommentrayNavSearchDocument,
+  type CommentrayStaticAssetCopy,
   browsePageSlugFromPair,
   buildCommentrayNavSearchDocument,
 } from "@commentray/render";
@@ -97,11 +98,14 @@ async function writePerPairBrowseHtmlPages(input: {
       input.repoRoot,
       input.cfg.storageDir.replaceAll("\\", "/"),
     );
+    const companionStaticAssetCopies: CommentrayStaticAssetCopy[] = [];
     const commentrayOutputUrls = {
       repoRootAbs: input.repoRoot,
       htmlOutputFileAbs: outPath,
       markdownUrlBaseDirAbs,
       commentrayStorageRootAbs,
+      staticSiteOutDirAbs: input.outDir,
+      companionStaticAssetCopies,
     };
 
     const multiAngleBrowsing = await multiAngleBrowsingForBrowsePair(
@@ -265,11 +269,14 @@ export async function buildGithubPagesStaticSite(
     : repoRoot;
 
   const commentrayStorageRootAbs = path.resolve(repoRoot, cfg.storageDir.replaceAll("\\", "/"));
+  const companionStaticAssetCopies: CommentrayStaticAssetCopy[] = [];
   const commentrayOutputUrls = {
     repoRootAbs: repoRoot,
     htmlOutputFileAbs: outHtml,
     markdownUrlBaseDirAbs,
     commentrayStorageRootAbs,
+    staticSiteOutDirAbs: outDir,
+    companionStaticAssetCopies,
   };
 
   const blockStretchRows = flatBlockStretchRows(projectIndex, ss, Boolean(multiAngleBrowsing));

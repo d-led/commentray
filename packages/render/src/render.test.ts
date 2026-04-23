@@ -2,7 +2,11 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { type MarkdownPipelineOptions, renderMarkdownToHtml } from "./markdown-pipeline.js";
+import {
+  type CommentrayStaticAssetCopy,
+  type MarkdownPipelineOptions,
+  renderMarkdownToHtml,
+} from "./markdown-pipeline.js";
 import { renderSideBySideHtml } from "./side-by-side.js";
 
 function markdownWithAcmeDemoGithubBlob(opts: {
@@ -174,6 +178,7 @@ describe("Markdown to HTML — static asset URL rewriting", () => {
       },
     });
     expect(html).toContain('src="../.commentray/source/diagram.svg"');
+    expect(html).not.toContain("commentray-static-assets");
     expect(html).not.toContain("docs/logo.svg");
     const imgTags = [...html.matchAll(/<img[^>]*>/g)].map((m) => m[0]);
     expect(imgTags.some((t) => t.includes("diagram.svg"))).toBe(true);
@@ -222,5 +227,63 @@ describe("Markdown to HTML — static asset URL rewriting", () => {
     });
     expect(html).not.toContain("leak.svg");
     expect(html).not.toMatch(/<img[^>]*src=/);
+  });
+
+  it("should mirror storage images into the static site segment when staticSiteOutDirAbs is set", async () => {
+    const tmpRoot = await mkdtemp(path.join(tmpdir(), "cr-img-mirror-"));
+    const repoRoot = path.join(tmpRoot, "repo");
+    await mkdir(repoRoot, { recursive: true });
+    const storageRoot = path.join(repoRoot, ".commentray");
+    const companionDir = path.join(storageRoot, "source");
+    await mkdir(companionDir, { recursive: true });
+    await writeFile(path.join(companionDir, "diagram.svg"), "<svg/>", "utf8");
+    const outHtml = path.join(repoRoot, "_site", "index.html");
+    await mkdir(path.dirname(outHtml), { recursive: true });
+    const companionStaticAssetCopies: CommentrayStaticAssetCopy[] = [];
+
+    const html = await renderMarkdownToHtml("![d](./diagram.svg)", {
+      commentrayOutputUrls: {
+        repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: companionDir,
+        commentrayStorageRootAbs: storageRoot,
+        staticSiteOutDirAbs: path.join(repoRoot, "_site"),
+        companionStaticAssetCopies,
+      },
+    });
+
+    expect(html).toContain('src="commentray-static-assets/source/diagram.svg"');
+    expect(companionStaticAssetCopies).toHaveLength(1);
+    expect(companionStaticAssetCopies[0]?.fromAbs).toBe(path.join(companionDir, "diagram.svg"));
+    expect(companionStaticAssetCopies[0]?.toAbs).toBe(
+      path.join(repoRoot, "_site", "commentray-static-assets", "source", "diagram.svg"),
+    );
+  });
+
+  it("should use ../commentray-static-assets from browse HTML nested under the site root", async () => {
+    const tmpRoot = await mkdtemp(path.join(tmpdir(), "cr-img-mirror2-"));
+    const repoRoot = path.join(tmpRoot, "repo");
+    await mkdir(repoRoot, { recursive: true });
+    const storageRoot = path.join(repoRoot, ".commentray");
+    const companionDir = path.join(storageRoot, "source");
+    await mkdir(companionDir, { recursive: true });
+    await writeFile(path.join(companionDir, "diagram.svg"), "<svg/>", "utf8");
+    const outHtml = path.join(repoRoot, "_site", "browse", "pair.html");
+    await mkdir(path.dirname(outHtml), { recursive: true });
+    const companionStaticAssetCopies: CommentrayStaticAssetCopy[] = [];
+
+    const html = await renderMarkdownToHtml("![d](./diagram.svg)", {
+      commentrayOutputUrls: {
+        repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: companionDir,
+        commentrayStorageRootAbs: storageRoot,
+        staticSiteOutDirAbs: path.join(repoRoot, "_site"),
+        companionStaticAssetCopies,
+      },
+    });
+
+    expect(html).toContain('src="../commentray-static-assets/source/diagram.svg"');
+    expect(companionStaticAssetCopies).toHaveLength(1);
   });
 });

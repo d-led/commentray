@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   type CommentrayIndex,
@@ -140,6 +140,14 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     documentedPairsEmbeddedB64: opts.documentedPairsEmbeddedB64,
     multiAngleBrowsing: opts.multiAngleBrowsing,
   });
+
+  const copies = opts.commentrayOutputUrls?.companionStaticAssetCopies;
+  if (copies?.length) {
+    for (const { fromAbs, toAbs } of copies) {
+      await mkdir(path.dirname(toAbs), { recursive: true });
+      await copyFile(fromAbs, toAbs);
+    }
+  }
 
   await mkdir(path.dirname(outPath), { recursive: true });
   await writeFile(outPath, html, "utf8");

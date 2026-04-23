@@ -31,7 +31,18 @@ import { escapeHtml } from "./html-utils.js";
  *
  * **Links (`a[href]`)** — any in-repo file under `repoRootAbs` may still be linked (e.g. specs
  * under `docs/`). Only images are restricted to storage.
+ *
+ * **Static publish (`staticSiteOutDirAbs`)** — GitHub Pages and `commentray serve` only deploy
+ * files under the output site root (e.g. `_site/`). Local `img[src]` that would point outside
+ * that tree (typically `../.commentray/…`) are rewritten to
+ * `{@link COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT}/…` **under the site root**, and the
+ * pipeline records copies in {@link CommentrayOutputUrlOptions.companionStaticAssetCopies} for
+ * the build step to materialize on disk.
  */
+export const COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT = "commentray-static-assets";
+
+export type CommentrayStaticAssetCopy = { fromAbs: string; toAbs: string };
+
 export type CommentrayOutputUrlOptions = {
   repoRootAbs: string;
   htmlOutputFileAbs: string;
@@ -43,6 +54,17 @@ export type CommentrayOutputUrlOptions = {
   commentrayStorageRootAbs: string;
   /** When set, `https://github.com/<owner>/<repo>/blob|tree/<branch>/…` becomes a `/…` repo path. */
   githubBlobRepo?: { owner: string; repo: string };
+  /**
+   * Absolute path to the deployed static site root (e.g. `{repo}/_site`). When set, companion
+   * images under storage that are not already inside this directory are emitted as URLs under
+   * {@link COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT} and listed for copying.
+   */
+  staticSiteOutDirAbs?: string;
+  /**
+   * When {@link staticSiteOutDirAbs} is set, populated with `{ fromAbs, toAbs }` for each mirrored
+   * image so the HTML writer can `copyFile` after render.
+   */
+  companionStaticAssetCopies?: CommentrayStaticAssetCopy[];
 };
 
 export type MarkdownPipelineOptions = {
@@ -131,6 +153,9 @@ function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
   const storageRoot = path.resolve(ctx.commentrayStorageRootAbs);
   const htmlDir = path.dirname(path.resolve(ctx.htmlOutputFileAbs));
   const baseDir = path.resolve(ctx.markdownUrlBaseDirAbs);
+  const siteRootAbs = ctx.staticSiteOutDirAbs ? path.resolve(ctx.staticSiteOutDirAbs) : null;
+  const mirrorCopies = ctx.companionStaticAssetCopies;
+  const mirroredToAbs = new Set<string>();
 
   function resolveTargetAbs(raw: string, tagName: "a" | "img"): LocalUrlRewrite {
     const t = raw.trim();
@@ -154,7 +179,32 @@ function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
       return { blockedImage: true };
     }
 
-    const out = path.relative(htmlDir, resolved);
+    let targetAbsForUrl = resolved;
+    if (
+      tagName === "img" &&
+      siteRootAbs &&
+      mirrorCopies &&
+      isResolvedPathInsideRoot(resolved, storageRoot) &&
+      !isResolvedPathInsideRoot(resolved, siteRootAbs)
+    ) {
+      const mirrorRel = path.relative(storageRoot, resolved);
+      if (mirrorRel.startsWith("..") || path.isAbsolute(mirrorRel)) {
+        return { blockedImage: true };
+      }
+      const toAbs = path.normalize(
+        path.join(siteRootAbs, COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT, mirrorRel),
+      );
+      if (!isResolvedPathInsideRoot(toAbs, siteRootAbs)) {
+        return { blockedImage: true };
+      }
+      targetAbsForUrl = toAbs;
+      if (!mirroredToAbs.has(toAbs)) {
+        mirroredToAbs.add(toAbs);
+        mirrorCopies.push({ fromAbs: resolved, toAbs });
+      }
+    }
+
+    const out = path.relative(htmlDir, targetAbsForUrl);
     if (path.isAbsolute(out)) return null;
 
     return { relativeToHtml: posixHref(out) };

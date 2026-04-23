@@ -5,8 +5,16 @@ export type {
   CodeBrowserPageOptions,
 } from "./code-browser.js";
 export { commentrayRenderVersion } from "./package-version.js";
-export type { CommentrayOutputUrlOptions, MarkdownPipelineOptions } from "./markdown-pipeline.js";
-export { renderFencedCode, renderMarkdownToHtml } from "./markdown-pipeline.js";
+export type {
+  CommentrayOutputUrlOptions,
+  CommentrayStaticAssetCopy,
+  MarkdownPipelineOptions,
+} from "./markdown-pipeline.js";
+export {
+  COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT,
+  renderFencedCode,
+  renderMarkdownToHtml,
+} from "./markdown-pipeline.js";
 export { renderSideBySideHtml } from "./side-by-side.js";
 export type { SideBySideOptions } from "./side-by-side.js";
 export { browsePageSlugFromPair } from "./browse-page-slug.js";

@@ -201,4 +201,33 @@ describe("GitHub Pages static site output", () => {
   it("writes GitHub blob toolbar URLs for d-led/commentray + main when configured", async () => {
     repo = await runGithubToolbarUsesBlobUrlsForRealisticHost();
   });
+
+  it("mirrors companion storage images under _site/commentray-static-assets for Pages-style hosts", async () => {
+    repo = await mkdtemp(path.join(tmpdir(), "cr-pages-img-"));
+    await writeMinimalPagesFixture(repo, { title: "Img" });
+    await mkdir(path.join(repo, ".commentray", "source", "src", "assets"), { recursive: true });
+    await writeFile(
+      path.join(repo, ".commentray", "source", "src", "assets", "x.svg"),
+      "<svg/>",
+      "utf8",
+    );
+    await writeFile(
+      path.join(repo, ".commentray", "source", "src", "x.ts.md"),
+      "# Doc\n\n![](assets/x.svg)\n",
+      "utf8",
+    );
+    await buildGithubPagesStaticSite({ repoRoot: repo });
+    const mirrored = path.join(
+      repo,
+      "_site",
+      "commentray-static-assets",
+      "source",
+      "src",
+      "assets",
+      "x.svg",
+    );
+    expect(await readFile(mirrored, "utf8")).toContain("<svg");
+    const indexHtml = await readFile(path.join(repo, "_site", "index.html"), "utf8");
+    expect(indexHtml).toMatch(/commentray-static-assets\/source\/src\/assets\/x\.svg/);
+  });
 });

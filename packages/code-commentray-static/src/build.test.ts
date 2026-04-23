@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { CommentrayStaticAssetCopy } from "@commentray/render";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildCommentrayStatic } from "./build.js";
 
@@ -113,6 +114,48 @@ describe("Static browse HTML build — URLs and toolbar", () => {
     });
     const html = await readFile(outHtml, "utf8");
     expect(html).toContain('href="../docs/guide.md"');
+  });
+
+  it("should copy mirrored companion images into _site/commentray-static-assets", async () => {
+    outDir = await mkdtemp(path.join(tmpdir(), "ccrs-mirror-"));
+    const repoRoot = path.join(outDir, "repo");
+    const storage = path.join(repoRoot, ".commentray");
+    const companionDir = path.join(storage, "source", "pkg");
+    await mkdir(companionDir, { recursive: true });
+    await writeFile(
+      path.join(companionDir, "pic.svg"),
+      '<svg xmlns="http://www.w3.org/2000/svg"/>',
+      "utf8",
+    );
+    const mdPath = path.join(companionDir, "notes.md");
+    await writeFile(mdPath, "![](pic.svg)\n", "utf8");
+    const outHtml = path.join(repoRoot, "_site", "index.html");
+    await mkdir(path.dirname(outHtml), { recursive: true });
+    const companionStaticAssetCopies: CommentrayStaticAssetCopy[] = [];
+    await buildCommentrayStatic({
+      sourceFile: path.join(pkgRoot, "fixtures", "sample.ts"),
+      markdownFile: mdPath,
+      outHtml,
+      commentrayOutputUrls: {
+        repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: companionDir,
+        commentrayStorageRootAbs: storage,
+        staticSiteOutDirAbs: path.join(repoRoot, "_site"),
+        companionStaticAssetCopies,
+      },
+    });
+    const html = await readFile(outHtml, "utf8");
+    expect(html).toMatch(/commentray-static-assets\/source\/pkg\/pic\.svg/);
+    const mirrored = path.join(
+      repoRoot,
+      "_site",
+      "commentray-static-assets",
+      "source",
+      "pkg",
+      "pic.svg",
+    );
+    expect(await readFile(mirrored, "utf8")).toContain("<svg");
   });
 
   it("should surface GitHub repo in the toolbar and tool home in the footer", async () => {
