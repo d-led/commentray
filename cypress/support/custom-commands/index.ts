@@ -5,3 +5,4 @@ import "./a11y-forms-and-links";
 import "./dual-scroll";
 import "./static-site-behavior";
 import "./static-site-mobile";
+import "./mobile-flip-end";

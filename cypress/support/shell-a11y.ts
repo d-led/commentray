@@ -55,6 +55,8 @@ export const shellA11y = {
   shell: "#shell",
   /** Mobile single-pane flip control (`code-browser.ts` `#mobile-pane-flip`). */
   mobilePaneFlip: "#mobile-pane-flip",
+  /** Fixed duplicate flip when the toolbar flip is off-screen (narrow dual layout). */
+  mobilePaneFlipScroll: "#mobile-pane-flip-scroll",
   /** Commentary markdown scroll body (`code-browser.ts` `#doc-pane-body`). */
   docPaneBody: "#doc-pane-body",
   /** Wrapper class for fenced Mermaid blocks from the render pipeline. */

@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { buildGithubPagesStaticSite } from "@commentray/code-commentray-static/github-pages-site";
 import { writeE2eDualScrollFixture } from "./lib/write-e2e-dual-scroll-fixture.mjs";
+import { writeE2eMobileFlipEndFixture } from "./lib/write-e2e-mobile-flip-end-fixture.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -17,6 +18,7 @@ try {
   console.log(`Wrote ${outHtml}`);
   console.log(`Wrote ${navSearchPath}`);
   await writeE2eDualScrollFixture(repoRoot);
+  await writeE2eMobileFlipEndFixture(repoRoot);
 } catch (err) {
   console.error(err instanceof Error ? err.message : err);
   process.exit(1);

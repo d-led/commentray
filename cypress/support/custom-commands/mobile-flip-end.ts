@@ -1,0 +1,15 @@
+import { shellA11y } from "../shell-a11y";
+
+/** Matches `code-browser.ts` / client narrow single-pane breakpoint. */
+const MOBILE_VIEWPORT_WIDTH = 390;
+const MOBILE_VIEWPORT_HEIGHT = 844;
+
+Cypress.Commands.add("PrepareE2eMobileFlipEndFixtureAtMobileViewport", () => {
+  cy.clearLocalStorage();
+  cy.viewport(MOBILE_VIEWPORT_WIDTH, MOBILE_VIEWPORT_HEIGHT);
+  cy.visit("/__e2e__/mobile-flip-end/");
+  cy.get(shellA11y.shell).should("exist").and("have.attr", "data-layout", "dual");
+  cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane");
+  cy.get(shellA11y.mobilePaneFlip).should("be.visible");
+  cy.get(shellA11y.mobilePaneFlipScroll).should("exist").and("not.have.class", "is-visible");
+});

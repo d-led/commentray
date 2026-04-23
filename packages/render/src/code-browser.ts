@@ -1579,6 +1579,28 @@ const CODE_BROWSER_STYLES = `
         .toolbar-icon-btn--flip-only-narrow {
           display: inline-flex;
         }
+        /**
+         * Secondary flip: only on narrow viewports, only while the toolbar flip is off-screen
+         * (see client IntersectionObserver). Same control as toolbar; fixed so it stays reachable.
+         */
+        .toolbar-icon-btn--flip-scroll-narrow {
+          display: none;
+        }
+        #mobile-pane-flip-scroll.toolbar-icon-btn--flip-scroll-narrow.is-visible {
+          display: inline-flex;
+          position: fixed;
+          top: calc(10px + env(safe-area-inset-top, 0px));
+          right: calc(12px + env(safe-area-inset-right, 0px));
+          z-index: 50;
+          box-shadow:
+            0 1px 2px color-mix(in oklab, CanvasText 12%, transparent),
+            0 4px 14px color-mix(in oklab, CanvasText 18%, transparent);
+        }
+        /** Region connector lines are not needed on the narrow single-pane layout (gutter is hidden). */
+        .shell:not(.shell--stretch-rows) .gutter .gutter__rays {
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
         .nav-rail__doc-hub-summary {
           min-width: var(--cr-control-h);
           padding: 0 10px;
@@ -1849,6 +1871,10 @@ function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
     p.layout === "dual"
       ? `<button type="button" id="mobile-pane-flip" class="toolbar-icon-btn toolbar-icon-btn--flip-only-narrow" aria-label="Switch between source code and commentary" title="Switch between source code and commentary">${TOOLBAR_ICON_FLIP_PANES_SVG}</button>`
       : "";
+  const dualFlipScrollAffordanceHtml =
+    p.layout === "dual"
+      ? `<button type="button" id="mobile-pane-flip-scroll" class="toolbar-icon-btn toolbar-icon-btn--flip-scroll-narrow" hidden aria-label="Switch between source code and commentary" title="Switch between source code and commentary">${TOOLBAR_ICON_FLIP_PANES_SVG}</button>`
+      : "";
   return `<!doctype html>
 <html lang="en" data-commentray-theme="system">
   <head>
@@ -1895,6 +1921,7 @@ ${TOOLBAR_COLOR_THEME_HTML}
           </div>
         </div>
       </header>
+      ${dualFlipScrollAffordanceHtml}
       <header class="app__chrome" role="region" aria-label="Search">
         <div class="chrome__search-row">
           <label class="chrome__search-label" for="search-q" aria-label="Search" title="Search"><span class="chrome__search-label__caption nav-rail__search-label">Search</span><span class="chrome__search-label__glyph" aria-hidden="true">${CHROME_ICON_SEARCH_SVG}</span></label>

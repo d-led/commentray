@@ -125,6 +125,209 @@ function applyScrollTopClamped(scrollEl: HTMLElement, nextTop: number): void {
   scrollEl.scrollTop = clamped;
 }
 
+function paneUsesInternalYScroll(el: HTMLElement): boolean {
+  const max = el.scrollHeight - el.clientHeight;
+  if (max <= 1) return false;
+  const oy = getComputedStyle(el).overflowY;
+  return oy === "auto" || oy === "scroll" || oy === "overlay";
+}
+
+function rootScrollingElement(): HTMLElement {
+  const s = document.scrollingElement;
+  if (s instanceof HTMLElement) return s;
+  return document.documentElement;
+}
+
+function applyWindowScrollRatio(ratio: number): void {
+  const root = rootScrollingElement();
+  const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
+  const next = clamp(ratio * maxY, 0, maxY);
+  if (Math.abs(root.scrollTop - next) < 0.25) return;
+  root.scrollTop = next;
+}
+
+/**
+ * Reveal `child` near the top of the reading surface: the pane’s own scrollport when it scrolls
+ * internally (desktop dual-pane), otherwise the document root (narrow flow layout).
+ */
+function applyRevealChildInPane(scrollport: HTMLElement, child: Element, leadCssPx: number): void {
+  if (paneUsesInternalYScroll(scrollport)) {
+    applyScrollTopClamped(
+      scrollport,
+      Math.round(scrollTopToAlignChildTop(scrollport, child, leadCssPx)),
+    );
+    return;
+  }
+  const root = rootScrollingElement();
+  const cr = child.getBoundingClientRect();
+  const targetTop = globalThis.scrollY + cr.top - leadCssPx;
+  const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
+  const clamped = clamp(targetTop, 0, maxY);
+  if (Math.abs(root.scrollTop - clamped) < 0.25) return;
+  root.scrollTop = clamped;
+}
+
+/** Captured commentary→source scroll state for a narrow single-pane flip (see {@link DualPaneScrollSyncRunners}). */
+type DocToCodeFlipPlan =
+  | { k: "block"; src0: number; winRatio: number }
+  | { k: "mirrorI"; docTop: number; docSH: number; docCH: number }
+  | { k: "mirrorW"; ratio: number };
+
+/** Captured source→commentary scroll state for a narrow single-pane flip. */
+type CodeToDocFlipPlan =
+  | { k: "block"; mdLine0: number; winRatio: number }
+  | { k: "mirrorI"; codeTop: number; codeSH: number; codeCH: number }
+  | { k: "mirrorW"; ratio: number };
+
+function windowScrollRatio(): number {
+  const root = rootScrollingElement();
+  const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
+  return maxY > 0 ? clamp(root.scrollTop / maxY, 0, 1) : 0;
+}
+
+function applyDocToCodeFlipPlanImpl(
+  codePane: HTMLElement,
+  _docPane: HTMLElement,
+  plan: DocToCodeFlipPlan,
+): void {
+  if (plan.k === "block") {
+    const el = codePane.querySelector(`#code-line-${String(plan.src0)}`);
+    if (el) {
+      applyRevealChildInPane(codePane, el, 2);
+    } else {
+      applyWindowScrollRatio(plan.winRatio);
+    }
+    return;
+  }
+  if (plan.k === "mirrorW") {
+    if (paneUsesInternalYScroll(codePane)) {
+      const maxC = Math.max(0, codePane.scrollHeight - codePane.clientHeight);
+      applyScrollTopClamped(codePane, plan.ratio * maxC);
+    } else {
+      applyWindowScrollRatio(plan.ratio);
+    }
+    return;
+  }
+  const nextTop = mirroredScrollTop(
+    plan.docTop,
+    plan.docSH,
+    plan.docCH,
+    codePane.scrollHeight,
+    codePane.clientHeight,
+  );
+  if (paneUsesInternalYScroll(codePane)) {
+    applyScrollTopClamped(codePane, nextTop);
+    return;
+  }
+  const denom = Math.max(1, codePane.scrollHeight - codePane.clientHeight);
+  applyWindowScrollRatio(clamp(nextTop / denom, 0, 1));
+}
+
+function applyCodeToDocFlipPlanImpl(
+  _codePane: HTMLElement,
+  docPane: HTMLElement,
+  plan: CodeToDocFlipPlan,
+): void {
+  if (plan.k === "block") {
+    const anchor = docPane.querySelector(`[data-commentray-line="${String(plan.mdLine0)}"]`);
+    if (anchor instanceof HTMLElement) {
+      applyRevealChildInPane(docPane, anchor, 2);
+    } else {
+      applyWindowScrollRatio(plan.winRatio);
+    }
+    return;
+  }
+  if (plan.k === "mirrorW") {
+    if (paneUsesInternalYScroll(docPane)) {
+      const maxD = Math.max(0, docPane.scrollHeight - docPane.clientHeight);
+      applyScrollTopClamped(docPane, plan.ratio * maxD);
+    } else {
+      applyWindowScrollRatio(plan.ratio);
+    }
+    return;
+  }
+  const nextTop = mirroredScrollTop(
+    plan.codeTop,
+    plan.codeSH,
+    plan.codeCH,
+    docPane.scrollHeight,
+    docPane.clientHeight,
+  );
+  if (paneUsesInternalYScroll(docPane)) {
+    applyScrollTopClamped(docPane, nextTop);
+    return;
+  }
+  const denom = Math.max(1, docPane.scrollHeight - docPane.clientHeight);
+  applyWindowScrollRatio(clamp(nextTop / denom, 0, 1));
+}
+
+function buildDocToCodeFlipPlanBlockAware(
+  docPane: HTMLElement,
+  getLinks: () => BlockScrollLink[],
+): DocToCodeFlipPlan {
+  const winRatio = windowScrollRatio();
+  const links = getLinks();
+  const mdLine0 = probeCommentrayLine0FromDoc(docPane);
+  const src0 = pickSourceLine0ForCommentrayScroll(links, mdLine0);
+  if (src0 !== null) return { k: "block", src0, winRatio };
+  if (paneUsesInternalYScroll(docPane)) {
+    return {
+      k: "mirrorI",
+      docTop: docPane.scrollTop,
+      docSH: docPane.scrollHeight,
+      docCH: docPane.clientHeight,
+    };
+  }
+  return { k: "mirrorW", ratio: winRatio };
+}
+
+function buildCodeToDocFlipPlanBlockAware(
+  codePane: HTMLElement,
+  _docPane: HTMLElement,
+  getLinks: () => BlockScrollLink[],
+): CodeToDocFlipPlan {
+  const winRatio = windowScrollRatio();
+  const links = getLinks();
+  const line1 = probeCodeLine1FromViewport(codePane);
+  const mdLine0 = pickCommentrayLineForSourceScroll(links, line1);
+  if (mdLine0 === null) {
+    if (paneUsesInternalYScroll(codePane)) {
+      return {
+        k: "mirrorI",
+        codeTop: codePane.scrollTop,
+        codeSH: codePane.scrollHeight,
+        codeCH: codePane.clientHeight,
+      };
+    }
+    return { k: "mirrorW", ratio: winRatio };
+  }
+  return { k: "block", mdLine0, winRatio };
+}
+
+function buildDocToCodeFlipPlanProportional(docPane: HTMLElement): DocToCodeFlipPlan {
+  if (paneUsesInternalYScroll(docPane)) {
+    return {
+      k: "mirrorI",
+      docTop: docPane.scrollTop,
+      docSH: docPane.scrollHeight,
+      docCH: docPane.clientHeight,
+    };
+  }
+  return { k: "mirrorW", ratio: windowScrollRatio() };
+}
+
+function buildCodeToDocFlipPlanProportional(codePane: HTMLElement): CodeToDocFlipPlan {
+  if (paneUsesInternalYScroll(codePane)) {
+    return {
+      k: "mirrorI",
+      codeTop: codePane.scrollTop,
+      codeSH: codePane.scrollHeight,
+      codeCH: codePane.clientHeight,
+    };
+  }
+  return { k: "mirrorW", ratio: windowScrollRatio() };
+}
+
 function escapeHtmlText(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -741,10 +944,41 @@ function parseScrollBlockLinksFromShell(b64: string): BlockScrollLink[] {
   }
 }
 
+function rootScrollNearDocumentEnd(edgePx = 56): boolean {
+  const root = rootScrollingElement();
+  const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
+  return maxY > 0 && root.scrollTop >= maxY - edgePx;
+}
+
 function probeCodeLine1FromViewport(codePane: HTMLElement): number {
+  const rows = codePane.querySelectorAll<HTMLElement>('[id^="code-line-"]');
+  if (rows.length === 0) return 1;
+
+  if (!paneUsesInternalYScroll(codePane)) {
+    if (rootScrollNearDocumentEnd()) {
+      const last = rows[rows.length - 1];
+      const m = /^code-line-(\d+)$/.exec(last.id);
+      if (m) return Number(m[1]) + 1;
+      return rows.length;
+    }
+    const sr = codePane.getBoundingClientRect();
+    const vh = globalThis.innerHeight;
+    const clipT = Math.max(0, sr.top);
+    const clipB = Math.min(vh, sr.bottom);
+    const y = clipT + Math.max(2, Math.min(40, (clipB - clipT) * 0.15));
+    for (const el of rows) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom > y - 1e-3) {
+        const m = /^code-line-(\d+)$/.exec(el.id);
+        if (m) return Number(m[1]) + 1;
+        return 1;
+      }
+    }
+    return rows.length;
+  }
+
   const sr = codePane.getBoundingClientRect();
   const y = sr.top + codePane.clientTop + 2;
-  const rows = codePane.querySelectorAll<HTMLElement>('[id^="code-line-"]');
   for (const el of rows) {
     const r = el.getBoundingClientRect();
     if (r.bottom > y - 1e-3) {
@@ -753,13 +987,36 @@ function probeCodeLine1FromViewport(codePane: HTMLElement): number {
       return 1;
     }
   }
-  return rows.length > 0 ? rows.length : 1;
+  return rows.length;
 }
 
 function probeCommentrayLine0FromDoc(docPane: HTMLElement): number {
+  const anchors = docPane.querySelectorAll<HTMLElement>(".commentray-block-anchor");
+  if (anchors.length === 0) return 0;
+
+  if (!paneUsesInternalYScroll(docPane)) {
+    if (rootScrollNearDocumentEnd()) {
+      const last = anchors[anchors.length - 1];
+      const lineAttr = last.getAttribute("data-commentray-line");
+      return lineAttr !== null && lineAttr !== "" ? Number(lineAttr) : 0;
+    }
+    const dr = docPane.getBoundingClientRect();
+    const vh = globalThis.innerHeight;
+    const clipT = Math.max(0, dr.top);
+    const clipB = Math.min(vh, dr.bottom);
+    const y = clipT + Math.max(2, Math.min(40, (clipB - clipT) * 0.15));
+    let best = 0;
+    for (const a of anchors) {
+      const lineAttr = a.getAttribute("data-commentray-line");
+      if (lineAttr === null || lineAttr === "") continue;
+      if (a.getBoundingClientRect().top <= y + 1 + 1e-3) best = Number(lineAttr);
+      else break;
+    }
+    return best;
+  }
+
   const dr = docPane.getBoundingClientRect();
   const y = dr.top + docPane.clientTop + 2;
-  const anchors = docPane.querySelectorAll<HTMLElement>(".commentray-block-anchor");
   let best = 0;
   for (const a of anchors) {
     const lineAttr = a.getAttribute("data-commentray-line");
@@ -833,114 +1090,116 @@ function wireBidirectionalScroll(
   );
 }
 
+/** One-shot runners used when the mobile single-pane flip reveals the partner pane. */
+type DualPaneScrollSyncRunners = {
+  /** Apply code scroll position to the commentary scroll element. */
+  syncFromCodeToDoc: () => void;
+  /** Apply commentary scroll position to the code pane. */
+  syncFromDocToCode: () => void;
+  /**
+   * Narrow single-pane flip: the outgoing pane must still be visible for viewport probes; the
+   * incoming pane must be visible for geometry-based alignment — so capture first, flip
+   * `data-dual-mobile-pane`, then {@link finishMobileFlipToCode} on the next frame.
+   */
+  prepareMobileFlipToCode: () => void;
+  finishMobileFlipToCode: () => void;
+  prepareMobileFlipToDoc: () => void;
+  finishMobileFlipToDoc: () => void;
+};
+
 /** Index-backed scroll sync when `data-scroll-block-links-b64` is present; else see proportional fallback. */
 function wireBlockAwareScrollSync(
   codePane: HTMLElement,
   docPane: HTMLElement,
   getLinks: () => BlockScrollLink[],
-): void {
-  wireBidirectionalScroll(
-    codePane,
-    docPane,
-    () => {
-      const links = getLinks();
-      const line1 = probeCodeLine1FromViewport(codePane);
-      const mdLine0 = pickCommentrayLineForSourceScroll(links, line1);
-      if (mdLine0 === null) {
-        applyScrollTopClamped(
-          docPane,
-          mirroredScrollTop(
-            codePane.scrollTop,
-            codePane.scrollHeight,
-            codePane.clientHeight,
-            docPane.scrollHeight,
-            docPane.clientHeight,
-          ),
-        );
-      } else {
-        const anchor = docPane.querySelector(`[data-commentray-line="${String(mdLine0)}"]`);
-        if (anchor instanceof HTMLElement) {
-          applyScrollTopClamped(docPane, Math.round(scrollTopToAlignChildTop(docPane, anchor, 2)));
-        } else {
-          applyScrollTopClamped(
-            docPane,
-            mirroredScrollTop(
-              codePane.scrollTop,
-              codePane.scrollHeight,
-              codePane.clientHeight,
-              docPane.scrollHeight,
-              docPane.clientHeight,
-            ),
-          );
-        }
-      }
-    },
-    () => {
-      const links = getLinks();
-      const mdLine0 = probeCommentrayLine0FromDoc(docPane);
-      const src0 = pickSourceLine0ForCommentrayScroll(links, mdLine0);
-      if (src0 === null) {
-        applyScrollTopClamped(
-          codePane,
-          mirroredScrollTop(
-            docPane.scrollTop,
-            docPane.scrollHeight,
-            docPane.clientHeight,
-            codePane.scrollHeight,
-            codePane.clientHeight,
-          ),
-        );
-      } else {
-        const el = codePane.querySelector(`#code-line-${String(src0)}`);
-        if (el) {
-          applyScrollTopClamped(codePane, Math.round(scrollTopToAlignChildTop(codePane, el, 2)));
-        } else {
-          applyScrollTopClamped(
-            codePane,
-            mirroredScrollTop(
-              docPane.scrollTop,
-              docPane.scrollHeight,
-              docPane.clientHeight,
-              codePane.scrollHeight,
-              codePane.clientHeight,
-            ),
-          );
-        }
-      }
-    },
-  );
+): DualPaneScrollSyncRunners {
+  let pendingDocToCode: DocToCodeFlipPlan | null = null;
+  let pendingCodeToDoc: CodeToDocFlipPlan | null = null;
+
+  const syncFromCodeToDoc = (): void => {
+    applyCodeToDocFlipPlanImpl(
+      codePane,
+      docPane,
+      buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks),
+    );
+  };
+  const syncFromDocToCode = (): void => {
+    applyDocToCodeFlipPlanImpl(
+      codePane,
+      docPane,
+      buildDocToCodeFlipPlanBlockAware(docPane, getLinks),
+    );
+  };
+  const prepareMobileFlipToCode = (): void => {
+    pendingDocToCode = buildDocToCodeFlipPlanBlockAware(docPane, getLinks);
+  };
+  const finishMobileFlipToCode = (): void => {
+    if (!pendingDocToCode) return;
+    const p = pendingDocToCode;
+    pendingDocToCode = null;
+    applyDocToCodeFlipPlanImpl(codePane, docPane, p);
+  };
+  const prepareMobileFlipToDoc = (): void => {
+    pendingCodeToDoc = buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks);
+  };
+  const finishMobileFlipToDoc = (): void => {
+    if (!pendingCodeToDoc) return;
+    const p = pendingCodeToDoc;
+    pendingCodeToDoc = null;
+    applyCodeToDocFlipPlanImpl(codePane, docPane, p);
+  };
+  wireBidirectionalScroll(codePane, docPane, syncFromCodeToDoc, syncFromDocToCode);
+  return {
+    syncFromCodeToDoc,
+    syncFromDocToCode,
+    prepareMobileFlipToCode,
+    finishMobileFlipToCode,
+    prepareMobileFlipToDoc,
+    finishMobileFlipToDoc,
+  };
 }
 
 /** Proportional scroll sync when there is no index-backed block map (GitHub Pages default). */
-function wireProportionalScrollSync(codePane: HTMLElement, docPane: HTMLElement): void {
-  wireBidirectionalScroll(
-    codePane,
-    docPane,
-    () => {
-      applyScrollTopClamped(
-        docPane,
-        mirroredScrollTop(
-          codePane.scrollTop,
-          codePane.scrollHeight,
-          codePane.clientHeight,
-          docPane.scrollHeight,
-          docPane.clientHeight,
-        ),
-      );
-    },
-    () => {
-      applyScrollTopClamped(
-        codePane,
-        mirroredScrollTop(
-          docPane.scrollTop,
-          docPane.scrollHeight,
-          docPane.clientHeight,
-          codePane.scrollHeight,
-          codePane.clientHeight,
-        ),
-      );
-    },
-  );
+function wireProportionalScrollSync(
+  codePane: HTMLElement,
+  docPane: HTMLElement,
+): DualPaneScrollSyncRunners {
+  let pendingDocToCode: DocToCodeFlipPlan | null = null;
+  let pendingCodeToDoc: CodeToDocFlipPlan | null = null;
+
+  const syncFromCodeToDoc = (): void => {
+    applyCodeToDocFlipPlanImpl(codePane, docPane, buildCodeToDocFlipPlanProportional(codePane));
+  };
+  const syncFromDocToCode = (): void => {
+    applyDocToCodeFlipPlanImpl(codePane, docPane, buildDocToCodeFlipPlanProportional(docPane));
+  };
+  const prepareMobileFlipToCode = (): void => {
+    pendingDocToCode = buildDocToCodeFlipPlanProportional(docPane);
+  };
+  const finishMobileFlipToCode = (): void => {
+    if (!pendingDocToCode) return;
+    const p = pendingDocToCode;
+    pendingDocToCode = null;
+    applyDocToCodeFlipPlanImpl(codePane, docPane, p);
+  };
+  const prepareMobileFlipToDoc = (): void => {
+    pendingCodeToDoc = buildCodeToDocFlipPlanProportional(codePane);
+  };
+  const finishMobileFlipToDoc = (): void => {
+    if (!pendingCodeToDoc) return;
+    const p = pendingCodeToDoc;
+    pendingCodeToDoc = null;
+    applyCodeToDocFlipPlanImpl(codePane, docPane, p);
+  };
+  wireBidirectionalScroll(codePane, docPane, syncFromCodeToDoc, syncFromDocToCode);
+  return {
+    syncFromCodeToDoc,
+    syncFromDocToCode,
+    prepareMobileFlipToCode,
+    finishMobileFlipToCode,
+    prepareMobileFlipToDoc,
+    finishMobileFlipToDoc,
+  };
 }
 
 function centerYInViewport(el: Element): number {
@@ -1518,7 +1777,44 @@ function scheduleMermaidWhenDualDocPaneVisible(shell: HTMLElement, mq: MediaQuer
   });
 }
 
-function wireDualMobilePaneFlip(shell: HTMLElement, flipBtn: HTMLButtonElement): void {
+function wireDualMobilePaneFlipScrollAffordance(
+  primaryFlip: HTMLButtonElement,
+  scrollFlip: HTMLButtonElement,
+  mq: MediaQueryList,
+): void {
+  const hideScroll = (): void => {
+    scrollFlip.hidden = true;
+    scrollFlip.classList.remove("is-visible");
+  };
+  const showScroll = (): void => {
+    scrollFlip.hidden = false;
+    scrollFlip.classList.add("is-visible");
+  };
+  /** Prefer geometry over IntersectionObserver: a sliver “intersecting” the viewport is still unusable. */
+  const tick = (): void => {
+    if (!mq.matches) {
+      hideScroll();
+      return;
+    }
+    const r = primaryFlip.getBoundingClientRect();
+    const vh = globalThis.innerHeight;
+    const margin = 10;
+    const offScreen = r.bottom < margin || r.top > vh - margin;
+    if (offScreen) showScroll();
+    else hideScroll();
+  };
+  globalThis.addEventListener("scroll", tick, { passive: true });
+  globalThis.addEventListener("resize", tick, { passive: true });
+  mq.addEventListener("change", tick);
+  globalThis.requestAnimationFrame(tick);
+}
+
+function wireDualMobilePaneFlip(
+  shell: HTMLElement,
+  flipBtn: HTMLButtonElement,
+  scrollRunners: DualPaneScrollSyncRunners,
+  flipScrollBtn: HTMLButtonElement | null,
+): void {
   const mq = globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ);
   function readStoredPane(): "code" | "doc" {
     return normalizedDualMobilePane(readWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE));
@@ -1530,17 +1826,36 @@ function wireDualMobilePaneFlip(shell: HTMLElement, flipBtn: HTMLButtonElement):
       shell.removeAttribute("data-dual-mobile-pane");
     }
   }
-  flipBtn.addEventListener("click", () => {
+  const runFlip = (): void => {
     if (!mq.matches) return;
     const cur = normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane"));
     const next = cur === "code" ? "doc" : "code";
+    if (next === "code") {
+      scrollRunners.prepareMobileFlipToCode();
+    } else {
+      scrollRunners.prepareMobileFlipToDoc();
+    }
     shell.setAttribute("data-dual-mobile-pane", next);
     writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, next);
+    globalThis.requestAnimationFrame(() => {
+      globalThis.requestAnimationFrame(() => {
+        if (next === "code") {
+          scrollRunners.finishMobileFlipToCode();
+        } else {
+          scrollRunners.finishMobileFlipToDoc();
+        }
+      });
+    });
     // Only here (not on every viewport apply): avoids redundant Mermaid passes on load/resize for the default commentary-first shell.
     if (next === "doc") {
       scheduleMermaidWhenDualDocPaneVisible(shell, mq);
     }
-  });
+  };
+  flipBtn.addEventListener("click", runFlip);
+  if (flipScrollBtn) {
+    flipScrollBtn.addEventListener("click", runFlip);
+    wireDualMobilePaneFlipScrollAffordance(flipBtn, flipScrollBtn, mq);
+  }
   mq.addEventListener("change", applyForViewport);
   applyForViewport();
 }
@@ -1758,7 +2073,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
   searchInput: HTMLInputElement;
   searchResults: HTMLElement;
   requestBlockRayRedraw?: () => void;
-}): void {
+}): DualPaneScrollSyncRunners {
   const {
     codePane,
     docScrollEl,
@@ -1773,7 +2088,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
     requestBlockRayRedraw,
   } = args;
   if (multiPayload) {
-    wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinksRef.current);
+    const runners = wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinksRef.current);
     const angleSel = document.getElementById("angle-select") as HTMLSelectElement | null;
     if (angleSel && docBody) {
       angleSel.addEventListener("change", () => {
@@ -1824,13 +2139,12 @@ function wireDualPaneMultiAngleAndScroll(args: {
         });
       });
     }
-    return;
+    return runners;
   }
   if (scrollLinksRef.current.length > 0) {
-    wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinksRef.current);
-    return;
+    return wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinksRef.current);
   }
-  wireProportionalScrollSync(codePane, docScrollEl);
+  return wireProportionalScrollSync(codePane, docScrollEl);
 }
 
 function wireDualPaneCommentrayLocationHash(
@@ -1980,11 +2294,6 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
   );
   wireSplitter(STORAGE_SPLIT_PCT, shell, codePane, gutter, pct);
 
-  const flipBtn = document.getElementById("mobile-pane-flip");
-  if (flipBtn instanceof HTMLButtonElement) {
-    wireDualMobilePaneFlip(shell, flipBtn);
-  }
-
   const multiScript = document.getElementById("commentray-multi-angle-b64");
   const multiPayload = parseMultiAnglePayload(multiScript);
   const shouldWireBlockRays = multiPayload !== null || bundle.scrollLinksRef.current.length > 0;
@@ -1998,7 +2307,7 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
       })
     : undefined;
   blockRayRedraw.request = requestBlockRayRedraw;
-  wireDualPaneMultiAngleAndScroll({
+  const scrollRunners = wireDualPaneMultiAngleAndScroll({
     codePane,
     docScrollEl,
     docBody,
@@ -2011,6 +2320,17 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     searchResults,
     requestBlockRayRedraw,
   });
+
+  const flipBtn = document.getElementById("mobile-pane-flip");
+  const flipScrollBtn = document.getElementById("mobile-pane-flip-scroll");
+  if (flipBtn instanceof HTMLButtonElement) {
+    wireDualMobilePaneFlip(
+      shell,
+      flipBtn,
+      scrollRunners,
+      flipScrollBtn instanceof HTMLButtonElement ? flipScrollBtn : null,
+    );
+  }
 
   wireDualPaneCommentrayLocationHash(docScrollEl, () => bundle.mutable.mdLines.length);
 }

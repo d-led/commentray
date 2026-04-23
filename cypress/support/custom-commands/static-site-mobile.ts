@@ -35,5 +35,12 @@ Cypress.Commands.add("MobileSinglePaneLayoutShouldShowSourceColumnOnly", () => {
 });
 
 Cypress.Commands.add("TapMobilePaneFlipControl", () => {
-  cy.get(shellA11y.mobilePaneFlip).click();
+  cy.get("body").then(($body) => {
+    const alt = $body.find(shellA11y.mobilePaneFlipScroll)[0];
+    if (alt instanceof HTMLButtonElement && alt.classList.contains("is-visible")) {
+      cy.wrap(alt).click();
+      return;
+    }
+    cy.get(shellA11y.mobilePaneFlip).click();
+  });
 });

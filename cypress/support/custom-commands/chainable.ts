@@ -94,6 +94,8 @@ declare global {
       MobileSinglePaneLayoutShouldShowCommentaryColumnOnly(): Chainable<void>;
       MobileSinglePaneLayoutShouldShowSourceColumnOnly(): Chainable<void>;
       TapMobilePaneFlipControl(): Chainable<void>;
+
+      PrepareE2eMobileFlipEndFixtureAtMobileViewport(): Chainable<void>;
     }
   }
 }

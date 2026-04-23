@@ -52,6 +52,22 @@ describe("The Commentray GitHub Pages static build on a narrow viewport", () => 
     cy.DocPaneMermaidShouldShowDiagramOrMarkup();
   });
 
+  it("nudges the source pane scroll to match commentary depth when flipping after scrolling down", () => {
+    cy.MobileStaticSiteCodeBrowserChromeShouldBeReady();
+    cy.MobileSinglePaneLayoutShouldShowCommentaryColumnOnly();
+    cy.window().then((win) => {
+      const root = win.document.scrollingElement ?? win.document.documentElement;
+      const maxScroll = Math.max(0, root.scrollHeight - root.clientHeight);
+      expect(maxScroll, "home page should be taller than the mobile viewport").to.be.gt(80);
+      const target = Math.min(maxScroll, Math.max(120, Math.floor(maxScroll * 0.45)));
+      root.scrollTop = target;
+      expect(root.scrollTop, "commentary view scroll depth").to.be.gt(40);
+    });
+    cy.TapMobilePaneFlipControl();
+    cy.MobileSinglePaneLayoutShouldShowSourceColumnOnly();
+    cy.window().its("scrollY").should("be.gt", 5);
+  });
+
   it("keeps rendered Mermaid SVG after flipping to source and back to commentary", () => {
     cy.MobileStaticSiteCodeBrowserChromeShouldBeReady();
     cy.MobileSinglePaneLayoutShouldShowCommentaryColumnOnly();
