@@ -24,7 +24,7 @@
     "@commentray/code-commentray-static": "0.0.8",
     "@commentray/core": "0.0.8",
     "@commentray/render": "0.0.8",
-    "chokidar": "^4.0.3",
+    "chokidar": "^5.0.0",
     "commander": "^14.0.3",
     "serve": "^14.2.6"
   },
