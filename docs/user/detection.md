@@ -35,7 +35,7 @@ Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. E
 ## Editor extension (`commentray-vscode`)
 
 - **When:** While editing in VS Code or Cursor.
-- **What:** Open paired commentray, **bidirectional scroll sync** (block-aware when **index.json** and Markdown markers align), **add block from selection**, workspace validation in an **output channel**.
+- **What:** Open paired commentray (from the active editor, or **Explorer** right-click on a file), **bidirectional scroll sync** when enabled in settings (block-aware when **index.json** and Markdown markers align), **add block from selection**, workspace validation in an **output channel**. Validate uses the workspace folder that contains the active file when possible (**multi-root** friendly).
 - **Exit:** N/A—this is interactive. It does **not** replace hooks or pipeline checks you add in CI for blocking bad commits.
 
 ## Known gaps (policy, not silent bugs)
