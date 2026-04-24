@@ -160,6 +160,21 @@ describe("Code browser page — document shell and chrome", () => {
     expect(html).toContain("<strong>bold</strong>");
   });
 
+  it("should include a generator meta tag when a generator label is provided", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      generatorLabel: "Commentray @commentray/render@9.9.9-test",
+    });
+    expect(html).toContain(
+      '<meta name="generator" content="Commentray @commentray/render@9.9.9-test" />',
+    );
+  });
+});
+
+describe("Code browser page — companion GFM tables in HTML shell", () => {
   it("given a GFM table in companion Markdown, should emit a semantic table and doc-pane table chrome in CSS", async () => {
     const md = ["| Goal | Command |", "| --- | --- |", "| Build | `npm run build` |"].join("\n");
     const html = await renderCodeBrowserHtml({
@@ -192,19 +207,6 @@ describe("Code browser page — document shell and chrome", () => {
     });
     expect(html).toMatch(/<table[\s\S]*<\/table>/);
     expect(html).toContain("extension:vscode-readme-screenshots:desktop");
-  });
-
-  it("should include a generator meta tag when a generator label is provided", async () => {
-    const html = await renderCodeBrowserHtml({
-      title: "Demo",
-      code: "x",
-      language: "ts",
-      commentrayMarkdown: "body",
-      generatorLabel: "Commentray @commentray/render@9.9.9-test",
-    });
-    expect(html).toContain(
-      '<meta name="generator" content="Commentray @commentray/render@9.9.9-test" />',
-    );
   });
 });
 
