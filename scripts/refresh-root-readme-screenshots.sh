@@ -2,18 +2,19 @@
 set -euo pipefail
 
 # Open VS Code / Cursor with the Commentray extension loaded from source
-# (Extension Development Host) on the small dogfood fixture—so maintainers
-# can capture real UI (paired panes, menus, keybindings) for commentray docs.
+# (Extension Development Host) on the **dogfood** fixture so maintainers can
+# capture real UI for the **top-level README** companion.
 #
-# There is no automated screenshot step: OS or editor tools vary too much for
-# a reliable headless pipeline. Save PNG/SVG/WebP next to the angle’s `.md`
-# (dogfood README main angle):
+# There is no automated screenshot step: save PNG/SVG/WebP under:
 #   .commentray/source/README.md/assets/
-# Reference from main.md as:  ./assets/your-file.png   (same ./… rules as VS Code)
+# Reference from main.md as:  ./assets/your-file.png  (see docs/spec/storage.md).
 #
-# Usage (repo root):
-#   bash scripts/open-vscode-for-commentray-screenshots.sh
+# Usage (repository root):
+#   bash scripts/refresh-root-readme-screenshots.sh
 #   npm run extension:commentray-screenshots
+#
+# For the VS Code **extension** README (monorepo root in EDH), use:
+#   bash scripts/refresh-vscode-readme-screenshots-manual.sh
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/pick-editor-cli.sh
@@ -25,8 +26,8 @@ ASSETS_DIR="$REPO_ROOT/.commentray/source/README.md/assets"
 
 mkdir -p "$ASSETS_DIR"
 
-echo "Commentray screenshot prep"
-echo "----------------------------"
+echo "Commentray screenshot prep (root README companion)"
+echo "---------------------------------------------------"
 echo "1. This window will launch your editor in Extension Development Host on:"
 echo "   $FIXTURE"
 echo "2. Run Commentray commands (e.g. open paired markdown), arrange the layout."

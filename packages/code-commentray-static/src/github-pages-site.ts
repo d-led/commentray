@@ -1,4 +1,4 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -11,6 +11,7 @@ import {
   resolvePathUnderRepoRoot,
 } from "@commentray/core";
 import {
+  COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT,
   type CodeBrowserMultiAngleBrowsing,
   type CommentrayNavSearchDocument,
   type CommentrayStaticAssetCopy,
@@ -247,6 +248,10 @@ async function emitGithubPagesSiteArtifacts(input: {
 }): Promise<CommentrayNavSearchDocument> {
   let { navDoc } = input;
   await mkdir(input.outDir, { recursive: true });
+  await rm(path.join(input.outDir, COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT), {
+    recursive: true,
+    force: true,
+  });
   if (Array.isArray(navDoc.documentedPairs) && navDoc.documentedPairs.length > 0) {
     navDoc = await writePerPairBrowseHtmlPages({
       repoRoot: input.repoRoot,

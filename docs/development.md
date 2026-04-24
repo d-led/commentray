@@ -171,6 +171,8 @@ output channel where appropriate (see below).
 Extension integration tests use **`@vscode/test-cli`** and
 `packages/vscode/.vscode-test.mjs`. By default they download **`stable`**.
 
+**Desktop README screenshots (automated):** `bash scripts/refresh-vscode-readme-screenshots-desktop.sh` (alias: `npm run extension:vscode-readme-screenshots:desktop`) launches that VS Code build with `--remote-debugging-port` and uses Playwright CDP (`scripts/capture-vscode-readme-screenshots-desktop.mjs`), writing several **`vscode-*.png`** files. Scenario sequence and how to extend it: **`.commentray/source/packages/vscode/README.md/main.md`** (Maintainer). Optional **`COMMENTRAY_VSCODE_VIEWPORT_WIDTH`** / **`COMMENTRAY_VSCODE_VIEWPORT_HEIGHT`** (defaults 1200×780) and **`COMMENTRAY_VSCODE_ZOOM_LEVEL`** (default 2). The temp profile hides the secondary sidebar for cleaner frames. **`bash scripts/commentray-screenshots-in-fresh-worktree.sh`** runs the same in a clean worktree. Requires `npx playwright install chromium` once. Respects **`VSCODE_TEST_VERSION`** like extension tests. **Manual:** `bash scripts/refresh-vscode-readme-screenshots-manual.sh`, **`bash scripts/refresh-root-readme-screenshots.sh`** for hub README assets.
+
 - **Local / one-off:** set **`VSCODE_TEST_VERSION`** to `stable`, `insiders`, or
   an exact version string (for example the same value as `engines.vscode`):
 

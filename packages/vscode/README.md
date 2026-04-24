@@ -4,6 +4,38 @@ Side-by-side authoring for [Commentray](https://github.com/d-led/commentray):
 out-of-file Markdown "commentary tracks" for any source file in your
 workspace.
 
+## Walk-through (desktop VS Code)
+
+Captured from Extension Development Host + dogfood. In the palette, use **`>`** then **`Commentray`** so you see **commands**, not file search hits.
+
+### Find Commentray commands
+
+![Command palette — Commentray](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-palette-commentray.png)
+
+### Open paired markdown beside the editor
+
+![Open paired markdown beside editor](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-open-paired-beside.png)
+
+### Open paired markdown (choose angle)
+
+![Open paired markdown (choose angle)](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-open-paired-choose-angle.png)
+
+### Add commentary block from selection
+
+![Add commentary block from selection](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-add-block-from-selection.png)
+
+### Add angle to project
+
+![Add angle to project](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-add-angle-to-project.png)
+
+### Open Markdown preview for paired file
+
+![Open Markdown preview for paired file](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-markdown-preview.png)
+
+### Validate workspace
+
+![Validate workspace + output](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-validate-workspace.png)
+
 ## Commands
 
 Palette entries use the **Commentray** category (search `Commentray` or the command name).
@@ -36,15 +68,13 @@ Palette entries use the **Commentray** category (search `Commentray` or the comm
 **Angles** — **Open paired markdown (choose angle)** and **Add angle to project…**
 use the same workspace-folder rule as validate when picking the repo root.
 
-## Screenshots for commentray docs
+## Screenshots for docs
 
-To capture the real extension UI for Markdown under **Angles** (for example `.commentray/source/README.md/assets/` next to `main.md`), run from the repo root:
+**Automated (desktop):** `bash scripts/refresh-vscode-readme-screenshots-desktop.sh` (or `npm run extension:vscode-readme-screenshots:desktop`) writes **`vscode-*.png`** under `.commentray/source/packages/vscode/README.md/assets/`. **Fresh worktree:** `bash scripts/commentray-screenshots-in-fresh-worktree.sh`. How scenarios are authored lives in **`.commentray/source/packages/vscode/README.md/main.md`** (Maintainer section).
 
-```bash
-npm run extension:commentray-screenshots
-```
+**Manual (extension README):** `bash scripts/refresh-vscode-readme-screenshots-manual.sh`.
 
-That opens an **Extension Development Host** on `packages/vscode/fixtures/dogfood`. Save images in a normal folder next to the angle’s `.md` (e.g. `./assets/`) and reference with **`./assets/file.png`** so VS Code preview and static HTML agree. There is no automated screenshot pipeline in CI—see [`docs/spec/storage.md`](https://github.com/d-led/commentray/blob/main/docs/spec/storage.md) § Images.
+**Manual (root README):** `bash scripts/refresh-root-readme-screenshots.sh` → save under `.commentray/source/README.md/assets/`. See [storage — images](https://github.com/d-led/commentray/blob/main/docs/spec/storage.md).
 
 ## Integration tests
 

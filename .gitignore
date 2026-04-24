@@ -259,6 +259,7 @@ _site/
 
 # Cypress / E2E CI artifacts
 test-results/
+playwright-report/
 cypress/videos/
 cypress/screenshots/
 

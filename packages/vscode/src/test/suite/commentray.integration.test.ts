@@ -8,7 +8,7 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
 
-const pairedMarkdownPath = ".commentray/source/sample.ts.md";
+const pairedMarkdownPath = ".commentray/source/src/sample.ts.md";
 
 async function resetGeneratedCommentrayStorage(workspaceRoot: vscode.Uri): Promise<void> {
   const commentrayDir = vscode.Uri.joinPath(workspaceRoot, ".commentray");
@@ -21,7 +21,7 @@ async function resetGeneratedCommentrayStorage(workspaceRoot: vscode.Uri): Promi
 
 async function openFixtureSourceFile(workspaceRoot: vscode.Uri): Promise<vscode.TextEditor> {
   const doc = await vscode.workspace.openTextDocument(
-    vscode.Uri.joinPath(workspaceRoot, "sample.ts"),
+    vscode.Uri.joinPath(workspaceRoot, "src", "sample.ts"),
   );
   return vscode.window.showTextDocument(doc);
 }
@@ -55,7 +55,7 @@ describe("Commentray in VS Code (integration)", () => {
 
     it("Given a primary file URI (as from Explorer), when the user runs open paired with that URI, then the paired Markdown is created the same way.", async () => {
       await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-      const sampleUri = vscode.Uri.joinPath(workspaceRoot, "sample.ts");
+      const sampleUri = vscode.Uri.joinPath(workspaceRoot, "src", "sample.ts");
       await vscode.commands.executeCommand("commentray.openSideBySide", sampleUri);
 
       const pairedUri = vscode.Uri.joinPath(workspaceRoot, ...pairedMarkdownPath.split("/"));

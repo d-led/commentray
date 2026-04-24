@@ -88,7 +88,7 @@ Local `a[href]` / `img[src]` in commentray Markdown are rewritten for static HTM
 
 Put files **next to the companion `.md`** (e.g. `./assets/diagram.svg`) so editor completions and static output match. Diagrams elsewhere: use **`https://…`**, not **`![](/docs/…)`** as a local image.
 
-Dogfood: [`assets/paired-editors.svg`](../../.commentray/source/README.md/assets/paired-editors.svg) beside [`main.md`](../../.commentray/source/README.md/main.md). Maintainer captures: **`npm run extension:commentray-screenshots`**, then save under **`./assets/`** next to that angle’s `.md`.
+Dogfood: [`assets/paired-editors.svg`](../../.commentray/source/README.md/assets/paired-editors.svg) beside [`main.md`](../../.commentray/source/README.md/main.md). Maintainer captures: **`bash scripts/refresh-root-readme-screenshots.sh`** (or `npm run extension:commentray-screenshots`), then save under **`./assets/`** next to that angle’s `.md`. VS Code extension README PNGs: **`bash scripts/refresh-vscode-readme-screenshots-desktop.sh`** and companion **`.commentray/source/packages/vscode/README.md/main.md`** (Maintainer).
 
 ## Metadata
 

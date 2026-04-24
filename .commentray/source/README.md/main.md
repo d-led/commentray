@@ -26,7 +26,7 @@ Keep images **in the same directory as this `.md`** (or a normal subfolder like 
 
 ![Schematic: paired panes (primary left, commentray right)](./assets/paired-editors.svg)
 
-**Real screenshots:** run **`npm run extension:commentray-screenshots`**, capture the UI, save files under **`./assets/`** here, then **`![](./assets/your.png)`** like any other Markdown project.
+**Real screenshots:** run **`bash scripts/refresh-root-readme-screenshots.sh`** (or `npm run extension:commentray-screenshots`), capture the UI, save files under **`./assets/`** here, then **`![](./assets/your.png)`** like any other Markdown project. For the VS Code extension README walk-through PNGs, see **`.commentray/source/packages/vscode/README.md/main.md`** → Maintainer.
 
 The **VS Code / Cursor** extension is for **authoring**: **Commentray: Open commentray beside source**, both editors visible, scroll source and let commentray track. After **Commentray: Add block from selection**, sync can **snap to the block** that owns the visible source lines when `index.json` and `<!-- commentray:block id=… -->` markers agree; otherwise you stay on proportional sync. Same storage model as the site; the extension is where editing stays pleasant.
 
