@@ -14,6 +14,8 @@ import {
 } from "@commentray/core";
 import chokidar from "chokidar";
 
+import { startLivereloadServer } from "./serve-livereload.js";
+
 export type ServeCliOptions = {
   port: number;
 };
@@ -36,11 +38,15 @@ export async function runServeStaticPages(
   const repoRoot = path.resolve(repoRootAbs);
   const serveMain = resolveServeMain();
   const siteRel = "_site";
+  const siteAbs = path.join(repoRoot, siteRel);
+  const livereload = await startLivereloadServer(opts.port + 1);
 
-  async function rebuild(): Promise<void> {
+  async function rebuild(notifyBrowser = false): Promise<void> {
     process.stderr.write("[commentray serve] rebuilding…\n");
     await buildGithubPagesStaticSite({ repoRoot });
+    await livereload?.injectIntoSite(siteAbs);
     process.stderr.write("[commentray serve] rebuild finished\n");
+    if (notifyBrowser) livereload?.notifyReload();
   }
 
   await rebuild();
@@ -83,7 +89,7 @@ export async function runServeStaticPages(
     if (debounce !== undefined) clearTimeout(debounce);
     debounce = setTimeout(() => {
       debounce = undefined;
-      void rebuild().catch((err: unknown) => {
+      void rebuild(true).catch((err: unknown) => {
         process.stderr.write(
           `[commentray serve] rebuild failed: ${err instanceof Error ? err.message : String(err)}\n`,
         );
@@ -127,6 +133,7 @@ export async function runServeStaticPages(
     exiting = true;
     void (async () => {
       void watcher.close();
+      await livereload?.close();
       await stopServeChildAsync();
       process.exit(0);
     })();
