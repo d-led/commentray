@@ -950,6 +950,36 @@ function rootScrollNearDocumentEnd(edgePx = 56): boolean {
   return maxY > 0 && root.scrollTop >= maxY - edgePx;
 }
 
+/** When the pane itself is the scrollport (dual desktop), mirror root “near end” behavior. */
+function paneScrollNearEnd(pane: HTMLElement, edgePx = 56): boolean {
+  const maxY = Math.max(0, pane.scrollHeight - pane.clientHeight);
+  return maxY > 0 && pane.scrollTop >= maxY - edgePx;
+}
+
+function readCommentrayLine0FromAnchor(el: HTMLElement): number | null {
+  const lineAttr = el.getAttribute("data-commentray-line");
+  if (lineAttr === null || lineAttr === "") return null;
+  return Number(lineAttr);
+}
+
+/** Greatest marker line whose anchor sits at or above viewport Y `y`. */
+function bestCommentrayAnchorLine0AtOrAboveY(anchors: NodeListOf<HTMLElement>, y: number): number {
+  let best = 0;
+  for (const a of anchors) {
+    const line0 = readCommentrayLine0FromAnchor(a);
+    if (line0 === null) continue;
+    if (a.getBoundingClientRect().top <= y + 1 + 1e-3) best = line0;
+    else break;
+  }
+  return best;
+}
+
+function lastCommentrayAnchorLine0(anchors: NodeListOf<HTMLElement>): number {
+  const last = anchors[anchors.length - 1];
+  if (!last) return 0;
+  return readCommentrayLine0FromAnchor(last) ?? 0;
+}
+
 function probeCodeLine1FromViewport(codePane: HTMLElement): number {
   const rows = codePane.querySelectorAll<HTMLElement>('[id^="code-line-"]');
   if (rows.length === 0) return 1;
@@ -977,6 +1007,13 @@ function probeCodeLine1FromViewport(codePane: HTMLElement): number {
     return rows.length;
   }
 
+  if (paneScrollNearEnd(codePane)) {
+    const last = rows[rows.length - 1];
+    const m = /^code-line-(\d+)$/.exec(last.id);
+    if (m) return Number(m[1]) + 1;
+    return rows.length;
+  }
+
   const sr = codePane.getBoundingClientRect();
   const y = sr.top + codePane.clientTop + 2;
   for (const el of rows) {
@@ -995,36 +1032,20 @@ function probeCommentrayLine0FromDoc(docPane: HTMLElement): number {
   if (anchors.length === 0) return 0;
 
   if (!paneUsesInternalYScroll(docPane)) {
-    if (rootScrollNearDocumentEnd()) {
-      const last = anchors[anchors.length - 1];
-      const lineAttr = last.getAttribute("data-commentray-line");
-      return lineAttr !== null && lineAttr !== "" ? Number(lineAttr) : 0;
-    }
+    if (rootScrollNearDocumentEnd()) return lastCommentrayAnchorLine0(anchors);
     const dr = docPane.getBoundingClientRect();
     const vh = globalThis.innerHeight;
     const clipT = Math.max(0, dr.top);
     const clipB = Math.min(vh, dr.bottom);
     const y = clipT + Math.max(2, Math.min(40, (clipB - clipT) * 0.15));
-    let best = 0;
-    for (const a of anchors) {
-      const lineAttr = a.getAttribute("data-commentray-line");
-      if (lineAttr === null || lineAttr === "") continue;
-      if (a.getBoundingClientRect().top <= y + 1 + 1e-3) best = Number(lineAttr);
-      else break;
-    }
-    return best;
+    return bestCommentrayAnchorLine0AtOrAboveY(anchors, y);
   }
+
+  if (paneScrollNearEnd(docPane)) return lastCommentrayAnchorLine0(anchors);
 
   const dr = docPane.getBoundingClientRect();
   const y = dr.top + docPane.clientTop + 2;
-  let best = 0;
-  for (const a of anchors) {
-    const lineAttr = a.getAttribute("data-commentray-line");
-    if (lineAttr === null || lineAttr === "") continue;
-    if (a.getBoundingClientRect().top <= y + 1 + 1e-3) best = Number(lineAttr);
-    else break;
-  }
-  return best;
+  return bestCommentrayAnchorLine0AtOrAboveY(anchors, y);
 }
 
 type SyncPane = "none" | "code" | "doc";
