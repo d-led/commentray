@@ -226,6 +226,56 @@ function isClosingFenceLine(
   return info.rest.trim() === "";
 }
 
+/**
+ * GFM delimiter row: cells between pipes contain only colons, hyphens, and spaces; each cell has
+ * at least three hyphens (same rule remark-gfm uses). Used so we do not append raw HTML to table
+ * lines — trailing `<span>` breaks GFM table recognition in the Markdown parser.
+ */
+function isGfmTableDelimiterRow(line: string): boolean {
+  const t = trimEndSpacesTabs(line);
+  if (!t.includes("|")) return false;
+  const cells = t
+    .split("|")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (cells.length === 0) return false;
+  for (const cell of cells) {
+    if (!/^:?-{3,}:?$/.test(cell)) return false;
+  }
+  return true;
+}
+
+/**
+ * 0-based line indices that must not receive a trailing line-anchor span: they belong to a GFM
+ * table (header + delimiter + following rows until a blank line). Scans full `lines` so indices
+ * align with {@link injectCommentrayDocAnchors}; lines inside fenced code are harmless to mark
+ * because that pass never appends anchors there anyway.
+ */
+function gfmTableLineIndicesWithoutAnchors(lines: string[]): Set<number> {
+  const skip = new Set<number>();
+  const n = lines.length;
+  for (let i = 0; i < n - 1; i++) {
+    const header = lines[i] ?? "";
+    const delim = lines[i + 1] ?? "";
+    if (header === "") continue;
+    if (!trimEndSpacesTabs(header).includes("|")) continue;
+    if (isSetextUnderlineLine(header) || isThematicBreakLine(header)) continue;
+    if (!isGfmTableDelimiterRow(delim)) continue;
+    skip.add(i);
+    skip.add(i + 1);
+    let j = i + 2;
+    while (j < n) {
+      const row = lines[j] ?? "";
+      if (row === "") break;
+      if (isSetextUnderlineLine(row) || isThematicBreakLine(row)) break;
+      if (isGfmTableDelimiterRow(row)) break;
+      skip.add(j);
+      j++;
+    }
+  }
+  return skip;
+}
+
 function lineAnchorHtml(mdLine0: number): string {
   const mdLine = String(mdLine0);
   return `<span class="commentray-line-anchor" data-commentray-md-line="${mdLine}" id="commentray-md-line-${mdLine}" aria-hidden="true"></span>`;
@@ -244,11 +294,14 @@ function appendMdLineAnchorWhenAllowed(line: string, mdLine0: number): string {
  *
  * Anchors are appended to the line when safe. A **leading** `<span>` breaks CommonMark block
  * recognition (`#` headings, lists, thematic breaks, fences). Fenced code lines must not get a
- * trailing anchor either (would corrupt fence delimiters or appear inside code).
+ * trailing anchor either (would corrupt fence delimiters or appear inside code). **GFM pipe
+ * tables** must not get a trailing anchor: extra HTML after the row breaks `remark-gfm` table
+ * detection, so tables would render as plain text.
  */
 function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[]): string {
   const byId = links ? new Map(links.map((l) => [l.id, l])) : undefined;
   const lines = markdown.split("\n");
+  const skipLineAnchor = gfmTableLineIndicesWithoutAnchors(lines);
   let fence: FenceState | null = null;
   const out: string[] = [];
 
@@ -287,6 +340,11 @@ function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[])
         `<div id="commentray-block-${escapeHtml(id)}" class="commentray-block-anchor" aria-hidden="true"${attrs}></div>`,
       );
       out.push("");
+      continue;
+    }
+
+    if (skipLineAnchor.has(i)) {
+      out.push(line);
       continue;
     }
 
@@ -1355,11 +1413,38 @@ const CODE_BROWSER_STYLES = `
       .doc-pane-body {
         flex: 1 1 auto; min-height: 0; overflow: auto;
       }
-      /** Wide GFM tables: intrinsic width so the doc pane scrolls sideways instead of squeezing columns. */
-      .pane--doc .doc-pane-body :where(table) {
+      /**
+       * GFM tables in rendered Markdown (doc pane, stretch preamble, per-block doc cells).
+       * Intrinsic width so the pane scrolls sideways instead of squeezing columns; borders
+       * and padding match familiar GitHub-style readability.
+       */
+      .pane--doc .doc-pane-body :where(table),
+      .shell--stretch-rows .stretch-preamble :where(table),
+      .block-stretch td.stretch-doc .stretch-doc-inner :where(table) {
         width: max-content;
         max-width: none;
         border-collapse: collapse;
+        margin: 0.85em 0;
+        font-size: inherit;
+        line-height: inherit;
+      }
+      .pane--doc .doc-pane-body :where(th, td),
+      .shell--stretch-rows .stretch-preamble :where(th, td),
+      .block-stretch td.stretch-doc .stretch-doc-inner :where(th, td) {
+        border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+        padding: 8px 12px;
+        vertical-align: top;
+      }
+      .pane--doc .doc-pane-body :where(thead th),
+      .shell--stretch-rows .stretch-preamble :where(thead th),
+      .block-stretch td.stretch-doc .stretch-doc-inner :where(thead th) {
+        font-weight: 600;
+        background: color-mix(in oklab, CanvasText 7%, Canvas);
+      }
+      .pane--doc .doc-pane-body tbody tr:nth-child(even) :where(td),
+      .shell--stretch-rows .stretch-preamble tbody tr:nth-child(even) :where(td),
+      .block-stretch td.stretch-doc .stretch-doc-inner tbody tr:nth-child(even) :where(td) {
+        background: color-mix(in oklab, CanvasText 3.5%, Canvas);
       }
       .pane--doc .doc-pane-body .commentray-mermaid {
         overflow-x: auto;
@@ -1723,11 +1808,6 @@ const CODE_BROWSER_STYLES = `
         max-width: 100%;
       }
       .shell--stretch-rows .stretch-preamble img { max-width: 100%; height: auto; }
-      .shell--stretch-rows .stretch-preamble :where(table) {
-        width: max-content;
-        max-width: none;
-        border-collapse: collapse;
-      }
       .block-stretch {
         width: 100%;
         border-collapse: collapse;
@@ -1752,11 +1832,6 @@ const CODE_BROWSER_STYLES = `
         overflow-x: auto;
       }
       .block-stretch td.stretch-doc .stretch-doc-inner img { max-width: 100%; height: auto; }
-      .block-stretch td.stretch-doc .stretch-doc-inner :where(table) {
-        width: max-content;
-        max-width: none;
-        border-collapse: collapse;
-      }
       .block-stretch td.stretch-doc .stretch-doc-inner .commentray-mermaid {
         overflow-x: auto;
         max-width: 100%;

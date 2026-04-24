@@ -61,4 +61,26 @@ pre {
   max-width: 100%;
   height: auto;
 }
+
+.commentray :where(table) {
+  width: max-content;
+  max-width: none;
+  border-collapse: collapse;
+  margin: 0.85em 0;
+}
+
+.commentray :where(th, td) {
+  border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+  padding: 8px 12px;
+  vertical-align: top;
+}
+
+.commentray :where(thead th) {
+  font-weight: 600;
+  background: color-mix(in oklab, CanvasText 7%, Canvas);
+}
+
+.commentray tbody tr:nth-child(even) :where(td) {
+  background: color-mix(in oklab, CanvasText 3.5%, Canvas);
+}
 `;

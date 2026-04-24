@@ -160,6 +160,40 @@ describe("Code browser page — document shell and chrome", () => {
     expect(html).toContain("<strong>bold</strong>");
   });
 
+  it("given a GFM table in companion Markdown, should emit a semantic table and doc-pane table chrome in CSS", async () => {
+    const md = ["| Goal | Command |", "| --- | --- |", "| Build | `npm run build` |"].join("\n");
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "//",
+      language: "ts",
+      commentrayMarkdown: md,
+    });
+    expect(html).toMatch(/<table[\s\S]*<\/table>/);
+    expect(html).toContain("<thead");
+    expect(html).toContain("<tbody");
+    expect(html).toContain("npm run build");
+    expect(html).toContain(".pane--doc .doc-pane-body :where(thead th)");
+    expect(html).toContain("tbody tr:nth-child(even)");
+    /** Per-line anchors must not be injected into table rows (would break remark-gfm table parse). */
+    expect(html).not.toMatch(/\| --- \| --- \|<span class="commentray-line-anchor"/);
+  });
+
+  it("given a wide three-column GFM table like the VS Code README, should still parse as HTML table", async () => {
+    const md = [
+      "| Goal                                                                                  | Bash (preferred)                                            | npm alias                                                   |",
+      "| ------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |",
+      "| Regenerate **desktop** `vscode-*.png` here                                            | `bash scripts/a.sh`                                         | `npm run extension:vscode-readme-screenshots:desktop`       |",
+    ].join("\n");
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "//",
+      language: "ts",
+      commentrayMarkdown: md,
+    });
+    expect(html).toMatch(/<table[\s\S]*<\/table>/);
+    expect(html).toContain("extension:vscode-readme-screenshots:desktop");
+  });
+
   it("should include a generator meta tag when a generator label is provided", async () => {
     const html = await renderCodeBrowserHtml({
       title: "Demo",
