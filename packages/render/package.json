@@ -21,7 +21,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node esbuild-code-browser-client.mjs",
+    "build": "tsc -p tsconfig.build.json && node esbuild-code-browser-client.mjs && node copy-static-assets.mjs",
     "clean": "rm -rf dist"
   },
   "dependencies": {

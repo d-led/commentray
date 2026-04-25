@@ -665,6 +665,22 @@ function loadCodeBrowserClientBundle(): string {
   );
 }
 
+/** Intro-tour specific stylesheet; kept in a dedicated CSS file for easier tweaking. */
+function loadCodeBrowserIntroStyles(): string {
+  const packagesDir = findMonorepoPackagesDir(monorepoLayoutStartDir(import.meta.url));
+  const renderDistDir = join(packagesDir, "render", "dist");
+  const inDist = join(renderDistDir, "code-browser-intro.css");
+  const fromSrc = join(packagesDir, "render", "src", "code-browser-intro.css");
+  for (const p of [inDist, fromSrc]) {
+    if (existsSync(p)) {
+      return readFileSync(p, "utf8");
+    }
+  }
+  throw new Error(
+    "Missing code-browser-intro.css. Ensure the render package includes intro tour styles.",
+  );
+}
+
 /**
  * Compact theme control: primary click opens a menu (readme.io–style), secondary click cycles
  * system → light → dark. Paired with {@link ./code-browser-color-theme.ts} and the client bundle.
@@ -688,6 +704,8 @@ const TOOLBAR_SHARE_LINK_HTML = `          <button type="button" id="commentray-
 
 const TOOLBAR_HELP_TOUR_HTML = `          <button type="button" id="commentray-help-tour" class="toolbar-theme__trigger toolbar-help-tour-btn" aria-label="Restart onboarding walkthrough" title="Restart onboarding walkthrough">${TOOLBAR_ICON_HELP_TOUR_SVG}</button>
 `;
+
+const CODE_BROWSER_INTRO_STYLES = loadCodeBrowserIntroStyles();
 
 const CODE_BROWSER_STYLES = `
       :root {
@@ -1226,85 +1244,7 @@ const CODE_BROWSER_STYLES = `
       .toolbar-icon-btn--source-markdown {
         display: inline-flex;
       }
-      .commentray-wide-intro__target {
-        outline: 2px solid color-mix(in oklab, #d6b300 62%, CanvasText);
-        outline-offset: 3px;
-        border-radius: 6px;
-      }
-      #commentray-wide-intro {
-        --commentray-intro-note-bg: #fff4b3;
-        --commentray-intro-note-border: #d4c071;
-        --commentray-intro-note-text: #2f2a11;
-        --commentray-intro-note-btn-bg: #fff8d7;
-        --commentray-intro-note-btn-border: #ccb86a;
-        position: fixed;
-        z-index: 90;
-        width: min(340px, calc(100vw - 16px));
-        border-radius: 12px;
-        border: 1px solid var(--commentray-intro-note-border);
-        background: var(--commentray-intro-note-bg);
-        color: var(--commentray-intro-note-text);
-        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2);
-        padding: 12px 12px 10px;
-      }
-      #commentray-wide-intro[data-side="below"] .commentray-wide-intro__pointer {
-        top: -8px;
-        left: var(--pointer-left, 18px);
-        border-left: 8px solid transparent;
-        border-right: 8px solid transparent;
-        border-bottom: 8px solid var(--commentray-intro-note-bg);
-      }
-      #commentray-wide-intro[data-side="above"] .commentray-wide-intro__pointer {
-        bottom: -8px;
-        left: var(--pointer-left, 18px);
-        border-left: 8px solid transparent;
-        border-right: 8px solid transparent;
-        border-top: 8px solid var(--commentray-intro-note-bg);
-      }
-      .commentray-wide-intro__pointer {
-        position: absolute;
-        width: 0;
-        height: 0;
-      }
-      .commentray-wide-intro__title {
-        font-weight: 700;
-        margin: 0 0 6px;
-        line-height: 1.25;
-      }
-      .commentray-wide-intro__body {
-        margin: 0 0 10px;
-        font-size: 13px;
-        line-height: 1.45;
-      }
-      .commentray-wide-intro__footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        font-size: 12px;
-      }
-      .commentray-wide-intro__actions {
-        display: flex;
-        gap: 6px;
-        flex-wrap: wrap;
-      }
-      .commentray-wide-intro__actions button {
-        border: 1px solid var(--commentray-intro-note-btn-border);
-        border-radius: 8px;
-        background: var(--commentray-intro-note-btn-bg);
-        color: var(--commentray-intro-note-text);
-        padding: 4px 8px;
-        cursor: pointer;
-        font-size: 12px;
-        font-family: inherit;
-      }
-      .commentray-wide-intro__actions button:hover {
-        background: color-mix(in oklab, var(--commentray-intro-note-btn-bg) 88%, CanvasText);
-      }
-      .commentray-wide-intro__actions button:focus-visible {
-        outline: 2px solid color-mix(in oklab, #5c5200 58%, Canvas);
-        outline-offset: 1px;
-      }
+${CODE_BROWSER_INTRO_STYLES}
       .toolbar label input:focus-visible {
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
         outline-offset: 2px;

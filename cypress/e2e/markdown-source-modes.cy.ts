@@ -3,6 +3,34 @@ import { shellA11y } from "../support/shell-a11y";
 const WIDE_MODE_INTRO_STORAGE_KEY = "commentray.codeCommentrayStatic.wideModeIntro.v1";
 const SOURCE_PANE_MODE_STORAGE_KEY = "commentray.codeCommentrayStatic.sourceMarkdownPaneMode";
 
+function expectVisibleArrows(count: number): void {
+  cy.get("#commentray-wide-intro-arrows .commentray-wide-intro__arrow")
+    .should("have.length", count)
+    .each(($arrow) => {
+      const el = $arrow[0];
+      const style = getComputedStyle(el);
+      const width = Number.parseFloat(style.width);
+      expect(width).to.be.greaterThan(16);
+      expect(style.opacity).to.not.eq("0");
+      expect(style.display).to.not.eq("none");
+    });
+}
+
+function expectArrowStartsOutsideBubble(): void {
+  cy.get("#commentray-wide-intro").then(($bubble) => {
+    const bubbleRect = $bubble[0].getBoundingClientRect();
+    cy.get("#commentray-wide-intro-arrows .commentray-wide-intro__arrow").each(($arrow) => {
+      const arrowRect = $arrow[0].getBoundingClientRect();
+      const startInsideBubble =
+        arrowRect.left >= bubbleRect.left &&
+        arrowRect.left <= bubbleRect.right &&
+        arrowRect.top >= bubbleRect.top &&
+        arrowRect.top <= bubbleRect.bottom;
+      expect(startInsideBubble).to.eq(false);
+    });
+  });
+}
+
 describe("Markdown source rendering modes", () => {
   it("starts in rendered markdown even if prior storage asked for source", () => {
     cy.viewport(1280, 900);
@@ -31,7 +59,11 @@ describe("Markdown source rendering modes", () => {
 
   it("preserves source scroll sync after toggling source markdown mode and changing angle", () => {
     cy.viewport(1280, 900);
-    cy.visit("/");
+    cy.visit("/", {
+      onBeforeLoad(win) {
+        win.localStorage.setItem(WIDE_MODE_INTRO_STORAGE_KEY, "1");
+      },
+    });
     cy.get(shellA11y.shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
     cy.get("#source-markdown-pane-flip").should("contain.text", "Render");
     cy.get("#source-markdown-pane-flip").should("have.attr", "aria-pressed", "true");
@@ -109,6 +141,53 @@ describe("Markdown source rendering modes", () => {
 
     cy.get("#commentray-help-tour").click();
     cy.get("#commentray-wide-intro").should("be.visible");
+  });
+
+  it("draws two visible intro arrows in wide mode without crossing the bubble text area", () => {
+    cy.viewport(1280, 900);
+    cy.visit("/", {
+      onBeforeLoad(win) {
+        win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
+      },
+    });
+
+    cy.get("#commentray-wide-intro").should("be.visible");
+    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Welcome").should(
+      "be.visible",
+    );
+    expectVisibleArrows(2);
+    expectArrowStartsOutsideBubble();
+
+    cy.get('#commentray-wide-intro button[data-wide-intro="next"]').click();
+    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Two views").should(
+      "be.visible",
+    );
+    expectVisibleArrows(2);
+    expectArrowStartsOutsideBubble();
+  });
+
+  it("recomputes intro arrows when viewport switches between wide and narrow", () => {
+    cy.viewport(1280, 900);
+    cy.visit("/", {
+      onBeforeLoad(win) {
+        win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
+      },
+    });
+
+    cy.get("#commentray-wide-intro").should("be.visible");
+    expectVisibleArrows(2);
+
+    cy.viewport(390, 844);
+    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Welcome").should(
+      "be.visible",
+    );
+    expectVisibleArrows(1);
+
+    cy.viewport(1280, 900);
+    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Welcome").should(
+      "be.visible",
+    );
+    expectVisibleArrows(2);
   });
 
   it("shows intro tour on narrow viewports with narrow-view copy", () => {

@@ -1917,13 +1917,15 @@ function normalizedDualMobilePane(v: string | null | undefined): "code" | "doc" 
 }
 
 type WideIntroStep = {
-  targetSelector: string;
+  targetSelector?: string;
+  targetSelectors?: string[];
   title: string;
   body: string;
 };
 
 type WideIntroElements = {
   bubble: HTMLElement;
+  arrowLayer: HTMLElement;
   titleEl: HTMLElement;
   bodyEl: HTMLElement;
   progressEl: HTMLElement;
@@ -1942,6 +1944,8 @@ function clearOpenWideModeIntroTour(): void {
   }
   const open = document.getElementById("commentray-wide-intro");
   if (open instanceof HTMLElement) open.remove();
+  const arrows = document.getElementById("commentray-wide-intro-arrows");
+  if (arrows instanceof HTMLElement) arrows.remove();
 }
 
 function wideIntroStepsForShell(shell: HTMLElement): WideIntroStep[] {
@@ -1955,12 +1959,12 @@ function wideIntroStepsForShell(shell: HTMLElement): WideIntroStep[] {
     introTargetSelector === "#shell" ? shellSelector : introTargetSelector;
   return [
     {
-      targetSelector: shellOrIntroTargetSelector,
+      targetSelectors: narrowActive ? [shellOrIntroTargetSelector] : ["#code-pane", "#doc-pane"],
       title: "Welcome",
       body: "Welcome to commentray, a system to create and view commentaries next to the source tree. Angles are different aspects of these commentaries, so switch between them and keep scrolling while both panes stay aligned.",
     },
     {
-      targetSelector: shellOrIntroTargetSelector,
+      targetSelectors: narrowActive ? [shellOrIntroTargetSelector] : ["#code-pane", "#doc-pane"],
       title: "Two views",
       body: narrowActive
         ? "You are in narrow view now. Use the pane flip to switch code and commentary. Wide view shows both panes side by side."
@@ -1995,6 +1999,11 @@ function wideIntroStepsForShell(shell: HTMLElement): WideIntroStep[] {
 }
 
 function createWideIntroElements(): WideIntroElements | null {
+  const arrowLayer = document.createElement("div");
+  arrowLayer.id = "commentray-wide-intro-arrows";
+  arrowLayer.setAttribute("aria-hidden", "true");
+  document.body.appendChild(arrowLayer);
+
   const bubble = document.createElement("section");
   bubble.id = "commentray-wide-intro";
   bubble.setAttribute("role", "dialog");
@@ -2028,20 +2037,31 @@ function createWideIntroElements(): WideIntroElements | null {
     !(nextBtn instanceof HTMLButtonElement) ||
     !(skipBtn instanceof HTMLButtonElement)
   ) {
+    arrowLayer.remove();
     bubble.remove();
     return null;
   }
-  return { bubble, titleEl, bodyEl, progressEl, backBtn, nextBtn, skipBtn };
+  return { bubble, arrowLayer, titleEl, bodyEl, progressEl, backBtn, nextBtn, skipBtn };
 }
 
-function wideIntroTargetForCurrentStep(
-  steps: WideIntroStep[],
-  current: number,
-): HTMLElement | null {
+function wideIntroTargetsForCurrentStep(steps: WideIntroStep[], current: number): HTMLElement[] {
   const step = steps[current];
-  if (!step) return null;
-  const found = document.querySelector(step.targetSelector);
-  return found instanceof HTMLElement ? found : null;
+  if (!step) return [];
+  const selectors =
+    Array.isArray(step.targetSelectors) && step.targetSelectors.length > 0
+      ? step.targetSelectors
+      : step.targetSelector
+        ? [step.targetSelector]
+        : [];
+  const targets: HTMLElement[] = [];
+  const seen = new Set<HTMLElement>();
+  for (const selector of selectors) {
+    const found = document.querySelector(selector);
+    if (!(found instanceof HTMLElement) || seen.has(found)) continue;
+    seen.add(found);
+    targets.push(found);
+  }
+  return targets;
 }
 
 function repositionWideIntroBubble(bubble: HTMLElement, target: HTMLElement): void {
@@ -2064,52 +2084,135 @@ function repositionWideIntroBubble(bubble: HTMLElement, target: HTMLElement): vo
   bubble.style.setProperty("--pointer-left", `${String(Math.round(pointerLeft))}px`);
 }
 
+function renderWideIntroArrows(
+  bubble: HTMLElement,
+  arrowLayer: HTMLElement,
+  targets: HTMLElement[],
+): void {
+  arrowLayer.replaceChildren();
+  if (targets.length === 0) return;
+
+  const bubbleRect = bubble.getBoundingClientRect();
+  const bubbleCenterX = bubbleRect.left + bubbleRect.width / 2;
+  const bubbleCenterY = bubbleRect.top + bubbleRect.height / 2;
+  const edgePadding = 12;
+  const sideInset = 8;
+  const spread = 12;
+
+  for (const [index, target] of targets.entries()) {
+    const rect = target.getBoundingClientRect();
+    // Point to the middle of each target element.
+    const endX = rect.left + rect.width / 2;
+    const endY = rect.top + rect.height / 2;
+    const toTargetX = endX - bubbleCenterX;
+    const toTargetY = endY - bubbleCenterY;
+    const horizontalDominant = Math.abs(toTargetX) >= Math.abs(toTargetY);
+    const spreadOffset = index - (targets.length - 1) / 2;
+
+    let startX: number;
+    let startY: number;
+    if (horizontalDominant) {
+      startX = toTargetX >= 0 ? bubbleRect.right + sideInset : bubbleRect.left - sideInset;
+      startY = clamp(
+        endY + spreadOffset * spread,
+        bubbleRect.top + edgePadding,
+        bubbleRect.bottom - edgePadding,
+      );
+    } else {
+      startY = toTargetY >= 0 ? bubbleRect.bottom + sideInset : bubbleRect.top - sideInset;
+      startX = clamp(
+        endX + spreadOffset * spread,
+        bubbleRect.left + edgePadding,
+        bubbleRect.right - edgePadding,
+      );
+    }
+
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const length = Math.hypot(dx, dy);
+    if (!Number.isFinite(length) || length < 12) continue;
+
+    const arrow = document.createElement("span");
+    arrow.className = "commentray-wide-intro__arrow";
+    arrow.style.left = `${String(Math.round(startX))}px`;
+    arrow.style.top = `${String(Math.round(startY))}px`;
+    arrow.style.width = `${String(Math.round(length))}px`;
+    arrow.style.setProperty("--wide-intro-arrow-angle", `${String(Math.atan2(dy, dx))}rad`);
+    const head = document.createElement("span");
+    head.className = "commentray-wide-intro__arrow-head";
+    arrow.appendChild(head);
+    arrowLayer.appendChild(arrow);
+  }
+}
+
 function wireWideModeIntroTour(shell: HTMLElement, opts?: { force?: boolean }): void {
   if (!opts?.force && readWebStorageItem(localStorage, STORAGE_WIDE_MODE_INTRO_DONE) === "1")
     return;
   clearOpenWideModeIntroTour();
-  const steps = wideIntroStepsForShell(shell);
+  let steps = wideIntroStepsForShell(shell);
+  let viewportMode: "narrow" | "wide" = isNarrowViewport() ? "narrow" : "wide";
 
   const elements = createWideIntroElements();
   if (!elements) return;
 
   let current = 0;
-  let highlighted: HTMLElement | null = null;
-  const { bubble, titleEl, bodyEl, progressEl, backBtn, nextBtn, skipBtn } = elements;
+  let highlighted: HTMLElement[] = [];
+  const { bubble, arrowLayer, titleEl, bodyEl, progressEl, backBtn, nextBtn, skipBtn } = elements;
 
   const closeTour = (): void => {
-    highlighted?.classList.remove("commentray-wide-intro__target");
+    for (const el of highlighted) el.classList.remove("commentray-wide-intro__target");
+    highlighted = [];
+    arrowLayer.remove();
     bubble.remove();
-    globalThis.removeEventListener("resize", reposition);
+    globalThis.removeEventListener("resize", onResize);
     globalThis.removeEventListener("scroll", reposition, true);
     document.removeEventListener("keydown", onKeyDown, true);
     writeWebStorageItem(localStorage, STORAGE_WIDE_MODE_INTRO_DONE, "1");
   };
 
+  const refreshStepsForViewportMode = (): void => {
+    const nextMode: "narrow" | "wide" = isNarrowViewport() ? "narrow" : "wide";
+    if (nextMode === viewportMode) return;
+    viewportMode = nextMode;
+    steps = wideIntroStepsForShell(shell);
+  };
+
   const reposition = (): void => {
-    const target = wideIntroTargetForCurrentStep(steps, current);
-    if (!target) return;
-    repositionWideIntroBubble(bubble, target);
+    refreshStepsForViewportMode();
+    const targets = wideIntroTargetsForCurrentStep(steps, current);
+    const primary = targets[0];
+    if (!primary) {
+      arrowLayer.replaceChildren();
+      return;
+    }
+    repositionWideIntroBubble(bubble, primary);
+    renderWideIntroArrows(bubble, arrowLayer, targets);
   };
 
   const render = (): void => {
-    while (current < steps.length && !wideIntroTargetForCurrentStep(steps, current)) current++;
+    refreshStepsForViewportMode();
+    while (current < steps.length && wideIntroTargetsForCurrentStep(steps, current).length === 0)
+      current++;
     if (current >= steps.length) {
       closeTour();
       return;
     }
     const step = steps[current];
-    const target = wideIntroTargetForCurrentStep(steps, current);
-    if (!step || !target) return;
-    highlighted?.classList.remove("commentray-wide-intro__target");
-    highlighted = target;
-    highlighted.classList.add("commentray-wide-intro__target");
+    const targets = wideIntroTargetsForCurrentStep(steps, current);
+    if (!step || targets.length === 0) return;
+    for (const el of highlighted) el.classList.remove("commentray-wide-intro__target");
+    highlighted = targets;
+    for (const el of highlighted) el.classList.add("commentray-wide-intro__target");
     titleEl.textContent = step.title;
     bodyEl.textContent = step.body;
     progressEl.textContent = `${String(current + 1)} / ${String(steps.length)}`;
     backBtn.disabled = current === 0;
     nextBtn.textContent = current === steps.length - 1 ? "Done" : "Next";
     reposition();
+  };
+
+  const onResize = (): void => {
+    render();
   };
 
   const onKeyDown = (ev: KeyboardEvent): void => {
@@ -2131,7 +2234,7 @@ function wireWideModeIntroTour(shell: HTMLElement, opts?: { force?: boolean }): 
     render();
   });
   skipBtn.addEventListener("click", closeTour);
-  globalThis.addEventListener("resize", reposition);
+  globalThis.addEventListener("resize", onResize);
   globalThis.addEventListener("scroll", reposition, true);
   document.addEventListener("keydown", onKeyDown, true);
   render();
