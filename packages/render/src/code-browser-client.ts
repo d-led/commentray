@@ -1883,13 +1883,14 @@ function wireDocumentedFilesTree(): void {
     return;
   }
 
+  const detailsHub: HTMLDetailsElement = hub;
   const treeMount: HTMLElement = treeHost;
 
-  const jsonUrl = hub.getAttribute("data-nav-json-url")?.trim() ?? "";
+  const jsonUrl = detailsHub.getAttribute("data-nav-json-url")?.trim() ?? "";
   const embeddedB64 = shell?.getAttribute("data-documented-pairs-b64")?.trim() ?? "";
   if (jsonUrl.length === 0 && embeddedB64.length === 0) return;
 
-  const placeDocHubFlyout = wireDocumentedFilesTreeMobileFlyout(hub);
+  const placeDocHubFlyout = wireDocumentedFilesTreeMobileFlyout(detailsHub);
 
   const ensureLoaded = loadDocumentedPairs(jsonUrl, embeddedB64);
   let cachedPairs: DocumentedPairNav[] | null = null;
@@ -1918,21 +1919,30 @@ function wireDocumentedFilesTree(): void {
     }
   }
 
-  hub.addEventListener("toggle", () => {
+  detailsHub.addEventListener("toggle", () => {
     placeDocHubFlyout();
-    if (hub.open) {
+    if (detailsHub.open) {
       globalThis.requestAnimationFrame(() => {
         placeDocHubFlyout();
         focusDocumentedFilesFilterInput();
       });
     }
-    if (!hub.open) return;
+    if (!detailsHub.open) return;
     void hydrateTree();
   });
 
+  function onDocumentedFilesHubEscape(ev: KeyboardEvent): void {
+    if (!detailsHub.open || ev.key !== "Escape") return;
+    ev.preventDefault();
+    detailsHub.open = false;
+    const sum = detailsHub.querySelector("summary");
+    if (sum instanceof HTMLElement) sum.focus({ preventScroll: true });
+  }
+  document.addEventListener("keydown", onDocumentedFilesHubEscape, true);
+
   if (filterInput instanceof HTMLInputElement) {
     filterInput.addEventListener("input", () => {
-      if (!hub.open || cachedPairs === null) return;
+      if (!detailsHub.open || cachedPairs === null) return;
       applyFilterAndRender();
     });
   }
