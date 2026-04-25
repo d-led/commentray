@@ -193,7 +193,11 @@ function applyDocToCodeFlipPlanImpl(
   lineIdPrefix = "code-line-",
 ): void {
   if (plan.k === "block") {
-    const el = codePane.querySelector(`#${lineIdPrefix}${String(plan.src0)}`);
+    const exact = codePane.querySelector(`#${lineIdPrefix}${String(plan.src0)}`);
+    const el =
+      exact instanceof HTMLElement
+        ? exact
+        : findAnchorAtOrAfter(sourceAnchorsFromPrefix(lineIdPrefix), plan.src0);
     if (el) {
       applyRevealChildInPane(codePane, el, 2);
     } else {
@@ -1308,6 +1312,13 @@ function findAnchorAtOrBefore(
     }
   }
   return ans >= 0 ? (anchors[ans]?.el ?? null) : null;
+}
+
+function sourceAnchorsFromPrefix(prefix: string): Array<{ line0: number; el: HTMLElement }> {
+  return Array.from(document.querySelectorAll<HTMLElement>(`[id^="${prefix}"]`))
+    .map((el) => ({ line0: sourceAnchorIndexFromId(el.id, prefix), el }))
+    .filter((x): x is { line0: number; el: HTMLElement } => x.line0 !== null)
+    .sort((a, b) => a.line0 - b.line0);
 }
 
 function subscribeBlockRayRedraw(
