@@ -2612,6 +2612,18 @@ function normalizePairBrowseHrefForCurrentPath(shell: HTMLElement, pathname: str
   }
 }
 
+function activeCommentrayHashTokenFromViewport(): string | null {
+  const docPane = document.getElementById("doc-pane");
+  if (!(docPane instanceof HTMLElement)) return null;
+  const docBody = document.getElementById("doc-pane-body");
+  const docScrollEl = docBody instanceof HTMLElement ? docBody : docPane;
+  const anchors = docScrollEl.querySelectorAll<HTMLElement>(".commentray-block-anchor");
+  if (anchors.length === 0) return null;
+  const mdLine0 = probeCommentrayLine0FromDoc(docScrollEl);
+  if (!Number.isFinite(mdLine0) || mdLine0 < 0) return null;
+  return `commentray-md-line-${String(mdLine0)}`;
+}
+
 function maybeBackfillAddressBarWithHumanePairLink(): void {
   const shell = document.getElementById("shell");
   if (!(shell instanceof HTMLElement)) return;
@@ -2636,25 +2648,15 @@ function permalinkHashSuffixFromUi(): string {
     if (t.length === 0) return;
     if (!tokens.includes(t)) tokens.push(t);
   };
-  let selectedAngleToken = "";
   const angleSel = document.getElementById("angle-select");
   if (angleSel instanceof HTMLSelectElement) {
     const id = angleSel.value.trim();
     if (id.length > 0) {
-      selectedAngleToken = `angle-${encodeURIComponent(id)}`;
-      pushUnique(selectedAngleToken);
+      pushUnique(`angle-${encodeURIComponent(id)}`);
     }
   }
-  const rawHash = globalThis.location.hash.replace(/^#/, "").trim();
-  if (rawHash.length > 0) {
-    for (const part of rawHash.split("--")) {
-      if (part.startsWith("angle-")) {
-        // Keep exactly one angle token: prefer the current angle selector value.
-        if (selectedAngleToken.length > 0) continue;
-      }
-      pushUnique(part);
-    }
-  }
+  const activeAnchor = activeCommentrayHashTokenFromViewport();
+  if (activeAnchor) pushUnique(activeAnchor);
   return tokens.length > 0 ? `#${tokens.join("--")}` : "";
 }
 
