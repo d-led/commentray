@@ -1710,6 +1710,12 @@ function wireDocumentedFilesTreeMobileFlyout(hub: HTMLDetailsElement): () => voi
   return placeFlyout;
 }
 
+function focusDocumentedFilesFilterInput(): void {
+  const el = document.getElementById("documented-files-filter");
+  if (!(el instanceof HTMLInputElement)) return;
+  el.focus({ preventScroll: true });
+}
+
 function wireDocumentedFilesTree(): void {
   const hub = document.getElementById("documented-files-hub");
   const treeHost = document.getElementById("documented-files-tree");
@@ -1757,7 +1763,10 @@ function wireDocumentedFilesTree(): void {
   hub.addEventListener("toggle", () => {
     placeDocHubFlyout();
     if (hub.open) {
-      globalThis.requestAnimationFrame(placeDocHubFlyout);
+      globalThis.requestAnimationFrame(() => {
+        placeDocHubFlyout();
+        focusDocumentedFilesFilterInput();
+      });
     }
     if (!hub.open) return;
     void hydrateTree();
