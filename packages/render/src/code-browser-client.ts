@@ -1264,6 +1264,52 @@ function commentaryBandEndYViewport(
   return bottom;
 }
 
+function sourceAnchorIndexFromId(id: string, prefix: string): number | null {
+  if (!id.startsWith(prefix)) return null;
+  const n = Number.parseInt(id.slice(prefix.length), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function findAnchorAtOrAfter(
+  anchors: ReadonlyArray<{ line0: number; el: HTMLElement }>,
+  line0: number,
+): HTMLElement | null {
+  let lo = 0;
+  let hi = anchors.length - 1;
+  let ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const line = anchors[mid]?.line0 ?? -1;
+    if (line >= line0) {
+      ans = mid;
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  return ans >= 0 ? (anchors[ans]?.el ?? null) : null;
+}
+
+function findAnchorAtOrBefore(
+  anchors: ReadonlyArray<{ line0: number; el: HTMLElement }>,
+  line0: number,
+): HTMLElement | null {
+  let lo = 0;
+  let hi = anchors.length - 1;
+  let ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const line = anchors[mid]?.line0 ?? -1;
+    if (line <= line0) {
+      ans = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return ans >= 0 ? (anchors[ans]?.el ?? null) : null;
+}
+
 function subscribeBlockRayRedraw(
   gutter: HTMLElement,
   codePane: HTMLElement,
@@ -1288,7 +1334,7 @@ function drawBlockRaysIntoSvg(
   docScrollEl: HTMLElement,
   getLinks: () => BlockScrollLink[],
   probeTopSourceLine1Based: () => number,
-  lineIdPrefix = "code-line-",
+  lineIdPrefix: string,
 ): void {
   const links = getLinks();
   const sorted = sortBlockLinksBySource(links);
@@ -1305,6 +1351,12 @@ function drawBlockRaysIntoSvg(
   svg.setAttribute("preserveAspectRatio", "none");
 
   const parts: string[] = [];
+  const sourceAnchors = Array.from(
+    document.querySelectorAll<HTMLElement>(`[id^="${lineIdPrefix}"]`),
+  )
+    .map((el) => ({ line0: sourceAnchorIndexFromId(el.id, lineIdPrefix), el }))
+    .filter((x): x is { line0: number; el: HTMLElement } => x.line0 !== null)
+    .sort((a, b) => a.line0 - b.line0);
 
   for (let i = 0; i < sorted.length; i++) {
     const link = sorted[i];
@@ -1313,8 +1365,12 @@ function drawBlockRaysIntoSvg(
 
     const i0 = codeLineDomIndex0(link.sourceStart);
     const i1 = codeLineDomIndex0(link.sourceEnd);
-    const codeTop = document.getElementById(`${lineIdPrefix}${String(i0)}`);
-    const codeBot = document.getElementById(`${lineIdPrefix}${String(i1)}`);
+    const codeTop =
+      document.getElementById(`${lineIdPrefix}${String(i0)}`) ??
+      findAnchorAtOrAfter(sourceAnchors, i0);
+    const codeBot =
+      document.getElementById(`${lineIdPrefix}${String(i1)}`) ??
+      findAnchorAtOrBefore(sourceAnchors, i1);
     const docTop = document.getElementById(`commentray-block-${link.id}`);
     if (!codeTop || !codeBot || !docTop) continue;
 
@@ -1373,10 +1429,10 @@ function wireBlockRayConnectors(args: {
   docScrollEl: HTMLElement;
   getLinks: () => BlockScrollLink[];
   probeTopSourceLine1Based: () => number;
-  lineIdPrefix?: string;
+  sourceLineIdPrefix?: () => string;
 }): () => void {
   const { gutter, codePane, docScrollEl, getLinks, probeTopSourceLine1Based } = args;
-  const lineIdPrefix = args.lineIdPrefix ?? "code-line-";
+  const sourceLineIdPrefix = args.sourceLineIdPrefix ?? (() => "code-line-");
 
   const svgNs = "http://www.w3.org/2000/svg";
   const host = document.createElement("div");
@@ -1397,7 +1453,7 @@ function wireBlockRayConnectors(args: {
         docScrollEl,
         getLinks,
         probeTopSourceLine1Based,
-        lineIdPrefix,
+        sourceLineIdPrefix(),
       );
     });
   }
@@ -1960,6 +2016,7 @@ function wireSourceMarkdownPaneFlip(
   codePane: HTMLElement,
   flipBtn: HTMLButtonElement,
   flipScrollBtn: HTMLButtonElement | null,
+  onAfterFlip?: () => void,
 ): void {
   function syncSourceMarkdownFlipA11y(): void {
     const mode = sourcePaneModeForShell(shell);
@@ -2004,6 +2061,7 @@ function wireSourceMarkdownPaneFlip(
         rewriteHubRelativeBrowseAnchorsIn(sourceMdBody);
       }
     }
+    onAfterFlip?.();
   };
   flipBtn.addEventListener("click", runFlip);
   if (flipScrollBtn) {
@@ -2448,7 +2506,11 @@ function initializeSourceMarkdownPane(shell: HTMLElement): void {
   rewriteHubRelativeBrowseAnchorsIn(sourceMdBody);
 }
 
-function wireSourceMarkdownControls(shell: HTMLElement, codePane: HTMLElement): void {
+function wireSourceMarkdownControls(
+  shell: HTMLElement,
+  codePane: HTMLElement,
+  onAfterFlip?: () => void,
+): void {
   const sourceMdFlip = document.getElementById("source-markdown-pane-flip");
   const sourceMdFlipScroll = document.getElementById("source-markdown-pane-flip-scroll");
   if (!(sourceMdFlip instanceof HTMLButtonElement)) return;
@@ -2457,6 +2519,7 @@ function wireSourceMarkdownControls(shell: HTMLElement, codePane: HTMLElement): 
     codePane,
     sourceMdFlip,
     sourceMdFlipScroll instanceof HTMLButtonElement ? sourceMdFlipScroll : null,
+    onAfterFlip,
   );
   initializeSourceMarkdownPane(shell);
 }
@@ -2589,7 +2652,7 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
         getLinks: () => bundle.scrollLinksRef.current,
         probeTopSourceLine1Based: () =>
           probeCodeLine1FromViewport(codePane, sourceLineIdPrefixForShell(shell)),
-        lineIdPrefix: sourceLineIdPrefixForShell(shell),
+        sourceLineIdPrefix: () => sourceLineIdPrefixForShell(shell),
       })
     : undefined;
   blockRayRedraw.request = requestBlockRayRedraw;
@@ -2617,7 +2680,9 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
       flipScrollBtn instanceof HTMLButtonElement ? flipScrollBtn : null,
     );
   }
-  wireSourceMarkdownControls(shell, codePane);
+  wireSourceMarkdownControls(shell, codePane, () => {
+    requestBlockRayRedraw?.();
+  });
 
   wireDualPaneCommentrayLocationHash(docScrollEl, () => bundle.mutable.mdLines.length);
 }
