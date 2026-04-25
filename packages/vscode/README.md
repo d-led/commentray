@@ -70,6 +70,8 @@ use the same workspace-folder rule as validate when picking the repo root.
 For automation or keybindings, you can skip the picker with
 `vscode.commands.executeCommand("commentray.openCommentrayAngle", { angleId: "main" })`
 (angles layout and `.commentray.toml` definitions must already be enabled).
+You can also add angles without prompts via
+`vscode.commands.executeCommand("commentray.addAngleDefinition", { id: "architecture", title: "Architecture", makeDefault: false })`.
 
 ## Screenshots for docs
 

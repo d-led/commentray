@@ -15,16 +15,16 @@ import {
 describe("Commentray Angles in VS Code (integration)", () => {
   const dogfoodWorkspace = registerDogfoodWorkspaceLifecycle();
 
+  beforeEach(async () => {
+    await enableAnglesDogfoodFixture(dogfoodWorkspace.root());
+  });
+
+  afterEach(async () => {
+    await restoreDogfoodCommentrayToml(dogfoodWorkspace.root());
+    await resetGeneratedCommentrayStorage(dogfoodWorkspace.root());
+  });
+
   describe("Open paired markdown for a specific angle (programmatic)", () => {
-    beforeEach(async () => {
-      await enableAnglesDogfoodFixture(dogfoodWorkspace.root());
-    });
-
-    afterEach(async () => {
-      await restoreDogfoodCommentrayToml(dogfoodWorkspace.root());
-      await resetGeneratedCommentrayStorage(dogfoodWorkspace.root());
-    });
-
     it('Given Angles layout with two definitions, when open angle is invoked with { angleId: "alt" }, then the alt companion file is created under the per-source folder.', async () => {
       await openFixtureSourceFile(dogfoodWorkspace.root());
       await vscode.commands.executeCommand("commentray.openCommentrayAngle", { angleId: "alt" });
@@ -49,6 +49,25 @@ describe("Commentray Angles in VS Code (integration)", () => {
       const bytes = await vscode.workspace.fs.readFile(mainUri);
       const text = new TextDecoder("utf-8").decode(bytes);
       assert.ok(text.includes("# Commentray"), "Expected placeholder in main angle Markdown.");
+    });
+  });
+
+  describe("Add angle to project (programmatic)", () => {
+    it('Given Angles layout is enabled, when add angle is invoked with { id: "architecture", title: "Architecture", makeDefault: false }, then .commentray.toml includes that definition.', async () => {
+      await vscode.commands.executeCommand("commentray.addAngleDefinition", {
+        id: "architecture",
+        title: "Architecture",
+        makeDefault: false,
+      });
+
+      const tomlUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ".commentray.toml");
+      const bytes = await vscode.workspace.fs.readFile(tomlUri);
+      const text = new TextDecoder("utf-8").decode(bytes);
+      assert.ok(text.includes('id = "architecture"'), "Expected new angle id in .commentray.toml.");
+      assert.ok(
+        text.includes('title = "Architecture"'),
+        "Expected new angle title in .commentray.toml.",
+      );
     });
   });
 });

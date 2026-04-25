@@ -425,6 +425,45 @@ function presetAngleFromOpenAngleCommandArg(arg: unknown): OpenAngleCommandArg {
   }
 }
 
+/** `executeCommand("commentray.addAngleDefinition", { id: "architecture", title: "Architecture", makeDefault: true })` skips prompts (tests, automation). */
+type AddAngleDefinitionCommandArg =
+  | "absent"
+  | "invalid"
+  | { id: string; title?: string; makeDefault?: boolean };
+
+function parseOptionalString(value: unknown): string | "invalid" | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") return "invalid";
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseOptionalBoolean(value: unknown): boolean | "invalid" | undefined {
+  if (value === undefined) return undefined;
+  return typeof value === "boolean" ? value : "invalid";
+}
+
+function presetFromAddAngleDefinitionCommandArg(arg: unknown): AddAngleDefinitionCommandArg {
+  if (arg === undefined || arg === null) return "absent";
+  if (typeof arg !== "object") return "invalid";
+  if (!("id" in arg)) return "absent";
+  const rawId = Reflect.get(arg, "id");
+  if (typeof rawId !== "string") return "invalid";
+  const trimmedId = rawId.trim();
+  if (trimmedId.length === 0) return "invalid";
+  let id: string;
+  try {
+    id = assertValidAngleId(trimmedId);
+  } catch {
+    return "invalid";
+  }
+  const title = parseOptionalString(Reflect.get(arg, "title"));
+  if (title === "invalid") return "invalid";
+  const makeDefault = parseOptionalBoolean(Reflect.get(arg, "makeDefault"));
+  if (makeDefault === "invalid") return "invalid";
+  return { id, title, makeDefault };
+}
+
 async function openSideBySideCommand(arg?: unknown): Promise<void> {
   let editor = vscode.window.activeTextEditor;
   const fromExplorer = uriFromOpenSideBySideArgs(arg);
@@ -468,9 +507,7 @@ async function openCommentrayAngleCommand(arg?: unknown): Promise<void> {
   }
 
   let angleId: string;
-  if (preset !== "absent") {
-    angleId = preset.angleId;
-  } else {
+  if (preset === "absent") {
     const items: vscode.QuickPickItem[] = cfg.angles.definitions.map((d) => ({
       label: d.title,
       description: d.id,
@@ -500,6 +537,8 @@ async function openCommentrayAngleCommand(arg?: unknown): Promise<void> {
       if (!chosen.description) return;
       angleId = assertValidAngleId(chosen.description);
     }
+  } else {
+    angleId = preset.angleId;
   }
 
   const paths = await resolvePairedPaths(active.editor, active.folder, angleId);
@@ -518,7 +557,7 @@ function pickWorkspaceFolderForRepoWideCommand(): vscode.WorkspaceFolder | undef
   return folders[0];
 }
 
-async function addAngleDefinitionCommand(): Promise<void> {
+async function addAngleDefinitionCommand(arg?: unknown): Promise<void> {
   const folder = pickWorkspaceFolderForRepoWideCommand();
   if (!folder) {
     await vscode.window.showWarningMessage("Open a workspace folder first.");
@@ -526,41 +565,60 @@ async function addAngleDefinitionCommand(): Promise<void> {
   }
   const repoRoot = folder.uri.fsPath;
   const cfg = await loadCommentrayConfig(repoRoot);
-  const idRaw = await vscode.window.showInputBox({
-    title: "New Commentray angle",
-    prompt: "Short id (used in paths and .commentray.toml), e.g. architecture",
-    validateInput: (value) => {
-      try {
-        assertValidAngleId(value);
-        return undefined;
-      } catch (e) {
-        return e instanceof Error ? e.message : String(e);
-      }
-    },
-  });
-  if (!idRaw) return;
-  const id = assertValidAngleId(idRaw);
-  const titleRaw = await vscode.window.showInputBox({
-    title: "Display title",
-    prompt: "Optional — shown in the angle picker",
-    value: id,
-  });
-  let makeDefault = cfg.angles.definitions.length === 0;
-  if (!makeDefault) {
-    const pick = await vscode.window.showQuickPick(
-      [
-        { label: "Yes", description: "Set as default_angle in .commentray.toml" },
-        { label: "No", description: "Keep the current default" },
-      ],
-      { placeHolder: `Set “${id}” as the default angle?` },
+  const preset = presetFromAddAngleDefinitionCommandArg(arg);
+  if (preset === "invalid") {
+    await vscode.window.showWarningMessage(
+      'Invalid angle definition: use { "id": "your-angle", "title"?: "Display title", "makeDefault"?: true|false } when invoking this command programmatically.',
     );
-    makeDefault = pick?.label === "Yes";
+    return;
   }
+
+  let id: string;
+  let title: string | undefined;
+  let makeDefault: boolean;
+  if (preset === "absent") {
+    const idRaw = await vscode.window.showInputBox({
+      title: "New Commentray angle",
+      prompt: "Short id (used in paths and .commentray.toml), e.g. architecture",
+      validateInput: (value) => {
+        try {
+          assertValidAngleId(value);
+          return undefined;
+        } catch (e) {
+          return e instanceof Error ? e.message : String(e);
+        }
+      },
+    });
+    if (!idRaw) return;
+    id = assertValidAngleId(idRaw);
+    const titleRaw = await vscode.window.showInputBox({
+      title: "Display title",
+      prompt: "Optional — shown in the angle picker",
+      value: id,
+    });
+    title = titleRaw?.trim() && titleRaw.trim() !== id ? titleRaw.trim() : undefined;
+    makeDefault = cfg.angles.definitions.length === 0;
+    if (!makeDefault) {
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: "Yes", description: "Set as default_angle in .commentray.toml" },
+          { label: "No", description: "Keep the current default" },
+        ],
+        { placeHolder: `Set “${id}” as the default angle?` },
+      );
+      makeDefault = pick?.label === "Yes";
+    }
+  } else {
+    id = preset.id;
+    title = preset.title;
+    makeDefault = preset.makeDefault ?? cfg.angles.definitions.length === 0;
+  }
+
   try {
     await ensureAnglesSentinelFile(repoRoot, cfg.storageDir);
     await upsertAngleDefinitionInCommentrayToml(repoRoot, {
       id,
-      title: titleRaw?.trim() && titleRaw.trim() !== id ? titleRaw.trim() : undefined,
+      title,
       makeDefault,
     });
   } catch (e) {
@@ -568,7 +626,7 @@ async function addAngleDefinitionCommand(): Promise<void> {
     await vscode.window.showErrorMessage(`Could not update .commentray.toml: ${msg}`);
     return;
   }
-  await vscode.window.showInformationMessage(
+  void vscode.window.showInformationMessage(
     `Angle “${id}” was added to .commentray.toml and Angles layout is enabled (${commentrayAnglesSentinelPath(cfg.storageDir)}).`,
   );
 }
