@@ -8,6 +8,7 @@ import { migrateIndex } from "./migrate.js";
 import { coerceIndexSchemaVersion, CURRENT_SCHEMA_VERSION, type CommentrayIndex } from "./model.js";
 import { defaultMetadataIndexPath, normalizeRepoRelativePath } from "./paths.js";
 import {
+  extractCommentrayBlockIdsFromMarkdown,
   validateIndexMarkerSemantics,
   validateMarkerBoundariesInSource,
   validateMarkerRegionsAgainstIndexedSources,
@@ -39,6 +40,31 @@ function stagedScopeNeedsFullIndexValidation(staged: ReadonlySet<string>): boole
   const indexJson = normalizeRepoRelativePath(".commentray/metadata/index.json");
   const toml = normalizeRepoRelativePath(".commentray.toml");
   return staged.has(indexJson) || staged.has(toml);
+}
+
+async function loadMarkdownBlockIdsByIndexedSource(
+  repoRoot: string,
+  index: CommentrayIndex,
+): Promise<Map<string, Set<string>>> {
+  const bySource = new Map<string, Set<string>>();
+  for (const [crPath, entry] of Object.entries(index.byCommentrayPath)) {
+    const norm = normalizeRepoRelativePath(entry.sourcePath);
+    let set = bySource.get(norm);
+    if (!set) {
+      set = new Set();
+      bySource.set(norm, set);
+    }
+    const abs = path.join(repoRoot, crPath);
+    try {
+      const md = await fs.readFile(abs, "utf8");
+      for (const id of extractCommentrayBlockIdsFromMarkdown(md)) {
+        set.add(id);
+      }
+    } catch {
+      /* missing or unreadable companion — other validation may warn */
+    }
+  }
+  return bySource;
 }
 
 function indexFilteredForStaged(
@@ -99,7 +125,12 @@ async function collectIssuesForLoadedIndex(
     }
   }
 
-  for (const issue of validateMarkerRegionsAgainstIndexedSources(index, indexedSourceTexts)) {
+  const markdownBlockIdsBySourceNorm = await loadMarkdownBlockIdsByIndexedSource(repoRoot, index);
+  for (const issue of validateMarkerRegionsAgainstIndexedSources(
+    index,
+    indexedSourceTexts,
+    markdownBlockIdsBySourceNorm,
+  )) {
     issues.push({ level: issue.level, message: issue.message });
   }
 

@@ -12,7 +12,7 @@ Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. E
 ## CLI `commentray validate`
 
 - **When:** You run it manually, in CI, or from the pre-commit hook.
-- **What:** Schema validation for **`.commentray/metadata/index.json`**, anchor integrity (including symbol presence and line ranges where applicable), marker pairing and uniqueness rules, alignment between index keys and paths, and staleness evidence via the **Git** SCM adapter (blob SHA / last-known commit fields) for recorded sources.
+- **What:** Schema validation for **`.commentray/metadata/index.json`**, anchor integrity (including symbol presence and line ranges where applicable), marker pairing and uniqueness rules, **non-overlapping** marker-backed inner ranges per primary source, **warnings** when a source region is missing a matching `<!-- commentray:block id=… -->` in companion Markdown for that primary, alignment between index keys and paths, and staleness evidence via the **Git** SCM adapter (blob SHA / last-known commit fields) for recorded sources.
 - **Exit:** **0** if there are no **errors**; **1** if any error exists. Warnings print but do not change exit code.
 - **Scope:** Full repo by default; pass **`--staged`** to limit checks to index entries whose primary or companion path matches staged files (unless `index.json` or `.commentray.toml` itself is staged, in which case the full index is validated).
 

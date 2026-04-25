@@ -40,7 +40,7 @@ marker:<id>
 
 The same token appears in source as `commentray:<id>` in `#region` / `#endregion` style delimiters, or as `commentray:start id=<id>` / `commentray:end id=<id>` in generic comments. The Markdown `<!-- commentray:block id=<id> -->` marker and `index.json` `block.id` must use **the same** `<id>` when the anchor is `marker:…`. **Which delimiter shape applies** depends on the primary file’s language — see [Source region delimiters (by editor language)](../user/source-region-delimiters.md).
 
-Validation: **per source file**, paired starts/ends must be well-formed (no duplicate opens, no orphans). **`commentray validate`** also warns when the same id is reused across **different** source files (repo-wide ambiguity for links) and errors if the same `(sourcePath, marker id)` is claimed by different block ids in the index.
+Validation: **per source file**, paired starts/ends must be well-formed (no duplicate opens, no orphans), and **inner line ranges** of distinct regions must not intersect (**error** if they overlap, including nested regions). **`commentray validate`** also **warns** when a paired source region has no matching `<!-- commentray:block id=… -->` line in any indexed companion Markdown for that primary (orphan region relative to commentary files), **warns** when the same id is reused across **different** source files (repo-wide ambiguity for links), and **errors** if the same `(sourcePath, marker id)` is claimed by different block ids in the index.
 
 ### Opaque anchors
 

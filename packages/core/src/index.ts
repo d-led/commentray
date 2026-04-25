@@ -138,7 +138,9 @@ export {
 export { MARKER_ID_BODY, assertValidMarkerId, normaliseMarkerSlugOrThrow } from "./marker-ids.js";
 export type { MarkerValidationIssue } from "./marker-validation.js";
 export {
+  extractCommentrayBlockIdsFromMarkdown,
   validateIndexMarkerSemantics,
   validateMarkerBoundariesInSource,
   validateMarkerRegionsAgainstIndexedSources,
+  validateOverlappingMarkerInnerRangesInSource,
 } from "./marker-validation.js";

@@ -1,11 +1,66 @@
 import { parseAnchor } from "./anchors.js";
-import { assertValidMarkerId } from "./marker-ids.js";
+import { assertValidMarkerId, MARKER_ID_BODY } from "./marker-ids.js";
 import type { CommentrayIndex } from "./model.js";
 import { normalizeRepoRelativePath } from "./paths.js";
 import { findCommentrayMarkerPairs } from "./region-marker-convert.js";
 import { parseCommentrayRegionBoundary, sourceLineRangeForMarkerId } from "./source-markers.js";
 
 export type MarkerValidationIssue = { level: "error" | "warn"; message: string };
+
+/**
+ * Block ids declared in companion markdown via `<!-- commentray:block id=… -->` (valid ids only).
+ */
+export function extractCommentrayBlockIdsFromMarkdown(markdown: string): Set<string> {
+  const out = new Set<string>();
+  const re = new RegExp(`<!--\\s*commentray:block\\s+id=(${MARKER_ID_BODY})\\s*-->`, "gi");
+  for (const m of markdown.matchAll(re)) {
+    const raw = m[1];
+    if (raw === undefined) continue;
+    try {
+      out.add(assertValidMarkerId(raw));
+    } catch {
+      /* ignore malformed ids on that line */
+    }
+  }
+  return out;
+}
+
+/**
+ * Detects two or more well-formed marker regions whose **inner** 1-based inclusive line ranges
+ * intersect. Adjacent regions (last inner line N, next inner starts N+1) do not overlap.
+ */
+export function validateOverlappingMarkerInnerRangesInSource(
+  sourceText: string,
+  sourcePath: string,
+): MarkerValidationIssue[] {
+  const text = sourceText.replaceAll("\r\n", "\n");
+  const pairs = findCommentrayMarkerPairs(text);
+  type Rng = { id: string; start: number; end: number };
+  const ranges: Rng[] = [];
+  for (const pair of pairs) {
+    const r = sourceLineRangeForMarkerId(text, pair.id);
+    if (r === null) continue;
+    ranges.push({ id: pair.id, start: r.start, end: r.end });
+  }
+  const issues: MarkerValidationIssue[] = [];
+  for (let i = 0; i < ranges.length; i++) {
+    const a = ranges[i];
+    if (a === undefined) continue;
+    for (let j = i + 1; j < ranges.length; j++) {
+      const b = ranges[j];
+      if (b === undefined) continue;
+      if (a.end < b.start || b.end < a.start) continue;
+      issues.push({
+        level: "error",
+        message:
+          `${sourcePath}: commentray regions "${a.id}" (inner lines ${a.start}–${a.end}) and "${b.id}" ` +
+          `(${b.start}–${b.end}) overlap. Regions in the same primary file must not share source lines — ` +
+          `close one region before the other begins, or split the file.`,
+      });
+    }
+  }
+  return issues;
+}
 
 /**
  * Scans a single source file for Commentray region / marker boundaries and reports:
@@ -66,6 +121,7 @@ export function validateMarkerBoundariesInSource(
     });
   }
 
+  issues.push(...validateOverlappingMarkerInnerRangesInSource(sourceText, sourcePath));
   return issues;
 }
 
@@ -132,17 +188,39 @@ function orphanRegionIssues(
   index: CommentrayIndex,
   indexedSourceTexts: Map<string, string>,
   claimedBySourceNorm: Map<string, Set<string>>,
+  markdownBlockIdsBySourceNorm: Map<string, Set<string>> | undefined,
 ): MarkerValidationIssue[] {
   const issues: MarkerValidationIssue[] = [];
   const orphanWarned = new Set<string>();
   for (const [norm, text] of indexedSourceTexts) {
     const pairs = findCommentrayMarkerPairs(text);
     const claimed = claimedBySourceNorm.get(norm) ?? new Set();
+    const mdIds = markdownBlockIdsBySourceNorm?.get(norm);
     const displayPath = displaySourcePathForNorm(index, norm);
     for (const pair of pairs) {
-      if (claimed.has(pair.id)) continue;
       const dedupe = `${norm}\0${pair.id}`;
       if (orphanWarned.has(dedupe)) continue;
+
+      if (markdownBlockIdsBySourceNorm !== undefined) {
+        const inMd = mdIds?.has(pair.id) ?? false;
+        if (inMd) continue;
+        orphanWarned.add(dedupe);
+        const indexed = claimed.has(pair.id);
+        const tail = indexed
+          ? ` An indexed block uses anchor marker:${pair.id}, but no companion markdown line ` +
+            `\`<!-- commentray:block id=${pair.id} -->\` was found for this primary (add the marker or fix the path).`
+          : ` No indexed block uses anchor marker:${pair.id}, and no companion markdown references this id.`;
+        issues.push({
+          level: "warn",
+          message:
+            `Primary "${displayPath}" has a commentray region "${pair.id}" (delimiter lines ` +
+            `${pair.startLine0 + 1} and ${pair.endLine0 + 1}) that is not referenced by any ` +
+            `\`<!-- commentray:block id=${pair.id} -->\` line in companion markdown for this primary.${tail}`,
+        });
+        continue;
+      }
+
+      if (claimed.has(pair.id)) continue;
       orphanWarned.add(dedupe);
       issues.push({
         level: "warn",
@@ -159,17 +237,22 @@ function orphanRegionIssues(
 
 /**
  * For each `marker:` block, ensures the primary file contains a well-formed paired
- * region that resolves to a non-empty span. Warns when a paired region exists in
- * the primary but no indexed block claims `marker:<id>` (orphan region).
+ * region that resolves to a non-empty span.
+ *
+ * When `markdownBlockIdsBySourceNorm` is set (repo validation), warns for **orphan** regions: a
+ * paired delimiter id in the primary that has no matching `<!-- commentray:block id=… -->` in any
+ * indexed companion markdown for that primary. When it is omitted (tests), the legacy rule
+ * applies: warn only when no indexed block claims `marker:<id>`.
  */
 export function validateMarkerRegionsAgainstIndexedSources(
   index: CommentrayIndex,
   indexedSourceTexts: Map<string, string>,
+  markdownBlockIdsBySourceNorm?: Map<string, Set<string>>,
 ): MarkerValidationIssue[] {
   const claimed = claimedMarkerIdsByNormalizedSource(index);
   return [
     ...unresolvedMarkerAnchorIssues(index, indexedSourceTexts),
-    ...orphanRegionIssues(index, indexedSourceTexts, claimed),
+    ...orphanRegionIssues(index, indexedSourceTexts, claimed, markdownBlockIdsBySourceNorm),
   ];
 }
 
