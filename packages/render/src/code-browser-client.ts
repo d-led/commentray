@@ -1939,8 +1939,8 @@ function isNarrowViewport(): boolean {
 }
 
 function clearOpenWideModeIntroTour(): void {
-  for (const el of Array.from(document.querySelectorAll(".commentray-wide-intro__target"))) {
-    if (el instanceof HTMLElement) el.classList.remove("commentray-wide-intro__target");
+  for (const el of Array.from(document.querySelectorAll(".commentray-wide-intro-target"))) {
+    if (el instanceof HTMLElement) el.classList.remove("commentray-wide-intro-target");
   }
   const open = document.getElementById("commentray-wide-intro");
   if (open instanceof HTMLElement) open.remove();
@@ -2009,12 +2009,12 @@ function createWideIntroElements(): WideIntroElements | null {
   bubble.setAttribute("role", "dialog");
   bubble.setAttribute("aria-live", "polite");
   bubble.innerHTML = `
-    <span class="commentray-wide-intro__pointer" aria-hidden="true"></span>
-    <p class="commentray-wide-intro__title"></p>
-    <p class="commentray-wide-intro__body"></p>
-    <div class="commentray-wide-intro__footer">
-      <span class="commentray-wide-intro__progress"></span>
-      <div class="commentray-wide-intro__actions">
+    <span class="commentray-wide-intro-pointer" aria-hidden="true"></span>
+    <p class="commentray-wide-intro-title"></p>
+    <p class="commentray-wide-intro-body"></p>
+    <div class="commentray-wide-intro-footer">
+      <span class="commentray-wide-intro-progress"></span>
+      <div class="commentray-wide-intro-actions">
         <button type="button" data-wide-intro="back">Back</button>
         <button type="button" data-wide-intro="next">Next</button>
         <button type="button" data-wide-intro="skip">Skip</button>
@@ -2023,9 +2023,9 @@ function createWideIntroElements(): WideIntroElements | null {
   `;
   document.body.appendChild(bubble);
 
-  const titleEl = bubble.querySelector(".commentray-wide-intro__title");
-  const bodyEl = bubble.querySelector(".commentray-wide-intro__body");
-  const progressEl = bubble.querySelector(".commentray-wide-intro__progress");
+  const titleEl = bubble.querySelector(".commentray-wide-intro-title");
+  const bodyEl = bubble.querySelector(".commentray-wide-intro-body");
+  const progressEl = bubble.querySelector(".commentray-wide-intro-progress");
   const backBtn = bubble.querySelector('button[data-wide-intro="back"]');
   const nextBtn = bubble.querySelector('button[data-wide-intro="next"]');
   const skipBtn = bubble.querySelector('button[data-wide-intro="skip"]');
@@ -2133,13 +2133,13 @@ function renderWideIntroArrows(
     if (!Number.isFinite(length) || length < 12) continue;
 
     const arrow = document.createElement("span");
-    arrow.className = "commentray-wide-intro__arrow";
+    arrow.className = "commentray-wide-intro-arrow";
     arrow.style.left = `${String(Math.round(startX))}px`;
     arrow.style.top = `${String(Math.round(startY))}px`;
     arrow.style.width = `${String(Math.round(length))}px`;
     arrow.style.setProperty("--wide-intro-arrow-angle", `${String(Math.atan2(dy, dx))}rad`);
     const head = document.createElement("span");
-    head.className = "commentray-wide-intro__arrow-head";
+    head.className = "commentray-wide-intro-arrow-head";
     arrow.appendChild(head);
     arrowLayer.appendChild(arrow);
   }
@@ -2160,7 +2160,7 @@ function wireWideModeIntroTour(shell: HTMLElement, opts?: { force?: boolean }): 
   const { bubble, arrowLayer, titleEl, bodyEl, progressEl, backBtn, nextBtn, skipBtn } = elements;
 
   const closeTour = (): void => {
-    for (const el of highlighted) el.classList.remove("commentray-wide-intro__target");
+    for (const el of highlighted) el.classList.remove("commentray-wide-intro-target");
     highlighted = [];
     arrowLayer.remove();
     bubble.remove();
@@ -2200,9 +2200,9 @@ function wireWideModeIntroTour(shell: HTMLElement, opts?: { force?: boolean }): 
     const step = steps[current];
     const targets = wideIntroTargetsForCurrentStep(steps, current);
     if (!step || targets.length === 0) return;
-    for (const el of highlighted) el.classList.remove("commentray-wide-intro__target");
+    for (const el of highlighted) el.classList.remove("commentray-wide-intro-target");
     highlighted = targets;
-    for (const el of highlighted) el.classList.add("commentray-wide-intro__target");
+    for (const el of highlighted) el.classList.add("commentray-wide-intro-target");
     titleEl.textContent = step.title;
     bodyEl.textContent = step.body;
     progressEl.textContent = `${String(current + 1)} / ${String(steps.length)}`;

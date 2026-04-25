@@ -16,6 +16,5 @@ if [[ ! -x "${BIN}" ]]; then
   exit 1
 fi
 
-if "${BIN}" --allow-empty-input "**/*.css" "**/*.scss"; then
-  echo "Stylelint: no findings (clean)." >&2
-fi
+"${BIN}" --allow-empty-input "**/*.css" "**/*.scss"
+echo "Stylelint: no findings (clean)." >&2

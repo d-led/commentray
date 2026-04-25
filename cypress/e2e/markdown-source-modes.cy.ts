@@ -4,7 +4,7 @@ const WIDE_MODE_INTRO_STORAGE_KEY = "commentray.codeCommentrayStatic.wideModeInt
 const SOURCE_PANE_MODE_STORAGE_KEY = "commentray.codeCommentrayStatic.sourceMarkdownPaneMode";
 
 function expectVisibleArrows(count: number): void {
-  cy.get("#commentray-wide-intro-arrows .commentray-wide-intro__arrow")
+  cy.get("#commentray-wide-intro-arrows .commentray-wide-intro-arrow")
     .should("have.length", count)
     .each(($arrow) => {
       const el = $arrow[0];
@@ -19,7 +19,7 @@ function expectVisibleArrows(count: number): void {
 function expectArrowStartsOutsideBubble(): void {
   cy.get("#commentray-wide-intro").then(($bubble) => {
     const bubbleRect = $bubble[0].getBoundingClientRect();
-    cy.get("#commentray-wide-intro-arrows .commentray-wide-intro__arrow").each(($arrow) => {
+    cy.get("#commentray-wide-intro-arrows .commentray-wide-intro-arrow").each(($arrow) => {
       const arrowRect = $arrow[0].getBoundingClientRect();
       const startInsideBubble =
         arrowRect.left >= bubbleRect.left &&
@@ -126,7 +126,7 @@ describe("Markdown source rendering modes", () => {
     });
 
     cy.get("#commentray-wide-intro").should("be.visible");
-    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Welcome").should(
+    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
       "be.visible",
     );
     cy.get('#commentray-wide-intro button[data-wide-intro="skip"]').click();
@@ -152,14 +152,14 @@ describe("Markdown source rendering modes", () => {
     });
 
     cy.get("#commentray-wide-intro").should("be.visible");
-    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Welcome").should(
+    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
       "be.visible",
     );
     expectVisibleArrows(2);
     expectArrowStartsOutsideBubble();
 
     cy.get('#commentray-wide-intro button[data-wide-intro="next"]').click();
-    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Two views").should(
+    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Two views").should(
       "be.visible",
     );
     expectVisibleArrows(2);
@@ -178,13 +178,13 @@ describe("Markdown source rendering modes", () => {
     expectVisibleArrows(2);
 
     cy.viewport(390, 844);
-    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Welcome").should(
+    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
       "be.visible",
     );
     expectVisibleArrows(1);
 
     cy.viewport(1280, 900);
-    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Welcome").should(
+    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
       "be.visible",
     );
     expectVisibleArrows(2);
@@ -198,14 +198,14 @@ describe("Markdown source rendering modes", () => {
       },
     });
     cy.get("#commentray-wide-intro").should("be.visible");
-    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Welcome").should(
+    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
       "be.visible",
     );
     cy.get('#commentray-wide-intro button[data-wide-intro="next"]').click();
-    cy.contains("#commentray-wide-intro .commentray-wide-intro__title", "Two views").should(
+    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Two views").should(
       "be.visible",
     );
-    cy.contains("#commentray-wide-intro .commentray-wide-intro__body", "narrow view").should(
+    cy.contains("#commentray-wide-intro .commentray-wide-intro-body", "narrow view").should(
       "be.visible",
     );
   });
