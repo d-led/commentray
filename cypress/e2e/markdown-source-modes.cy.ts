@@ -1,8 +1,19 @@
 import { shellA11y } from "../support/shell-a11y";
 
 const WIDE_MODE_INTRO_STORAGE_KEY = "commentray.codeCommentrayStatic.wideModeIntro.v1";
+const SOURCE_PANE_MODE_STORAGE_KEY = "commentray.codeCommentrayStatic.sourceMarkdownPaneMode";
 
 describe("Markdown source rendering modes", () => {
+  it("starts in rendered markdown even if prior storage asked for source", () => {
+    cy.viewport(1280, 900);
+    cy.visit("/", {
+      onBeforeLoad(win) {
+        win.localStorage.setItem(SOURCE_PANE_MODE_STORAGE_KEY, "source");
+      },
+    });
+    cy.get(shellA11y.shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
+  });
+
   it("keeps doc-to-source scroll sync when left pane shows rendered markdown (wide)", () => {
     cy.viewport(1280, 900);
     cy.visit("/");
@@ -58,6 +69,20 @@ describe("Markdown source rendering modes", () => {
     cy.get("#source-markdown-pane-flip").click();
     cy.get(shellA11y.shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
     cy.get(shellA11y.wrapLinesLabel).should("not.be.visible");
+    cy.get(shellA11y.wrapLinesLabel).should("have.css", "display", "none");
+  });
+
+  it("keeps the narrow source/render toggle square", () => {
+    cy.viewport(390, 844);
+    cy.visit("/");
+    cy.get(shellA11y.mobilePaneFlip).click();
+    cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane", "code");
+    cy.get("#source-markdown-pane-flip")
+      .should("be.visible")
+      .then(($btn) => {
+        const rect = $btn[0].getBoundingClientRect();
+        expect(Math.abs(rect.width - rect.height)).to.be.lessThan(1.5);
+      });
   });
 
   it("shows wide-mode intro tour once and persists dismissal", () => {

@@ -1034,6 +1034,7 @@ const CODE_BROWSER_STYLES = `
       }
       .app__footer-attribution__version { font-weight: 600; }
       .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+      .toolbar label[hidden] { display: none !important; }
       .toolbar-wrap-lines {
         position: relative;
         margin: 0;
