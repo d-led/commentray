@@ -34,6 +34,13 @@ Cypress.Commands.add("OpenCommentRayedFilesDisclosure", () => {
   cy.contains("summary", "Comment-rayed files").click();
 });
 
+/** Closes the Comment-rayed files `<details>` hub via Escape (filter field is focused when open). */
+Cypress.Commands.add("CloseCommentRayedFilesHubWithEscape", () => {
+  cy.get("#documented-files-hub").should("have.prop", "open", true);
+  cy.get("#documented-files-filter").focus().type("{esc}");
+  cy.get("#documented-files-hub").should("have.prop", "open", false);
+});
+
 Cypress.Commands.add("CommentRayedFilesTreeShouldExposeAtLeastOneFileLink", () => {
   cy.get('[role="tree"]', { timeout: 15000 })
     .find("a")

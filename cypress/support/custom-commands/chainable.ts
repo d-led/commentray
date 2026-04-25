@@ -62,6 +62,7 @@ declare global {
       DocumentationHomeLinkShouldPointToRelativeIndex(): Chainable<void>;
       ShellPairBrowseLinkShouldAdvertiseOnSiteBrowsePage(): Chainable<void>;
       OpenCommentRayedFilesDisclosure(): Chainable<void>;
+      CloseCommentRayedFilesHubWithEscape(): Chainable<void>;
       CommentRayedFilesTreeShouldExposeAtLeastOneFileLink(): Chainable<void>;
       FollowFirstBrowseFileLinkInTree(): Chainable<void>;
       ShellPairBrowseLinkShouldAvoidStackedBrowseSegments(): Chainable<void>;

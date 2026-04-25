@@ -24,6 +24,12 @@ describe("The Commentray GitHub Pages static build", () => {
       cy.CommentRayedFilesTreeShouldExposeAtLeastOneFileLink();
     });
 
+    it("closes the Comment-rayed files hub when Escape is pressed", () => {
+      cy.OpenCommentRayedFilesDisclosure();
+      cy.CommentRayedFilesTreeShouldExposeAtLeastOneFileLink();
+      cy.CloseCommentRayedFilesHubWithEscape();
+    });
+
     it("keeps pair-browse routes from stacking under repeated /browse/ segments", () => {
       cy.OpenCommentRayedFilesDisclosure();
       cy.FollowFirstBrowseFileLinkInTree();
