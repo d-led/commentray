@@ -66,6 +66,11 @@ export type CommentrayOutputUrlOptions = {
    * image so the HTML writer can `copyFile` after render.
    */
   companionStaticAssetCopies?: CommentrayStaticAssetCopy[];
+  /**
+   * Optional prefix for local repo file links when static hosting does not serve the source tree.
+   * Supported forms: absolute `http(s)` URL prefix or absolute path prefix (`/...`).
+   */
+  sourceLinkPrefix?: string;
 };
 
 export type MarkdownPipelineOptions = {
@@ -147,6 +152,33 @@ function isResolvedPathInsideRoot(resolvedAbs: string, rootAbs: string): boolean
   return true;
 }
 
+function normalizeSourceLinkPrefix(raw: string): string | null {
+  const t = raw.trim();
+  if (t.length === 0) return null;
+  if (t.startsWith("/")) return t.replace(/\/+$/, "");
+  let u: URL;
+  try {
+    u = new URL(t);
+  } catch {
+    return null;
+  }
+  const proto = u.protocol.toLowerCase();
+  if (proto !== "http:" && proto !== "https:") return null;
+  return t.replace(/\/+$/, "");
+}
+
+function prefixedSourceHref(prefix: string, repoRoot: string, resolvedAbs: string): string | null {
+  const rel = path.relative(repoRoot, resolvedAbs);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  const tail = rel
+    .split(path.sep)
+    .filter((seg) => seg.length > 0)
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
+  if (tail.length === 0) return null;
+  return `${prefix}/${tail}`;
+}
+
 type LocalUrlRewrite = { relativeToHtml: string } | { blockedImage: true } | null;
 
 function skipNonFilesystemLocalUrl(raw: string): boolean {
@@ -203,6 +235,7 @@ function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
   const htmlDir = path.dirname(path.resolve(ctx.htmlOutputFileAbs));
   const baseDir = path.resolve(ctx.markdownUrlBaseDirAbs);
   const siteRootAbs = ctx.staticSiteOutDirAbs ? path.resolve(ctx.staticSiteOutDirAbs) : null;
+  const sourceLinkPrefix = normalizeSourceLinkPrefix(ctx.sourceLinkPrefix ?? "");
   const mirrorCopies = ctx.companionStaticAssetCopies;
   const mirroredToAbs = new Set<string>();
 
@@ -229,6 +262,16 @@ function rehypeCommentrayOutputUrls(ctx: CommentrayOutputUrlOptions) {
 
     const out = path.relative(htmlDir, targetAbsForUrl);
     if (path.isAbsolute(out)) return null;
+
+    if (
+      tagName === "a" &&
+      sourceLinkPrefix &&
+      siteRootAbs &&
+      !isResolvedPathInsideRoot(targetAbsForUrl, siteRootAbs)
+    ) {
+      const prefixed = prefixedSourceHref(sourceLinkPrefix, repoRoot, resolved);
+      if (prefixed) return { relativeToHtml: prefixed };
+    }
 
     return { relativeToHtml: posixHref(out) };
   }

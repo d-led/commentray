@@ -39,6 +39,8 @@ export type CommentrayToml = {
     /** Markdown shown above the optional commentray file and GitHub link. */
     intro?: string;
     github_url?: string;
+    /** Optional prefix used for source links when static hosting does not serve repo files. */
+    source_link_prefix?: string;
     /** Repo-relative path to the source file shown in the code pane (default README.md). */
     default_source_file?: string;
     /** Repo-relative path to the source file shown in the code pane (default README.md). */
@@ -69,6 +71,8 @@ export type ResolvedStaticSite = {
   title: string;
   introMarkdown: string;
   githubUrl: string | null;
+  /** Optional source link prefix for published pages (e.g. GitHub blob base or `/src`). */
+  sourceLinkPrefix: string | null;
   /** Branch used when building `relatedGithubNav` blob URLs. */
   githubBlobBranch: string;
   sourceFile: string;
@@ -99,6 +103,7 @@ const defaultStaticSite: ResolvedStaticSite = {
   title: "Commentray",
   introMarkdown: "",
   githubUrl: null,
+  sourceLinkPrefix: null,
   githubBlobBranch: "main",
   sourceFile: "README.md",
   defaultAngleId: null,
@@ -257,6 +262,7 @@ function resolveStaticSite(parsed: CommentrayToml, storageDir: string): Resolved
     title: nonEmptyTrimmed(ss?.title) ?? defaultStaticSite.title,
     introMarkdown: ss?.intro ?? defaultStaticSite.introMarkdown,
     githubUrl,
+    sourceLinkPrefix: nonEmptyTrimmed(ss?.source_link_prefix),
     githubBlobBranch,
     sourceFile,
     defaultAngleId,
@@ -270,6 +276,26 @@ function resolveStaticSite(parsed: CommentrayToml, storageDir: string): Resolved
   };
 }
 
+function assertValidSourceLinkPrefix(value: string | undefined): void {
+  if (!value?.trim()) return;
+  const t = value.trim();
+  if (t.startsWith("/")) return;
+  let u: URL;
+  try {
+    u = new URL(t);
+  } catch {
+    throw new Error(
+      `.commentray.toml static_site.source_link_prefix must be an absolute path prefix or http(s) URL (got: ${value})`,
+    );
+  }
+  const proto = u.protocol.toLowerCase();
+  if (proto !== "http:" && proto !== "https:") {
+    throw new Error(
+      `.commentray.toml static_site.source_link_prefix must be an absolute path prefix or http(s) URL (got: ${value})`,
+    );
+  }
+}
+
 function assertSafeConfigPaths(parsed: CommentrayToml): void {
   assertSafeRepoRelativePath("storage.dir", parsed.storage?.dir);
   assertStorageDirNotInsideGit(parsed.storage?.dir);
@@ -278,6 +304,7 @@ function assertSafeConfigPaths(parsed: CommentrayToml): void {
   assertSafeRepoRelativePath("static_site.source_file", ss?.source_file);
   assertSafeRepoRelativePath("static_site.commentray_markdown", ss?.commentray_markdown);
   assertSafeRepoRelativePath("static_site.commentary_markdown", ss?.commentary_markdown);
+  assertValidSourceLinkPrefix(ss?.source_link_prefix);
   for (let i = 0; i < (ss?.related_github_files?.length ?? 0); i++) {
     assertSafeRepoRelativePath(
       `static_site.related_github_files[${i}].path`,

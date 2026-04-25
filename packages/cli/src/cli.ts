@@ -236,6 +236,13 @@ async function cmdRender(opts: RenderCliOptions & { mermaid: boolean }) {
     htmlOutputFileAbs: outPath,
     markdownUrlBaseDirAbs: path.dirname(mdAbs),
     commentrayStorageRootAbs,
+    sourceLinkPrefix:
+      cfg.staticSite.sourceLinkPrefix ??
+      (ghParsed
+        ? `https://github.com/${encodeURIComponent(ghParsed.owner)}/${encodeURIComponent(
+            ghParsed.repo,
+          )}/blob/${encodeURIComponent(cfg.staticSite.githubBlobBranch)}`
+        : undefined),
     ...(ghParsed ? { githubBlobRepo: { owner: ghParsed.owner, repo: ghParsed.repo } } : {}),
   };
   const html = await renderSideBySideHtml({

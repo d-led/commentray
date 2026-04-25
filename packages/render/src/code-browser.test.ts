@@ -1,4 +1,7 @@
 import { Buffer } from "node:buffer";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 import { CURRENT_SCHEMA_VERSION } from "@commentray/core";
 import { describe, expect, it } from "vitest";
@@ -366,6 +369,79 @@ describe("Code browser page — file path display", () => {
     });
     expect(html).not.toContain("<script>x</script>/evil.ts");
     expect(html).toContain("&lt;script&gt;x&lt;/script&gt;/");
+  });
+});
+
+describe("Code browser page — source markdown link resolution", () => {
+  it("resolves rendered source-markdown links from the source tree, not companion storage", async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), "cr-source-pane-link-"));
+    const repoRoot = path.join(tmp, "repo");
+    const storageRoot = path.join(repoRoot, ".commentray");
+    await mkdir(path.join(repoRoot, "docs", "user"), { recursive: true });
+    await mkdir(storageRoot, { recursive: true });
+    await writeFile(
+      path.join(repoRoot, "README.md"),
+      "# Hello\n\n[Install](docs/user/install.md)\n",
+      "utf8",
+    );
+    await writeFile(path.join(repoRoot, "docs", "user", "install.md"), "# Install\n", "utf8");
+    const outHtml = path.join(repoRoot, "_site", "browse", "pair.html");
+    await mkdir(path.dirname(outHtml), { recursive: true });
+
+    const html = await renderCodeBrowserHtml({
+      filePath: "README.md",
+      code: "# Hello\n\n[Install](docs/user/install.md)\n",
+      language: "md",
+      commentrayMarkdown: "Companion docs",
+      commentrayOutputUrls: {
+        repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: path.join(storageRoot, "source", "README.md"),
+        commentrayStorageRootAbs: storageRoot,
+      },
+    });
+
+    expect(html).toContain('href="../../docs/user/install.md"');
+    expect(html).not.toContain(".commentray/source/README.md/docs/user/install.md");
+  });
+
+  it("keeps pair browse links stable while resolving source-markdown links from source tree", async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), "cr-source-pane-pair-link-"));
+    const repoRoot = path.join(tmp, "repo");
+    const storageRoot = path.join(repoRoot, ".commentray");
+    await mkdir(path.join(repoRoot, "docs", "user"), { recursive: true });
+    await mkdir(storageRoot, { recursive: true });
+    await writeFile(
+      path.join(repoRoot, "README.md"),
+      "# Hello\n\n[Install](docs/user/install.md)\n",
+      "utf8",
+    );
+    await writeFile(path.join(repoRoot, "docs", "user", "install.md"), "# Install\n", "utf8");
+    const outHtml = path.join(repoRoot, "_site", "browse", "pair.html");
+    await mkdir(path.dirname(outHtml), { recursive: true });
+
+    const html = await renderCodeBrowserHtml({
+      filePath: "README.md",
+      code: "# Hello\n\n[Install](docs/user/install.md)\n",
+      language: "md",
+      commentrayMarkdown: "Companion docs",
+      commentrayPathForSearch: ".commentray/source/README.md/main.md",
+      commentrayOnGithubUrl:
+        "https://github.com/acme/demo/blob/main/.commentray/source/README.md/main.md",
+      commentrayStaticBrowseUrl: "./browse/readme@main.html",
+      commentrayOutputUrls: {
+        repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: path.join(storageRoot, "source", "README.md"),
+        commentrayStorageRootAbs: storageRoot,
+      },
+    });
+
+    expect(html).toContain('href="../../docs/user/install.md"');
+    expect(html).toContain('data-commentray-pair-browse-href="./browse/readme@main.html"');
+    expect(html).not.toContain(
+      'data-commentray-pair-browse-href="https://github.com/acme/demo/blob/main/.commentray/source/README.md/main.md"',
+    );
   });
 });
 

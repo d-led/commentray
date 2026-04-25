@@ -45,18 +45,19 @@ On-disk **multi-angle layout** is enabled only when **`{storage.dir}/source/.def
 
 Single-page static **code + commentray** settings (GitHub Pages, `commentray render`, etc.).
 
-| Key                                        | Default      | Meaning                                                                                                             |
-| ------------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------- |
-| **`title`**                                | `Commentray` | HTML `<title>` / heading context.                                                                                   |
-| **`intro`**                                | empty        | Markdown above the panes.                                                                                           |
-| **`github_url`**                           | empty        | Repo home URL for toolbar link and optional blob rewriting.                                                         |
-| **`default_source_file`**                  | `README.md`  | Repo-relative source opened by default on the static hub (`index.html`).                                            |
-| **`default_angle`**                        | empty        | Angle id used for the hub’s default companion file (`.commentray/source/{default_source_file}/{default_angle}.md`). |
-| **`source_file`**                          | —            | **Deprecated**; use **`default_source_file`**.                                                                      |
-| **`commentray_markdown`**                  | empty        | Optional explicit companion Markdown path for the hub default pair (overrides `default_angle` derivation).          |
-| **`commentary_markdown`**                  | —            | **Deprecated**; use **`commentray_markdown`**.                                                                      |
-| **`github_blob_branch`**                   | `main`       | Branch segment for **`related_github_files`** blob URLs.                                                            |
-| **`[[static_site.related_github_files]]`** | none         | Optional **`path`** (repo-relative) and **`label`** for toolbar “also on GitHub” links.                             |
+| Key                                        | Default      | Meaning                                                                                                                                                         |
+| ------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`title`**                                | `Commentray` | HTML `<title>` / heading context.                                                                                                                               |
+| **`intro`**                                | empty        | Markdown above the panes.                                                                                                                                       |
+| **`github_url`**                           | empty        | Repo home URL for toolbar link and optional blob rewriting.                                                                                                     |
+| **`source_link_prefix`**                   | empty        | Optional prefix for rendered **source-markdown** links when `_site/` does not host repo files (for example `https://github.com/acme/repo/blob/main` or `/src`). |
+| **`default_source_file`**                  | `README.md`  | Repo-relative source opened by default on the static hub (`index.html`).                                                                                        |
+| **`default_angle`**                        | empty        | Angle id used for the hub’s default companion file (`.commentray/source/{default_source_file}/{default_angle}.md`).                                             |
+| **`source_file`**                          | —            | **Deprecated**; use **`default_source_file`**.                                                                                                                  |
+| **`commentray_markdown`**                  | empty        | Optional explicit companion Markdown path for the hub default pair (overrides `default_angle` derivation).                                                      |
+| **`commentary_markdown`**                  | —            | **Deprecated**; use **`commentray_markdown`**.                                                                                                                  |
+| **`github_blob_branch`**                   | `main`       | Branch segment for **`related_github_files`** blob URLs.                                                                                                        |
+| **`[[static_site.related_github_files]]`** | none         | Optional **`path`** (repo-relative) and **`label`** for toolbar “also on GitHub” links.                                                                         |
 
 ## Canonical spec
 

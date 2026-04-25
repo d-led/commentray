@@ -162,6 +162,20 @@ function preferredSourceAliasTarget(
   );
 }
 
+function staticSourceLinkPrefix(
+  ss: ResolvedStaticSite,
+  ghNavBase: GithubNavBase | null,
+  relativeGithubBlobLinks: boolean,
+): string | undefined {
+  const explicit = ss.sourceLinkPrefix?.trim();
+  if (explicit) return explicit;
+  if (!relativeGithubBlobLinks) return undefined;
+  if (!ghNavBase) return undefined;
+  return `https://github.com/${encodeURIComponent(ghNavBase.owner)}/${encodeURIComponent(
+    ghNavBase.repo,
+  )}/blob/${encodeURIComponent(ghNavBase.branch)}`;
+}
+
 async function writePreferredSourceAliasPages(input: {
   outDir: string;
   sourceAliasTargets: Map<string, Array<{ slug: string; angleId: string; sourcePath: string }>>;
@@ -176,6 +190,29 @@ async function writePreferredSourceAliasPages(input: {
       slug: preferred.slug,
     });
   }
+}
+
+function browseCommentrayOutputUrls(input: {
+  repoRoot: string;
+  outPath: string;
+  markdownUrlBaseDirAbs: string;
+  cfg: ResolvedCommentrayConfig;
+  outDir: string;
+  companionStaticAssetCopies: CommentrayStaticAssetCopy[];
+  sourceLinkPrefix: string | undefined;
+}) {
+  return {
+    repoRootAbs: input.repoRoot,
+    htmlOutputFileAbs: input.outPath,
+    markdownUrlBaseDirAbs: input.markdownUrlBaseDirAbs,
+    commentrayStorageRootAbs: path.resolve(
+      input.repoRoot,
+      input.cfg.storageDir.replaceAll("\\", "/"),
+    ),
+    staticSiteOutDirAbs: input.outDir,
+    companionStaticAssetCopies: input.companionStaticAssetCopies,
+    sourceLinkPrefix: input.sourceLinkPrefix,
+  };
 }
 
 async function writeBrowsePageForPair(input: {
@@ -207,19 +244,20 @@ async function writeBrowsePageForPair(input: {
   if (!(await pathExists(mdAbs)) || !(await pathExists(sourceAbs))) return;
 
   const markdownUrlBaseDirAbs = path.dirname(mdAbs);
-  const commentrayStorageRootAbs = path.resolve(
-    input.repoRoot,
-    input.cfg.storageDir.replaceAll("\\", "/"),
-  );
   const companionStaticAssetCopies: CommentrayStaticAssetCopy[] = [];
-  const commentrayOutputUrls = {
-    repoRootAbs: input.repoRoot,
-    htmlOutputFileAbs: outPath,
+  const commentrayOutputUrls = browseCommentrayOutputUrls({
+    repoRoot: input.repoRoot,
+    outPath,
     markdownUrlBaseDirAbs,
-    commentrayStorageRootAbs,
-    staticSiteOutDirAbs: input.outDir,
+    cfg: input.cfg,
+    outDir: input.outDir,
     companionStaticAssetCopies,
-  };
+    sourceLinkPrefix: staticSourceLinkPrefix(
+      input.ss,
+      input.ghNavBase,
+      input.cfg.render.relativeGithubBlobLinks,
+    ),
+  });
   const multiAngleBrowsing = await multiAngleBrowsingForBrowsePair(
     input.repoRoot,
     input.cfg,
@@ -567,6 +605,7 @@ export async function buildGithubPagesStaticSite(
     commentrayStorageRootAbs,
     staticSiteOutDirAbs: outDir,
     companionStaticAssetCopies,
+    sourceLinkPrefix: staticSourceLinkPrefix(ss, ghNavBase, cfg.render.relativeGithubBlobLinks),
   };
 
   const blockStretchRows = flatBlockStretchRows(projectIndex, ss, Boolean(multiAngleBrowsing));

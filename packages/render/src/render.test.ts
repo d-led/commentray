@@ -318,3 +318,30 @@ describe("Markdown to HTML — static asset URL rewriting (site mirror)", () => 
     expect(companionStaticAssetCopies).toHaveLength(1);
   });
 });
+
+describe("Markdown to HTML — source link prefix fallback", () => {
+  it("rewrites local links to source_link_prefix when target is outside static site root", async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), "cr-source-prefix-"));
+    const repoRoot = path.join(tmp, "repo");
+    const storageRoot = path.join(repoRoot, ".commentray");
+    await mkdir(path.join(repoRoot, "docs", "user"), { recursive: true });
+    await mkdir(storageRoot, { recursive: true });
+    await writeFile(path.join(repoRoot, "docs", "user", "install.md"), "# Install\n", "utf8");
+    const outHtml = path.join(repoRoot, "_site", "browse", "pair.html");
+    await mkdir(path.dirname(outHtml), { recursive: true });
+
+    const html = await renderMarkdownToHtml("[Install](docs/user/install.md)", {
+      commentrayOutputUrls: {
+        repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: repoRoot,
+        commentrayStorageRootAbs: storageRoot,
+        staticSiteOutDirAbs: path.join(repoRoot, "_site"),
+        sourceLinkPrefix: "https://github.com/acme/demo/blob/main",
+      },
+    });
+
+    expect(html).toContain('href="https://github.com/acme/demo/blob/main/docs/user/install.md"');
+    expect(html).not.toContain('href="../../docs/user/install.md"');
+  });
+});

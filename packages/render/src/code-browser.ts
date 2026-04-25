@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import path, { join } from "node:path";
 
 import {
   MARKER_ID_BODY,
@@ -664,8 +664,23 @@ function sourceMarkdownToggleControlsHtml(enabled: boolean): {
 function isMarkdownLikeSource(opts: CodeBrowserPageOptions): boolean {
   const lang = opts.language.trim().toLowerCase();
   if (lang === "md" || lang === "markdown" || lang === "mdx") return true;
-  const path = (opts.filePath ?? "").trim().toLowerCase();
-  return path.endsWith(".md") || path.endsWith(".mdx") || path.endsWith(".markdown");
+  const filePath = (opts.filePath ?? "").trim().toLowerCase();
+  return filePath.endsWith(".md") || filePath.endsWith(".mdx") || filePath.endsWith(".markdown");
+}
+
+/** For source-pane Markdown, resolve local links from the source file directory (repo tree), not companion storage. */
+function sourcePaneOutputUrls(
+  opts: CodeBrowserPageOptions,
+): CommentrayOutputUrlOptions | undefined {
+  const out = opts.commentrayOutputUrls;
+  if (!out) return undefined;
+  const srcRel = (opts.filePath ?? "").trim();
+  if (srcRel.length === 0) return out;
+  const repoRoot = path.resolve(out.repoRootAbs);
+  const candidate = path.resolve(repoRoot, srcRel);
+  const rel = path.relative(repoRoot, candidate);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return out;
+  return { ...out, markdownUrlBaseDirAbs: path.dirname(candidate) };
 }
 
 /** Plain-text Src/Doc labels above the panes; column widths track the resizable split via `--split-pct`. */
@@ -2604,11 +2619,12 @@ async function buildMultiAngleDualPaneShell(
 
   const sourceMarkdownEnabled = isMarkdownLikeSource(opts);
   const sourceMdForPane = sourceMarkdownEnabled ? injectSourceMarkdownAnchors(opts.code) : "";
+  const sourcePaneUrls = sourcePaneOutputUrls(opts);
   const [codeHtml, sourceMarkdownPaneHtml] = await Promise.all([
     renderHighlightedCodeLineRows(opts.code, opts.language),
     sourceMarkdownEnabled
       ? renderMarkdownToHtml(sourceMdForPane, {
-          commentrayOutputUrls: opts.commentrayOutputUrls,
+          commentrayOutputUrls: sourcePaneUrls,
         })
       : Promise.resolve(""),
   ]);
@@ -2722,6 +2738,7 @@ async function buildCodeBrowserShell(
     }
     const sourceMarkdownEnabled = isMarkdownLikeSource(opts);
     const sourceMdForPane = sourceMarkdownEnabled ? injectSourceMarkdownAnchors(opts.code) : "";
+    const sourcePaneUrls = sourcePaneOutputUrls(opts);
     const [codeHtml, commentrayHtml, sourceMarkdownPaneHtml] = await Promise.all([
       renderHighlightedCodeLineRows(opts.code, opts.language),
       renderMarkdownToHtml(mdForDoc, {
@@ -2729,7 +2746,7 @@ async function buildCodeBrowserShell(
       }),
       sourceMarkdownEnabled
         ? renderMarkdownToHtml(sourceMdForPane, {
-            commentrayOutputUrls: opts.commentrayOutputUrls,
+            commentrayOutputUrls: sourcePaneUrls,
           })
         : Promise.resolve(""),
     ]);

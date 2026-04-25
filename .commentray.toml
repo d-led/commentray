@@ -15,6 +15,8 @@ defaultStrategy = [ "symbol", "lines" ]
 [static_site]
 title = "Commentray"
 github_url = "https://github.com/d-led/commentray"
+# Optional source-link base when _site/ doesn't host repo files:
+# source_link_prefix = "https://github.com/d-led/commentray/blob/main"
 default_source_file = "README.md"
 default_angle = "main"
 github_blob_branch = "main"

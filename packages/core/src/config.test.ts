@@ -31,6 +31,7 @@ describe("Merging Commentray TOML configuration", () => {
         title: "Docs",
         intro: "## Hello",
         github_url: "https://github.com/a/b",
+        source_link_prefix: "https://github.com/a/b/blob/main",
         default_source_file: "src/index.ts",
         default_angle: "architecture",
       },
@@ -38,6 +39,7 @@ describe("Merging Commentray TOML configuration", () => {
     expect(cfg.staticSite.title).toBe("Docs");
     expect(cfg.staticSite.introMarkdown).toBe("## Hello");
     expect(cfg.staticSite.githubUrl).toBe("https://github.com/a/b");
+    expect(cfg.staticSite.sourceLinkPrefix).toBe("https://github.com/a/b/blob/main");
     expect(cfg.staticSite.sourceFile).toBe("src/index.ts");
     expect(cfg.staticSite.defaultAngleId).toBe("architecture");
     expect(cfg.staticSite.commentrayMarkdownFile).toBe(
@@ -142,6 +144,15 @@ commentray_markdown = """
     expect(() =>
       mergeCommentrayConfig({ static_site: { commentray_markdown: "../outside.md" } }),
     ).toThrow(/static_site\.commentray_markdown/);
+  });
+
+  it("rejects invalid static_site.source_link_prefix", () => {
+    expect(() =>
+      mergeCommentrayConfig({ static_site: { source_link_prefix: "javascript:alert(1)" } }),
+    ).toThrow(/static_site\.source_link_prefix/);
+    expect(() =>
+      mergeCommentrayConfig({ static_site: { source_link_prefix: "relative/prefix" } }),
+    ).toThrow(/static_site\.source_link_prefix/);
   });
 
   describe("Rejecting storage.dir inside the .git directory", () => {

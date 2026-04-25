@@ -257,4 +257,33 @@ describe("GitHub Pages static site output", () => {
     const indexHtml = await readFile(path.join(repo, "_site", "index.html"), "utf8");
     expect(indexHtml).toMatch(/commentray-static-assets\/source\/src\/assets\/x\.svg/);
   });
+
+  it("rewrites rendered source-markdown local links to GitHub blob URLs when enabled", async () => {
+    repo = await mkdtemp(path.join(tmpdir(), "cr-pages-src-links-"));
+    await writeFile(
+      path.join(repo, ".commentray.toml"),
+      [
+        "[static_site]",
+        'title = "Src links"',
+        'github_url = "https://github.com/acme/demo"',
+        'source_file = "README.md"',
+        'commentray_markdown = ".commentray/source/README.md.md"',
+        "",
+        "[render]",
+        "mermaid = false",
+        "relative_github_blob_links = true",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await mkdir(path.join(repo, "docs", "user"), { recursive: true });
+    await writeFile(path.join(repo, "README.md"), "[Install](docs/user/install.md)\n", "utf8");
+    await writeFile(path.join(repo, "docs", "user", "install.md"), "# Install\n", "utf8");
+    await mkdir(path.join(repo, ".commentray", "source"), { recursive: true });
+    await writeFile(path.join(repo, ".commentray", "source", "README.md.md"), "# Doc\n", "utf8");
+    await buildGithubPagesStaticSite({ repoRoot: repo });
+    const html = await readFile(path.join(repo, "_site", "index.html"), "utf8");
+    expect(html).toContain('href="https://github.com/acme/demo/blob/main/docs/user/install.md"');
+    expect(html).not.toContain('href="docs/user/install.md"');
+  });
 });
