@@ -39,7 +39,7 @@ describe("Code browser page — layout shell and search", () => {
     }
     const raw = decodeURIComponent(m[1].slice("data:image/svg+xml,".length));
     expect(raw).toContain("M36 20 Q36 14.5 43 14.5");
-    expect(raw).toContain("#fcd34d");
+    expect(raw).toContain("#e8ba26");
   });
 
   it("should embed raw payloads on the shell element for the client bundle", async () => {

@@ -6,6 +6,9 @@ Turn docs/logos/2.jpg-style assets into a clean transparent PNG:
 - Strip light anti-alias fringes at the transparency boundary.
 - Optionally grow the silhouette outward by N pixels (solid navy).
 - Snap every opaque pixel to the nearest flat brand color (no JPEG grain).
+- Nudge small yellow sprocket squares up to ±2px horizontally toward the navy
+  perforation lane center (speech bubble is left unchanged).
+- Remove tiny grey islands (snap noise) so the asset matches three solid windows.
 
 Dependencies: Python 3.10+, Pillow, NumPy (no SciPy).
 
@@ -32,6 +35,11 @@ PALETTE = np.stack([NAVY, GREY, YELLOW], axis=0).astype(np.float32)  # (3, 3)
 BG_LUMA_MIN = 192
 HALO_THRESHOLDS = (88, 80)
 OUTWARD_DILATE_STEPS = 2
+# Nudge small yellow sprocket squares toward the middle of the navy perforation lane (pixels).
+SPROCKET_MAX_AREA = 8000
+SPROCKET_NUDGE_MAX = 2
+# Speckle grey outside the three main windows (snap noise) → navy.
+GREY_ISLAND_MAX_AREA = 500
 
 
 def _binary_dilate(mask: np.ndarray, iterations: int = 1) -> np.ndarray:
@@ -135,6 +143,132 @@ def _snap_opaque_to_palette(rgb: np.ndarray, alpha: np.ndarray) -> None:
     rgb[opaque] = PALETTE[nearest].astype(np.uint8)
 
 
+def _nudge_sprocket_perforations(rgb: np.ndarray, alpha: np.ndarray) -> None:
+    """
+    Shift small yellow components (sprockets, not the speech bubble) a few pixels
+    toward the horizontal center of the navy strip between the outer edge and the grey film.
+    """
+    h, w = alpha.shape
+    opaque = alpha >= 128
+    is_yellow = opaque & np.all(rgb == YELLOW, axis=2)
+    if not is_yellow.any():
+        return
+    grey = opaque & np.all(rgb == GREY, axis=2)
+    navy = opaque & np.all(rgb == NAVY, axis=2)
+
+    visited = np.zeros((h, w), dtype=bool)
+    from collections import deque
+
+    for y0 in range(h):
+        for x0 in range(w):
+            if not is_yellow[y0, x0] or visited[y0, x0]:
+                continue
+            q: deque[tuple[int, int]] = deque([(x0, y0)])
+            visited[y0, x0] = True
+            cells: list[tuple[int, int]] = []
+            while q:
+                x, y = q.popleft()
+                cells.append((x, y))
+                for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                    if (
+                        nx < 0
+                        or nx >= w
+                        or ny < 0
+                        or ny >= h
+                        or visited[ny, nx]
+                        or not is_yellow[ny, nx]
+                    ):
+                        continue
+                    visited[ny, nx] = True
+                    q.append((nx, ny))
+            if len(cells) > SPROCKET_MAX_AREA:
+                continue
+
+            xs = [c[0] for c in cells]
+            ys = [c[1] for c in cells]
+            cx = (min(xs) + max(xs)) / 2.0
+            y_mid = (min(ys) + max(ys)) // 2
+            r0 = max(0, y_mid - 3)
+            r1 = min(h, y_mid + 4)
+            mids: list[float] = []
+            for row in range(r0, r1):
+                gx = np.flatnonzero(grey[row, :])
+                nx = np.flatnonzero(navy[row, :])
+                if gx.size == 0 or nx.size == 0:
+                    continue
+                g_min = int(gx.min())
+                g_max = int(gx.max())
+                if cx < w / 2:
+                    n_left = nx[nx < g_min]
+                    if n_left.size:
+                        n_edge = int(n_left.max())
+                        mids.append((n_edge + g_min) / 2.0)
+                else:
+                    n_right = nx[nx > g_max]
+                    if n_right.size:
+                        n_edge = int(n_right.min())
+                        mids.append((g_max + n_edge) / 2.0)
+            if not mids:
+                continue
+            lane_mid = float(np.median(mids))
+            dx = int(np.round(lane_mid - cx))
+            if dx == 0:
+                continue
+            dx = max(-SPROCKET_NUDGE_MAX, min(SPROCKET_NUDGE_MAX, dx))
+
+            targets = [(x + dx, y) for x, y in cells]
+            if any(
+                nx < 0
+                or nx >= w
+                or alpha[y, nx] < 128
+                or not np.all(rgb[y, nx] == NAVY)
+                for nx, y in targets
+            ):
+                continue
+
+            for x, y in cells:
+                rgb[y, x] = NAVY
+            for nx, y in targets:
+                rgb[y, nx] = YELLOW
+
+
+def _merge_small_grey_islands(rgb: np.ndarray, alpha: np.ndarray) -> None:
+    """Turn tiny grey connected components into navy (palette speckle)."""
+    h, w = alpha.shape
+    opaque = alpha >= 128
+    is_grey = opaque & np.all(rgb == GREY, axis=2)
+    if not is_grey.any():
+        return
+    visited = np.zeros((h, w), dtype=bool)
+    from collections import deque
+
+    for y0 in range(h):
+        for x0 in range(w):
+            if not is_grey[y0, x0] or visited[y0, x0]:
+                continue
+            q: deque[tuple[int, int]] = deque([(x0, y0)])
+            visited[y0, x0] = True
+            cells: list[tuple[int, int]] = []
+            while q:
+                x, y = q.popleft()
+                cells.append((x, y))
+                for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                    if (
+                        nx < 0
+                        or nx >= w
+                        or ny < 0
+                        or ny >= h
+                        or visited[ny, nx]
+                        or not is_grey[ny, nx]
+                    ):
+                        continue
+                    visited[ny, nx] = True
+                    q.append((nx, ny))
+            if len(cells) <= GREY_ISLAND_MAX_AREA:
+                for x, y in cells:
+                    rgb[y, x] = NAVY
+
+
 def process(
     rgb_in: np.ndarray,
     *,
@@ -151,6 +285,8 @@ def process(
     _expand_silhouette_outward(rgb_u8, alpha, outward_px, NAVY)
     if snap_palette:
         _snap_opaque_to_palette(rgb_u8, alpha)
+        _nudge_sprocket_perforations(rgb_u8, alpha)
+        _merge_small_grey_islands(rgb_u8, alpha)
     rgba = np.dstack([rgb_u8, alpha])
     return rgba
 

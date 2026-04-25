@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Rasterize the canonical SVG logo into the PNG icon shipped inside the
-# Commentray VSIX. The Marketplace requires a PNG (SVG is rejected); we
-# regenerate from the SVG source so docs/logos stays the single source of truth.
+# Rasterize the canonical vector logo into the PNG icon shipped inside the
+# Commentray VSIX. The Marketplace requires a PNG (SVG is rejected).
+# Source: `docs/logos/2.svg` (regenerate from `docs/logos/2.png` via
+# `docs/logos/scripts/png-to-svg-trace.py` when the raster changes).
 #
 # Usage:
 #   bash scripts/build-vscode-icon.sh
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_SVG="$REPO_ROOT/docs/logos/1.svg"
+SOURCE_SVG="$REPO_ROOT/docs/logos/2.svg"
 TARGET_PNG="$REPO_ROOT/packages/vscode/icon.png"
 TARGET_SIZE=256
 
-if ! command -v rsvg-convert >/dev/null 2>&1; then
-  echo "rsvg-convert not found. Install with: brew install librsvg" >&2
+if [[ ! -f "$SOURCE_SVG" ]]; then
+  echo "Missing icon source: $SOURCE_SVG" >&2
   exit 1
 fi
 
-if [[ ! -f "$SOURCE_SVG" ]]; then
-  echo "Missing icon source: $SOURCE_SVG" >&2
+if ! command -v rsvg-convert >/dev/null 2>&1; then
+  echo "rsvg-convert not found. Install with: brew install librsvg" >&2
   exit 1
 fi
 
