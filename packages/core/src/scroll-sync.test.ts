@@ -40,6 +40,22 @@ describe("Block scroll link derivation from index and markers", () => {
     ]);
   });
 
+  it("returns no links when the index entry’s stored companion path disagrees with the lookup key", () => {
+    const key = ".commentray/source/README.md/main.md";
+    const mismatched: typeof index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [key]: {
+          sourcePath: "src/a.ts",
+          commentrayPath: ".commentray/source/README.md/architecture.md",
+          blocks: [{ id: "b1", anchor: "lines:1-2" }],
+        },
+      },
+    };
+    const mdOne = "<!-- commentray:block id=b1 -->\n## x\n";
+    expect(buildBlockScrollLinks(mismatched, "src/a.ts", key, mdOne)).toEqual([]);
+  });
+
   it("resolves marker: anchors using Region Marker-style #region delimiters in source", () => {
     const idx = {
       schemaVersion: CURRENT_SCHEMA_VERSION,

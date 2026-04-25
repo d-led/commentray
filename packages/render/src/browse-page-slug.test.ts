@@ -23,7 +23,7 @@ describe("browsePageSlugFromPair", () => {
     expect(swapped).not.toBe(canonical);
   });
 
-  it("keeps the slug stable for a known pair permalink", () => {
+  it("matches a fixed digest for a reference pair (deterministic across rebuilds)", () => {
     expect(
       browsePageSlugFromPair({
         sourcePath: "README.md",

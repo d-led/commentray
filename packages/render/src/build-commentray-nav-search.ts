@@ -33,9 +33,9 @@ export type DocumentedPairNav = {
   sourceOnGithub?: string;
   commentrayOnGithub?: string;
   /**
-   * When the static Pages build emits per-pair browse HTML (e.g. `_site/browse/…html`), a URL
-   * relative to the site root `index.html` (e.g. `./browse/x.html`) so the hub can open the same
-   * Commentray UI for other files without leaving the site.
+   * When the static Pages build emits per-pair browse HTML under `_site/browse/`, a URL relative
+   * to the site root `index.html` (e.g. `./browse/src/x.ts/index.html` or `./browse/README.md@main.html`)
+   * so the hub can open the same Commentray UI without leaving the site.
    */
   staticBrowseUrl?: string;
 };
@@ -148,7 +148,7 @@ async function appendPairRowsSync(
  *
  * `documentedPairs` lists every merged pair. When `githubBlobBase` is set, GitHub-style **blob**
  * URLs are included for optional outbound links; the static-site build always adds same-site
- * `staticBrowseUrl` when it emits `_site/browse/*.html`.
+ * `staticBrowseUrl` when it emits `_site/browse/` (human `…/index.html` / `@angle.html` shims plus canonical `*.html`).
  *
  * Pairs are merged from the metadata index, a walk of the configured storage `source` tree for
  * every `*.md` companion (flat or Angles layout), and an optional single-page `fallback`. For the

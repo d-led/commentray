@@ -90,10 +90,15 @@ Build and preview:
 
 Static browser behavior:
 
-- Stable pair browse permalinks under `/browse/`
-- Humane alias paths (source-shaped browse routes)
+- **Stable** pair browse URLs under `/browse/` **as long as** you do not rename
+  or move the primary file or its companion Markdown: the opaque slug is fixed
+  for that `(sourcePath, commentrayPath)` pair across rebuilds and machines.
+  **Rename or move** either side → those strings change → **a new slug** (old
+  links are not redirected automatically).
+- Humane alias paths (source-shaped browse routes) where the host can serve them
 - Share/copy permalink control in toolbar
-- Main hub backfills address bar to humane browse path for current pair
+- Main hub may adjust the address bar toward the canonical browse URL for the
+  current pair
 
 Related docs:
 

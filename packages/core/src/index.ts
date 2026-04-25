@@ -5,12 +5,15 @@ export type {
   BlockRange,
   CreateBlockForRangeInput,
   CreatedBlock,
+  WrapSourceLineRangeWithCommentrayMarkersInput,
+  WrapSourceLineRangeWithCommentrayMarkersResult,
 } from "./blocks.js";
 export {
   addBlockToIndex,
   appendBlockToCommentray,
   createBlockForRange,
   generateBlockId,
+  wrapSourceLineRangeWithCommentrayMarkers,
 } from "./blocks.js";
 export { assertValidAngleId } from "./angles.js";
 export {
@@ -106,6 +109,25 @@ export {
   parseCommentrayRegionBoundary,
   sourceLineRangeForMarkerId,
 } from "./source-markers.js";
+export type {
+  RegionMarkerNamingHintStrategy,
+  RegionMarkerNamingInput,
+  RegionMarkerNamingRange,
+  RegionMarkerNamingStrategy,
+} from "./region-marker-naming.js";
+export {
+  CallbackRegionMarkerNamingStrategy,
+  CodeStructureHintStrategy,
+  CompositeRegionMarkerNamingStrategy,
+  defaultRegionMarkerNamingStrategy,
+  EnclosingSymbolHintStrategy,
+  MarkdownHeadingHintStrategy,
+  TomlTableHeaderHintStrategy,
+  tryCodeStructureNameHint,
+  tryMarkdownHeadingTitleAbove,
+  tryNormaliseContextLabelToMarkerId,
+  tryTomlTablePathAboveSelection,
+} from "./region-marker-naming.js";
 export type { CommentrayMarkerPair } from "./region-marker-convert.js";
 export {
   convertCommentraySourceMarkersToLanguage,

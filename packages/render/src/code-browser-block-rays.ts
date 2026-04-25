@@ -145,6 +145,37 @@ export function sortBlockLinksBySource(links: BlockScrollLink[]): BlockScrollLin
   return [...links].sort((a, b) => a.sourceStart - b.sourceStart);
 }
 
+/** One entry per block id (earliest source span) when scroll-link payloads contain duplicates. */
+export function dedupeBlockScrollLinksById(links: BlockScrollLink[]): BlockScrollLink[] {
+  const byId = new Map<string, BlockScrollLink>();
+  for (const l of sortBlockLinksBySource(links)) {
+    if (!byId.has(l.id)) byId.set(l.id, l);
+  }
+  return sortBlockLinksBySource([...byId.values()]);
+}
+
+export function sortBlockLinksByCommentrayLine(links: BlockScrollLink[]): BlockScrollLink[] {
+  return [...links].sort((a, b) =>
+    a.commentrayLine !== b.commentrayLine
+      ? a.commentrayLine - b.commentrayLine
+      : a.sourceStart - b.sourceStart,
+  );
+}
+
+/**
+ * Next block in companion document order (`commentrayLine`). Gutter doc bands must follow
+ * rendered markdown order, which can differ from source line order (multi-file / inverted pairs).
+ */
+export function nextBlockLinkInCommentrayOrder(
+  all: ReadonlyArray<BlockScrollLink>,
+  current: BlockScrollLink,
+): BlockScrollLink | undefined {
+  const sorted = sortBlockLinksByCommentrayLine([...all]);
+  const idx = sorted.findIndex((l) => l.id === current.id);
+  if (idx < 0) return undefined;
+  return sorted[idx + 1];
+}
+
 export function activeBlockIdForViewport(
   links: BlockScrollLink[],
   topSourceLine1Based: number,

@@ -2,7 +2,7 @@
 /**
  * Post-`npm run pages:build` checks for `_site/`:
  * - Optional GitHub blob URLs match `https://github.com/<owner>/<repo>/blob/<branch>/…` (no doubled `/blob/`).
- * - `#shell` carries `data-commentray-pair-browse-href` (same-site `./browse/<slug>.html` or GitHub blob) and resolves without `/browse/browse/` stacking.
+ * - `#shell` carries `data-commentray-pair-browse-href` (same-site `./browse/<slug>.html`, `./browse/…/index.html`, or GitHub blob) and resolves without `/browse/browse/` stacking.
  *
  * Optional live check (network): `COMMENTRAY_VALIDATE_PAGES_LIVE=1` sends HEAD to the first GitHub blob URL found in the hub index.
  */
@@ -14,7 +14,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const GITHUB_BLOB_RE =
   /^https:\/\/github\.com\/(?<owner>[^/]+)\/(?<repo>[^/]+)\/blob\/(?<branch>[^/]+)\/(?<path>.+)$/;
 
-const BROWSE_HTML_RE = /^\.\/browse\/[^/]+\.html$/;
+const BROWSE_FLAT_RE = /^\.\/browse\/[^/]+\.html$/;
+const BROWSE_INDEXED_RE = /^\.\/browse\/.+\/index\.html$/;
+
+function isHubRelativeBrowseHref(href) {
+  return BROWSE_FLAT_RE.test(href) || BROWSE_INDEXED_RE.test(href);
+}
 
 const repoRoot = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const siteDir = join(repoRoot, "_site");
@@ -63,8 +68,10 @@ function assertDocPairHref(label, href) {
     assertGithubBlobUrl(`${label} (GitHub fallback)`, href);
     return;
   }
-  if (!BROWSE_HTML_RE.test(href)) {
-    fail(`${label}: expected ./browse/<slug>.html or GitHub blob, got: ${href}`);
+  if (!isHubRelativeBrowseHref(href)) {
+    fail(
+      `${label}: expected ./browse/<slug>.html, ./browse/…/index.html, or GitHub blob, got: ${href}`,
+    );
   }
 }
 
@@ -93,10 +100,8 @@ async function maybeHeadGithub(url) {
 }
 
 async function assertBrowseMatrixResolves(docHubHref, pairNav, origins, pathnames) {
-  if (!existsSync(pairNav) || !BROWSE_HTML_RE.test(docHubHref)) return;
+  if (!existsSync(pairNav) || !isHubRelativeBrowseHref(docHubHref)) return;
   const { resolveStaticBrowseHref } = await import(pathToFileURL(pairNav).href);
-  const m = /^\.\/browse\/([^/]+\.html)$/.exec(docHubHref);
-  const slug = m[1];
   for (const origin of origins) {
     for (const pathname of pathnames) {
       const resolved = resolveStaticBrowseHref(docHubHref, pathname, origin);
@@ -123,9 +128,14 @@ async function validateHubIndex(indexHtml) {
   assertDocPairHref("hub shell data-commentray-pair-browse-href", docHubHref);
 
   const origins = ["https://d-led.github.io", "http://127.0.0.1:14173"];
-  const slug = /^\.\/browse\/([^/]+\.html)$/.exec(docHubHref)?.[1];
-  const pathnames = slug ? [`/browse/${slug}`, `/commentray/browse/${slug}`] : [];
-  if (slug) {
+  const flatSlug = /^\.\/browse\/([^/]+\.html)$/.exec(docHubHref)?.[1];
+  const indexedInner = /^\.\/browse\/(.+)\/index\.html$/.exec(docHubHref)?.[1];
+  const pathnames = flatSlug
+    ? [`/browse/${flatSlug}`, `/commentray/browse/${flatSlug}`]
+    : indexedInner
+      ? [`/browse/${indexedInner}/index.html`, `/commentray/browse/${indexedInner}/index.html`]
+      : [];
+  if (pathnames.length > 0) {
     await assertBrowseMatrixResolves(docHubHref, pairNavPath, origins, pathnames);
   }
 }
@@ -142,10 +152,16 @@ async function validateBrowsePage(name, html) {
   if (src) assertGithubBlobUrl(`browse/${name} (first GitHub blob link)`, src);
   assertDocPairHref(`browse/${name} shell data-commentray-pair-browse-href`, doc);
 
-  if (!existsSync(pairNavPath) || !BROWSE_HTML_RE.test(doc)) return;
+  if (!existsSync(pairNavPath) || !isHubRelativeBrowseHref(doc)) return;
   const { resolveStaticBrowseHref } = await import(pathToFileURL(pairNavPath).href);
-  const slug = /^\.\/browse\/([^/]+\.html)$/.exec(doc)[1];
-  const resolved = resolveStaticBrowseHref(doc, `/browse/${slug}`, "http://127.0.0.1:14173");
+  const flatSlug = /^\.\/browse\/([^/]+\.html)$/.exec(doc)?.[1];
+  const indexedInner = /^\.\/browse\/(.+)\/index\.html$/.exec(doc)?.[1];
+  const pathnameProbe = flatSlug
+    ? `/browse/${flatSlug}`
+    : indexedInner
+      ? `/browse/${indexedInner}/index.html`
+      : `/browse/${name}`;
+  const resolved = resolveStaticBrowseHref(doc, pathnameProbe, "http://127.0.0.1:14173");
   if (resolved.includes("/browse/browse/")) {
     fail(`browse/${name}: resolved pair browse → ${resolved}`);
   }

@@ -2,7 +2,7 @@ import { MERMAID_SYNTAX_ERROR_SNIPPET, shellA11y } from "../shell-a11y";
 
 const MERMAID_E2E_TIMEOUT_MS = 20000;
 const BROWSE_LINK_REL_OR_ABS_RE =
-  /^(?:\.\/browse\/[^/]+\.html|https?:\/\/[^/]+\/browse\/[^/]+\.html)(?:\?.*)?$/;
+  /^(?:\.\/browse\/(?:[^/]+\.html|.+\/index\.html)|https?:\/\/[^/]+\/browse\/(?:[^/]+\.html|.+\/index\.html))(?:\?.*)?$/;
 
 Cypress.Commands.add("CommentrayPaneReadmeLinksShouldUseGithubBlobUrls", () => {
   cy.get(shellA11y.panes.commentray)
@@ -57,7 +57,7 @@ Cypress.Commands.add("FollowFirstBrowseFileLinkInTree", () => {
       const href = $a.attr("href");
       expect(href)
         .to.be.a("string")
-        .and.match(/\/browse\/[^/]+\.html(\?.*)?$/);
+        .and.match(/\/browse\/(?:[^/]+\.html|.+\/index\.html)(\?.*)?$/);
       if (typeof href !== "string") {
         throw new Error("Expected browse tree link href");
       }

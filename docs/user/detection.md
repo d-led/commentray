@@ -40,7 +40,7 @@ Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. E
 
 ## Known gaps (policy, not silent bugs)
 
-These are intentionally **out of scope** for v0 or not implemented yet; track mitigations in your own process:
+These are intentionally **out of scope for the current feature set** (or not implemented yet); track mitigations in your own process:
 
 - **Cross-file refactors:** Symbol moved to another file without a Git rename Commentray understands—anchors may need manual updates.
 - **Orphan commentray:** Primary source removed but companion Markdown or index entries left behind—`validate` flags inconsistencies when paths and anchors no longer line up; there is no automatic deletion policy.

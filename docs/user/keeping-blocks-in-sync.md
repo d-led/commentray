@@ -26,7 +26,7 @@ Commentray ties three surfaces together. If they drift apart, validation fails, 
 - **Cons:** Markers live in the primary file; reviewers must accept them. **`markerId` in the index** (when present) must stay consistent with **`marker:`** resolution rules (see [anchors.md](../spec/anchors.md)).
 - **Consistency:** Never rename a region id in source without updating **`marker:`** / **`markerId`** and the Markdown **`id=`** and index **`id`** to the same new token. Use **`commentray convert-source-markers`** if you change language/comment style.
 
-See [blocks.md — Source markers](../spec/blocks.md#source-markers-language-dependent) for delimiter shapes.
+See **[Source region delimiters (by editor language)](source-region-delimiters.md)** for a table of delimiter shapes by VS Code `languageId`, and [blocks.md — Source markers](../spec/blocks.md#source-markers-language-dependent) for the normative narrative.
 
 ## Single checklist: “is this block still coherent?”
 

@@ -32,6 +32,10 @@
  *   vscode-add-block-from-selection.png
  *   vscode-add-angle-to-project.png
  *   vscode-markdown-preview.png
+ *   vscode-rendered-preview-default-palette.png
+ *   vscode-rendered-preview-default.png
+ *   vscode-rendered-preview-angle-palette.png
+ *   vscode-rendered-preview-angle.png
  *   vscode-validate-workspace.png
  *
  * @see https://github.com/microsoft/playwright/issues/22351
@@ -182,6 +186,18 @@ async function runPaletteQuery(page, commandQuery, { afterEnterMs = 3500, typeDe
 }
 
 /**
+ * Types a command query in run-command palette mode **without** pressing Enter (for palette-only
+ * screenshots).
+ *
+ * @param {import('playwright').Page} page
+ */
+async function typeInCommandPalette(page, commandQuery, { typeDelay = 20 } = {}) {
+  await openCommandPaletteCommandMode(page);
+  await page.keyboard.type(commandQuery, { delay: typeDelay });
+  await sleep(650);
+}
+
+/**
  * @param {string} userDataDir
  */
 async function writeScreenshotProfileSettings(userDataDir) {
@@ -277,6 +293,52 @@ async function prepareDisposableProfile() {
  *
  * @param {string} profileRoot
  */
+/** Verbose companion Markdown for README / desktop capture (Main angle). */
+const SCREENSHOT_MAIN_MD = `## Sample companion — Main
+
+*Angle \`main\` · \`main.md\` · README screenshot seed*
+
+This companion file is intentionally **verbose** for desktop README screenshots: the rendered preview should show real paragraphs, headings, and a visible **page break**—not a one-line stub that becomes unreadable when the frame is small.
+
+### Why keep commentary beside the source?
+
+Teams accumulate context that does not belong inline: release checklists, product nuance, links to specs, and “gotchas” from review. Commentray stores that prose next to the repository while keeping the primary source file approachable for day-to-day coding.
+
+<!-- commentray:page-break -->
+
+### How the rendered preview differs from the built-in Markdown preview
+
+**Open rendered Commentray preview (default angle)** uses the same HTML pipeline as static pages: GitHub-flavored Markdown, syntax highlighting, and Commentray anchors so scroll sync can follow the source editor. The built-in preview is still useful while editing raw \`.md\`; this mode matches what readers see on the site.
+
+#### Practical workflow
+
+1. Keep \`src/sample.ts\` focused on the implementation.
+2. Narrate intent, trade-offs, and rollout notes in this companion track.
+3. Scroll the source and preview together so reviewers stay oriented in long files.
+
+> **Tip:** If you maintain multiple angles, keep each angle self-contained so readers can switch narratives without losing the thread.
+`;
+
+/** Second angle: visibly different copy for “choose angle” preview shots. */
+const SCREENSHOT_ALT_MD = `## Sample companion — Alt
+
+*Angle \`alt\` · \`alt.md\` · README screenshot seed*
+
+Use this angle for **friendlier onboarding** aimed at new contributors: what to install, which palette commands to try first, and how to sanity-check a change before opening a pull request.
+
+README automation opens this file when exercising **Open rendered Commentray preview (choose angle)…** so the rendered preview is clearly different from the default **Main** companion.
+
+### Before you ask for review
+
+- [ ] Run tests locally.
+- [ ] Call out risk areas in the PR description.
+- [ ] Link the issue or ticket that motivated the change.
+
+### Where to go deeper
+
+Point readers at \`docs/\` for diagrams and long-form specs; keep this angle short, current, and motivating.
+`;
+
 async function materializeScreenshotWorkspaceWithAngles(profileRoot) {
   const ws = path.join(profileRoot, "screenshot-dogfood");
   await cp(dogfood, ws, { recursive: true });
@@ -298,6 +360,12 @@ id = "alt"
 title = "Alt"
 `;
   await writeFile(path.join(ws, ".commentray.toml"), `${anglesToml}\n`, "utf-8");
+
+  const companionDir = path.join(ws, ".commentray", "source", "src", "sample.ts");
+  await mkdir(companionDir, { recursive: true });
+  await writeFile(path.join(companionDir, "main.md"), SCREENSHOT_MAIN_MD, "utf-8");
+  await writeFile(path.join(companionDir, "alt.md"), SCREENSHOT_ALT_MD, "utf-8");
+
   return ws;
 }
 
@@ -349,6 +417,42 @@ async function runScreenshotScenarios(page) {
     afterEnterMs: 4500,
   });
   await shot(page, "vscode-markdown-preview.png");
+  await dismissOverlays(page);
+
+  // Rendered preview — default angle: palette (command highlighted) then webview body.
+  await page.keyboard.press(focusGroup(1));
+  await sleep(550);
+  await openSampleTs(page);
+  await typeInCommandPalette(
+    page,
+    commentrayCommand("Open rendered Commentray preview (default angle)"),
+  );
+  await shot(page, "vscode-rendered-preview-default-palette.png");
+  await page.keyboard.press("Enter");
+  await sleep(6000);
+  await page.keyboard.press(focusGroup(2));
+  await sleep(1100);
+  await shot(page, "vscode-rendered-preview-default.png");
+  await dismissOverlays(page);
+
+  // Rendered preview — choose angle: palette, pick **Alt**, then webview.
+  await page.keyboard.press(focusGroup(1));
+  await sleep(550);
+  await openSampleTs(page);
+  await typeInCommandPalette(
+    page,
+    commentrayCommand(`Open rendered Commentray preview (choose angle)\u2026`),
+  );
+  await shot(page, "vscode-rendered-preview-angle-palette.png");
+  await page.keyboard.press("Enter");
+  await sleep(4200);
+  await page.keyboard.press("ArrowDown");
+  await sleep(450);
+  await page.keyboard.press("Enter");
+  await sleep(6000);
+  await page.keyboard.press(focusGroup(2));
+  await sleep(1100);
+  await shot(page, "vscode-rendered-preview-angle.png");
   await dismissOverlays(page);
 
   await runPaletteQuery(page, commentrayCommand("Validate workspace"), { afterEnterMs: 3500 });

@@ -47,6 +47,7 @@
     "extension:vscode-readme-screenshots": "bash scripts/refresh-vscode-readme-screenshots-manual.sh",
     "extension:vscode-readme-screenshots:desktop": "bash scripts/refresh-vscode-readme-screenshots-desktop.sh",
     "extension:vscode-readme-screenshots:desktop:fresh": "bash scripts/commentray-screenshots-in-fresh-worktree.sh",
+    "extension:vscode-readme-screenshots:show": "bash scripts/show-vscode-readme-screenshots.sh",
     "extension:install": "bash scripts/install-extension.sh",
     "extension:package": "bash scripts/install-extension.sh --package-only",
     "extension:publish": "bash scripts/install-extension.sh --publish",

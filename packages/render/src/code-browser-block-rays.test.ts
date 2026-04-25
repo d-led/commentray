@@ -5,8 +5,11 @@ import {
   clampViewportYToGutterLocal,
   codeLineDomIndex0,
   cubicBezierAcrossGutterD,
+  dedupeBlockScrollLinksById,
   gutterRayBezierPaths,
+  nextBlockLinkInCommentrayOrder,
   splitCubicAtT,
+  sortBlockLinksByCommentrayLine,
   sortBlockLinksBySource,
 } from "./code-browser-block-rays.js";
 
@@ -80,6 +83,27 @@ describe("sortBlockLinksBySource", () => {
       { id: "b1", commentrayLine: 0, sourceStart: 1, sourceEnd: 5 },
     ]);
     expect(out.map((x) => x.id)).toEqual(["b1", "b2"]);
+  });
+});
+
+describe("dedupeBlockScrollLinksById", () => {
+  it("keeps the earliest source span when the same id appears twice", () => {
+    const out = dedupeBlockScrollLinksById([
+      { id: "x", commentrayLine: 0, sourceStart: 10, sourceEnd: 12 },
+      { id: "x", commentrayLine: 0, sourceStart: 1, sourceEnd: 3 },
+    ]);
+    expect(out).toEqual([{ id: "x", commentrayLine: 0, sourceStart: 1, sourceEnd: 3 }]);
+  });
+});
+
+describe("nextBlockLinkInCommentrayOrder", () => {
+  it("uses companion line order, not source order", () => {
+    const a = { id: "static", commentrayLine: 100, sourceStart: 1, sourceEnd: 10 };
+    const b = { id: "angles", commentrayLine: 50, sourceStart: 20, sourceEnd: 30 };
+    const both = [a, b];
+    expect(sortBlockLinksByCommentrayLine(both).map((x) => x.id)).toEqual(["angles", "static"]);
+    expect(nextBlockLinkInCommentrayOrder(both, b)?.id).toBe("static");
+    expect(nextBlockLinkInCommentrayOrder(both, a)).toBeUndefined();
   });
 });
 

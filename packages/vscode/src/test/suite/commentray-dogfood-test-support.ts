@@ -4,6 +4,28 @@ import * as vscode from "vscode";
 
 export const pairedMarkdownPath = ".commentray/source/src/sample.ts.md";
 
+/** Tracked `fixtures/dogfood/src/sample.ts` (restored each test so “add block” region wraps do not accumulate). */
+const DOGFOOD_SAMPLE_TS_BYTES = new TextEncoder().encode(
+  [
+    "// Sample source file for exercising the Commentray VS Code extension.",
+    "//",
+    "// Open this file and run **Commentray: Open paired markdown beside editor** (or",
+    "// the angle / rendered-preview commands) to work with the companion Markdown",
+    "// under `.commentray/source/src/sample.ts/`. README screenshots use longer",
+    "// companion prose plus a page break so the rendered preview is readable in",
+    "// small frames.",
+    "",
+    "export function greet(name: string): string {",
+    "  return `Hello, ${name}!`;",
+    "}",
+    "",
+    "export function farewell(name: string): string {",
+    "  return `Goodbye, ${name}.`;",
+    "}",
+    "",
+  ].join("\n"),
+);
+
 export type DogfoodWorkspaceAccessor = {
   /** Dogfood workspace folder URI; valid after the suite `before` hook runs. */
   root(): vscode.Uri;
@@ -19,6 +41,8 @@ export function registerDogfoodWorkspaceLifecycle(): DogfoodWorkspaceAccessor {
   });
   beforeEach(async () => {
     await resetGeneratedCommentrayStorage(workspaceRoot);
+    const sampleUri = vscode.Uri.joinPath(workspaceRoot, "src", "sample.ts");
+    await vscode.workspace.fs.writeFile(sampleUri, DOGFOOD_SAMPLE_TS_BYTES);
   });
   return {
     root: () => workspaceRoot,

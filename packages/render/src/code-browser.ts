@@ -2,12 +2,12 @@ import { existsSync, readFileSync } from "node:fs";
 import path, { join } from "node:path";
 
 import {
-  MARKER_ID_BODY,
   buildBlockScrollLinks,
   type BlockScrollLink,
   type CommentrayIndex,
   findMonorepoPackagesDir,
   monorepoLayoutStartDir,
+  normalizeRepoRelativePath,
 } from "@commentray/core";
 
 import { tryBuildBlockStretchTableHtml } from "./block-stretch-layout.js";
@@ -21,6 +21,10 @@ import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
 import { type CommentrayOutputUrlOptions, renderMarkdownToHtml } from "./markdown-pipeline.js";
 import { commentrayRenderVersion } from "./package-version.js";
 import { normPosixPath } from "./code-browser-pair-nav.js";
+import {
+  injectCommentrayDocAnchors,
+  injectSourceMarkdownAnchors,
+} from "./inject-md-line-anchors.js";
 
 /** One angle tab for {@link CodeBrowserPageOptions.multiAngleBrowsing}. */
 export type CodeBrowserMultiAngleSpec = {
@@ -30,10 +34,18 @@ export type CodeBrowserMultiAngleSpec = {
   commentrayPathRel: string;
   commentrayOnGithubUrl?: string;
   /**
-   * When the static site emits `_site/browse/<slug>.html` per pair, same-tab navigation for the
-   * Doc toolbar control (preferred over {@link commentrayOnGithubUrl} on the hub).
+   * When the static site emits per-pair browse pages, same-tab navigation for the Doc toolbar
+   * (preferred over {@link commentrayOnGithubUrl} on the hub). Typical values are hub-relative
+   * `./browse/<human-path>/index.html` or `./browse/<source>@<angle>.html`; opaque `./browse/<hash>.html`
+   * remains valid for the canonical HTML file on disk.
    */
   staticBrowseUrl?: string;
+  /**
+   * When set, `blockStretchRows.commentrayPathRel` must equal this angle’s {@link commentrayPathRel}
+   * and `blockStretchRows.sourceRelative` must equal the page primary {@link CodeBrowserPageOptions.filePath}
+   * (repo-relative, normalized the same way as the index). Otherwise scroll links are omitted so one
+   * angle never inherits another angle’s index slice.
+   */
   blockStretchRows?: {
     index: CommentrayIndex;
     sourceRelative: string;
@@ -134,8 +146,8 @@ export type CodeBrowserPageOptions = {
    */
   commentrayOnGithubUrl?: string;
   /**
-   * When set (e.g. `./browse/<slug>.html` from the static Pages build), the Doc toolbar icon
-   * opens this URL on the **same origin** instead of GitHub.
+   * When set (e.g. `./browse/…/index.html` or `./browse/<hash>.html` from the static Pages build),
+   * the Doc toolbar icon opens this URL on the **same origin** instead of GitHub.
    */
   commentrayStaticBrowseUrl?: string;
   /**
@@ -154,12 +166,32 @@ export type CodeBrowserPageOptions = {
    * an Angle selector, embeds each rendered Markdown body, and disables stretch layout.
    */
   multiAngleBrowsing?: CodeBrowserMultiAngleBrowsing;
+  /**
+   * When set to a valid Git object id (7–40 hex digits, e.g. CI `github.sha`), appended to the
+   * page footer after the build time so published static output is traceable to a commit.
+   * Omit for local builds.
+   */
+  pagesBuildCommitSha?: string;
 };
 
 function renderGeneratorMetaHtml(label: string | undefined): string {
   const t = label?.trim();
   if (!t) return "";
   return `<meta name="generator" content="${escapeHtml(t)}" />\n    `;
+}
+
+/** Accepts short or full SHA; returns lowercase hex or undefined if the string is not a Git object name. */
+function normalizePagesBuildCommitSha(raw: string | undefined): string | undefined {
+  const t = raw?.trim();
+  if (!t) return undefined;
+  const lower = t.toLowerCase();
+  if (!/^[0-9a-f]{7,40}$/.test(lower)) return undefined;
+  return lower;
+}
+
+function footerCommitSuffixHtml(commitSha: string): string {
+  const esc = escapeHtml(commitSha);
+  return ` · <code class="app__footer-attribution__sha" translate="no">${esc}</code>`;
 }
 
 const META_DESCRIPTION_MAX_LEN = 320;
@@ -174,280 +206,6 @@ function codeBrowserMetaDescription(opts: CodeBrowserPageOptions, title: string)
 function renderMetaDescriptionHtml(opts: CodeBrowserPageOptions, title: string): string {
   const content = codeBrowserMetaDescription(opts, title);
   return `<meta name="description" content="${escapeHtml(content)}" />\n    `;
-}
-
-/** Single capture: marker id (avoid a wrapping group around the whole comment — that shifted indices). */
-const BLOCK_MARKER_HTML_LINE = new RegExp(
-  `^<!--\\s*commentray:block\\s+id=(${MARKER_ID_BODY})\\s*-->$`,
-  "i",
-);
-const PAGE_BREAK_MARKER_HTML_LINE = /^<!--\s*commentray:page-break\s*-->$/i;
-
-function trimEndSpacesTabs(s: string): string {
-  let end = s.length;
-  while (end > 0) {
-    const c = s[end - 1];
-    if (c !== " " && c !== "\t") break;
-    end--;
-  }
-  return s.slice(0, end);
-}
-
-function isSetextUnderlineLine(line: string): boolean {
-  const t = trimEndSpacesTabs(line);
-  return /^\s{0,3}=+\s*$/.test(t) || /^\s{0,3}-+\s*$/.test(t);
-}
-
-function isThematicBreakLine(line: string): boolean {
-  const t = trimEndSpacesTabs(line);
-  return (
-    /^\s{0,3}(?:\*[ \t]*){3,}\s*$/.test(t) ||
-    /^\s{0,3}(?:-[ \t]*){3,}\s*$/.test(t) ||
-    /^\s{0,3}(?:_[ \t]*){3,}\s*$/.test(t)
-  );
-}
-
-type FenceState = { ch: "`" | "~"; len: number };
-
-function parseFenceDelimiter(line: string): { ch: "`" | "~"; runLen: number; rest: string } | null {
-  const t = trimEndSpacesTabs(line);
-  const m = /^(\s{0,3})(`{3,}|~{3,})(.*)$/.exec(t);
-  if (!m) return null;
-  const run = m[2];
-  const head = run[0];
-  if (head !== "`" && head !== "~") return null;
-  const ch: "`" | "~" = head === "`" ? "`" : "~";
-  return { ch, runLen: run.length, rest: m[3] ?? "" };
-}
-
-function isClosingFenceLine(
-  info: NonNullable<ReturnType<typeof parseFenceDelimiter>>,
-  open: FenceState,
-): boolean {
-  if (info.ch !== open.ch || info.runLen < open.len) return false;
-  return info.rest.trim() === "";
-}
-
-/**
- * GFM delimiter row: cells between pipes contain only colons, hyphens, and spaces; each cell has
- * at least three hyphens (same rule remark-gfm uses). Used so we do not append raw HTML to table
- * lines — trailing `<span>` breaks GFM table recognition in the Markdown parser.
- */
-function isGfmTableDelimiterRow(line: string): boolean {
-  const t = trimEndSpacesTabs(line);
-  if (!t.includes("|")) return false;
-  const cells = t
-    .split("|")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  if (cells.length === 0) return false;
-  for (const cell of cells) {
-    if (!/^:?-{3,}:?$/.test(cell)) return false;
-  }
-  return true;
-}
-
-/**
- * 0-based line indices that must not receive a trailing line-anchor span: they belong to a GFM
- * table (header + delimiter + following rows until a blank line). Scans full `lines` so indices
- * align with {@link injectCommentrayDocAnchors}; lines inside fenced code are harmless to mark
- * because that pass never appends anchors there anyway.
- */
-function gfmTableLineIndicesWithoutAnchors(lines: string[]): Set<number> {
-  const skip = new Set<number>();
-  const n = lines.length;
-  for (let i = 0; i < n - 1; i++) {
-    const header = lines[i] ?? "";
-    const delim = lines[i + 1] ?? "";
-    if (header === "") continue;
-    if (!trimEndSpacesTabs(header).includes("|")) continue;
-    if (isSetextUnderlineLine(header) || isThematicBreakLine(header)) continue;
-    if (!isGfmTableDelimiterRow(delim)) continue;
-    skip.add(i);
-    skip.add(i + 1);
-    let j = i + 2;
-    while (j < n) {
-      const row = lines[j] ?? "";
-      if (row === "") break;
-      if (isSetextUnderlineLine(row) || isThematicBreakLine(row)) break;
-      if (isGfmTableDelimiterRow(row)) break;
-      skip.add(j);
-      j++;
-    }
-  }
-  return skip;
-}
-
-function lineAnchorHtml(mdLine0: number): string {
-  const mdLine = String(mdLine0);
-  return `<span class="commentray-line-anchor" data-commentray-md-line="${mdLine}" id="commentray-md-line-${mdLine}" aria-hidden="true"></span>`;
-}
-
-function sourceLineAnchorHtml(line0: number): string {
-  const s = String(line0);
-  return `<span class="commentray-line-anchor commentray-line-anchor--source" data-source-md-line="${s}" id="code-md-line-${s}" aria-hidden="true"></span>`;
-}
-
-function appendMdLineAnchorWhenAllowed(line: string, mdLine0: number): string {
-  if (isSetextUnderlineLine(line) || isThematicBreakLine(line)) return line;
-  /** Blank lines must stay blank: a line that is only `<span …>` breaks CommonMark HTML / paragraph starts after block markers. */
-  if (line === "") return "";
-  return `${line}${lineAnchorHtml(mdLine0)}`;
-}
-
-function appendSourceMdLineAnchorWhenAllowed(line: string, line0: number): string {
-  if (isSetextUnderlineLine(line) || isThematicBreakLine(line)) return line;
-  if (line === "") return "";
-  return `${line}${sourceLineAnchorHtml(line0)}`;
-}
-
-type PageBreakNextBlockMeta = {
-  commentrayLine: number;
-  sourceStart?: number;
-};
-
-function pageBreakNextBlockMetaByLine(
-  lines: string[],
-  byId?: Map<string, BlockScrollLink>,
-): Map<number, PageBreakNextBlockMeta> {
-  const out = new Map<number, PageBreakNextBlockMeta>();
-  let nextMeta: PageBreakNextBlockMeta | null = null;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i] ?? "";
-    const blockMatch = BLOCK_MARKER_HTML_LINE.exec(line);
-    if (blockMatch?.[1]) {
-      const id = blockMatch[1];
-      const sourceStart = byId?.get(id)?.sourceStart;
-      nextMeta =
-        sourceStart !== undefined ? { commentrayLine: i, sourceStart } : { commentrayLine: i };
-      continue;
-    }
-    if (!PAGE_BREAK_MARKER_HTML_LINE.test(line) || nextMeta === null) continue;
-    out.set(i, nextMeta);
-  }
-  return out;
-}
-
-function blockAnchorAttrs(link: BlockScrollLink | undefined): string {
-  if (link === undefined) return "";
-  return ` data-source-start="${String(link.sourceStart)}" data-commentray-line="${String(link.commentrayLine)}"`;
-}
-
-function pageBreakNextAttrs(next: PageBreakNextBlockMeta | undefined): string {
-  if (next === undefined) return "";
-  const nextCommentrayAttr = ` data-next-commentray-line="${String(next.commentrayLine)}"`;
-  const nextSourceAttr =
-    next.sourceStart !== undefined ? ` data-next-source-start="${String(next.sourceStart)}"` : "";
-  return `${nextCommentrayAttr}${nextSourceAttr}`;
-}
-
-/**
- * Inserts per-line anchors for search / hash jumps and block separator anchors after each
- * `<!-- commentray:block … -->` line (optional index attrs).
- *
- * Anchors are appended to the line when safe. A **leading** `<span>` breaks CommonMark block
- * recognition (`#` headings, lists, thematic breaks, fences). Fenced code lines must not get a
- * trailing anchor either (would corrupt fence delimiters or appear inside code). **GFM pipe
- * tables** must not get a trailing anchor: extra HTML after the row breaks `remark-gfm` table
- * detection, so tables would render as plain text.
- */
-function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[]): string {
-  const byId = links ? new Map(links.map((l) => [l.id, l])) : undefined;
-  const lines = markdown.split("\n");
-  const pageBreakNextByLine = pageBreakNextBlockMetaByLine(lines, byId);
-  const skipLineAnchor = gfmTableLineIndicesWithoutAnchors(lines);
-  let fence: FenceState | null = null;
-  const out: string[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    const delim = parseFenceDelimiter(line);
-    if (fence) {
-      if (delim && isClosingFenceLine(delim, fence)) {
-        fence = null;
-        out.push(line);
-        continue;
-      }
-      out.push(line);
-      continue;
-    }
-
-    if (delim) {
-      fence = { ch: delim.ch, len: delim.runLen };
-      out.push(line);
-      continue;
-    }
-
-    const m = BLOCK_MARKER_HTML_LINE.exec(line);
-    if (m?.[1]) {
-      const id = m[1];
-      const attrs = blockAnchorAttrs(byId?.get(id));
-      /** One `push` with embedded `\n\n` merged poorly with `join("\\n")`; keep real blank lines around raw `<div>`. */
-      out.push(`${line}${lineAnchorHtml(i)}`);
-      out.push("");
-      out.push(
-        `<div id="commentray-block-${escapeHtml(id)}" class="commentray-block-anchor" aria-hidden="true"${attrs}></div>`,
-      );
-      out.push("");
-      continue;
-    }
-
-    if (PAGE_BREAK_MARKER_HTML_LINE.test(line)) {
-      const nextAttrs = pageBreakNextAttrs(pageBreakNextByLine.get(i));
-      out.push(`${line}${lineAnchorHtml(i)}`);
-      out.push("");
-      out.push(
-        `<div class="commentray-page-break" data-commentray-page-break="true"${nextAttrs} aria-hidden="true"><div class="commentray-page-break__rule"></div></div>`,
-      );
-      out.push("");
-      continue;
-    }
-
-    if (skipLineAnchor.has(i)) {
-      out.push(line);
-      continue;
-    }
-
-    out.push(appendMdLineAnchorWhenAllowed(line, i));
-  }
-
-  return out.join("\n");
-}
-
-/**
- * Adds stable source-line anchors (`id="code-line-N"`) to Markdown so rendered-source mode can
- * preserve block-aware scroll sync and block ray geometry.
- */
-function injectSourceMarkdownAnchors(markdown: string): string {
-  const lines = markdown.split("\n");
-  const skipLineAnchor = gfmTableLineIndicesWithoutAnchors(lines);
-  let fence: FenceState | null = null;
-  const out: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    const delim = parseFenceDelimiter(line);
-    if (fence) {
-      if (delim && isClosingFenceLine(delim, fence)) {
-        fence = null;
-        out.push(line);
-        continue;
-      }
-      out.push(line);
-      continue;
-    }
-    if (delim) {
-      fence = { ch: delim.ch, len: delim.runLen };
-      out.push(line);
-      continue;
-    }
-    if (skipLineAnchor.has(i)) {
-      out.push(line);
-      continue;
-    }
-    out.push(appendSourceMdLineAnchorWhenAllowed(line, i));
-  }
-  return out.join("\n");
 }
 
 /** GitHub “mark” glyph (Octicons-style path), MIT-licensed silhouette. */
@@ -558,10 +316,12 @@ function renderPageFooterHtml(input: {
   builtAt: Date;
   toolHomeUrl: string | undefined;
   commentrayRenderSemver: string;
+  pagesBuildCommitSha: string | undefined;
 }): string {
-  const { builtAt, toolHomeUrl, commentrayRenderSemver } = input;
+  const { builtAt, toolHomeUrl, commentrayRenderSemver, pagesBuildCommitSha } = input;
   const iso = builtAt.toISOString();
   const human = formatCommentrayBuiltAtLocal(builtAt);
+  const commitSuffix = pagesBuildCommitSha ? footerCommitSuffixHtml(pagesBuildCommitSha) : "";
   const tool = safeExternalHttpUrl(toolHomeUrl);
   if (tool) {
     const te = escapeHtml(tool);
@@ -572,13 +332,16 @@ function renderPageFooterHtml(input: {
       `Rendered with <a href="${te}" target="_blank" rel="noopener noreferrer">Commentray</a> ` +
       `<span class="app__footer-attribution__version" translate="no">v${ver}</span>: ` +
       `<time datetime="${escapeHtml(iso)}">${escapeHtml(human)}</time>` +
+      commitSuffix +
       `</p>` +
       `</footer>`
     );
   }
   return (
     `<footer class="app__footer" role="contentinfo">` +
-    `<p class="app__footer-line">HTML generated <time datetime="${escapeHtml(iso)}">${escapeHtml(human)}</time></p>` +
+    `<p class="app__footer-line">HTML generated <time datetime="${escapeHtml(iso)}">${escapeHtml(human)}</time>` +
+    commitSuffix +
+    `</p>` +
     `</footer>`
   );
 }
@@ -683,7 +446,7 @@ function sourcePaneOutputUrls(
   return { ...out, markdownUrlBaseDirAbs: path.dirname(candidate) };
 }
 
-/** Plain-text Src/Doc labels above the panes; column widths track the resizable split via `--split-pct`. */
+/** Pair paths above the panes; column widths track the resizable split via `--split-pct`. */
 function renderShellPairContextHtml(
   filePath: string | undefined,
   commentrayPath: string | undefined,
@@ -697,12 +460,10 @@ function renderShellPairContextHtml(
   const crDisp = crRaw.length > 0 ? cr : "—";
   return `<div class="shell__pair-context" aria-label="Current documentation pair">
     <div class="shell__pair-cell shell__pair-cell--src">
-      <span class="shell__pair-lab">Src</span>
       <span class="shell__pair-path" title="${fp}">${fpDisp}</span>
     </div>
     <div class="shell__pair-gutter-spacer" aria-hidden="true"></div>
     <div class="shell__pair-cell shell__pair-cell--doc">
-      <span class="shell__pair-lab">Doc</span>
       <span class="shell__pair-path shell__pair-path--secondary" id="nav-rail-doc-path" title="${cr}">${crDisp}</span>
     </div>
   </div>`;
@@ -1115,6 +876,13 @@ const CODE_BROWSER_STYLES = `
         text-underline-offset: 2px;
       }
       .app__footer-attribution__version { font-weight: 600; }
+      .app__footer-attribution__sha {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.95em;
+        font-weight: 500;
+        padding: 0 2px;
+        word-break: break-all;
+      }
       .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
       .toolbar label[hidden] { display: none !important; }
       .toolbar-wrap-lines {
@@ -1573,14 +1341,6 @@ ${CODE_BROWSER_INTRO_STYLES}
         min-width: 0;
         padding-left: var(--cr-pane-inline-pad);
       }
-      .shell__pair-lab {
-        flex: 0 0 auto;
-        font-size: var(--cr-label-caps-fs);
-        font-weight: 700;
-        letter-spacing: var(--cr-label-caps-track);
-        text-transform: uppercase;
-        opacity: 0.72;
-      }
       .shell__pair-path {
         flex: 1 1 auto;
         min-width: 0;
@@ -1685,7 +1445,12 @@ ${CODE_BROWSER_INTRO_STYLES}
       .gutter__rays {
         position: absolute; inset: 0; pointer-events: none; z-index: 1;
       }
-      .gutter__rays svg { width: 100%; height: 100%; display: block; overflow: visible; }
+      .gutter__rays svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        overflow: hidden;
+      }
       .gutter__rays-path {
         fill: none; stroke-linecap: round; vector-effect: non-scaling-stroke;
         stroke: color-mix(in oklab, var(--commentray-ray-accent) 72%, CanvasText);
@@ -2564,12 +2329,18 @@ async function multiAngleJsonRowAndDocHtml(
   spec: CodeBrowserMultiAngleSpec,
 ): Promise<{ jsonRow: MultiAngleJsonRow; commentrayHtml: string; scrollB64: string }> {
   const rows = spec.blockStretchRows;
+  const angleCrNorm = normalizeRepoRelativePath(spec.commentrayPathRel.replaceAll("\\", "/"));
+  const primaryNorm = normalizeRepoRelativePath((opts.filePath ?? "").replaceAll("\\", "/"));
+  const rowsPathOk =
+    rows !== undefined &&
+    normalizeRepoRelativePath(rows.commentrayPathRel.replaceAll("\\", "/")) === angleCrNorm &&
+    normalizeRepoRelativePath(rows.sourceRelative.replaceAll("\\", "/")) === primaryNorm;
   const links =
-    rows !== undefined
+    rows !== undefined && rowsPathOk
       ? buildBlockScrollLinks(
           rows.index,
           rows.sourceRelative,
-          rows.commentrayPathRel,
+          angleCrNorm,
           spec.markdown,
           opts.code,
         )
@@ -2896,6 +2667,7 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     builtAt,
     toolHomeUrl: opts.toolHomeUrl,
     commentrayRenderSemver: renderSemver,
+    pagesBuildCommitSha: normalizePagesBuildCommitSha(opts.pagesBuildCommitSha),
   });
   const { hljsLight, hljsDark } = hljsStylesheetThemes(opts.hljsTheme);
 

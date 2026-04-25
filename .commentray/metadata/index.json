@@ -30,6 +30,54 @@
           "snippet": "commentray-snippet/v1\n ## Dogfood: narrow Pages + scroll-linked flip\n \n On [GitHub Pages](https://d-led.github.io/commentray/), use a **narrow** viewport (or a phone), **scroll this README to the bottom**, then use **flip source / commentary**. Scroll should stay **block-linked** with this companion file, and a **second flip control** appears when the toolbar flip scrolls off-screen.\n "
         }
       ]
+    },
+    ".commentray/source/.commentray.toml/main.md": {
+      "sourcePath": ".commentray.toml",
+      "commentrayPath": ".commentray/source/.commentray.toml/main.md",
+      "blocks": [
+        {
+          "id": "toml-lede",
+          "anchor": "marker:toml-lede",
+          "markerId": "toml-lede",
+          "snippet": "commentray-snippet/v1\n [storage]\n dir = \".commentray\""
+        },
+        {
+          "id": "toml-scm",
+          "anchor": "marker:toml-scm",
+          "markerId": "toml-scm",
+          "snippet": "commentray-snippet/v1\n [scm]\n provider = \"git\""
+        },
+        {
+          "id": "toml-render",
+          "anchor": "marker:toml-render",
+          "markerId": "toml-render",
+          "snippet": "commentray-snippet/v1\n [render]\n mermaid = true\n syntaxTheme = \"github-dark\"\n relative_github_blob_links = true"
+        },
+        {
+          "id": "toml-anchors",
+          "anchor": "marker:toml-anchors",
+          "markerId": "toml-anchors",
+          "snippet": "commentray-snippet/v1\n [anchors]\n defaultStrategy = [ \"symbol\", \"lines\" ]"
+        },
+        {
+          "id": "toml-static-site",
+          "anchor": "marker:toml-static-site",
+          "markerId": "toml-static-site",
+          "snippet": "commentray-snippet/v1\n [static_site]\n title = \"Commentray\"\n github_url = \"https://github.com/d-led/commentray\"\n # Optional source-link base when _site/ doesn't host repo files:\n # source_link_prefix = \"https://github.com/d-led/commentray/blob/main\"\n default_source_file = \"README.md\"\n default_angle = \"main\"\n github_blob_branch = \"main\""
+        },
+        {
+          "id": "toml-angles",
+          "anchor": "marker:toml-angles",
+          "markerId": "toml-angles",
+          "snippet": "commentray-snippet/v1\n [angles]\n default_angle = \"main\"\n \n [[angles.definitions]]\n id = \"main\"\n title = \"Main\"\n \n [[angles.definitions]]\n id = \"architecture\"\n title = \"Architecture\""
+        },
+        {
+          "id": "toml-pointers",
+          "anchor": "marker:toml-pointers",
+          "markerId": "toml-pointers",
+          "snippet": "commentray-snippet/v1\n # (Normative block text lives in companion Markdown — \"Pointers\" section.)"
+        }
+      ]
     }
   }
 }

@@ -55,6 +55,12 @@ export type BuildCommentrayStaticOptions = {
   /** Repo-relative companion Markdown path (with `staticSearchScope: "commentray-and-paths"`). */
   commentrayPathForSearch?: string;
   /**
+   * Passed through to `renderCodeBrowserHtml` (default `"auto"`). Static browse uses `"dual"`
+   * when {@link blockStretchRows} is set so index-backed block sync uses side-by-side panes and
+   * the resize gutter can draw block rays (stretch layout shares one scroll and omits that payload).
+   */
+  codeBrowserLayout?: "auto" | "dual";
+  /**
    * When markers + index blocks align, `renderCodeBrowserHtml` may emit one scrollable
    * blame-style table (`codeBrowserLayout: "auto"`, default).
    */
@@ -67,7 +73,7 @@ export type BuildCommentrayStaticOptions = {
   sourceOnGithubUrl?: string;
   /** GitHub blob URL for the companion commentray Markdown file. */
   commentrayOnGithubUrl?: string;
-  /** Same-site browse URL for the companion (e.g. `./browse/<slug>.html`); overrides GitHub for the Doc icon when set. */
+  /** Same-site browse URL for the companion (e.g. `./browse/…/index.html`); overrides GitHub for the Doc icon when set. */
   commentrayStaticBrowseUrl?: string;
   /** Relative URL to `commentray-nav-search.json` for the documented-files tree. */
   documentedNavJsonUrl?: string;
@@ -75,6 +81,11 @@ export type BuildCommentrayStaticOptions = {
   documentedPairsEmbeddedB64?: string;
   /** When set with two or more angles, renders an Angle switcher (GitHub Pages static hub). */
   multiAngleBrowsing?: CodeBrowserMultiAngleBrowsing;
+  /**
+   * Optional Git commit for the published static build (7–40 hex); shown in the page footer.
+   * Set from CI (e.g. `COMMENTRAY_PAGES_BUILD_SHA`); omit locally.
+   */
+  pagesBuildCommitSha?: string;
 };
 
 const staticPackageDir = path.join(
@@ -152,6 +163,7 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     builtAt,
     staticSearchScope: opts.staticSearchScope,
     commentrayPathForSearch: opts.commentrayPathForSearch,
+    ...(opts.codeBrowserLayout ? { codeBrowserLayout: opts.codeBrowserLayout } : {}),
     blockStretchRows: opts.blockStretchRows,
     sourceOnGithubUrl: opts.sourceOnGithubUrl,
     commentrayOnGithubUrl: opts.commentrayOnGithubUrl,
@@ -159,6 +171,7 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     documentedNavJsonUrl: opts.documentedNavJsonUrl,
     documentedPairsEmbeddedB64: opts.documentedPairsEmbeddedB64,
     multiAngleBrowsing: opts.multiAngleBrowsing,
+    ...(opts.pagesBuildCommitSha ? { pagesBuildCommitSha: opts.pagesBuildCommitSha } : {}),
   });
 
   await copyCompanionStaticMirrors(opts.commentrayOutputUrls?.companionStaticAssetCopies);

@@ -41,6 +41,12 @@ describe("Inserting Commentray region markers into source text", () => {
     expect(start).toBe("  /* commentray:start id=c0 */\n");
     expect(end).toBe("\n  /* commentray:end id=c0 */");
   });
+
+  it("uses HTML comment regions for Markdown (README-style)", () => {
+    const { start, end } = commentrayRegionInsertions("markdown", "readme-why", "");
+    expect(start).toBe("<!-- #region commentray:readme-why -->\n");
+    expect(end).toBe("\n<!-- #endregion commentray:readme-why -->");
+  });
 });
 
 describe("Parsing Commentray region boundary lines", () => {

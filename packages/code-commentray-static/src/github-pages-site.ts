@@ -21,6 +21,7 @@ import {
 
 import { type BuildCommentrayStaticOptions, buildCommentrayStatic } from "./build.js";
 import {
+  blockStretchRowsForDocumentedPair,
   flatBlockStretchRows,
   type GithubNavBase,
   loadMultiAngleBrowsingIfEnabled,
@@ -31,40 +32,15 @@ import {
   sourceAndCommentrayGithubUrls,
 } from "./github-pages-site-prep.js";
 import { pathExists } from "./github-pages-site-shared.js";
+import {
+  browsePairStaticBrowseRelUrl,
+  commentrayFileStem,
+  humanBrowseAliasPathFromPair,
+  normPosixPath,
+  sourceBrowseAliasPath,
+} from "./browse-pair-static-url.js";
 
 const DEFAULT_TOOL_HOME = "https://github.com/d-led/commentray";
-
-function normPosixPath(s: string): string {
-  return s.trim().replaceAll("\\", "/").replace(/^\.\//, "").replace(/^\/+/, "");
-}
-
-function commentrayFileStem(commentrayPath: string): string {
-  const norm = normPosixPath(commentrayPath);
-  const last = norm.split("/").filter(Boolean).at(-1) ?? "commentray";
-  return last.replace(/\.md$/i, "");
-}
-
-function sourceBrowseAliasPath(sourcePath: string): string {
-  const sourceSegments = normPosixPath(sourcePath)
-    .split("/")
-    .filter(Boolean)
-    .map((seg) => encodeURIComponent(seg));
-  return sourceSegments.length > 0 ? sourceSegments.join("/") : "pair";
-}
-
-function humanBrowseAliasPathFromPair(
-  pair: { sourcePath: string; commentrayPath: string },
-  sourcePathDuplicateCount: number,
-): string {
-  const sourceAlias = sourceBrowseAliasPath(pair.sourcePath);
-  if (sourceAlias === "pair") {
-    return sourcePathDuplicateCount > 1
-      ? `pair@${encodeURIComponent(commentrayFileStem(pair.commentrayPath))}`
-      : "pair";
-  }
-  if (sourcePathDuplicateCount <= 1) return sourceAlias;
-  return `${sourceAlias}@${encodeURIComponent(commentrayFileStem(pair.commentrayPath))}`;
-}
 
 async function writeHumanBrowseAliasDirIndex(input: {
   outDir: string;
@@ -215,6 +191,50 @@ function browseCommentrayOutputUrls(input: {
   };
 }
 
+function dualBlockStretchBrowseOpts(
+  projectIndex: CommentrayIndex | null,
+  p: { sourcePath: string; commentrayPath: string },
+): Pick<BuildCommentrayStaticOptions, "blockStretchRows" | "codeBrowserLayout"> | undefined {
+  const blockStretchRows = blockStretchRowsForDocumentedPair(
+    projectIndex,
+    p.sourcePath,
+    p.commentrayPath,
+  );
+  if (!blockStretchRows) return undefined;
+  return { blockStretchRows, codeBrowserLayout: "dual" };
+}
+
+async function writeBrowseAliasesAfterStaticHtml(input: {
+  outDir: string;
+  pair: { sourcePath: string; commentrayPath: string };
+  slug: string;
+  sourcePathCounts: Map<string, number>;
+  sourceAliasTargets: Map<string, Array<{ slug: string; angleId: string; sourcePath: string }>>;
+}): Promise<void> {
+  const p = input.pair;
+  const sourceKey = normPosixPath(p.sourcePath);
+  const duplicateCount = input.sourcePathCounts.get(sourceKey) ?? 1;
+  const aliasRelPath = humanBrowseAliasPathFromPair(p, duplicateCount);
+  if (duplicateCount > 1) {
+    await writeHumanBrowseAliasHtmlFile({
+      outDir: input.outDir,
+      aliasRelPath: `${aliasRelPath}.html`,
+      slug: input.slug,
+    });
+  } else {
+    await writeHumanBrowseAliasDirIndex({
+      outDir: input.outDir,
+      aliasRelPath,
+      slug: input.slug,
+    });
+  }
+  if (duplicateCount <= 1) return;
+  const angleId = commentrayFileStem(p.commentrayPath);
+  const cur = input.sourceAliasTargets.get(sourceKey) ?? [];
+  cur.push({ slug: input.slug, angleId, sourcePath: p.sourcePath });
+  input.sourceAliasTargets.set(sourceKey, cur);
+}
+
 async function writeBrowsePageForPair(input: {
   repoRoot: string;
   outDir: string;
@@ -230,6 +250,7 @@ async function writeBrowsePageForPair(input: {
   ss: ResolvedStaticSite;
   toolHomeUrl: string;
   builtAt: Date;
+  pagesBuildCommitSha: string | undefined;
   projectIndex: CommentrayIndex | null;
   ghNavBase: GithubNavBase | null;
   documentedPairsEmbeddedB64?: string;
@@ -266,6 +287,7 @@ async function writeBrowsePageForPair(input: {
     input.ghNavBase,
     p,
   );
+  const dualStretchOpts = dualBlockStretchBrowseOpts(input.projectIndex, p);
   const commentrayPathForSearch = pickDefaultCommentrayRel(multiAngleBrowsing, p.commentrayPath);
   await buildCommentrayStatic({
     sourceFile: sourceAbs,
@@ -282,6 +304,7 @@ async function writeBrowsePageForPair(input: {
     staticSearchScope: "commentray-and-paths",
     commentrayPathForSearch,
     ...(multiAngleBrowsing ? { multiAngleBrowsing } : {}),
+    ...(dualStretchOpts ?? {}),
     ...(p.sourceOnGithub ? { sourceOnGithubUrl: p.sourceOnGithub } : {}),
     ...(p.commentrayOnGithub ? { commentrayOnGithubUrl: p.commentrayOnGithub } : {}),
     /** Hub-relative; client resolves from `/browse/…` so the Doc icon never stacks `/browse/browse/`. */
@@ -291,28 +314,15 @@ async function writeBrowsePageForPair(input: {
     ...(input.documentedPairsEmbeddedB64
       ? { documentedPairsEmbeddedB64: input.documentedPairsEmbeddedB64 }
       : {}),
+    ...(input.pagesBuildCommitSha ? { pagesBuildCommitSha: input.pagesBuildCommitSha } : {}),
   });
-  const sourceKey = normPosixPath(p.sourcePath);
-  const duplicateCount = input.sourcePathCounts.get(sourceKey) ?? 1;
-  const aliasRelPath = humanBrowseAliasPathFromPair(p, duplicateCount);
-  if (duplicateCount > 1) {
-    await writeHumanBrowseAliasHtmlFile({
-      outDir: input.outDir,
-      aliasRelPath: `${aliasRelPath}.html`,
-      slug,
-    });
-  } else {
-    await writeHumanBrowseAliasDirIndex({
-      outDir: input.outDir,
-      aliasRelPath,
-      slug,
-    });
-  }
-  if (duplicateCount <= 1) return;
-  const angleId = commentrayFileStem(p.commentrayPath);
-  const cur = input.sourceAliasTargets.get(sourceKey) ?? [];
-  cur.push({ slug, angleId, sourcePath: p.sourcePath });
-  input.sourceAliasTargets.set(sourceKey, cur);
+  await writeBrowseAliasesAfterStaticHtml({
+    outDir: input.outDir,
+    pair: p,
+    slug,
+    sourcePathCounts: input.sourcePathCounts,
+    sourceAliasTargets: input.sourceAliasTargets,
+  });
 }
 
 async function multiAngleBrowsingForBrowsePair(
@@ -352,15 +362,20 @@ async function writePerPairBrowseHtmlPages(input: {
   ss: ResolvedStaticSite;
   toolHomeUrl: string;
   builtAt: Date;
+  pagesBuildCommitSha: string | undefined;
   projectIndex: CommentrayIndex | null;
   ghNavBase: GithubNavBase | null;
 }): Promise<CommentrayNavSearchDocument> {
   const pairs = input.navDoc.documentedPairs;
   if (!pairs?.length) return input.navDoc;
 
+  const sourcePathCounts = sourcePathCountsFromPairs(pairs);
   const augmented = pairs.map((p) => ({
     ...p,
-    staticBrowseUrl: `./browse/${browsePageSlugFromPair(p)}.html`,
+    staticBrowseUrl: browsePairStaticBrowseRelUrl(
+      p,
+      sourcePathCounts.get(normPosixPath(p.sourcePath)) ?? 1,
+    ),
   }));
   const navWithUrls: CommentrayNavSearchDocument = { ...input.navDoc, documentedPairs: augmented };
   const emb = documentedPairsEmbeddedB64FromNav(navWithUrls);
@@ -371,7 +386,6 @@ async function writePerPairBrowseHtmlPages(input: {
     string,
     Array<{ slug: string; angleId: string; sourcePath: string }>
   >();
-  const sourcePathCounts = sourcePathCountsFromPairs(augmented);
   const preferredSourceAngleId = preferredSourceAliasAngleId({
     cfg: input.cfg,
     ss: input.ss,
@@ -387,6 +401,7 @@ async function writePerPairBrowseHtmlPages(input: {
       ss: input.ss,
       toolHomeUrl: input.toolHomeUrl,
       builtAt: input.builtAt,
+      pagesBuildCommitSha: input.pagesBuildCommitSha,
       projectIndex: input.projectIndex,
       ghNavBase: input.ghNavBase,
       documentedPairsEmbeddedB64: emb,
@@ -433,6 +448,7 @@ function staticRenderOptions(input: {
   cfg: ResolvedCommentrayConfig;
   toolHomeUrl: string;
   builtAt: Date;
+  pagesBuildCommitSha: string | undefined;
   commentrayOutputUrls: NonNullable<BuildCommentrayStaticOptions["commentrayOutputUrls"]>;
   blockStretchRows: BuildCommentrayStaticOptions["blockStretchRows"];
   multiAngleBrowsing: CodeBrowserMultiAngleBrowsing | undefined;
@@ -473,6 +489,7 @@ function staticRenderOptions(input: {
       ? { commentrayStaticBrowseUrl: input.commentrayStaticBrowseUrl }
       : {}),
     builtAt: input.builtAt,
+    ...(input.pagesBuildCommitSha ? { pagesBuildCommitSha: input.pagesBuildCommitSha } : {}),
   };
 }
 
@@ -480,6 +497,11 @@ export type BuildGithubPagesStaticSiteOptions = {
   repoRoot: string;
   /** Footer “Rendered with …” link; defaults to the public Commentray repository. */
   toolHomeUrl?: string;
+  /**
+   * Git commit SHA for this build (7–40 hex), shown in the footer on every static page.
+   * Omit for local builds; CI sets this via `COMMENTRAY_PAGES_BUILD_SHA` / workflow env.
+   */
+  pagesBuildCommitSha?: string;
 };
 
 async function emitGithubPagesSiteArtifacts(input: {
@@ -491,6 +513,7 @@ async function emitGithubPagesSiteArtifacts(input: {
   ss: ResolvedStaticSite;
   toolHomeUrl: string;
   builtAt: Date;
+  pagesBuildCommitSha: string | undefined;
   projectIndex: CommentrayIndex | null;
   ghNavBase: GithubNavBase | null;
   commentrayOutputUrls: NonNullable<BuildCommentrayStaticOptions["commentrayOutputUrls"]>;
@@ -521,6 +544,7 @@ async function emitGithubPagesSiteArtifacts(input: {
       ss: input.ss,
       toolHomeUrl: input.toolHomeUrl,
       builtAt: input.builtAt,
+      pagesBuildCommitSha: input.pagesBuildCommitSha,
       projectIndex: input.projectIndex,
       ghNavBase: input.ghNavBase,
     });
@@ -539,6 +563,7 @@ async function emitGithubPagesSiteArtifacts(input: {
     cfg: input.cfg,
     toolHomeUrl: input.toolHomeUrl,
     builtAt: input.builtAt,
+    pagesBuildCommitSha: input.pagesBuildCommitSha,
     commentrayOutputUrls: input.commentrayOutputUrls,
     blockStretchRows: input.blockStretchRows,
     multiAngleBrowsing: input.multiAngleBrowsing,
@@ -562,6 +587,7 @@ export async function buildGithubPagesStaticSite(
 ): Promise<{ outHtml: string; navSearchPath: string }> {
   const repoRoot = path.resolve(opts.repoRoot);
   const toolHomeUrl = opts.toolHomeUrl?.trim() || DEFAULT_TOOL_HOME;
+  const pagesBuildCommitSha = opts.pagesBuildCommitSha?.trim();
   const builtAt = new Date();
 
   const cfg = await loadCommentrayConfig(repoRoot);
@@ -635,6 +661,7 @@ export async function buildGithubPagesStaticSite(
       ss,
       toolHomeUrl,
       builtAt,
+      pagesBuildCommitSha: pagesBuildCommitSha || undefined,
       projectIndex,
       ghNavBase,
       commentrayOutputUrls,

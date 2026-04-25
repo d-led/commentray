@@ -29,12 +29,16 @@ export function siteRootPathnameFromPathname(pathname: string): string {
   return noFile.replace(/\/+$/, "") || "/";
 }
 
-/** `./browse/<slug>.html` or `browse/<slug>.html` from nav JSON (see `github-pages-site.ts`). */
-const STATIC_BROWSE_REL = /^(?:\.\/)?browse\/([^/?#]+\.html)$/i;
+/** Flat canonical page: `./browse/<hash>.html` (opaque slug, one path segment). */
+const STATIC_BROWSE_FLAT = /^(?:\.\/)?browse\/([^/?#]+\.html)$/i;
+
+/** Human-readable shim: `./browse/<encoded/source/segments>/index.html` (see `browse-pair-static-url.ts`). */
+const STATIC_BROWSE_INDEXED = /^(?:\.\/)?browse\/(.+)\/index\.html$/i;
 
 /** True when `href` is hub-root-relative static browse (not same-dir `./other.html`). */
 export function isHubRelativeStaticBrowseHref(href: string): boolean {
-  return STATIC_BROWSE_REL.test(href.trim());
+  const t = href.trim();
+  return STATIC_BROWSE_FLAT.test(t) || STATIC_BROWSE_INDEXED.test(t);
 }
 
 /**
@@ -47,19 +51,26 @@ export function resolveStaticBrowseHref(
 ): string {
   const r = relativeBrowse.trim();
   if (r.startsWith("/")) return `${origin}${r}`;
-  const m = STATIC_BROWSE_REL.exec(r);
-  if (m?.[1]) {
-    const root = siteRootPathnameFromPathname(pathname);
-    const path = root === "/" ? `/browse/${m[1]}` : `${root}/browse/${m[1]}`;
+  const root = siteRootPathnameFromPathname(pathname);
+  const mFlat = STATIC_BROWSE_FLAT.exec(r);
+  if (mFlat?.[1]) {
+    const path = root === "/" ? `/browse/${mFlat[1]}` : `${root}/browse/${mFlat[1]}`;
+    return `${origin}${path}`;
+  }
+  const mIdx = STATIC_BROWSE_INDEXED.exec(r);
+  if (mIdx?.[1]) {
+    const inner = mIdx[1];
+    const path =
+      root === "/" ? `/browse/${inner}/index.html` : `${root}/browse/${inner}/index.html`;
     return `${origin}${path}`;
   }
   return new URL(r, `${origin}${pathname}`).href;
 }
 
 /**
- * Value for `#shell` `data-commentray-pair-browse-href`: keep portable `./browse/<slug>.html`
- * when the static site build emits hub-relative URLs (matches server HTML); otherwise resolve
- * like {@link resolveStaticBrowseHref} for anchors and odd relative forms.
+ * Value for `#shell` `data-commentray-pair-browse-href`: keep portable `./browse/…` hub-relative
+ * URLs when the static site emits them (`*.html` or `…/index.html`); otherwise resolve like
+ * {@link resolveStaticBrowseHref} for anchors and odd relative forms.
  */
 export function staticBrowseHrefForShellDataAttribute(
   staticBrowseUrl: string,
@@ -68,8 +79,10 @@ export function staticBrowseHrefForShellDataAttribute(
 ): string {
   const r = staticBrowseUrl.trim();
   if (r.length === 0) return "";
-  const m = STATIC_BROWSE_REL.exec(r);
-  if (m?.[1]) return `./browse/${m[1]}`;
+  const flat = STATIC_BROWSE_FLAT.exec(r);
+  if (flat?.[1]) return `./browse/${flat[1]}`;
+  const indexed = STATIC_BROWSE_INDEXED.exec(r);
+  if (indexed?.[1]) return `./browse/${indexed[1]}/index.html`;
   return resolveStaticBrowseHref(r, pathname, origin);
 }
 

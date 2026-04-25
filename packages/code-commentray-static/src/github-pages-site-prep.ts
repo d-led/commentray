@@ -12,11 +12,11 @@ import {
   parseGithubRepoWebUrl,
 } from "@commentray/core";
 import {
-  browsePageSlugFromPair,
   type CodeBrowserMultiAngleBrowsing,
   type CodeBrowserMultiAngleSpec,
 } from "@commentray/render";
 
+import { browsePairStaticBrowseRelUrl } from "./browse-pair-static-url.js";
 import type { BuildCommentrayStaticOptions } from "./build.js";
 import { composeCommentrayMarkdown, pathExists } from "./github-pages-site-shared.js";
 
@@ -56,14 +56,12 @@ async function multiAngleSpecForDefinition(
     ghNavBase !== null
       ? githubRepoBlobFileUrl(ghNavBase.owner, ghNavBase.repo, ghNavBase.branch, rel)
       : undefined;
-  const staticBrowseUrl = `./browse/${browsePageSlugFromPair({ sourcePath: ss.sourceFile, commentrayPath: rel })}.html`;
   return {
     id: def.id,
     title: def.title,
     markdown: composed,
     commentrayPathRel: rel,
     commentrayOnGithubUrl,
-    staticBrowseUrl,
     ...(angleBlockStretch ? { blockStretchRows: angleBlockStretch } : {}),
   };
 }
@@ -85,6 +83,13 @@ export async function loadMultiAngleBrowsingIfEnabled(
     if (spec !== undefined) angles.push(spec);
   }
   if (angles.length < 2) return undefined;
+  const dup = angles.length;
+  for (const a of angles) {
+    a.staticBrowseUrl = browsePairStaticBrowseRelUrl(
+      { sourcePath: ss.sourceFile, commentrayPath: a.commentrayPathRel },
+      dup,
+    );
+  }
   return { defaultAngleId: defaultAngleIdForOpen(cfg), angles };
 }
 
@@ -127,19 +132,33 @@ export function pickDefaultCommentrayRel(
   return commentrayMarkdownFile ?? "";
 }
 
+/**
+ * Resolves index-backed block scroll wiring for one documented source ↔ commentray path.
+ * Used for static per-pair browse pages (and the flat hub when multi-angle is off).
+ */
+export function blockStretchRowsForDocumentedPair(
+  projectIndex: CommentrayIndex | null,
+  sourcePath: string,
+  commentrayPathRel: string,
+): BuildCommentrayStaticOptions["blockStretchRows"] {
+  const rel = commentrayPathRel.trim();
+  if (!projectIndex || rel.length === 0) return undefined;
+  const entry = projectIndex.byCommentrayPath[rel];
+  if (!entry || entry.blocks.length === 0 || entry.sourcePath !== sourcePath) return undefined;
+  return {
+    index: projectIndex,
+    sourceRelative: entry.sourcePath,
+    commentrayPathRel: rel,
+  };
+}
+
 export function flatBlockStretchRows(
   projectIndex: CommentrayIndex | null,
   ss: ResolvedStaticSite,
   hasMultiAngle: boolean,
 ): BuildCommentrayStaticOptions["blockStretchRows"] {
-  if (hasMultiAngle || !projectIndex || !ss.commentrayMarkdownFile) return undefined;
-  const entry = projectIndex.byCommentrayPath[ss.commentrayMarkdownFile];
-  if (!entry || entry.blocks.length === 0 || entry.sourcePath !== ss.sourceFile) return undefined;
-  return {
-    index: projectIndex,
-    sourceRelative: entry.sourcePath,
-    commentrayPathRel: ss.commentrayMarkdownFile,
-  };
+  if (hasMultiAngle || !ss.commentrayMarkdownFile) return undefined;
+  return blockStretchRowsForDocumentedPair(projectIndex, ss.sourceFile, ss.commentrayMarkdownFile);
 }
 
 export function sourceAndCommentrayGithubUrls(

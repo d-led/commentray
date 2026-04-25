@@ -38,15 +38,22 @@ They can be the same in simple setups, but are intentionally separable.
 
 ## Why humane URLs remain aliases, not canonical IDs
 
-Human-readable paths are better for comprehension and sharing, but canonical
-slug URLs remain critical:
+Human-readable paths are better for comprehension and sharing, but opaque
+**slug** URLs under `/browse/<slug>.html` remain the canonical pair identity in
+the static export.
 
-- slugs are stable even when path normalization rules evolve,
-- slugs are collision-resistant across source/commentray pairs,
-- old bookmarks must keep working.
+- A slug is **deterministic** and therefore **stable across rebuilds** for as
+  long as the exact `(sourcePath, commentrayPath)` strings the build uses stay
+  the same (same pair → same slug on every machine).
+- **Renaming or moving** the primary file or the companion Markdown **changes**
+  those strings → **a new slug**; old `/browse/…` links are not automatically
+  redirected.
+- Truncated SHA-256 makes accidental collisions between different pairs
+  vanishingly unlikely.
 
-So the strategy is additive: preserve slug canonicals, add humane aliases,
-ensure shared links resolve to stable destinations.
+So the strategy is additive: keep slug pages as the canonical target, add
+humane alias shims where hosts allow them, and treat **slug algorithm or path
+string changes** as breaking bookmark events (see `docs/development.md`).
 
 ## Manual scope boundaries
 

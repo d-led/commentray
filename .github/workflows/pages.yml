@@ -42,6 +42,9 @@ jobs:
 
       - name: Build static site
         run: npm run pages:build
+        env:
+          # Burn into HTML footer via `scripts/build-static-pages.mjs` (validated in render).
+          COMMENTRAY_PAGES_BUILD_SHA: ${{ github.sha }}
 
       - name: Validate Pages GitHub/blob + browse link shapes
         run: node scripts/validate-pages-github-links.mjs

@@ -45,6 +45,8 @@ _(write commentary here)_
 
 When the index uses a **`marker:<id>`** anchor, the primary file carries paired delimiters in real comments. Where a **`#region` / `//#region`** style is a widespread editor convention (JavaScript/TypeScript, SCSS, C#, Ruby, C/C++ `#pragma`, Python `# region`, HTML, Lua, VB, …), Commentray follows the same shapes as [Region Marker](https://marketplace.visualstudio.com/items?itemName=txava.region-marker), naming the region **`commentray:<id>`**. For languages **without** that shared idiom (Rust, Java, Kotlin, plain **CSS**, Docker/YAML/Make, …), tools fall back to ordinary **`//` / `#` / `/* … */`** comments and our explicit tokens **`commentray:start id=<id>`** / **`commentray:end id=<id>`**. Both families are understood by `@commentray/core` (`commentrayRegionInsertions`, `parseCommentrayRegionBoundary`).
 
+**Per-language cheat sheet:** [Source region delimiters (by editor language)](../user/source-region-delimiters.md).
+
 To **rewrite** existing markers after you change language or convention, use **`convertCommentraySourceMarkersToLanguage`** (pairs are discovered with `findCommentrayMarkerPairs`, then each span is rebuilt for the target language id). The CLI exposes the same behaviour as **`commentray convert-source-markers --file <repo-relative> --language <vscode-language-id>`** (optional `--dry-run`).
 
 ## Metadata index (`index.json`, schema v3)
@@ -60,7 +62,7 @@ Each entry still records both `sourcePath` and `commentrayPath`; the object key 
 
 Automated “search the neighbourhood and patch `lines:`” resolvers are intentionally **not** part of strict validation today; they remain a possible future extension on top of the same `snippet` v1 format.
 
-## Staleness (v0 rules)
+## Staleness (current diagnostics)
 
 The core library computes lightweight diagnostics:
 

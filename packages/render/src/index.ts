@@ -15,6 +15,14 @@ export {
   renderFencedCode,
   renderMarkdownToHtml,
 } from "./markdown-pipeline.js";
+export {
+  renderCommentrayPreviewHtml,
+  type RenderCommentrayPreviewHtmlArgs,
+} from "./commentray-preview-html.js";
+export {
+  injectCommentrayDocAnchors,
+  injectSourceMarkdownAnchors,
+} from "./inject-md-line-anchors.js";
 export { renderSideBySideHtml } from "./side-by-side.js";
 export type { SideBySideOptions } from "./side-by-side.js";
 export { browsePageSlugFromPair } from "./browse-page-slug.js";

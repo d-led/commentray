@@ -1,6 +1,8 @@
 import { buildCommentraySnippetV1 } from "./block-snippet.js";
 import { formatMarkerAnchor } from "./anchors.js";
 import { assertValidMarkerId } from "./marker-ids.js";
+import { leadingIndentOfLine } from "./region-marker-convert.js";
+import { commentrayRegionInsertions } from "./source-markers.js";
 import type { CommentrayBlock, CommentrayIndex, SourceFileIndexEntry } from "./model.js";
 
 /** 1-based inclusive range of source lines a block points to. */
@@ -50,6 +52,48 @@ const CARET_PLACEHOLDER = "_(write commentary here)_";
  * carries it in the commentary file. Pure: no I/O, deterministic when a
  * fixed `rng` and `id` are supplied.
  */
+export type WrapSourceLineRangeWithCommentrayMarkersInput = {
+  sourceText: string;
+  range: BlockRange;
+  languageId: string;
+  /** Must equal the block id used in `marker:<id>` anchors and companion markers. */
+  markerId: string;
+};
+
+export type WrapSourceLineRangeWithCommentrayMarkersResult = {
+  sourceText: string;
+  /** 1-based inclusive lines inside the delimiter pair (content only, not marker lines). */
+  innerRange: BlockRange;
+};
+
+/**
+ * Wraps an inclusive 1-based line range with language-appropriate Commentray
+ * start/end delimiters (e.g. `<!-- #region commentray:… -->` in Markdown,
+ * `# commentray:start id=…` in TOML/YAML). Does not write files.
+ */
+export function wrapSourceLineRangeWithCommentrayMarkers(
+  input: WrapSourceLineRangeWithCommentrayMarkersInput,
+): WrapSourceLineRangeWithCommentrayMarkersResult {
+  const id = assertValidMarkerId(input.markerId);
+  const rawLines = input.sourceText.replaceAll("\r\n", "\n").split("\n");
+  const r = clampRange(input.range, input.sourceText);
+  const start0 = r.startLine - 1;
+  const end0 = r.endLine - 1;
+  const firstLine = rawLines[start0] ?? "";
+  const indent = leadingIndentOfLine(firstLine);
+  const { start, end } = commentrayRegionInsertions(input.languageId, id, indent);
+  const innerLines = rawLines.slice(start0, end0 + 1);
+  const innerPart = innerLines.join("\n");
+  const combined =
+    innerLines.length > 0 ? `${start}${innerPart}${end}` : `${start.replace(/\n$/, "")}${end}`;
+  const wrappedLines = combined.split("\n");
+  const newLines = [...rawLines.slice(0, start0), ...wrappedLines, ...rawLines.slice(end0 + 1)];
+  return {
+    sourceText: newLines.join("\n"),
+    innerRange: { startLine: start0 + 2, endLine: end0 + 2 },
+  };
+}
+
 export function createBlockForRange(input: CreateBlockForRangeInput): CreatedBlock {
   const range = clampRange(input.range, input.sourceText);
   const id = input.id !== undefined ? assertValidMarkerId(input.id) : generateBlockId(input.rng);

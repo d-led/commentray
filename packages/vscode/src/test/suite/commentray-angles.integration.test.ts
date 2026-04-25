@@ -50,6 +50,14 @@ describe("Commentray Angles in VS Code (integration)", () => {
       const text = new TextDecoder("utf-8").decode(bytes);
       assert.ok(text.includes("# Commentray"), "Expected placeholder in main angle Markdown.");
     });
+
+    it('Given Angles layout, when rendered preview choose angle runs with { angleId: "alt" }, then the command completes without rejecting.', async () => {
+      const editor = await openFixtureSourceFile(dogfoodWorkspace.root());
+      await vscode.window.showTextDocument(editor.document, { preview: false });
+      await vscode.commands.executeCommand("commentray.openRenderedPreviewChooseAngle", {
+        angleId: "alt",
+      });
+    });
   });
 
   describe("Add angle to project (programmatic)", () => {

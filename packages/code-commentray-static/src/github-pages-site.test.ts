@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ensureAnglesSentinelFile } from "@commentray/core";
+import { CURRENT_SCHEMA_VERSION, ensureAnglesSentinelFile, writeIndex } from "@commentray/core";
+import { browsePageSlugFromPair } from "@commentray/render";
 
 import { buildGithubPagesStaticSite } from "./github-pages-site.js";
 
@@ -32,6 +33,115 @@ async function writeMinimalPagesFixture(
   await writeFile(path.join(repo, "src", "x.ts"), "export const x = 1;\n", "utf8");
   await mkdir(path.join(repo, ".commentray", "source", "src"), { recursive: true });
   await writeFile(path.join(repo, ".commentray", "source", "src", "x.ts.md"), "# Doc\n", "utf8");
+}
+
+/** Shared `[angles]` + `[[angles.definitions]]` + `[render]` tail for README.md hub fixtures. */
+const README_ANGLES_TOML_TAIL = [
+  "",
+  "[angles]",
+  'default_angle = "main"',
+  "",
+  "[[angles.definitions]]",
+  'id = "main"',
+  'title = "Main"',
+  "",
+  "[[angles.definitions]]",
+  'id = "architecture"',
+  'title = "Architecture"',
+  "",
+  "[render]",
+  "mermaid = false",
+  "",
+] as const;
+
+async function writeReadmeMultiAngleHubToml(repo: string, title: string): Promise<void> {
+  await writeFile(
+    path.join(repo, ".commentray.toml"),
+    [
+      "[static_site]",
+      `title = "${title}"`,
+      'source_file = "README.md"',
+      'commentray_markdown = ".commentray/source/README.md/main.md"',
+      ...README_ANGLES_TOML_TAIL,
+    ].join("\n"),
+    "utf8",
+  );
+}
+
+async function writeReadmeAnglesCompanionStubs(repo: string): Promise<void> {
+  await writeFile(path.join(repo, "README.md"), "# App\n", "utf8");
+  await mkdir(path.join(repo, ".commentray", "source", "README.md"), { recursive: true });
+  await writeFile(
+    path.join(repo, ".commentray", "source", "README.md", "main.md"),
+    "# Main angle\n",
+    "utf8",
+  );
+  await writeFile(
+    path.join(repo, ".commentray", "source", "README.md", "architecture.md"),
+    "# Architecture angle\n",
+    "utf8",
+  );
+}
+
+async function seedReadmeAnglesPagesFixture(repo: string, title: string): Promise<void> {
+  await ensureAnglesSentinelFile(repo, ".commentray");
+  await writeReadmeMultiAngleHubToml(repo, title);
+  await writeReadmeAnglesCompanionStubs(repo);
+}
+
+const README_MAIN_ANGLE_MD = ".commentray/source/README.md/main.md";
+const EXTRA_TS_MAIN_MD = ".commentray/source/extra.ts/main.md";
+
+/** README multi-angle hub + `extra.ts` indexed pair (shared by browse scroll-link tests). */
+async function seedAnglesHubWithIndexedExtraPair(input: {
+  tmpPrefix: string;
+  hubTitle: string;
+  /** Second source + companion on disk only — not added to `index.json`. */
+  withDiskOnlyOrphan: boolean;
+}): Promise<{
+  repo: string;
+  extraCr: string;
+  orphanCr: string | undefined;
+}> {
+  const repo = await mkdtemp(path.join(tmpdir(), input.tmpPrefix));
+  await seedReadmeAnglesPagesFixture(repo, input.hubTitle);
+  await writeFile(path.join(repo, "extra.ts"), "a\nb\n", "utf8");
+  await mkdir(path.join(repo, ".commentray", "source", "extra.ts"), { recursive: true });
+  await writeFile(
+    path.join(repo, EXTRA_TS_MAIN_MD),
+    "<!-- commentray:block id=b1 -->\n\n## Extra doc\n",
+    "utf8",
+  );
+
+  let orphanCr: string | undefined;
+  if (input.withDiskOnlyOrphan) {
+    await writeFile(path.join(repo, "orphan.ts"), "x\n", "utf8");
+    await mkdir(path.join(repo, ".commentray", "source", "orphan.ts"), { recursive: true });
+    orphanCr = ".commentray/source/orphan.ts/main.md";
+    await writeFile(
+      path.join(repo, orphanCr),
+      "<!-- commentray:block id=o1 -->\n\n## Orphan doc\n",
+      "utf8",
+    );
+  }
+
+  await writeIndex(repo, {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    byCommentrayPath: {
+      [README_MAIN_ANGLE_MD]: {
+        sourcePath: "README.md",
+        commentrayPath: README_MAIN_ANGLE_MD,
+        blocks: [],
+      },
+      [EXTRA_TS_MAIN_MD]: {
+        sourcePath: "extra.ts",
+        commentrayPath: EXTRA_TS_MAIN_MD,
+        blocks: [{ id: "b1", anchor: "lines:1-2" }],
+      },
+    },
+  });
+
+  return { repo, extraCr: EXTRA_TS_MAIN_MD, orphanCr };
 }
 
 async function runWritesSiteAndNavFromFlatCompanions(): Promise<string> {
@@ -79,45 +189,7 @@ async function runWritesSiteAndNavFromFlatCompanions(): Promise<string> {
 
 async function runAngleSelectorOnBrowsePermalinks(): Promise<string> {
   const r = await mkdtemp(path.join(tmpdir(), "cr-pages-ang-"));
-  const storage = ".commentray";
-  await ensureAnglesSentinelFile(r, storage);
-  await writeFile(
-    path.join(r, ".commentray.toml"),
-    [
-      "[static_site]",
-      'title = "Angles"',
-      'source_file = "README.md"',
-      'commentray_markdown = ".commentray/source/README.md/main.md"',
-      "",
-      "[angles]",
-      'default_angle = "main"',
-      "",
-      "[[angles.definitions]]",
-      'id = "main"',
-      'title = "Main"',
-      "",
-      "[[angles.definitions]]",
-      'id = "architecture"',
-      'title = "Architecture"',
-      "",
-      "[render]",
-      "mermaid = false",
-      "",
-    ].join("\n"),
-    "utf8",
-  );
-  await writeFile(path.join(r, "README.md"), "# App\n", "utf8");
-  await mkdir(path.join(r, ".commentray", "source", "README.md"), { recursive: true });
-  await writeFile(
-    path.join(r, ".commentray", "source", "README.md", "main.md"),
-    "# Main angle\n",
-    "utf8",
-  );
-  await writeFile(
-    path.join(r, ".commentray", "source", "README.md", "architecture.md"),
-    "# Architecture angle\n",
-    "utf8",
-  );
+  await seedReadmeAnglesPagesFixture(r, "Angles");
 
   await buildGithubPagesStaticSite({ repoRoot: r });
 
@@ -206,6 +278,90 @@ async function runBrowseWithoutGithubUrl(): Promise<string> {
   return r;
 }
 
+/** Hub uses two README angles; a second source has only one angle file so browse is not multi-angle. */
+async function runBrowseSingleAnglePairEmbedsScrollBlockLinks(): Promise<string> {
+  const { repo: r, extraCr } = await seedAnglesHubWithIndexedExtraPair({
+    tmpPrefix: "cr-pages-bss-",
+    hubTitle: "Angles + extra",
+    withDiskOnlyOrphan: false,
+  });
+
+  await buildGithubPagesStaticSite({ repoRoot: r });
+
+  const nav = JSON.parse(
+    await readFile(path.join(r, "_site", "commentray-nav-search.json"), "utf8"),
+  ) as {
+    documentedPairs?: { sourcePath: string; staticBrowseUrl?: string }[];
+  };
+  const extraPair = nav.documentedPairs?.find((p) => p.sourcePath === "extra.ts");
+  expect(extraPair?.staticBrowseUrl).toMatch(/^\.\/browse\/.+\.html$/);
+  const canonicalSlug = browsePageSlugFromPair({
+    sourcePath: "extra.ts",
+    commentrayPath: extraCr,
+  });
+  const browseHtml = await readFile(
+    path.join(r, "_site", "browse", `${canonicalSlug}.html`),
+    "utf8",
+  );
+  const b64 = /data-scroll-block-links-b64="([^"]*)"/.exec(browseHtml)?.[1];
+  if (!b64)
+    throw new Error("expected non-empty data-scroll-block-links-b64 on extra.ts browse page");
+  const links = JSON.parse(Buffer.from(b64, "base64").toString("utf8")) as unknown[];
+  expect(Array.isArray(links)).toBe(true);
+  expect(links.length).toBeGreaterThan(0);
+  return r;
+}
+
+/**
+ * Documents the split between **nav / browse** (disk + index merge) and **block scroll + rays**
+ * (index `blocks` only). Without this, a repo can list many pairs while only hub defaults get
+ * obvious block sync — easy to mistake for a renderer regression.
+ */
+async function runBrowseIndexedPairGetsScrollLinksDiskOnlyPairGetsEmptyPayload(): Promise<string> {
+  const {
+    repo: r,
+    extraCr,
+    orphanCr,
+  } = await seedAnglesHubWithIndexedExtraPair({
+    tmpPrefix: "cr-pages-idx-disk-",
+    hubTitle: "Indexed vs disk-only",
+    withDiskOnlyOrphan: true,
+  });
+  if (orphanCr === undefined) throw new Error("expected disk-only orphan path");
+
+  await buildGithubPagesStaticSite({ repoRoot: r });
+
+  const nav = JSON.parse(
+    await readFile(path.join(r, "_site", "commentray-nav-search.json"), "utf8"),
+  ) as { documentedPairs?: { sourcePath: string }[] };
+  const sources = new Set((nav.documentedPairs ?? []).map((p) => p.sourcePath));
+  expect(sources.has("extra.ts")).toBe(true);
+  // Disk-only pair: still listed for browse/search, but not in index.json.
+  expect(sources.has("orphan.ts")).toBe(true);
+
+  const extraSlug = browsePageSlugFromPair({
+    sourcePath: "extra.ts",
+    commentrayPath: extraCr,
+  });
+  const extraHtml = await readFile(path.join(r, "_site", "browse", `${extraSlug}.html`), "utf8");
+  const extraAttr = /data-scroll-block-links-b64="([^"]*)"/.exec(extraHtml);
+  expect(extraAttr).not.toBeNull();
+  if (extraAttr?.[1] === undefined) throw new Error("expected capture");
+  expect(extraAttr[1].length).toBeGreaterThan(0);
+  const extraLinks = JSON.parse(Buffer.from(extraAttr[1], "base64").toString("utf8")) as unknown[];
+  expect(extraLinks.length).toBeGreaterThan(0);
+
+  const orphanSlug = browsePageSlugFromPair({ sourcePath: "orphan.ts", commentrayPath: orphanCr });
+  const orphanHtml = await readFile(path.join(r, "_site", "browse", `${orphanSlug}.html`), "utf8");
+  const orphanAttr = /data-scroll-block-links-b64="([^"]*)"/.exec(orphanHtml);
+  expect(orphanAttr).not.toBeNull();
+  if (orphanAttr?.[1] === undefined) throw new Error("expected capture");
+  // No index entry → no block links for gutter rays / block-aware scroll in the shell.
+  expect(orphanAttr[1]).toBe("");
+
+  return r;
+}
+
 describe("GitHub Pages static site output", () => {
   let repo: string;
 
@@ -217,8 +373,33 @@ describe("GitHub Pages static site output", () => {
     repo = await runWritesSiteAndNavFromFlatCompanions();
   });
 
+  it("stamps pagesBuildCommitSha into the hub and browse footers when the builder passes it", async () => {
+    repo = await mkdtemp(path.join(tmpdir(), "cr-pages-foot-sha-"));
+    await writeMinimalPagesFixture(repo, {
+      title: "Sha footer",
+      githubUrl: "https://github.com/acme/demo",
+    });
+    const sha = "0123456789abcdef0123456789abcdef01234567";
+    await buildGithubPagesStaticSite({ repoRoot: repo, pagesBuildCommitSha: sha });
+    const hub = await readFile(path.join(repo, "_site", "index.html"), "utf8");
+    expect(hub).toContain(`>${sha}</code>`);
+    const browseFiles = await readdir(path.join(repo, "_site", "browse"));
+    const browseName = browseFiles.find((f) => f.endsWith(".html"));
+    if (browseName === undefined) throw new Error("expected browse html");
+    const browseHtml = await readFile(path.join(repo, "_site", "browse", browseName), "utf8");
+    expect(browseHtml).toContain(`>${sha}</code>`);
+  });
+
   it("includes the angle selector on browse permalinks when multi-angle is enabled", async () => {
     repo = await runAngleSelectorOnBrowsePermalinks();
+  });
+
+  it("embeds block scroll links on browse for a single-angle pair when the hub uses angles", async () => {
+    repo = await runBrowseSingleAnglePairEmbedsScrollBlockLinks();
+  });
+
+  it("embeds non-empty scroll-link payload only for index-backed pairs; disk-only pairs get an empty attribute", async () => {
+    repo = await runBrowseIndexedPairGetsScrollLinksDiskOnlyPairGetsEmptyPayload();
   });
 
   it("writes browse pages and hub nav without static_site.github_url (same-site navigation only)", async () => {

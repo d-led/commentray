@@ -13,8 +13,14 @@ import { writeE2eMobileFlipEndFixture } from "./lib/write-e2e-mobile-flip-end-fi
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+/** CI (e.g. GitHub Actions) sets this so the static footer includes the commit; omitted locally. */
+const pagesBuildCommitSha = process.env.COMMENTRAY_PAGES_BUILD_SHA?.trim();
+
 try {
-  const { outHtml, navSearchPath } = await buildGithubPagesStaticSite({ repoRoot });
+  const { outHtml, navSearchPath } = await buildGithubPagesStaticSite({
+    repoRoot,
+    ...(pagesBuildCommitSha ? { pagesBuildCommitSha } : {}),
+  });
   console.log(`Wrote ${outHtml}`);
   console.log(`Wrote ${navSearchPath}`);
   await writeE2eDualScrollFixture(repoRoot);

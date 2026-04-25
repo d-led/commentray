@@ -36,6 +36,22 @@ When multiple [angles](https://github.com/d-led/commentray/blob/main/docs/spec/s
 
 ![Open Markdown preview for paired file](./assets/vscode-markdown-preview.png)
 
+## Open rendered Commentray preview (default angle)
+
+**Commentray: Open rendered Commentray preview (default angle)** opens the same HTML pipeline as static pages in a webview beside the source. The first frame is the command palette with the command highlighted; the second is the rendered preview.
+
+![Rendered preview — default angle, command palette](./assets/vscode-rendered-preview-default-palette.png)
+
+![Rendered preview — default angle, webview](./assets/vscode-rendered-preview-default.png)
+
+## Open rendered Commentray preview (choose angle)
+
+**Commentray: Open rendered Commentray preview (choose angle)…** opens the angle quick pick, then renders the chosen companion (here **Alt**) with the same preview stack.
+
+![Rendered preview — choose angle, command palette](./assets/vscode-rendered-preview-angle-palette.png)
+
+![Rendered preview — choose angle, webview](./assets/vscode-rendered-preview-angle.png)
+
 ## Validate workspace
 
 **Commentray: Validate workspace** runs the same checks as `commentray validate` and streams results to the **Commentray** output channel (focus output if you want the log in frame).
@@ -65,7 +81,7 @@ More on asset layout: [storage — images](https://github.com/d-led/commentray/b
 
 Automation is **not** Cypress: one Node driver script drives a disposable VS Code window.
 
-1. **Workspace** — the Extension Development Host opens **`packages/vscode/fixtures/dogfood`** (see `README.md` there). Primary source for the scripted tour is **`src/sample.ts`**; paired Markdown appears under `.commentray/source/…` when commands run.
-2. **Driver** — `scripts/capture-vscode-readme-screenshots-desktop.mjs` launches VS Code (via `@vscode/test-electron`), connects with Playwright CDP, then runs a **fixed sequence**: command palette in **`>`** (run-command) mode, `shot(page, "vscode-….png")` calls, editor focus groups, sleeps. Output files go to **this** directory’s `./assets/`.
-3. **Changing or adding a frame** — edit that `.mjs`: extend `main()` after `ensureBuilt()`, reuse `runPaletteQuery` / `openSampleTs` / `dismissOverlays`, match command titles to **`packages/vscode/package.json`** → `contributes.commands` (**`Commentray: …`** strings). Tune `afterEnterMs` if UI lags. Keep filenames aligned with the `![…](./assets/…)` references in this file and in `packages/vscode/README.md`.
-4. **Manual scenarios** — use dogfood or your own folder; follow `scripts/refresh-vscode-readme-screenshots-manual.sh` (opens EDH + prints where to save files).
+1. **Workspace** — the Extension Development Host opens **`packages/vscode/fixtures/dogfood`** (see [the fixture `README.md`](../../../../../packages/vscode/fixtures/dogfood/README.md)). Primary source for the scripted tour is **`src/sample.ts`**; paired Markdown appears under `.commentray/source/…` when commands run.
+2. **Driver** — [`scripts/capture-vscode-readme-screenshots-desktop.mjs`](../../../../../scripts/capture-vscode-readme-screenshots-desktop.mjs) launches VS Code (via `@vscode/test-electron`), connects with Playwright CDP, then runs a **fixed sequence**: command palette in **`>`** (run-command) mode, `shot(page, "vscode-….png")` calls, editor focus groups, sleeps. It also seeds **verbose** `main.md` / `alt.md` under `.commentray/source/src/sample.ts/` (including a `<!-- commentray:page-break -->` demo) so rendered-preview frames are readable. Output files go to **this** directory’s `./assets/`.
+3. **Changing or adding a frame** — edit that `.mjs`: extend `main()` after `ensureBuilt()`, reuse `runPaletteQuery` / `openSampleTs` / `dismissOverlays`, match command titles to [`packages/vscode/package.json`](../../../../../packages/vscode/package.json) → `contributes.commands` (**`Commentray: …`** strings). Tune `afterEnterMs` if UI lags. Keep filenames aligned with the `![…](./assets/…)` references in this file and in [`packages/vscode/README.md`](../../../../../packages/vscode/README.md).
+4. **Manual scenarios** — use dogfood or your own folder; follow [`scripts/refresh-vscode-readme-screenshots-manual.sh`](../../../../../scripts/refresh-vscode-readme-screenshots-manual.sh) (opens EDH + prints where to save files).

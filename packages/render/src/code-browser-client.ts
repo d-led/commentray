@@ -9,7 +9,9 @@ import {
   activeBlockIdForViewport,
   clampViewportYToGutterLocal,
   codeLineDomIndex0,
+  dedupeBlockScrollLinksById,
   gutterRayBezierPaths,
+  nextBlockLinkInCommentrayOrder,
   sortBlockLinksBySource,
 } from "./code-browser-block-rays.js";
 import {
@@ -1418,7 +1420,7 @@ function drawBlockRaysIntoSvg(
   probeTopSourceLine1Based: () => number,
   lineIdPrefix: string,
 ): void {
-  const links = getLinks();
+  const links = dedupeBlockScrollLinksById(getLinks());
   const sorted = sortBlockLinksBySource(links);
   const gutterRect = gutter.getBoundingClientRect();
   const w = gutterRect.width;
@@ -1443,7 +1445,7 @@ function drawBlockRaysIntoSvg(
   for (let i = 0; i < sorted.length; i++) {
     const link = sorted[i];
     if (!link) continue;
-    const next = sorted[i + 1];
+    const next = nextBlockLinkInCommentrayOrder(links, link);
 
     const i0 = codeLineDomIndex0(link.sourceStart);
     const i1 = codeLineDomIndex0(link.sourceEnd);
@@ -2972,7 +2974,9 @@ function humaneBrowseAliasPathForSource(sourcePath: string): string {
   return sourcePath
     .split("/")
     .filter((seg) => seg.length > 0)
-    .map((seg) => encodeURIComponent(seg))
+    .map((seg) =>
+      seg.startsWith(".") ? `%2E${encodeURIComponent(seg.slice(1))}` : encodeURIComponent(seg),
+    )
     .join("/");
 }
 
@@ -3061,11 +3065,26 @@ function maybeBackfillAddressBarWithHumanePairLink(): void {
   const pathname = globalThis.location.pathname;
   normalizeDocumentationHomeHrefForCurrentPath();
   if (!shellEligibleForHumaneBackfill(shell, pathname)) return;
-  const nextPath = nextHumaneBrowsePathForShell(shell, pathname);
-  if (nextPath === null) return;
   const beforeHref = globalThis.location.href;
   absolutizeNavJsonUrls(shell, beforeHref);
   normalizePairBrowseHrefForCurrentPath(shell, pathname);
+
+  /** Prefer the same `staticBrowseUrl` the static build put on `#shell` (slug or `…/index.html` shims). */
+  const canonicalBrowsePathname = ((): string | null => {
+    const raw = shell.getAttribute("data-commentray-pair-browse-href")?.trim() ?? "";
+    if (raw.length === 0) return null;
+    try {
+      const u = new URL(raw, globalThis.location.href);
+      if (u.origin !== globalThis.location.origin) return null;
+      if (!u.pathname.includes("/browse/")) return null;
+      return u.pathname;
+    } catch {
+      return null;
+    }
+  })();
+
+  const nextPath = canonicalBrowsePathname ?? nextHumaneBrowsePathForShell(shell, pathname);
+  if (nextPath === null) return;
   globalThis.history.replaceState(
     null,
     "",

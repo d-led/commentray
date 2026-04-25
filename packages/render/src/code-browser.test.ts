@@ -1,13 +1,13 @@
 import { Buffer } from "node:buffer";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { CURRENT_SCHEMA_VERSION } from "@commentray/core";
 import { describe, expect, it } from "vitest";
 
+import { mkTempRepoWithBrowsePairHtmlLayout } from "./browse-pair-html-test-fixtures.js";
 import { COMMENTRAY_COLOR_THEME_STORAGE_KEY } from "./code-browser-color-theme.js";
-import { renderCodeBrowserHtml } from "./code-browser.js";
+import { type CodeBrowserPageOptions, renderCodeBrowserHtml } from "./code-browser.js";
 
 function textContentWithoutTags(html: string): string {
   let cur = html;
@@ -22,6 +22,42 @@ function textContentWithoutTags(html: string): string {
 function bannerRegionHtml(html: string): string {
   const m = /<header[^>]*role="banner"[^>]*>[\s\S]*?<\/header>/i.exec(html);
   return m?.[0] ?? "";
+}
+
+function commentrayOutputUrlsForReadmeSourcePane(
+  repoRoot: string,
+  storageRoot: string,
+  outHtml: string,
+): {
+  repoRootAbs: string;
+  htmlOutputFileAbs: string;
+  markdownUrlBaseDirAbs: string;
+  commentrayStorageRootAbs: string;
+} {
+  return {
+    repoRootAbs: repoRoot,
+    htmlOutputFileAbs: outHtml,
+    markdownUrlBaseDirAbs: path.join(storageRoot, "source", "README.md"),
+    commentrayStorageRootAbs: storageRoot,
+  };
+}
+
+const readmeWithRelativeInstallLink = "# Hello\n\n[Install](docs/user/install.md)\n";
+
+async function renderReadmeInstallLinkSourcePaneHtml(
+  repoRoot: string,
+  storageRoot: string,
+  outHtml: string,
+  extra?: Partial<CodeBrowserPageOptions>,
+): Promise<string> {
+  return renderCodeBrowserHtml({
+    filePath: "README.md",
+    code: readmeWithRelativeInstallLink,
+    language: "md",
+    commentrayMarkdown: "Companion docs",
+    commentrayOutputUrls: commentrayOutputUrlsForReadmeSourcePane(repoRoot, storageRoot, outHtml),
+    ...extra,
+  });
 }
 
 describe("Code browser page — layout shell and search", () => {
@@ -374,67 +410,27 @@ describe("Code browser page — file path display", () => {
 
 describe("Code browser page — source markdown link resolution", () => {
   it("resolves rendered source-markdown links from the source tree, not companion storage", async () => {
-    const tmp = await mkdtemp(path.join(tmpdir(), "cr-source-pane-link-"));
-    const repoRoot = path.join(tmp, "repo");
-    const storageRoot = path.join(repoRoot, ".commentray");
-    await mkdir(path.join(repoRoot, "docs", "user"), { recursive: true });
-    await mkdir(storageRoot, { recursive: true });
-    await writeFile(
-      path.join(repoRoot, "README.md"),
-      "# Hello\n\n[Install](docs/user/install.md)\n",
-      "utf8",
-    );
-    await writeFile(path.join(repoRoot, "docs", "user", "install.md"), "# Install\n", "utf8");
-    const outHtml = path.join(repoRoot, "_site", "browse", "pair.html");
-    await mkdir(path.dirname(outHtml), { recursive: true });
+    const { repoRoot, storageRoot, outHtml } =
+      await mkTempRepoWithBrowsePairHtmlLayout("cr-source-pane-link-");
+    await writeFile(path.join(repoRoot, "README.md"), readmeWithRelativeInstallLink, "utf8");
 
-    const html = await renderCodeBrowserHtml({
-      filePath: "README.md",
-      code: "# Hello\n\n[Install](docs/user/install.md)\n",
-      language: "md",
-      commentrayMarkdown: "Companion docs",
-      commentrayOutputUrls: {
-        repoRootAbs: repoRoot,
-        htmlOutputFileAbs: outHtml,
-        markdownUrlBaseDirAbs: path.join(storageRoot, "source", "README.md"),
-        commentrayStorageRootAbs: storageRoot,
-      },
-    });
+    const html = await renderReadmeInstallLinkSourcePaneHtml(repoRoot, storageRoot, outHtml);
 
     expect(html).toContain('href="../../docs/user/install.md"');
     expect(html).not.toContain(".commentray/source/README.md/docs/user/install.md");
   });
 
   it("keeps pair browse links stable while resolving source-markdown links from source tree", async () => {
-    const tmp = await mkdtemp(path.join(tmpdir(), "cr-source-pane-pair-link-"));
-    const repoRoot = path.join(tmp, "repo");
-    const storageRoot = path.join(repoRoot, ".commentray");
-    await mkdir(path.join(repoRoot, "docs", "user"), { recursive: true });
-    await mkdir(storageRoot, { recursive: true });
-    await writeFile(
-      path.join(repoRoot, "README.md"),
-      "# Hello\n\n[Install](docs/user/install.md)\n",
-      "utf8",
+    const { repoRoot, storageRoot, outHtml } = await mkTempRepoWithBrowsePairHtmlLayout(
+      "cr-source-pane-pair-link-",
     );
-    await writeFile(path.join(repoRoot, "docs", "user", "install.md"), "# Install\n", "utf8");
-    const outHtml = path.join(repoRoot, "_site", "browse", "pair.html");
-    await mkdir(path.dirname(outHtml), { recursive: true });
+    await writeFile(path.join(repoRoot, "README.md"), readmeWithRelativeInstallLink, "utf8");
 
-    const html = await renderCodeBrowserHtml({
-      filePath: "README.md",
-      code: "# Hello\n\n[Install](docs/user/install.md)\n",
-      language: "md",
-      commentrayMarkdown: "Companion docs",
+    const html = await renderReadmeInstallLinkSourcePaneHtml(repoRoot, storageRoot, outHtml, {
       commentrayPathForSearch: ".commentray/source/README.md/main.md",
       commentrayOnGithubUrl:
         "https://github.com/acme/demo/blob/main/.commentray/source/README.md/main.md",
       commentrayStaticBrowseUrl: "./browse/readme@main.html",
-      commentrayOutputUrls: {
-        repoRootAbs: repoRoot,
-        htmlOutputFileAbs: outHtml,
-        markdownUrlBaseDirAbs: path.join(storageRoot, "source", "README.md"),
-        commentrayStorageRootAbs: storageRoot,
-      },
     });
 
     expect(html).toContain('href="../../docs/user/install.md"');
@@ -501,6 +497,33 @@ describe("Code browser page — toolbar link policy", () => {
     expect(html).toMatch(/<footer[\s\S]*Rendered with[\s\S]*v\d+\.\d+\.\d+<\/span>\s*:\s*<time/);
     expect(html).toContain('datetime="2026-05-01T12:00:00.000Z"');
     expect(html).not.toContain("HTML generated");
+  });
+
+  it("should append a normalized commit id to the attribution footer when pagesBuildCommitSha is set", async () => {
+    const sha = "a1b2c3d4e5f6789012345678901234567890abcd";
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      toolHomeUrl: "https://github.com/d-led/commentray",
+      builtAt: new Date("2026-05-01T12:00:00.000Z"),
+      pagesBuildCommitSha: sha,
+    });
+    expect(html).toContain(`>${sha}</code>`);
+    expect(html).toContain('class="app__footer-attribution__sha"');
+  });
+
+  it("should ignore pagesBuildCommitSha that is not a Git hex object id", async () => {
+    const html = await renderCodeBrowserHtml({
+      title: "Demo",
+      code: "x",
+      language: "ts",
+      commentrayMarkdown: "body",
+      toolHomeUrl: "https://github.com/d-led/commentray",
+      pagesBuildCommitSha: "main",
+    });
+    expect(html).not.toContain('class="app__footer-attribution__sha"');
   });
 
   it("should omit executable toolbar links when URLs are not http(s)", async () => {
@@ -693,6 +716,63 @@ describe("Code browser page — multi-angle browsing", () => {
     expect(html).toContain('id="source-markdown-pane-flip"');
     expect(html).toContain('id="code-pane-markdown-body"');
     expect(html).toContain('id="code-md-line-0"');
+  });
+});
+
+describe("Code browser page — multi-angle index isolation", () => {
+  it("should omit scroll links for an angle when blockStretchRows targets another companion path", async () => {
+    const mainPath = ".commentray/source/README.md/main.md";
+    const archPath = ".commentray/source/README.md/architecture.md";
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [mainPath]: {
+          sourcePath: "README.md",
+          commentrayPath: mainPath,
+          blocks: [{ id: "readme-lede", anchor: "lines:1-3" }],
+        },
+      },
+    };
+    const html = await renderCodeBrowserHtml({
+      filePath: "README.md",
+      code: "a\nb\nc\n",
+      language: "txt",
+      commentrayMarkdown: "",
+      multiAngleBrowsing: {
+        defaultAngleId: "main",
+        angles: [
+          {
+            id: "main",
+            markdown: "<!-- commentray:block id=readme-lede -->\n## Lede\n",
+            commentrayPathRel: mainPath,
+            blockStretchRows: {
+              index,
+              sourceRelative: "README.md",
+              commentrayPathRel: mainPath,
+            },
+          },
+          {
+            id: "architecture",
+            markdown: "<!-- commentray:block id=readme-lede -->\n## Arch\n",
+            commentrayPathRel: archPath,
+            blockStretchRows: {
+              index,
+              sourceRelative: "README.md",
+              commentrayPathRel: mainPath,
+            },
+          },
+        ],
+      },
+    });
+    const script = /<script[^>]*id="commentray-multi-angle-b64"[^>]*>([^<]*)<\/script>/i.exec(html);
+    expect(script?.[1]).toBeDefined();
+    const payload = JSON.parse(Buffer.from(script?.[1] ?? "", "base64").toString("utf8")) as {
+      angles: Array<{ id: string; scrollBlockLinksB64: string }>;
+    };
+    const main = payload.angles.find((a) => a.id === "main");
+    const arch = payload.angles.find((a) => a.id === "architecture");
+    expect((main?.scrollBlockLinksB64 ?? "").length).toBeGreaterThan(0);
+    expect(arch?.scrollBlockLinksB64 ?? "").toBe("");
   });
 });
 

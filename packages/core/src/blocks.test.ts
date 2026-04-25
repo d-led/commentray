@@ -5,6 +5,7 @@ import {
   appendBlockToCommentray,
   createBlockForRange,
   generateBlockId,
+  wrapSourceLineRangeWithCommentrayMarkers,
 } from "./blocks.js";
 import { emptyIndex } from "./metadata.js";
 import type { CommentrayBlock } from "./model.js";
@@ -15,6 +16,34 @@ function seeded(values: number[]): () => number {
   let i = 0;
   return () => values[i++ % values.length];
 }
+
+describe("Wrapping a source line range with Commentray region delimiters", () => {
+  it("uses HTML-style regions in Markdown like the repository README", () => {
+    const src = ["# Title", "body", "tail"].join("\n");
+    const { sourceText, innerRange } = wrapSourceLineRangeWithCommentrayMarkers({
+      sourceText: src,
+      range: { startLine: 2, endLine: 2 },
+      languageId: "markdown",
+      markerId: "readme-why",
+    });
+    expect(sourceText).toContain("<!-- #region commentray:readme-why -->");
+    expect(sourceText).toContain("<!-- #endregion commentray:readme-why -->");
+    expect(innerRange).toEqual({ startLine: 3, endLine: 3 });
+  });
+
+  it("uses hash line-comment markers in TOML (same pairing contract as README, different comment syntax)", () => {
+    const src = ["[storage]", 'dir = "x"', "", "[scm]", "y = 1"].join("\n");
+    const { sourceText, innerRange } = wrapSourceLineRangeWithCommentrayMarkers({
+      sourceText: src,
+      range: { startLine: 1, endLine: 2 },
+      languageId: "toml",
+      markerId: "toml-lede",
+    });
+    expect(sourceText).toContain("# commentray:start id=toml-lede");
+    expect(sourceText).toContain("# commentray:end id=toml-lede");
+    expect(innerRange).toEqual({ startLine: 2, endLine: 3 });
+  });
+});
 
 describe("Creating a new documentation block for a source range", () => {
   it("anchors the block with a marker id tied to the block id (source regions use the same id)", () => {

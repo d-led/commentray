@@ -2,6 +2,7 @@ import { parseAnchor } from "./anchors.js";
 import type { BlockScrollLink } from "./block-scroll-pickers.js";
 import { MARKER_ID_BODY } from "./marker-ids.js";
 import type { CommentrayIndex } from "./model.js";
+import { normalizeRepoRelativePath } from "./paths.js";
 import { sourceLineRangeForMarkerId } from "./source-markers.js";
 
 export type { BlockScrollLink } from "./block-scroll-pickers.js";
@@ -37,6 +38,9 @@ export function buildBlockScrollLinks(
 ): BlockScrollLink[] {
   const entry = index?.byCommentrayPath[commentrayPath];
   if (!entry || entry.sourcePath !== sourceRelative || entry.blocks.length === 0) return [];
+  const entryCrNorm = normalizeRepoRelativePath(entry.commentrayPath.replaceAll("\\", "/"));
+  const lookupCrNorm = normalizeRepoRelativePath(commentrayPath.replaceAll("\\", "/"));
+  if (entryCrNorm !== lookupCrNorm) return [];
   const markerLineById = markerLineByIdFromMarkdown(commentrayMarkdown);
   const links: BlockScrollLink[] = [];
   for (const block of entry.blocks) {

@@ -32,6 +32,7 @@ describe("isHubRelativeStaticBrowseHref", () => {
   it("should accept hub-root browse URLs from nav JSON", () => {
     expect(isHubRelativeStaticBrowseHref("./browse/x.html")).toBe(true);
     expect(isHubRelativeStaticBrowseHref("browse/y.html")).toBe(true);
+    expect(isHubRelativeStaticBrowseHref("./browse/pkg%2Fsrc%2Ffoo.ts/index.html")).toBe(true);
   });
 
   it("should reject non-browse relative links", () => {
@@ -51,6 +52,13 @@ describe("resolveStaticBrowseHref", () => {
       "https://pages.github.io/repo/browse/slug.html",
     );
   });
+
+  it("should resolve human ./browse/…/index.html paths under a Pages-style repo root", () => {
+    const origin = "https://pages.github.io";
+    expect(
+      resolveStaticBrowseHref("./browse/README.md/index.html", "/repo/browse/current.html", origin),
+    ).toBe("https://pages.github.io/repo/browse/README.md/index.html");
+  });
 });
 
 describe("staticBrowseHrefForShellDataAttribute", () => {
@@ -62,6 +70,9 @@ describe("staticBrowseHrefForShellDataAttribute", () => {
     expect(staticBrowseHrefForShellDataAttribute("browse/Xy.html", "/any/path", origin)).toBe(
       "./browse/Xy.html",
     );
+    expect(
+      staticBrowseHrefForShellDataAttribute("./browse/src%2Fx.ts/index.html", "/", origin),
+    ).toBe("./browse/src%2Fx.ts/index.html");
   });
 
   it("should still resolve absolute click targets when the URL is not static browse", () => {

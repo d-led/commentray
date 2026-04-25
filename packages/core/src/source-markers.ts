@@ -53,7 +53,8 @@ const VB_REGION = new Set(["vb"]);
 
 const LUA_REGION = new Set(["lua"]);
 
-const HTML_FAMILY = new Set(["html", "xml", "handlebars", "vue-html"]);
+/** Includes Markdown so `commentrayRegionInsertions("markdown", …)` matches README `<!-- #region commentray:… -->`. */
+const HTML_FAMILY = new Set(["html", "xml", "handlebars", "vue-html", "markdown", "md"]);
 
 const PYTHONIC = new Set(["python", "jupyter"]);
 

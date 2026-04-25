@@ -38,7 +38,7 @@ Print the path for any file:
 commentray paths src/app.ts
 ```
 
-Create the Markdown file (empty is fine to start). Write prose under optional **`<!-- commentray:block id=… -->`** markers when you use blocks; see [Keeping blocks in sync](keeping-blocks-in-sync.md).
+Create the Markdown file (empty is fine to start). Write prose under optional **`<!-- commentray:block id=… -->`** markers when you use blocks; see [Keeping blocks in sync](keeping-blocks-in-sync.md). For **`marker:`** blocks, pair delimiters in the primary file match the editor language — see [Source region delimiters](source-region-delimiters.md).
 
 ## 3. Validate
 

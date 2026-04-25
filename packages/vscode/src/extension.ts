@@ -10,6 +10,7 @@ import {
   commentrayAnglesSentinelPath,
   createBlockForRange,
   defaultMetadataIndexPath,
+  defaultRegionMarkerNamingStrategy,
   emptyIndex,
   ensureAnglesSentinelFile,
   loadCommentrayConfig,
@@ -20,10 +21,13 @@ import {
   resolveCommentrayMarkdownPath,
   upsertAngleDefinitionInCommentrayToml,
   validateProject,
+  wrapSourceLineRangeWithCommentrayMarkers,
   writeIndex,
 } from "@commentray/core";
 import * as path from "node:path";
 import * as vscode from "vscode";
+
+import { CommentrayRenderedPreviewPanel } from "./commentray-rendered-preview.js";
 
 type ScrollPair = {
   code: vscode.TextEditor;
@@ -113,6 +117,7 @@ async function refreshActivePairBlocks(): Promise<void> {
     activePair.sourceRelative,
     activePair.commentrayPathRel,
     activePair.commentray.document.getText(),
+    activePair.code.document.getText(),
   );
 }
 
@@ -254,21 +259,12 @@ async function resolvePairedPaths(
   };
 }
 
-/**
- * Translate the active selection into a 1-based inclusive line range. A
- * selection that ends at column 0 of the line after the last highlighted
- * character is collapsed to the previous line — this matches the way users
- * visually "drag through line 20": end line should be 20, not 21.
- */
-function selectionToRange(editor: vscode.TextEditor): BlockRange {
-  const selection = editor.selection;
-  const startLine = selection.start.line + 1;
-  const rawEndLine = selection.end.line + 1;
-  const endLine =
-    selection.end.line > selection.start.line && selection.end.character === 0
-      ? rawEndLine - 1
-      : rawEndLine;
-  return { startLine, endLine: Math.max(startLine, endLine) };
+/** 1-based inclusive line range covering every line that touches the selection (for region wrap). */
+function fullLineBlockRange(editor: vscode.TextEditor): BlockRange {
+  const sel = editor.selection;
+  const lo = Math.min(sel.start.line, sel.end.line);
+  const hi = Math.max(sel.start.line, sel.end.line);
+  return { startLine: lo + 1, endLine: hi + 1 };
 }
 
 function scrollSyncEnabled(): boolean {
@@ -304,6 +300,7 @@ async function openBesideAndSync(
     paths.sourceRelative,
     paths.commentrayPathRel,
     commentrayDoc.getText(),
+    codeEditor.document.getText(),
   );
   const pair: ScrollPair = {
     code: codeEditor,
@@ -425,6 +422,67 @@ function presetAngleFromOpenAngleCommandArg(arg: unknown): OpenAngleCommandArg {
   }
 }
 
+function validateAngleIdInput(value: string): string | undefined {
+  try {
+    assertValidAngleId(value);
+    return undefined;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
+/**
+ * Angles layout must be on. Returns an angle id, or `null` when the user cancels, angles are off,
+ * or the programmatic `arg` is invalid (after showing a warning).
+ */
+async function pickCommentrayAngleIdInteractively(
+  folder: vscode.WorkspaceFolder,
+  arg: unknown | undefined,
+  quickPickTitle: string,
+  placeHolder: string,
+): Promise<string | null> {
+  const cfg = await loadCommentrayConfig(folder.uri.fsPath);
+  if (!commentrayAnglesLayoutEnabled(folder.uri.fsPath, cfg.storageDir)) {
+    const sentinel = commentrayAnglesSentinelPath(cfg.storageDir);
+    await vscode.window.showInformationMessage(
+      `Angles layout is off (missing ${sentinel}). Use “Commentray: Add angle to project…” to enable it and register angles in .commentray.toml.`,
+    );
+    return null;
+  }
+
+  const preset = presetAngleFromOpenAngleCommandArg(arg);
+  if (preset === "invalid") {
+    await vscode.window.showWarningMessage(
+      'Invalid angle id: use { "angleId": "your-angle" } when invoking this command programmatically.',
+    );
+    return null;
+  }
+
+  if (preset !== "absent") return preset.angleId;
+
+  const items: vscode.QuickPickItem[] = cfg.angles.definitions.map((d) => ({
+    label: d.title,
+    description: d.id,
+  }));
+  items.push({ label: "Custom angle id…", alwaysShow: true });
+  const chosen = await vscode.window.showQuickPick(items, {
+    title: quickPickTitle,
+    placeHolder,
+  });
+  if (!chosen) return null;
+  if (chosen.label === "Custom angle id…") {
+    const raw = await vscode.window.showInputBox({
+      title: "Angle id",
+      prompt: "Use letters, digits, underscores, or hyphens (1–64 chars).",
+      validateInput: validateAngleIdInput,
+    });
+    if (!raw) return null;
+    return assertValidAngleId(raw);
+  }
+  if (!chosen.description) return null;
+  return assertValidAngleId(chosen.description);
+}
+
 /** `executeCommand("commentray.addAngleDefinition", { id: "architecture", title: "Architecture", makeDefault: true })` skips prompts (tests, automation). */
 type AddAngleDefinitionCommandArg =
   | "absent"
@@ -489,57 +547,13 @@ async function openSideBySideCommand(arg?: unknown): Promise<void> {
 async function openCommentrayAngleCommand(arg?: unknown): Promise<void> {
   const active = await requireActiveEditorInWorkspace();
   if (!active) return;
-  const cfg = await loadCommentrayConfig(active.folder.uri.fsPath);
-  if (!commentrayAnglesLayoutEnabled(active.folder.uri.fsPath, cfg.storageDir)) {
-    const sentinel = commentrayAnglesSentinelPath(cfg.storageDir);
-    await vscode.window.showInformationMessage(
-      `Angles layout is off (missing ${sentinel}). Use “Commentray: Add angle to project…” to enable it and register angles in .commentray.toml.`,
-    );
-    return;
-  }
-
-  const preset = presetAngleFromOpenAngleCommandArg(arg);
-  if (preset === "invalid") {
-    await vscode.window.showWarningMessage(
-      'Invalid angle id: use { "angleId": "your-angle" } when invoking this command programmatically.',
-    );
-    return;
-  }
-
-  let angleId: string;
-  if (preset === "absent") {
-    const items: vscode.QuickPickItem[] = cfg.angles.definitions.map((d) => ({
-      label: d.title,
-      description: d.id,
-    }));
-    items.push({ label: "Custom angle id…", alwaysShow: true });
-    const chosen = await vscode.window.showQuickPick(items, {
-      title: "Open Commentray angle",
-      placeHolder: "Pick an angle for the current source file",
-    });
-    if (!chosen) return;
-    if (chosen.label === "Custom angle id…") {
-      const raw = await vscode.window.showInputBox({
-        title: "Angle id",
-        prompt: "Use letters, digits, underscores, or hyphens (1–64 chars).",
-        validateInput: (value) => {
-          try {
-            assertValidAngleId(value);
-            return undefined;
-          } catch (e) {
-            return e instanceof Error ? e.message : String(e);
-          }
-        },
-      });
-      if (!raw) return;
-      angleId = assertValidAngleId(raw);
-    } else {
-      if (!chosen.description) return;
-      angleId = assertValidAngleId(chosen.description);
-    }
-  } else {
-    angleId = preset.angleId;
-  }
+  const angleId = await pickCommentrayAngleIdInteractively(
+    active.folder,
+    arg,
+    "Open Commentray angle",
+    "Pick an angle for the current source file",
+  );
+  if (!angleId) return;
 
   const paths = await resolvePairedPaths(active.editor, active.folder, angleId);
   if (!paths) return;
@@ -580,14 +594,7 @@ async function addAngleDefinitionCommand(arg?: unknown): Promise<void> {
     const idRaw = await vscode.window.showInputBox({
       title: "New Commentray angle",
       prompt: "Short id (used in paths and .commentray.toml), e.g. architecture",
-      validateInput: (value) => {
-        try {
-          assertValidAngleId(value);
-          return undefined;
-        } catch (e) {
-          return e instanceof Error ? e.message : String(e);
-        }
-      },
+      validateInput: validateAngleIdInput,
     });
     if (!idRaw) return;
     id = assertValidAngleId(idRaw);
@@ -637,11 +644,25 @@ async function startBlockFromSelectionCommand(): Promise<void> {
   const paths = await resolvePairedPaths(active.editor, active.folder);
   if (!paths) return;
 
+  const lineRange = fullLineBlockRange(active.editor);
+  const blockId = defaultRegionMarkerNamingStrategy.suggestMarkerId({
+    languageId: active.editor.document.languageId,
+    sourceText: active.editor.document.getText(),
+    range: lineRange,
+  });
+  const wrapped = wrapSourceLineRangeWithCommentrayMarkers({
+    sourceText: active.editor.document.getText(),
+    range: lineRange,
+    languageId: active.editor.document.languageId,
+    markerId: blockId,
+  });
+  await replaceDocumentContents(active.editor.document, wrapped.sourceText);
   const sourceText = active.editor.document.getText();
   const created = createBlockForRange({
     sourcePath: paths.sourceRelative,
     sourceText,
-    range: selectionToRange(active.editor),
+    range: wrapped.innerRange,
+    id: blockId,
   });
 
   const ensured = await ensureCommentrayFile(paths.commentrayUri);
@@ -683,16 +704,70 @@ async function validateWorkspaceCommand(output: vscode.OutputChannel): Promise<v
 }
 
 async function openCommentrayPreviewCommand(): Promise<void> {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) {
-    await vscode.window.showWarningMessage("Open a paired Commentray Markdown file first.");
-    return;
+  const active = await requireActiveEditorInWorkspace();
+  if (!active) return;
+
+  // Companion track is already focused — built-in preview applies to this `.md`.
+  try {
+    const relative = vscode.workspace.asRelativePath(active.editor.document.uri, false);
+    const normalized = normalizeRepoRelativePath(relative.replaceAll("\\", "/"));
+    const cfg = await loadCommentrayConfig(active.folder.uri.fsPath);
+    const sourcePrefix = storageCommentraySourcePrefix(cfg.storageDir);
+    if (normalized.startsWith(sourcePrefix) && active.editor.document.fileName.endsWith(".md")) {
+      await vscode.commands.executeCommand("markdown.showPreview", active.editor.document.uri);
+      return;
+    }
+  } catch {
+    /* fall through: resolve paired paths from primary */
   }
-  if (!editor.document.fileName.endsWith(".md")) {
-    await vscode.window.showWarningMessage("This command expects a Markdown (.md) file.");
-    return;
-  }
-  await vscode.commands.executeCommand("markdown.showPreview", editor.document.uri);
+
+  const paths = await resolvePairedPaths(active.editor, active.folder);
+  if (!paths) return;
+  const ensured = await ensureCommentrayFile(paths.commentrayUri);
+  await vscode.commands.executeCommand("markdown.showPreview", ensured);
+}
+
+async function openRenderedPreviewCore(
+  editor: vscode.TextEditor,
+  folder: vscode.WorkspaceFolder,
+  angleId?: string | null,
+): Promise<void> {
+  const paths = await resolvePairedPaths(editor, folder, angleId);
+  if (!paths) return;
+  const ensured = await ensureCommentrayFile(paths.commentrayUri);
+  const cfg = await loadCommentrayConfig(folder.uri.fsPath);
+  const editorNow =
+    vscode.window.visibleTextEditors.find((e) => e.document === editor.document) ?? editor;
+  await CommentrayRenderedPreviewPanel.openOrReveal({
+    repoRoot: paths.repoRoot,
+    storageDir: cfg.storageDir,
+    sourceRelative: paths.sourceRelative,
+    commentrayPathRel: paths.commentrayPathRel,
+    commentrayUri: ensured,
+    sourceEditor: editorNow,
+    pauseEditorScrollSync: () => disposeScrollSync(),
+    restoreEditorScrollSync: () => applyScrollSyncSettingFromConfig(),
+  });
+}
+
+async function openRenderedPreviewFromSourceCommand(): Promise<void> {
+  const active = await requireActiveEditorInWorkspace();
+  if (!active) return;
+  await openRenderedPreviewCore(active.editor, active.folder);
+}
+
+async function openRenderedPreviewChooseAngleCommand(arg?: unknown): Promise<void> {
+  const active = await requireActiveEditorInWorkspace();
+  if (!active) return;
+  const angleId = await pickCommentrayAngleIdInteractively(
+    active.folder,
+    arg,
+    "Rendered Commentray preview — angle",
+    "Pick an angle for the current source file",
+  );
+  if (!angleId) return;
+
+  await openRenderedPreviewCore(active.editor, active.folder, angleId);
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -714,6 +789,14 @@ export function activate(context: vscode.ExtensionContext) {
       "commentray.openCommentrayPreview",
       openCommentrayPreviewCommand,
     ),
+    vscode.commands.registerCommand(
+      "commentray.openRenderedPreview",
+      openRenderedPreviewFromSourceCommand,
+    ),
+    vscode.commands.registerCommand(
+      "commentray.openRenderedPreviewChooseAngle",
+      openRenderedPreviewChooseAngleCommand,
+    ),
     vscode.commands.registerCommand("commentray.validateWorkspace", () =>
       validateWorkspaceCommand(output),
     ),
@@ -731,6 +814,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
+  CommentrayRenderedPreviewPanel.disposeIfOpen();
   disposeScrollSync();
   lastBoundScrollPair = undefined;
   commentrayOutput = undefined;

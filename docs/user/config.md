@@ -12,9 +12,9 @@ Paths in config must be **repo-relative** with **no `..` segments**. **`storage.
 
 ## `[scm]`
 
-| Key            | Default | Meaning                     |
-| -------------- | ------- | --------------------------- |
-| **`provider`** | `git`   | SCM backend (v0: Git only). |
+| Key            | Default | Meaning                                                                                                      |
+| -------------- | ------- | ------------------------------------------------------------------------------------------------------------ |
+| **`provider`** | `git`   | SCM backend — only **Git** is implemented today (`ScmProvider` in core; other backends could plug in later). |
 
 ## `[render]`
 

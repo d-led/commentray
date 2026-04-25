@@ -28,6 +28,8 @@
     "onCommand:commentray.addAngleDefinition",
     "onCommand:commentray.startBlockFromSelection",
     "onCommand:commentray.openCommentrayPreview",
+    "onCommand:commentray.openRenderedPreview",
+    "onCommand:commentray.openRenderedPreviewChooseAngle",
     "onCommand:commentray.validateWorkspace"
   ],
   "main": "./dist/extension.js",
@@ -69,6 +71,16 @@
         "category": "Commentray"
       },
       {
+        "command": "commentray.openRenderedPreview",
+        "title": "Open rendered Commentray preview (default angle)",
+        "category": "Commentray"
+      },
+      {
+        "command": "commentray.openRenderedPreviewChooseAngle",
+        "title": "Open rendered Commentray preview (choose angle)…",
+        "category": "Commentray"
+      },
+      {
         "command": "commentray.validateWorkspace",
         "title": "Validate workspace",
         "category": "Commentray"
@@ -98,6 +110,16 @@
         {
           "command": "commentray.openCommentrayAngle",
           "group": "commentray@1b",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "commentray.openRenderedPreview",
+          "group": "commentray@1d",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "commentray.openRenderedPreviewChooseAngle",
+          "group": "commentray@1e",
           "when": "editorTextFocus"
         },
         {
@@ -132,7 +154,8 @@
     "test:vscode": "tsc -p tsconfig.tests.json && vscode-test"
   },
   "dependencies": {
-    "@commentray/core": "0.1.0"
+    "@commentray/core": "0.1.0",
+    "@commentray/render": "0.1.0"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",

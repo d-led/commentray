@@ -32,6 +32,18 @@ Captured from Extension Development Host + dogfood. In the palette, use **`>`** 
 
 ![Open Markdown preview for paired file](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-markdown-preview.png)
 
+### Open rendered Commentray preview (default angle)
+
+![Rendered preview — default angle, command palette](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-rendered-preview-default-palette.png)
+
+![Rendered preview — default angle, webview](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-rendered-preview-default.png)
+
+### Open rendered Commentray preview (choose angle)
+
+![Rendered preview — choose angle, command palette](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-rendered-preview-angle-palette.png)
+
+![Rendered preview — choose angle, webview](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-rendered-preview-angle.png)
+
 ### Validate workspace
 
 ![Validate workspace + output](https://raw.githubusercontent.com/d-led/commentray/main/.commentray/source/packages/vscode/README.md/assets/vscode-validate-workspace.png)
@@ -59,7 +71,14 @@ Palette entries use the **Commentray** category (search `Commentray` or the comm
   placeholder so you can type immediately. Default keybinding: **Cmd+Alt+K**
   (macOS) / **Ctrl+Alt+K** (Windows/Linux). Also in the editor context menu.
 - **Open Markdown preview for paired file** — opens VS Code's built-in Markdown
-  preview for the active `.md` file.
+  preview for the **paired** companion `.md` when a **primary** source file is
+  active; if a companion `.md` under the Commentray storage tree is already
+  focused, previews that file.
+- **Open rendered Commentray preview (default angle)** — opens a webview beside
+  the editor using the same Markdown HTML pipeline as static pages (scroll sync
+  with the source when the preview is active).
+- **Open rendered Commentray preview (choose angle)…** — picks an angle, then
+  opens that companion’s rendered preview the same way.
 - **Validate workspace** — runs the same validation as `commentray validate` and
   prints issues to the _Commentray_ output channel. Uses the workspace folder
   that contains the **active editor’s file** when possible (helps in **multi-root**
@@ -78,6 +97,7 @@ You can also add angles without prompts via
 **Automated (desktop):** `bash scripts/refresh-vscode-readme-screenshots-desktop.sh` (or `npm run extension:vscode-readme-screenshots:desktop`) writes **`vscode-*.png`** under `.commentray/source/packages/vscode/README.md/assets/`. The script copies `fixtures/dogfood` into a **temp folder** and enables **Angles** there so the “choose angle” frame shows the real Quick Pick without touching the tracked fixture. **Fresh worktree:** `bash scripts/commentray-screenshots-in-fresh-worktree.sh`. Scenario order and keys: **`.commentray/source/packages/vscode/README.md/main.md`** (Maintainer section).
 
 **Manual (extension README):** `bash scripts/refresh-vscode-readme-screenshots-manual.sh`.
+**Show latest screenshots in editor:** `bash scripts/show-vscode-readme-screenshots.sh` (or `npm run extension:vscode-readme-screenshots:show`) opens `vscode-*.png` from `.commentray/source/packages/vscode/README.md/assets/` in newest-first order.
 
 **Manual (root README):** `bash scripts/refresh-root-readme-screenshots.sh` → save under `.commentray/source/README.md/assets/`. See [storage — images](https://github.com/d-led/commentray/blob/main/docs/spec/storage.md).
 

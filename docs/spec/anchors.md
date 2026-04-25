@@ -1,6 +1,8 @@
-# Anchor grammar (v0)
+# Anchor grammar
 
-Anchors connect commentray **blocks** to spans inside a primary file. The grammar is intentionally small and versioned; language-specific plugins may interpret additional opaque anchors later.
+Anchors connect commentray **blocks** to spans inside a primary file. The grammar is intentionally small; language-specific plugins may interpret additional opaque anchors later.
+
+**About “v0” elsewhere in the repo:** some older docs used **“v0”** to mean _the first documented revision of this anchor string grammar_ (a doc label), **not** a product generation, **not** the `[scm]` section of `.commentray.toml`, and **not** a promise that only Git exists forever. When in doubt, trust the tables in [Configuration](../user/config.md) and this page’s grammar sections.
 
 ## Supported forms
 
@@ -36,7 +38,7 @@ marker:<id>
 
 `<id>` is **1–64 characters**: ASCII letters, digits, hyphen (`-`), and underscore (`_`); it must start with a letter or digit. Examples: `intro`, `auth-handler`, `block_01`, `a3f9k2`.
 
-The same token appears in source as `commentray:<id>` in `#region` / `#endregion` style delimiters, or as `commentray:start id=<id>` / `commentray:end id=<id>` in generic comments. The Markdown `<!-- commentray:block id=<id> -->` marker and `index.json` `block.id` must use **the same** `<id>` when the anchor is `marker:…`.
+The same token appears in source as `commentray:<id>` in `#region` / `#endregion` style delimiters, or as `commentray:start id=<id>` / `commentray:end id=<id>` in generic comments. The Markdown `<!-- commentray:block id=<id> -->` marker and `index.json` `block.id` must use **the same** `<id>` when the anchor is `marker:…`. **Which delimiter shape applies** depends on the primary file’s language — see [Source region delimiters (by editor language)](../user/source-region-delimiters.md).
 
 Validation: **per source file**, paired starts/ends must be well-formed (no duplicate opens, no orphans). **`commentray validate`** also warns when the same id is reused across **different** source files (repo-wide ambiguity for links) and errors if the same `(sourcePath, marker id)` is claimed by different block ids in the index.
 
