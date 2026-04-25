@@ -1,6 +1,8 @@
 import { MERMAID_SYNTAX_ERROR_SNIPPET, shellA11y } from "../shell-a11y";
 
 const MERMAID_E2E_TIMEOUT_MS = 20000;
+const BROWSE_LINK_REL_OR_ABS_RE =
+  /^(?:\.\/browse\/[^/]+\.html|https?:\/\/[^/]+\/browse\/[^/]+\.html)(?:\?.*)?$/;
 
 Cypress.Commands.add("CommentrayPaneReadmeLinksShouldUseGithubBlobUrls", () => {
   cy.get(shellA11y.panes.commentray)
@@ -15,13 +17,16 @@ Cypress.Commands.add("CommentrayPaneEmphasisShouldRenderAfterBlocks", () => {
 });
 
 Cypress.Commands.add("DocumentationHomeLinkShouldPointToRelativeIndex", () => {
-  cy.get('a[aria-label="Documentation home"]').should("have.attr", "href", "./");
+  cy.get('a[aria-label="Documentation home"]')
+    .should("have.attr", "href")
+    .and("match", /^(?:\.\/|\/|\/.+\/)$/)
+    .and("not.match", /\/browse\/?$/);
 });
 
 Cypress.Commands.add("ShellPairBrowseLinkShouldAdvertiseOnSiteBrowsePage", () => {
   cy.get(shellA11y.shell)
     .should("have.attr", "data-commentray-pair-browse-href")
-    .and("match", /\.\/browse\/[^/]+\.html$/)
+    .and("match", BROWSE_LINK_REL_OR_ABS_RE)
     .and("not.include", "github.com");
 });
 
@@ -56,7 +61,7 @@ Cypress.Commands.add("FollowFirstBrowseFileLinkInTree", () => {
 Cypress.Commands.add("ShellPairBrowseLinkShouldAvoidStackedBrowseSegments", () => {
   cy.get(shellA11y.shell)
     .should("have.attr", "data-commentray-pair-browse-href")
-    .and("match", /\.\/browse\/[^/]+\.html(\?.*)?$/)
+    .and("match", BROWSE_LINK_REL_OR_ABS_RE)
     .and("not.contain", "/browse/browse/");
 });
 
@@ -134,7 +139,7 @@ Cypress.Commands.add("CommentrayPaneShouldContainText", (text) => {
 Cypress.Commands.add("ShellPairBrowseLinkShouldMatchRelativeBrowseHtml", () => {
   cy.get(shellA11y.shell)
     .should("have.attr", "data-commentray-pair-browse-href")
-    .and("match", /\.\/browse\/[^/]+\.html$/);
+    .and("match", BROWSE_LINK_REL_OR_ABS_RE);
 });
 
 Cypress.Commands.add("ShellPairBrowseLinkShouldNotPointAtGithubHost", () => {

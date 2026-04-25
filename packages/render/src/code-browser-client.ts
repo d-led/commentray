@@ -2898,6 +2898,14 @@ function normalizePairBrowseHrefForCurrentPath(shell: HTMLElement, pathname: str
   }
 }
 
+function normalizeDocumentationHomeHrefForCurrentPath(): void {
+  const home = document.querySelector('a[aria-label="Documentation home"]');
+  if (!(home instanceof HTMLAnchorElement)) return;
+  const siteRoot = siteRootPathnameFromPathname(globalThis.location.pathname);
+  const normalized = siteRoot === "/" ? "/" : `${siteRoot}/`;
+  home.setAttribute("href", normalized);
+}
+
 function activeCommentrayHashTokenFromViewport(): string | null {
   const docPane = document.getElementById("doc-pane");
   if (!(docPane instanceof HTMLElement)) return null;
@@ -2914,6 +2922,7 @@ function maybeBackfillAddressBarWithHumanePairLink(): void {
   const shell = document.getElementById("shell");
   if (!(shell instanceof HTMLElement)) return;
   const pathname = globalThis.location.pathname;
+  normalizeDocumentationHomeHrefForCurrentPath();
   if (!shellEligibleForHumaneBackfill(shell, pathname)) return;
   const nextPath = nextHumaneBrowsePathForShell(shell, pathname);
   if (nextPath === null) return;

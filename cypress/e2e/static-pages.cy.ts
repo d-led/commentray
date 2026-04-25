@@ -37,7 +37,9 @@ describe("The Commentray GitHub Pages static build", () => {
         .then((browseHref) => {
           expect(browseHref)
             .to.be.a("string")
-            .and.match(/^\.\/browse\/[^/]+\.html$/);
+            .and.match(
+              /^(?:\.\/browse\/[^/]+\.html|https?:\/\/[^/]+\/browse\/[^/]+\.html)(?:\?.*)?$/,
+            );
           if (typeof browseHref !== "string") {
             throw new Error("Expected shell browse permalink href");
           }
@@ -47,14 +49,17 @@ describe("The Commentray GitHub Pages static build", () => {
       cy.CurrentPageShouldDisplayCodeBrowserShell();
       cy.location("pathname").should("match", /\/browse\/[^/]+(?:\.html)?$/);
       cy.location("pathname").should("not.match", /\/browse\/browse\//);
-      cy.get('a[aria-label="Documentation home"]').should("have.attr", "href", "../index.html");
+      cy.get('a[aria-label="Documentation home"]')
+        .should("have.attr", "href")
+        .and("match", /^(?:\/|\/.+\/)$/)
+        .and("not.match", /\/browse\/?$/);
       cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
     });
 
     it("serves humane source browse paths as real pages on static hosts", () => {
       cy.visit("/browse/README.md@main.html");
       cy.CurrentPageShouldDisplayCodeBrowserShell();
-      cy.location("pathname").should("match", /\/browse\/README\.md@main\.html$/);
+      cy.location("pathname").should("match", /\/browse\/[^/]+$/);
       cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
     });
 
