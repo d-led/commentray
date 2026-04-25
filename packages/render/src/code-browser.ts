@@ -20,6 +20,7 @@ import { COMMENTRAY_FAVICON_LINK_HTML } from "./inline-favicon.js";
 import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
 import { type CommentrayOutputUrlOptions, renderMarkdownToHtml } from "./markdown-pipeline.js";
 import { commentrayRenderVersion } from "./package-version.js";
+import { normPosixPath } from "./code-browser-pair-nav.js";
 
 /** One angle tab for {@link CodeBrowserPageOptions.multiAngleBrowsing}. */
 export type CodeBrowserMultiAngleSpec = {
@@ -1186,6 +1187,14 @@ const CODE_BROWSER_STYLES = `
       .documented-files-tree .tree-file-link:hover {
         opacity: 0.92;
       }
+      .documented-files-tree .tree-file-link.tree-file-link--current {
+        font-weight: 600;
+        text-decoration-thickness: 2px;
+        border-radius: 3px;
+        padding: 1px 3px;
+        margin: -1px -3px;
+        background: color-mix(in oklab, CanvasText 10%, Canvas);
+      }
       .toolbar button {
         font: inherit;
         font-size: var(--cr-ui-fs);
@@ -1945,6 +1954,11 @@ type CodeBrowserPageParts = {
   generatorMetaHtml: string;
   /** Same-site hub control; first in `toolbar__primary-main` when present. */
   toolbarSiteHubHtml: string;
+  /**
+   * When non-empty, ` data-commentray-pair-source-path="…" data-commentray-pair-commentray-path="…"` on `#shell`
+   * so the documented-files tree can mark the active pair (incl. multi-angle updates on the client).
+   */
+  shellPairIdentityDataAttrs: string;
   /** When non-empty, ` data-commentray-pair-browse-href="…"` on `#shell` (same-site browse or GitHub blob). */
   shellPairDocDataAttr: string;
   angleSelectHtml: string;
@@ -2037,7 +2051,7 @@ ${TOOLBAR_COLOR_THEME_HTML}
         <div class="search-results" id="search-results" hidden aria-live="polite"></div>
       </header>
       <main id="main-content" class="app__main" tabindex="-1">
-        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" ? ' data-dual-mobile-pane="doc"' : ""} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairDocDataAttr}>
+        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" ? ' data-dual-mobile-pane="doc"' : ""} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairIdentityDataAttrs}${p.shellPairDocDataAttr}>
 ${p.shellInner}
         </div>
       </main>
@@ -2310,6 +2324,29 @@ function rawMdB64FromShell(shell: CodeBrowserShell, opts: CodeBrowserPageOptions
   );
 }
 
+function currentPairCommentrayPathRel(
+  shell: CodeBrowserShell,
+  opts: CodeBrowserPageOptions,
+): string {
+  return (
+    shell.multiShell?.commentrayPathForSearch ??
+    opts.commentrayPathForSearch ??
+    opts.blockStretchRows?.commentrayPathRel ??
+    ""
+  ).trim();
+}
+
+/**
+ * Repo-relative source + companion Markdown paths for matching the current page to nav pairs
+ * (see `code-browser-client.ts` documented-files tree).
+ */
+function shellPairIdentityDataAttrs(shell: CodeBrowserShell, opts: CodeBrowserPageOptions): string {
+  const src = normPosixPath(opts.filePath ?? "");
+  const cr = normPosixPath(currentPairCommentrayPathRel(shell, opts));
+  if (src.length === 0 || cr.length === 0) return "";
+  return ` data-commentray-pair-source-path="${escapeHtml(src)}" data-commentray-pair-commentray-path="${escapeHtml(cr)}"`;
+}
+
 /** Canonical doc target for static validation: same-site `./browse/…` when present, else GitHub blob. */
 function shellPairDocDataAttr(shell: CodeBrowserShell, opts: CodeBrowserPageOptions): string {
   if (shell.layout !== "dual") return "";
@@ -2387,12 +2424,14 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     opts.documentedNavJsonUrl,
   );
   const pairDocDataAttr = shellPairDocDataAttr(shell, opts);
+  const pairIdentityDataAttrs = shellPairIdentityDataAttrs(shell, opts);
 
   return buildCodeBrowserPageHtml({
     title,
     metaDescriptionHtml,
     generatorMetaHtml,
     toolbarSiteHubHtml,
+    shellPairIdentityDataAttrs: pairIdentityDataAttrs,
     shellPairDocDataAttr: pairDocDataAttr,
     angleSelectHtml: shell.angleSelectHtml,
     toolbarDocHubHtml,

@@ -66,7 +66,7 @@ flowchart LR
 | Theme            | Follow-ups                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **VS Code**      | Synchronized scroll: bidirectional stability, large `index.json`, long files, wrapped editors, `revealRange` / debounce edge cases (`packages/vscode/src/extension.ts`, `packages/core/src/scroll-sync.ts`). Extension Host: command surface smoke today; still add **scroll / visible-range** and **Angles quick-pick** scenarios—`bash scripts/test-vscode-extension.sh`, [`packages/vscode/.vscode-test.mjs`](../../packages/vscode/.vscode-test.mjs). **Webview** parity with `@commentray/render` and richer block gutter UX. |
-| **Angles & hub** | Richer hub when **unindexed** Angles companions exist on disk (nav search already merges disk + index); optional future: `index.json` keyed by `(sourcePath, angleId)` if metadata needs it.                                                                                                                                                                                                                                                                                                                                       |
+| **Angles & hub** | Richer hub when **unindexed** Angles companions exist on disk (nav search already merges disk + index); browse **Comment-rayed files** tree highlights the **active pair** (incl. multi-angle). Optional: `index.json` keyed by `(sourcePath, angleId)` if metadata needs it.                                                                                                                                                                                                                                                      |
 | **Language**     | Resolvers beyond minimal anchors: tree-sitter and/or LSP-backed symbol work. Today’s extension point: `plannedSymbolResolutionStrategy()` → **`none`** (`packages/core/src/language-intelligence.ts`).                                                                                                                                                                                                                                                                                                                             |
 | **Dogfood**      | Add `index.json` pairs (marker + Markdown block markers) when new primaries get a Pages or editor spotlight—pattern in [`docs/spec/blocks.md`](../spec/blocks.md).                                                                                                                                                                                                                                                                                                                                                                 |
 | **Path churn**   | **Still out of scope for v0:** auto-mutating the index from heuristics; scanning **untracked** or **non-text** files; cross-file **`symbol:`** resolution without tree-sitter/LSP. Relocation hints today: `git-relocation-scan.ts` and validate/init messaging.                                                                                                                                                                                                                                                                   |
@@ -87,24 +87,7 @@ Vitest tiers and coverage live at the repo root (`vitest*.config.ts`, `scripts/t
 
 ## Next session (handoff)
 
-### Read first
-
-1. This doc and the gaps table.
-2. [`docs/spec/storage.md`](../spec/storage.md), [`anchors.md`](../spec/anchors.md), [`blocks.md`](../spec/blocks.md).
-3. [`CONTRIBUTING.md`](../../CONTRIBUTING.md), [`docs/development.md`](../development.md).
-
-### Commands (non-exhaustive)
-
-| Intent                               | Command                                                                    |
-| ------------------------------------ | -------------------------------------------------------------------------- |
-| Same unit gate as `ci.yml` **quick** | `bash scripts/quality-gate.sh` or `npm run quality:gate`                   |
-| Integration / expensive Vitest       | `npm run test:integration`, `npm run test:expensive`                       |
-| Full gate without Cypress            | `npm run ci:full`                                                          |
-| Pages artifact                       | `npm run pages:build`                                                      |
-| Static browser E2E                   | `npm run e2e` or `npm run e2e:ci`                                          |
-| VS Code extension tests              | `bash scripts/test-vscode-extension.sh` or `npm run test:vscode-extension` |
-
-For the full script list, see **`docs/development.md`**.
+Skim the gaps table, then specs under `docs/spec/` as needed. **`bash scripts/quality-gate.sh`** before pushing; see **`docs/development.md`** for the full script matrix (integration, `ci:full`, `e2e`, VS Code extension).
 
 ## Parking lot
 

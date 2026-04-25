@@ -245,6 +245,7 @@ describe("Code browser page — toolbar chrome", () => {
       language: "ts",
       commentrayMarkdown: "body",
       filePath: "README.md",
+      commentrayPathForSearch: ".commentray/source/README.md.md",
       sourceOnGithubUrl: "https://github.com/acme/demo/blob/main/README.md",
       commentrayOnGithubUrl:
         "https://github.com/acme/demo/blob/main/.commentray/source/README.md.md",
@@ -254,6 +255,10 @@ describe("Code browser page — toolbar chrome", () => {
     expect(html).toContain('aria-label="Current documentation pair"');
     expect(html).toContain("README.md");
     expect(html).toContain(".commentray/source/README.md.md");
+    expect(html).toContain('data-commentray-pair-source-path="README.md"');
+    expect(html).toContain(
+      'data-commentray-pair-commentray-path=".commentray/source/README.md.md"',
+    );
     expect(html).toContain(
       'data-commentray-pair-browse-href="https://github.com/acme/demo/blob/main/.commentray/source/README.md.md"',
     );

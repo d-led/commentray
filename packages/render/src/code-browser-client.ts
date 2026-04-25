@@ -1547,6 +1547,42 @@ function treeFileLinkTitle(pr: DocumentedPairNav): string {
   return pr.sourcePath;
 }
 
+function clearDocumentedTreePairHighlights(tree: HTMLElement): void {
+  for (const el of tree.querySelectorAll("a.tree-file-link")) {
+    if (!(el instanceof HTMLAnchorElement)) continue;
+    el.classList.remove("tree-file-link--current");
+    el.removeAttribute("aria-current");
+  }
+}
+
+function markFirstDocumentedTreeLinkMatchingPair(
+  tree: HTMLElement,
+  curSrc: string,
+  curCr: string,
+): void {
+  for (const el of tree.querySelectorAll("a.tree-file-link")) {
+    if (!(el instanceof HTMLAnchorElement)) continue;
+    const sp = el.getAttribute("data-pair-source-path")?.trim() ?? "";
+    const cp = el.getAttribute("data-pair-commentray-path")?.trim() ?? "";
+    if (!isSameDocumentedPair({ sourcePath: sp, commentrayPath: cp }, curSrc, curCr)) continue;
+    el.classList.add("tree-file-link--current");
+    el.setAttribute("aria-current", "page");
+    break;
+  }
+}
+
+/** Marks the tree link for the pair shown in `#shell` (pair paths from server or multi-angle swap). */
+function applyDocumentedTreeCurrentPairHighlight(): void {
+  const shell = document.getElementById("shell");
+  const tree = document.getElementById("documented-files-tree");
+  if (!(shell instanceof HTMLElement) || !(tree instanceof HTMLElement)) return;
+  clearDocumentedTreePairHighlights(tree);
+  const curSrc = shell.getAttribute("data-commentray-pair-source-path")?.trim() ?? "";
+  const curCr = shell.getAttribute("data-commentray-pair-commentray-path")?.trim() ?? "";
+  if (curSrc.length === 0 || curCr.length === 0) return;
+  markFirstDocumentedTreeLinkMatchingPair(tree, curSrc, curCr);
+}
+
 function renderDocumentedTreeHtml(node: TrieNode): string {
   const keys = [...node.children.keys()].sort((a, b) => a.localeCompare(b));
   if (keys.length === 0) return "";
@@ -1564,11 +1600,13 @@ function renderDocumentedTreeHtml(node: TrieNode): string {
         const label = escapeHtmlText(treeFileLinkLabel(pr, multi));
         const title = escapeHtmlText(treeFileLinkTitle(pr));
         const href = escapeHtmlText(treeFileLinkHref(pr));
+        const spAttr = escapeHtmlText(normPosixPath(pr.sourcePath));
+        const crAttr = escapeHtmlText(normPosixPath(pr.commentrayPath));
         const useSiteBrowse = (pr.staticBrowseUrl?.trim() ?? "").length > 0;
         const external = useSiteBrowse ? "" : ' target="_blank" rel="noopener noreferrer"';
         lis.push(
           `<li><div class="tree-file">` +
-            `<a class="tree-file-link" href="${href}"${external} title="${title}">${label}</a>` +
+            `<a class="tree-file-link" href="${href}" data-pair-source-path="${spAttr}" data-pair-commentray-path="${crAttr}"${external} title="${title}">${label}</a>` +
             `</div></li>`,
         );
       }
@@ -1591,6 +1629,7 @@ function renderDocumentedPairsIntoHost(
   const root: TrieNode = { children: new Map(), pairs: [] };
   for (const p of pairs) insertSourcePathTrie(root, p);
   treeHost.innerHTML = renderDocumentedTreeHtml(root);
+  applyDocumentedTreeCurrentPairHighlight();
 }
 
 function loadDocumentedPairs(
@@ -2125,6 +2164,13 @@ function wireDualPaneMultiAngleAndScroll(args: {
         scrollLinksRef.current = parseScrollBlockLinksFromShell(a.scrollBlockLinksB64);
         shell.setAttribute("data-scroll-block-links-b64", a.scrollBlockLinksB64);
         shell.setAttribute("data-search-commentray-path", a.commentrayPathForSearch);
+        const crIdentity = normPosixPath(a.commentrayPathForSearch);
+        if (crIdentity.length > 0) {
+          shell.setAttribute("data-commentray-pair-commentray-path", crIdentity);
+        } else {
+          shell.removeAttribute("data-commentray-pair-commentray-path");
+        }
+        applyDocumentedTreeCurrentPairHighlight();
         const docPathEl = document.getElementById("nav-rail-doc-path");
         if (docPathEl) {
           const path = a.commentrayPathForSearch.trim();
