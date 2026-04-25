@@ -1907,6 +1907,7 @@ const STORAGE_SPLIT_PCT = "commentray.codeCommentrayStatic.splitPct";
 const STORAGE_WRAP_LINES = "commentray.codeCommentrayStatic.wrap";
 const STORAGE_DUAL_MOBILE_PANE = "commentray.codeCommentrayStatic.dualMobilePane";
 const STORAGE_SOURCE_MARKDOWN_PANE_MODE = "commentray.codeCommentrayStatic.sourceMarkdownPaneMode";
+const STORAGE_WIDE_MODE_INTRO_DONE = "commentray.codeCommentrayStatic.wideModeIntro.v1";
 
 /** Matches `code-browser.ts` `@media (max-width: 767px)` (dual column from 768px up). */
 const DUAL_MOBILE_SINGLE_PANE_MQ = "(max-width: 767px)";
@@ -1915,10 +1916,245 @@ function normalizedDualMobilePane(v: string | null | undefined): "code" | "doc" 
   return v === "code" ? "code" : "doc";
 }
 
+type WideIntroStep = {
+  targetSelector: string;
+  title: string;
+  body: string;
+};
+
+type WideIntroElements = {
+  bubble: HTMLElement;
+  titleEl: HTMLElement;
+  bodyEl: HTMLElement;
+  progressEl: HTMLElement;
+  backBtn: HTMLButtonElement;
+  nextBtn: HTMLButtonElement;
+  skipBtn: HTMLButtonElement;
+};
+
+function isNarrowViewport(): boolean {
+  return globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ).matches;
+}
+
+function clearOpenWideModeIntroTour(): void {
+  for (const el of Array.from(document.querySelectorAll(".commentray-wide-intro__target"))) {
+    if (el instanceof HTMLElement) el.classList.remove("commentray-wide-intro__target");
+  }
+  const open = document.getElementById("commentray-wide-intro");
+  if (open instanceof HTMLElement) open.remove();
+}
+
+function wideIntroStepsForShell(shell: HTMLElement): WideIntroStep[] {
+  const narrowActive = isNarrowViewport();
+  const introTargetSelector = narrowActive ? "#mobile-pane-flip" : "#shell";
+  const shellSelector =
+    shell.id.trim().length > 0 && typeof globalThis.CSS?.escape === "function"
+      ? `#${globalThis.CSS.escape(shell.id)}`
+      : "#shell";
+  const shellOrIntroTargetSelector =
+    introTargetSelector === "#shell" ? shellSelector : introTargetSelector;
+  return [
+    {
+      targetSelector: shellOrIntroTargetSelector,
+      title: "Welcome",
+      body: "Welcome to commentray, a system to create and view commentaries next to the source tree. Angles are different aspects of these commentaries, so switch between them and keep scrolling while both panes stay aligned.",
+    },
+    {
+      targetSelector: shellOrIntroTargetSelector,
+      title: "Two views",
+      body: narrowActive
+        ? "You are in narrow view now. Use the pane flip to switch code and commentary. Wide view shows both panes side by side."
+        : "You are in wide view now. It shows code and commentary side by side. Narrow view uses one pane and a flip control.",
+    },
+    {
+      targetSelector: "#search-q",
+      title: "Search quickly",
+      body: "Use this search input to jump to documented source lines and markdown snippets.",
+    },
+    {
+      targetSelector: "#angle-select",
+      title: "Angle switch",
+      body: "Change the Commentray angle to view a different narrative for this same source file.",
+    },
+    {
+      targetSelector: "#source-markdown-pane-flip",
+      title: "Source view mode",
+      body: "Toggle between raw source and rendered markdown in the source pane.",
+    },
+    {
+      targetSelector: "#wrap-lines",
+      title: "Readability controls",
+      body: "Wrap lines to reduce horizontal scrolling in both source and commentary panes.",
+    },
+    {
+      targetSelector: "#commentray-theme-trigger",
+      title: "Appearance",
+      body: "Change theme mode from this trigger (menu on left-click, quick cycle on right-click).",
+    },
+  ];
+}
+
+function createWideIntroElements(): WideIntroElements | null {
+  const bubble = document.createElement("section");
+  bubble.id = "commentray-wide-intro";
+  bubble.setAttribute("role", "dialog");
+  bubble.setAttribute("aria-live", "polite");
+  bubble.innerHTML = `
+    <span class="commentray-wide-intro__pointer" aria-hidden="true"></span>
+    <p class="commentray-wide-intro__title"></p>
+    <p class="commentray-wide-intro__body"></p>
+    <div class="commentray-wide-intro__footer">
+      <span class="commentray-wide-intro__progress"></span>
+      <div class="commentray-wide-intro__actions">
+        <button type="button" data-wide-intro="back">Back</button>
+        <button type="button" data-wide-intro="next">Next</button>
+        <button type="button" data-wide-intro="skip">Skip</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bubble);
+
+  const titleEl = bubble.querySelector(".commentray-wide-intro__title");
+  const bodyEl = bubble.querySelector(".commentray-wide-intro__body");
+  const progressEl = bubble.querySelector(".commentray-wide-intro__progress");
+  const backBtn = bubble.querySelector('button[data-wide-intro="back"]');
+  const nextBtn = bubble.querySelector('button[data-wide-intro="next"]');
+  const skipBtn = bubble.querySelector('button[data-wide-intro="skip"]');
+  if (
+    !(titleEl instanceof HTMLElement) ||
+    !(bodyEl instanceof HTMLElement) ||
+    !(progressEl instanceof HTMLElement) ||
+    !(backBtn instanceof HTMLButtonElement) ||
+    !(nextBtn instanceof HTMLButtonElement) ||
+    !(skipBtn instanceof HTMLButtonElement)
+  ) {
+    bubble.remove();
+    return null;
+  }
+  return { bubble, titleEl, bodyEl, progressEl, backBtn, nextBtn, skipBtn };
+}
+
+function wideIntroTargetForCurrentStep(
+  steps: WideIntroStep[],
+  current: number,
+): HTMLElement | null {
+  const step = steps[current];
+  if (!step) return null;
+  const found = document.querySelector(step.targetSelector);
+  return found instanceof HTMLElement ? found : null;
+}
+
+function repositionWideIntroBubble(bubble: HTMLElement, target: HTMLElement): void {
+  const rect = target.getBoundingClientRect();
+  const vw = globalThis.innerWidth;
+  const vh = globalThis.innerHeight;
+  const bubbleRect = bubble.getBoundingClientRect();
+  const bubbleWidth = bubbleRect.width > 0 ? bubbleRect.width : 340;
+  const bubbleHeight = bubbleRect.height > 0 ? bubbleRect.height : 160;
+  const margin = 8;
+  const canPlaceBelow = rect.bottom + 12 + bubbleHeight <= vh - margin;
+  const top = canPlaceBelow
+    ? Math.max(margin, rect.bottom + 12)
+    : Math.max(margin, rect.top - bubbleHeight - 12);
+  const left = clamp(rect.left, margin, vw - bubbleWidth - margin);
+  bubble.style.top = `${String(Math.round(top))}px`;
+  bubble.style.left = `${String(Math.round(left))}px`;
+  bubble.dataset.side = canPlaceBelow ? "below" : "above";
+  const pointerLeft = clamp(rect.left + rect.width / 2 - left - 8, 10, bubbleWidth - 22);
+  bubble.style.setProperty("--pointer-left", `${String(Math.round(pointerLeft))}px`);
+}
+
+function wireWideModeIntroTour(shell: HTMLElement, opts?: { force?: boolean }): void {
+  if (!opts?.force && readWebStorageItem(localStorage, STORAGE_WIDE_MODE_INTRO_DONE) === "1")
+    return;
+  clearOpenWideModeIntroTour();
+  const steps = wideIntroStepsForShell(shell);
+
+  const elements = createWideIntroElements();
+  if (!elements) return;
+
+  let current = 0;
+  let highlighted: HTMLElement | null = null;
+  const { bubble, titleEl, bodyEl, progressEl, backBtn, nextBtn, skipBtn } = elements;
+
+  const closeTour = (): void => {
+    highlighted?.classList.remove("commentray-wide-intro__target");
+    bubble.remove();
+    globalThis.removeEventListener("resize", reposition);
+    globalThis.removeEventListener("scroll", reposition, true);
+    document.removeEventListener("keydown", onKeyDown, true);
+    writeWebStorageItem(localStorage, STORAGE_WIDE_MODE_INTRO_DONE, "1");
+  };
+
+  const reposition = (): void => {
+    const target = wideIntroTargetForCurrentStep(steps, current);
+    if (!target) return;
+    repositionWideIntroBubble(bubble, target);
+  };
+
+  const render = (): void => {
+    while (current < steps.length && !wideIntroTargetForCurrentStep(steps, current)) current++;
+    if (current >= steps.length) {
+      closeTour();
+      return;
+    }
+    const step = steps[current];
+    const target = wideIntroTargetForCurrentStep(steps, current);
+    if (!step || !target) return;
+    highlighted?.classList.remove("commentray-wide-intro__target");
+    highlighted = target;
+    highlighted.classList.add("commentray-wide-intro__target");
+    titleEl.textContent = step.title;
+    bodyEl.textContent = step.body;
+    progressEl.textContent = `${String(current + 1)} / ${String(steps.length)}`;
+    backBtn.disabled = current === 0;
+    nextBtn.textContent = current === steps.length - 1 ? "Done" : "Next";
+    reposition();
+  };
+
+  const onKeyDown = (ev: KeyboardEvent): void => {
+    if (ev.key !== "Escape") return;
+    ev.preventDefault();
+    closeTour();
+  };
+
+  backBtn.addEventListener("click", () => {
+    if (current > 0) current--;
+    render();
+  });
+  nextBtn.addEventListener("click", () => {
+    if (current >= steps.length - 1) {
+      closeTour();
+      return;
+    }
+    current++;
+    render();
+  });
+  skipBtn.addEventListener("click", closeTour);
+  globalThis.addEventListener("resize", reposition);
+  globalThis.addEventListener("scroll", reposition, true);
+  document.addEventListener("keydown", onKeyDown, true);
+  render();
+}
+
+function wireWideModeIntroTrigger(shell: HTMLElement): void {
+  const btn = document.getElementById("commentray-help-tour");
+  if (!(btn instanceof HTMLButtonElement)) return;
+  btn.addEventListener("click", () => {
+    wireWideModeIntroTour(shell, { force: true });
+  });
+}
+
 function sourcePaneModeForShell(shell: HTMLElement): "source" | "rendered-markdown" {
   return shell.getAttribute("data-source-pane-mode") === "rendered-markdown"
     ? "rendered-markdown"
     : "source";
+}
+
+function syncWrapLinesVisibilityForSourcePaneMode(shell: HTMLElement): void {
+  const wrapToggle = document.querySelector("label.toolbar-wrap-lines");
+  if (!(wrapToggle instanceof HTMLLabelElement)) return;
+  wrapToggle.hidden = sourcePaneModeForShell(shell) === "rendered-markdown";
 }
 
 function sourceLineIdPrefixForShell(shell: HTMLElement): "code-line-" | "code-md-line-" {
@@ -2045,11 +2281,10 @@ function wireSourceMarkdownPaneFlip(
     apply(flipScrollBtn);
   }
 
-  const initial = readWebStorageItem(localStorage, STORAGE_SOURCE_MARKDOWN_PANE_MODE);
-  if (initial === "source" || initial === "rendered-markdown") {
-    shell.setAttribute("data-source-pane-mode", initial);
-  }
+  // Keep initial behavior deterministic: source pane starts in rendered markdown mode.
+  shell.setAttribute("data-source-pane-mode", "rendered-markdown");
   syncSourceMarkdownFlipA11y();
+  syncWrapLinesVisibilityForSourcePaneMode(shell);
   const runFlip = (): void => {
     const cur = sourcePaneModeForShell(shell);
     const currentPrefix = cur === "rendered-markdown" ? "code-md-line-" : "code-line-";
@@ -2059,6 +2294,7 @@ function wireSourceMarkdownPaneFlip(
     shell.setAttribute("data-source-pane-mode", next);
     writeWebStorageItem(localStorage, STORAGE_SOURCE_MARKDOWN_PANE_MODE, next);
     syncSourceMarkdownFlipA11y();
+    syncWrapLinesVisibilityForSourcePaneMode(shell);
     if (line0 !== null) {
       const row = codePane.querySelector(`#${nextPrefix}${String(line0)}`);
       if (row instanceof HTMLElement) {
@@ -2694,6 +2930,7 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
   wireSourceMarkdownControls(shell, codePane, () => {
     requestBlockRayRedraw?.();
   });
+  wireWideModeIntroTour(shell);
 
   wireDualPaneCommentrayLocationHash(docScrollEl, () => bundle.mutable.mdLines.length);
 }
@@ -3029,6 +3266,7 @@ function main(): void {
   if (!shell || !codePane) {
     return;
   }
+  wireWideModeIntroTrigger(shell);
 
   const layout = shell.getAttribute("data-layout") || "dual";
   if (layout === "stretch") {

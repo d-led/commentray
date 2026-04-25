@@ -461,6 +461,14 @@ const TOOLBAR_ICON_SHARE_LINK_SVG =
   '<path d="M14 10a5 5 0 0 0-7.07 0L4.1 12.83a5 5 0 0 0 7.07 7.07L14 17"/>' +
   "</svg>";
 
+/** Help glyph for re-running the onboarding walkthrough. */
+const TOOLBAR_ICON_HELP_TOUR_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="12" cy="12" r="9"/>' +
+  '<path d="M9.1 9a3 3 0 1 1 4.92 2.3c-.8.6-1.52 1.08-1.52 2.2"/>' +
+  '<circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none"/>' +
+  "</svg>";
+
 function safeExternalHttpUrl(url: string | undefined): string | null {
   const t = url?.trim();
   if (!t) return null;
@@ -596,7 +604,7 @@ function sourceMarkdownToggleControlsHtml(enabled: boolean): {
   }
   const label = "Switch source pane between rendered markdown and markdown source";
   const title = "Switch source pane between rendered markdown and markdown source";
-  const btn = `<button type="button" id="source-markdown-pane-flip" class="toolbar-icon-btn toolbar-icon-btn--source-markdown" aria-controls="code-pane" aria-pressed="false" aria-label="${label}" title="${title}">${TOOLBAR_ICON_FLIP_SOURCE_MARKDOWN_SVG}</button>`;
+  const btn = `<button type="button" id="source-markdown-pane-flip" class="toolbar-source-render-toggle" aria-controls="code-pane" aria-pressed="false" aria-label="${label}" title="${title}"><span class="toolbar-source-render-toggle__box" aria-hidden="true"></span><span class="toolbar-source-render-toggle__face" aria-hidden="true">${TOOLBAR_ICON_FLIP_SOURCE_MARKDOWN_SVG}</span><span class="toolbar-source-render-toggle__caption">Render</span></button>`;
   const floating = `<button type="button" id="source-markdown-pane-flip-scroll" class="toolbar-icon-btn toolbar-icon-btn--source-markdown-scroll-narrow" hidden aria-controls="code-pane" aria-pressed="false" aria-label="${label}" title="${title}">${TOOLBAR_ICON_FLIP_SOURCE_MARKDOWN_SVG}</button>`;
   return {
     sourceMarkdownToggleHtml: btn,
@@ -676,6 +684,9 @@ const TOOLBAR_COLOR_THEME_HTML = `          <div class="toolbar-theme">
 `;
 
 const TOOLBAR_SHARE_LINK_HTML = `          <button type="button" id="commentray-share-link" class="toolbar-theme__trigger toolbar-share-link-btn" aria-label="Copy shareable permalink" title="Copy shareable permalink">${TOOLBAR_ICON_SHARE_LINK_SVG}</button>
+`;
+
+const TOOLBAR_HELP_TOUR_HTML = `          <button type="button" id="commentray-help-tour" class="toolbar-theme__trigger toolbar-help-tour-btn" aria-label="Restart onboarding walkthrough" title="Restart onboarding walkthrough">${TOOLBAR_ICON_HELP_TOUR_SVG}</button>
 `;
 
 const CODE_BROWSER_STYLES = `
@@ -1141,8 +1152,157 @@ const CODE_BROWSER_STYLES = `
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
         outline-offset: 2px;
       }
+      .toolbar-source-render-toggle {
+        position: relative;
+        margin: 0;
+        min-height: var(--cr-control-h);
+        padding: 0 12px 0 10px;
+        border-radius: var(--cr-control-radius);
+        border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
+        background: Canvas;
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+        font-size: var(--cr-ui-fs);
+        font-weight: 500;
+        color: color-mix(in oklab, CanvasText 88%, Canvas);
+        cursor: pointer;
+      }
+      .toolbar-source-render-toggle:hover {
+        background: color-mix(in oklab, CanvasText 6%, Canvas);
+      }
+      .toolbar-source-render-toggle__box {
+        flex: 0 0 auto;
+        width: 16px;
+        height: 16px;
+        box-sizing: border-box;
+        border: 1.5px solid color-mix(in oklab, CanvasText 38%, Canvas);
+        border-radius: 3px;
+        background: Canvas;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: CanvasText;
+      }
+      .toolbar-source-render-toggle[aria-pressed="true"] .toolbar-source-render-toggle__box {
+        border-color: color-mix(in oklab, CanvasText 52%, Canvas);
+        background: color-mix(in oklab, CanvasText 6%, Canvas);
+      }
+      .toolbar-source-render-toggle__box::after {
+        content: "";
+        display: none;
+        width: 4px;
+        height: 9px;
+        margin-top: -2px;
+        border: solid currentColor;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+      }
+      .toolbar-source-render-toggle[aria-pressed="true"] .toolbar-source-render-toggle__box::after {
+        display: block;
+      }
+      .toolbar-source-render-toggle__face {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--cr-control-h);
+        min-width: var(--cr-control-h);
+        color: color-mix(in oklab, CanvasText 82%, Canvas);
+      }
+      .toolbar-source-render-toggle__caption {
+        white-space: nowrap;
+      }
+      .toolbar-source-render-toggle[aria-pressed="true"] {
+        color: CanvasText;
+        background: color-mix(in oklab, CanvasText 10%, Canvas);
+      }
+      .toolbar-source-render-toggle:focus-visible {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
+      }
       .toolbar-icon-btn--source-markdown {
         display: inline-flex;
+      }
+      .commentray-wide-intro__target {
+        outline: 2px solid color-mix(in oklab, #d6b300 62%, CanvasText);
+        outline-offset: 3px;
+        border-radius: 6px;
+      }
+      #commentray-wide-intro {
+        --commentray-intro-note-bg: #fff4b3;
+        --commentray-intro-note-border: #d4c071;
+        --commentray-intro-note-text: #2f2a11;
+        --commentray-intro-note-btn-bg: #fff8d7;
+        --commentray-intro-note-btn-border: #ccb86a;
+        position: fixed;
+        z-index: 90;
+        width: min(340px, calc(100vw - 16px));
+        border-radius: 12px;
+        border: 1px solid var(--commentray-intro-note-border);
+        background: var(--commentray-intro-note-bg);
+        color: var(--commentray-intro-note-text);
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2);
+        padding: 12px 12px 10px;
+      }
+      #commentray-wide-intro[data-side="below"] .commentray-wide-intro__pointer {
+        top: -8px;
+        left: var(--pointer-left, 18px);
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-bottom: 8px solid var(--commentray-intro-note-bg);
+      }
+      #commentray-wide-intro[data-side="above"] .commentray-wide-intro__pointer {
+        bottom: -8px;
+        left: var(--pointer-left, 18px);
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-top: 8px solid var(--commentray-intro-note-bg);
+      }
+      .commentray-wide-intro__pointer {
+        position: absolute;
+        width: 0;
+        height: 0;
+      }
+      .commentray-wide-intro__title {
+        font-weight: 700;
+        margin: 0 0 6px;
+        line-height: 1.25;
+      }
+      .commentray-wide-intro__body {
+        margin: 0 0 10px;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .commentray-wide-intro__footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+      }
+      .commentray-wide-intro__actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .commentray-wide-intro__actions button {
+        border: 1px solid var(--commentray-intro-note-btn-border);
+        border-radius: 8px;
+        background: var(--commentray-intro-note-btn-bg);
+        color: var(--commentray-intro-note-text);
+        padding: 4px 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-family: inherit;
+      }
+      .commentray-wide-intro__actions button:hover {
+        background: color-mix(in oklab, var(--commentray-intro-note-btn-bg) 88%, CanvasText);
+      }
+      .commentray-wide-intro__actions button:focus-visible {
+        outline: 2px solid color-mix(in oklab, #5c5200 58%, Canvas);
+        outline-offset: 1px;
       }
       .toolbar label input:focus-visible {
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
@@ -1962,6 +2122,47 @@ const CODE_BROWSER_STYLES = `
           color: CanvasText;
           text-shadow: 0 0 2px Canvas, 0 0 3px Canvas;
         }
+        .toolbar-source-render-toggle {
+          min-width: var(--cr-control-h);
+          width: var(--cr-control-h);
+          height: var(--cr-control-h);
+          padding: 0;
+          justify-content: center;
+          gap: 0;
+        }
+        .toolbar-source-render-toggle__caption {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+        }
+        .toolbar-source-render-toggle__box {
+          display: none;
+        }
+        .toolbar-source-render-toggle__face {
+          display: inline-flex;
+          position: relative;
+          width: 100%;
+          height: 100%;
+          min-height: var(--cr-control-h);
+          min-width: var(--cr-control-h);
+        }
+        .toolbar-source-render-toggle[aria-pressed="true"] .toolbar-source-render-toggle__face::after {
+          content: "✓";
+          position: absolute;
+          right: 1px;
+          bottom: 0;
+          font-size: 11px;
+          line-height: 1;
+          font-weight: 800;
+          color: CanvasText;
+          text-shadow: 0 0 2px Canvas, 0 0 3px Canvas;
+        }
         .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="code"] .pane--doc,
         .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="code"] .gutter {
           display: none !important;
@@ -2219,6 +2420,7 @@ ${CODE_BROWSER_STYLES}
           <div class="toolbar__primary-trail">
         ${p.toolbarEndHtml}
 ${TOOLBAR_SHARE_LINK_HTML}
+${TOOLBAR_HELP_TOUR_HTML}
 ${TOOLBAR_COLOR_THEME_HTML}
           </div>
         </div>
