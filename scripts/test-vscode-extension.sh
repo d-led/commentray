@@ -19,6 +19,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 npm run build -w @commentray/core
+npm run build -w @commentray/render
 cd packages/vscode
 npm run build
 
