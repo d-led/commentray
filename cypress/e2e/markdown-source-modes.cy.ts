@@ -31,6 +31,14 @@ function expectArrowStartsOutsideBubble(): void {
   });
 }
 
+function visitWithFreshWideIntroStorage(): void {
+  cy.visit("/", {
+    onBeforeLoad(win) {
+      win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
+    },
+  });
+}
+
 describe("Markdown source rendering modes", () => {
   it("starts in rendered markdown even if prior storage asked for source", () => {
     cy.viewport(1280, 900);
@@ -119,11 +127,7 @@ describe("Markdown source rendering modes", () => {
 
   it("shows wide-mode intro tour once and persists dismissal", () => {
     cy.viewport(1280, 900);
-    cy.visit("/", {
-      onBeforeLoad(win) {
-        win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
-      },
-    });
+    visitWithFreshWideIntroStorage();
 
     cy.get("#commentray-wide-intro").should("be.visible");
     cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
@@ -145,11 +149,7 @@ describe("Markdown source rendering modes", () => {
 
   it("draws two visible intro arrows in wide mode without crossing the bubble text area", () => {
     cy.viewport(1280, 900);
-    cy.visit("/", {
-      onBeforeLoad(win) {
-        win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
-      },
-    });
+    visitWithFreshWideIntroStorage();
 
     cy.get("#commentray-wide-intro").should("be.visible");
     cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
@@ -168,11 +168,7 @@ describe("Markdown source rendering modes", () => {
 
   it("recomputes intro arrows when viewport switches between wide and narrow", () => {
     cy.viewport(1280, 900);
-    cy.visit("/", {
-      onBeforeLoad(win) {
-        win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
-      },
-    });
+    visitWithFreshWideIntroStorage();
 
     cy.get("#commentray-wide-intro").should("be.visible");
     expectVisibleArrows(2);
@@ -192,11 +188,7 @@ describe("Markdown source rendering modes", () => {
 
   it("shows intro tour on narrow viewports with narrow-view copy", () => {
     cy.viewport(390, 844);
-    cy.visit("/", {
-      onBeforeLoad(win) {
-        win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
-      },
-    });
+    visitWithFreshWideIntroStorage();
     cy.get("#commentray-wide-intro").should("be.visible");
     cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
       "be.visible",
@@ -212,11 +204,7 @@ describe("Markdown source rendering modes", () => {
 
   it("ends with a help-button reminder and introduces share link", () => {
     cy.viewport(1280, 900);
-    cy.visit("/", {
-      onBeforeLoad(win) {
-        win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
-      },
-    });
+    visitWithFreshWideIntroStorage();
     cy.get("#commentray-wide-intro").should("be.visible");
 
     for (let i = 0; i < 9; i += 1) {
@@ -235,11 +223,7 @@ describe("Markdown source rendering modes", () => {
 
   it("shows a fallback intro action when wrap-lines toggle is hidden", () => {
     cy.viewport(1280, 900);
-    cy.visit("/", {
-      onBeforeLoad(win) {
-        win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
-      },
-    });
+    visitWithFreshWideIntroStorage();
 
     cy.get(shellA11y.shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
     cy.get(shellA11y.wrapLinesLabel).should("not.be.visible");
