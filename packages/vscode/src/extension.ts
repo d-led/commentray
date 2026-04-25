@@ -45,9 +45,33 @@ type PairedPaths = {
 };
 
 let activePair: ScrollPair | undefined;
+/** Last pair we bound scroll sync for; kept when listeners are disposed so toggling sync back on can reattach. */
+let lastBoundScrollPair: ScrollPair | undefined;
 let scrollSyncDisposable: vscode.Disposable | undefined;
 let ignoreScrollPairEvents = false;
 let blockRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+let commentrayOutput: vscode.OutputChannel | undefined;
+
+function logCommentray(line: string): void {
+  commentrayOutput?.appendLine(line);
+}
+
+function scrollPairEditorsReachable(pair: ScrollPair): boolean {
+  return (
+    vscode.window.visibleTextEditors.some((e) => e.document === pair.code.document) &&
+    vscode.window.visibleTextEditors.some((e) => e.document === pair.commentray.document)
+  );
+}
+
+function applyScrollSyncSettingFromConfig(): void {
+  if (scrollSyncEnabled()) {
+    if (!activePair && lastBoundScrollPair && scrollPairEditorsReachable(lastBoundScrollPair)) {
+      bindScrollSync(lastBoundScrollPair);
+    }
+  } else {
+    disposeScrollSync();
+  }
+}
 
 function storageCommentraySourcePrefix(storageDir: string): string {
   const sd = storageDir.replaceAll("\\", "/");
@@ -77,7 +101,13 @@ function withIgnoredScrollPairEvents(fn: () => void): void {
 
 async function refreshActivePairBlocks(): Promise<void> {
   if (!activePair) return;
-  const index = await readIndex(activePair.repoRoot);
+  let index: CommentrayIndex | null = null;
+  try {
+    index = await readIndex(activePair.repoRoot);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logCommentray(`[commentray] readIndex (refresh blocks): ${msg}`);
+  }
   activePair.blocks = buildBlockScrollLinks(
     index,
     activePair.sourceRelative,
@@ -138,6 +168,7 @@ function metadataIndexAbsolutePath(repoRoot: string): string {
 function bindScrollSync(pair: ScrollPair): void {
   disposeScrollSync();
   activePair = pair;
+  lastBoundScrollPair = pair;
 
   const onVisibleRanges = (event: vscode.TextEditorVisibleRangesChangeEvent) => {
     if (!activePair || ignoreScrollPairEvents) return;
@@ -258,7 +289,16 @@ async function openBesideAndSync(
   const codeEditor =
     vscode.window.visibleTextEditors.find((te) => te.document === sourceEditor.document) ??
     sourceEditor;
-  const index = await readIndex(paths.repoRoot);
+  let index: CommentrayIndex | null = null;
+  try {
+    index = await readIndex(paths.repoRoot);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logCommentray(`[commentray] readIndex (open pair): ${msg}`);
+    void vscode.window.showWarningMessage(
+      `Commentray could not read metadata index.json; block-aware scroll sync is limited until the file is valid. (${msg})`,
+    );
+  }
   const blocks = buildBlockScrollLinks(
     index,
     paths.sourceRelative,
@@ -345,7 +385,14 @@ async function upsertBlockMetadata(
   commentrayPathRel: string,
   block: Parameters<typeof addBlockToIndex>[1]["block"],
 ): Promise<void> {
-  const current: CommentrayIndex = (await readIndex(repoRoot)) ?? emptyIndex();
+  let current: CommentrayIndex;
+  try {
+    current = (await readIndex(repoRoot)) ?? emptyIndex();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logCommentray(`[commentray] readIndex (block metadata): ${msg}`);
+    current = emptyIndex();
+  }
   const next = addBlockToIndex(current, {
     sourcePath: sourceRelative,
     commentrayPath: commentrayPathRel,
@@ -592,8 +639,12 @@ async function openCommentrayPreviewCommand(): Promise<void> {
 
 export function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel("Commentray");
-  context.subscriptions.push(output);
+  commentrayOutput = output;
+
+  // Register commands before any listener that might throw — otherwise the host can show
+  // "command … not found" when activation aborts mid-way.
   context.subscriptions.push(
+    output,
     vscode.commands.registerCommand("commentray.openSideBySide", openSideBySideCommand),
     vscode.commands.registerCommand("commentray.openCommentrayAngle", openCommentrayAngleCommand),
     vscode.commands.registerCommand("commentray.addAngleDefinition", addAngleDefinitionCommand),
@@ -608,10 +659,21 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("commentray.validateWorkspace", () =>
       validateWorkspaceCommand(output),
     ),
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      try {
+        if (!e.affectsConfiguration("commentray.scrollSync")) return;
+        applyScrollSyncSettingFromConfig();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logCommentray(`[commentray] scroll sync setting handler: ${msg}`);
+      }
+    }),
     { dispose: () => disposeScrollSync() },
   );
 }
 
 export function deactivate() {
   disposeScrollSync();
+  lastBoundScrollPair = undefined;
+  commentrayOutput = undefined;
 }

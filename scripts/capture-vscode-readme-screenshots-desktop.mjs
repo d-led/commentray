@@ -22,6 +22,9 @@
  * Profile tweaks (cleaner shots): hide the secondary (Agent/Chat) sidebar and bump UI zoom via
  * `User/settings.json` in the disposable user-data dir.
  *
+ * Workspace: a **temporary copy** of `packages/vscode/fixtures/dogfood` with Angles enabled so
+ * “choose angle” shows the Quick Pick (the tracked fixture stays flat for extension tests).
+ *
  * Output PNGs (all under `.commentray/source/packages/vscode/README.md/assets/`):
  *   vscode-palette-commentray.png
  *   vscode-open-paired-beside.png
@@ -34,7 +37,7 @@
  * @see https://github.com/microsoft/playwright/issues/22351
  */
 import { execSync, spawn } from "node:child_process";
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -79,15 +82,10 @@ const selectAllShortcut = process.platform === "darwin" ? "Meta+A" : "Control+A"
 const focusGroup = (n) => (process.platform === "darwin" ? `Meta+${n}` : `Control+${n}`);
 
 async function ensureBuilt() {
+  // Screenshot runs should use the current extension code, not a stale dist artifact.
   if ((process.env.COMMENTRAY_DESKTOP_SCREENSHOT_SKIP_BUILD ?? "").trim() === "1") {
     await access(extensionJs);
     return;
-  }
-  try {
-    await access(extensionJs);
-    return;
-  } catch {
-    /* build */
   }
   execSync("npm run build -w @commentray/core && npm run build -w commentray-vscode", {
     cwd: repoRoot,
@@ -247,7 +245,7 @@ function resolveCdpPort() {
   );
 }
 
-function vscodeLaunchArgs(cdpPort, extensionsDir, userDataDir) {
+function vscodeLaunchArgs(cdpPort, extensionsDir, userDataDir, workspaceFolder) {
   return [
     `--remote-debugging-port=${cdpPort}`,
     "--no-sandbox",
@@ -259,7 +257,7 @@ function vscodeLaunchArgs(cdpPort, extensionsDir, userDataDir) {
     `--extensions-dir=${extensionsDir}`,
     `--user-data-dir=${userDataDir}`,
     `--extensionDevelopmentPath=${extRoot}`,
-    dogfood,
+    workspaceFolder,
   ];
 }
 
@@ -271,6 +269,36 @@ async function prepareDisposableProfile() {
   await mkdir(extensionsDir, { recursive: true });
   await writeScreenshotProfileSettings(userDataDir);
   return { profileRoot, userDataDir, extensionsDir };
+}
+
+/**
+ * Copy dogfood into the disposable profile and enable Angles (sentinel + `.commentray.toml`)
+ * so palette screenshots match multi-angle workflows without mutating the git-tracked fixture.
+ *
+ * @param {string} profileRoot
+ */
+async function materializeScreenshotWorkspaceWithAngles(profileRoot) {
+  const ws = path.join(profileRoot, "screenshot-dogfood");
+  await cp(dogfood, ws, { recursive: true });
+  const defaultSentinel = path.join(ws, ".commentray", "source", ".default");
+  await mkdir(path.dirname(defaultSentinel), { recursive: true });
+  await writeFile(defaultSentinel, "# Commentray Angles layout sentinel.\n", "utf-8");
+  const anglesToml = `[storage]
+dir = ".commentray"
+
+[angles]
+default_angle = "main"
+
+[[angles.definitions]]
+id = "main"
+title = "Main"
+
+[[angles.definitions]]
+id = "alt"
+title = "Alt"
+`;
+  await writeFile(path.join(ws, ".commentray.toml"), `${anglesToml}\n`, "utf-8");
+  return ws;
 }
 
 /**
@@ -294,7 +322,7 @@ async function runScreenshotScenarios(page) {
   await shot(page, "vscode-open-paired-beside.png");
 
   await runPaletteQuery(page, commentrayCommand("Open paired markdown (choose angle)"), {
-    afterEnterMs: 2800,
+    afterEnterMs: 4000,
   });
   await shot(page, "vscode-open-paired-choose-angle.png");
   await dismissOverlays(page);
@@ -356,12 +384,17 @@ async function main() {
 
   const vscodeExecutablePath = await downloadVscodeForScreenshots();
   const { profileRoot, userDataDir, extensionsDir } = await prepareDisposableProfile();
+  const screenshotWorkspace = await materializeScreenshotWorkspaceWithAngles(profileRoot);
   const cdpPort = resolveCdpPort();
-  const child = spawn(vscodeExecutablePath, vscodeLaunchArgs(cdpPort, extensionsDir, userDataDir), {
-    stdio: "ignore",
-    detached: false,
-    env: { ...process.env },
-  });
+  const child = spawn(
+    vscodeExecutablePath,
+    vscodeLaunchArgs(cdpPort, extensionsDir, userDataDir, screenshotWorkspace),
+    {
+      stdio: "ignore",
+      detached: false,
+      env: { ...process.env },
+    },
+  );
 
   const { chromium } = await import("playwright");
   let browser;

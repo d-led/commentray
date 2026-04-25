@@ -73,7 +73,7 @@ For automation or keybindings, you can skip the picker with
 
 ## Screenshots for docs
 
-**Automated (desktop):** `bash scripts/refresh-vscode-readme-screenshots-desktop.sh` (or `npm run extension:vscode-readme-screenshots:desktop`) writes **`vscode-*.png`** under `.commentray/source/packages/vscode/README.md/assets/`. **Fresh worktree:** `bash scripts/commentray-screenshots-in-fresh-worktree.sh`. How scenarios are authored lives in **`.commentray/source/packages/vscode/README.md/main.md`** (Maintainer section).
+**Automated (desktop):** `bash scripts/refresh-vscode-readme-screenshots-desktop.sh` (or `npm run extension:vscode-readme-screenshots:desktop`) writes **`vscode-*.png`** under `.commentray/source/packages/vscode/README.md/assets/`. The script copies `fixtures/dogfood` into a **temp folder** and enables **Angles** there so the “choose angle” frame shows the real Quick Pick without touching the tracked fixture. **Fresh worktree:** `bash scripts/commentray-screenshots-in-fresh-worktree.sh`. Scenario order and keys: **`.commentray/source/packages/vscode/README.md/main.md`** (Maintainer section).
 
 **Manual (extension README):** `bash scripts/refresh-vscode-readme-screenshots-manual.sh`.
 
