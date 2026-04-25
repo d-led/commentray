@@ -27,6 +27,26 @@ describe("The Commentray GitHub Pages static build", () => {
       cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
     });
 
+    it("keeps relative pair-browse links stable when landing on a direct browse permalink", () => {
+      cy.get(".shell")
+        .invoke("attr", "data-commentray-pair-browse-href")
+        .then((browseHref) => {
+          expect(browseHref)
+            .to.be.a("string")
+            .and.match(/^\.\/browse\/[^/]+\.html$/);
+          if (typeof browseHref !== "string") {
+            throw new Error("Expected shell browse permalink href");
+          }
+          cy.visit(browseHref);
+        });
+
+      cy.CurrentPageShouldDisplayCodeBrowserShell();
+      cy.location("pathname").should("match", /\/browse\/[^/]+(?:\.html)?$/);
+      cy.location("pathname").should("not.match", /\/browse\/browse\//);
+      cy.get('a[aria-label="Documentation home"]').should("have.attr", "href", "../index.html");
+      cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
+    });
+
     it("clears in-page search and hides hits when Escape is pressed", () => {
       cy.TypeTextInSearchField("commentray");
       cy.SearchResultsPanelShouldBeVisible();
