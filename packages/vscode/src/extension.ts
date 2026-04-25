@@ -360,6 +360,24 @@ function uriFromOpenSideBySideArgs(arg: unknown): vscode.Uri | undefined {
   return undefined;
 }
 
+/** `executeCommand("commentray.openCommentrayAngle", { angleId: "…" })` skips the picker (tests, keybindings). */
+type OpenAngleCommandArg = "absent" | "invalid" | { angleId: string };
+
+function presetAngleFromOpenAngleCommandArg(arg: unknown): OpenAngleCommandArg {
+  if (arg === undefined || arg === null) return "absent";
+  if (typeof arg !== "object") return "invalid";
+  if (!("angleId" in arg)) return "absent";
+  const raw = Reflect.get(arg, "angleId");
+  if (typeof raw !== "string") return "invalid";
+  const t = raw.trim();
+  if (t.length === 0) return "invalid";
+  try {
+    return { angleId: assertValidAngleId(t) };
+  } catch {
+    return "invalid";
+  }
+}
+
 async function openSideBySideCommand(arg?: unknown): Promise<void> {
   let editor = vscode.window.activeTextEditor;
   const fromExplorer = uriFromOpenSideBySideArgs(arg);
@@ -382,7 +400,7 @@ async function openSideBySideCommand(arg?: unknown): Promise<void> {
   await openBesideAndSync(active.editor, paths);
 }
 
-async function openCommentrayAngleCommand(): Promise<void> {
+async function openCommentrayAngleCommand(arg?: unknown): Promise<void> {
   const active = await requireActiveEditorInWorkspace();
   if (!active) return;
   const cfg = await loadCommentrayConfig(active.folder.uri.fsPath);
@@ -393,36 +411,50 @@ async function openCommentrayAngleCommand(): Promise<void> {
     );
     return;
   }
-  const items: vscode.QuickPickItem[] = cfg.angles.definitions.map((d) => ({
-    label: d.title,
-    description: d.id,
-  }));
-  items.push({ label: "Custom angle id…", alwaysShow: true });
-  const chosen = await vscode.window.showQuickPick(items, {
-    title: "Open Commentray angle",
-    placeHolder: "Pick an angle for the current source file",
-  });
-  if (!chosen) return;
-  let angleId: string;
-  if (chosen.label === "Custom angle id…") {
-    const raw = await vscode.window.showInputBox({
-      title: "Angle id",
-      prompt: "Use letters, digits, underscores, or hyphens (1–64 chars).",
-      validateInput: (value) => {
-        try {
-          assertValidAngleId(value);
-          return undefined;
-        } catch (e) {
-          return e instanceof Error ? e.message : String(e);
-        }
-      },
-    });
-    if (!raw) return;
-    angleId = assertValidAngleId(raw);
-  } else {
-    if (!chosen.description) return;
-    angleId = assertValidAngleId(chosen.description);
+
+  const preset = presetAngleFromOpenAngleCommandArg(arg);
+  if (preset === "invalid") {
+    await vscode.window.showWarningMessage(
+      'Invalid angle id: use { "angleId": "your-angle" } when invoking this command programmatically.',
+    );
+    return;
   }
+
+  let angleId: string;
+  if (preset !== "absent") {
+    angleId = preset.angleId;
+  } else {
+    const items: vscode.QuickPickItem[] = cfg.angles.definitions.map((d) => ({
+      label: d.title,
+      description: d.id,
+    }));
+    items.push({ label: "Custom angle id…", alwaysShow: true });
+    const chosen = await vscode.window.showQuickPick(items, {
+      title: "Open Commentray angle",
+      placeHolder: "Pick an angle for the current source file",
+    });
+    if (!chosen) return;
+    if (chosen.label === "Custom angle id…") {
+      const raw = await vscode.window.showInputBox({
+        title: "Angle id",
+        prompt: "Use letters, digits, underscores, or hyphens (1–64 chars).",
+        validateInput: (value) => {
+          try {
+            assertValidAngleId(value);
+            return undefined;
+          } catch (e) {
+            return e instanceof Error ? e.message : String(e);
+          }
+        },
+      });
+      if (!raw) return;
+      angleId = assertValidAngleId(raw);
+    } else {
+      if (!chosen.description) return;
+      angleId = assertValidAngleId(chosen.description);
+    }
+  }
+
   const paths = await resolvePairedPaths(active.editor, active.folder, angleId);
   if (!paths) return;
   await openBesideAndSync(active.editor, paths);

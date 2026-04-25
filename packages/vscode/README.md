@@ -67,6 +67,9 @@ Palette entries use the **Commentray** category (search `Commentray` or the comm
 
 **Angles** — **Open paired markdown (choose angle)** and **Add angle to project…**
 use the same workspace-folder rule as validate when picking the repo root.
+For automation or keybindings, you can skip the picker with
+`vscode.commands.executeCommand("commentray.openCommentrayAngle", { angleId: "main" })`
+(angles layout and `.commentray.toml` definitions must already be enabled).
 
 ## Screenshots for docs
 

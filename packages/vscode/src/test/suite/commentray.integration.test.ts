@@ -8,31 +8,18 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
 
-const pairedMarkdownPath = ".commentray/source/src/sample.ts.md";
-
-async function resetGeneratedCommentrayStorage(workspaceRoot: vscode.Uri): Promise<void> {
-  const commentrayDir = vscode.Uri.joinPath(workspaceRoot, ".commentray");
-  try {
-    await vscode.workspace.fs.delete(commentrayDir, { recursive: true, useTrash: false });
-  } catch {
-    // Missing folder is fine.
-  }
-}
-
-async function openFixtureSourceFile(workspaceRoot: vscode.Uri): Promise<vscode.TextEditor> {
-  const doc = await vscode.workspace.openTextDocument(
-    vscode.Uri.joinPath(workspaceRoot, "src", "sample.ts"),
-  );
-  return vscode.window.showTextDocument(doc);
-}
+import {
+  dogfoodWorkspaceRoot,
+  openFixtureSourceFile,
+  pairedMarkdownPath,
+  resetGeneratedCommentrayStorage,
+} from "./commentray-dogfood-test-support.js";
 
 describe("Commentray in VS Code (integration)", () => {
   let workspaceRoot: vscode.Uri;
 
   before(() => {
-    const folder = vscode.workspace.workspaceFolders?.[0];
-    assert.ok(folder, "Expected a workspace folder (tests must run with fixtures/dogfood open).");
-    workspaceRoot = folder.uri;
+    workspaceRoot = dogfoodWorkspaceRoot();
   });
 
   beforeEach(async () => {
