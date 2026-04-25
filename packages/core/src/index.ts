@@ -78,13 +78,19 @@ export {
 export type { PathRename } from "./commentray-index-renames.js";
 export type { BlockDiagnostic } from "./staleness.js";
 export { diagnoseBlock } from "./staleness.js";
-export type { ValidationIssue, ValidationResult } from "./validate-project.js";
+export type {
+  ValidationIssue,
+  ValidationResult,
+  ValidateProjectOptions,
+} from "./validate-project.js";
 export {
   readIndex,
   refreshIndexMigrationsOnDisk,
   validateProject,
   writeIndex,
 } from "./validate-project.js";
+export { plannedSymbolResolutionStrategy } from "./language-intelligence.js";
+export type { SymbolResolutionStrategy } from "./language-intelligence.js";
 export { relocationHintMessages } from "./relocation-hints.js";
 export type { RelocationHintsInput } from "./relocation-hints.js";
 export { runCommanderMain } from "./cli-bootstrap.js";

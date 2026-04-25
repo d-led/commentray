@@ -83,4 +83,30 @@ pre {
 .commentray tbody tr:nth-child(even) :where(td) {
   background: color-mix(in oklab, CanvasText 3.5%, Canvas);
 }
+
+.commentray :where(ul.contains-task-list) {
+  list-style: none;
+  padding-inline-start: 1.2em;
+}
+
+.commentray :where(li.task-list-item) {
+  position: relative;
+}
+
+.commentray :where(li.task-list-item input[type="checkbox"]) {
+  position: absolute;
+  margin-inline-start: -1.35em;
+  margin-top: 0.2em;
+}
+
+.commentray :where(del) {
+  opacity: 0.82;
+}
+
+.commentray :where(section.footnotes) {
+  margin-top: 1.5em;
+  padding-top: 0.75em;
+  border-top: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
+  font-size: 0.92em;
+}
 `;

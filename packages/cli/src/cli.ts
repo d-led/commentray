@@ -18,6 +18,7 @@ import {
   runCommanderMain,
   type ValidationIssue,
   validateProject,
+  type ValidateProjectOptions,
   writeIndex,
 } from "@commentray/core";
 import { renderSideBySideHtml } from "@commentray/render";
@@ -28,6 +29,8 @@ import { runMigrateAnglesFromCwd } from "./migrate-angles-cmd.js";
 import { findProjectRoot } from "./project-root.js";
 import { resolveRenderInputs, type RenderCliOptions } from "./render-inputs.js";
 import { logCliValidationIssue, logCliWarning } from "./cli-output.js";
+import { runAnglesAddFromCwd } from "./angles-add-cmd.js";
+import { readGitStagedRepoRelativePaths } from "./git-staged-paths.js";
 import { runServeStaticPages } from "./serve.js";
 
 async function repoRootFromCwd(): Promise<string> {
@@ -49,9 +52,24 @@ function pluralize(n: number, word: string): string {
   return `${String(n)} ${word}${n === 1 ? "" : "s"}`;
 }
 
-async function cmdValidate(): Promise<number> {
+async function cmdValidate(opts?: { staged?: boolean }): Promise<number> {
   const repoRoot = await repoRootFromCwd();
-  const result = await validateProject(repoRoot);
+  let validateOpts: ValidateProjectOptions | undefined;
+  if (opts?.staged) {
+    const staged = readGitStagedRepoRelativePaths(repoRoot);
+    if (staged === undefined) {
+      console.error(
+        "validate --staged: could not read staged paths (not a Git checkout or git failed).",
+      );
+      return 1;
+    }
+    if (staged.length === 0) {
+      console.error("validate --staged: no staged changes.");
+      return 1;
+    }
+    validateOpts = { stagedRepoRelativePaths: staged };
+  }
+  const result = await validateProject(repoRoot, validateOpts);
   for (const issue of result.issues) {
     logCliValidationIssue(issue);
   }
@@ -269,8 +287,9 @@ initCmd.action(async () => {
 program
   .command("validate")
   .description("Validate Commentray metadata and configuration")
-  .action(async () => {
-    process.exitCode = await cmdValidate();
+  .option("--staged", "Only validate index entries touched by staged files (Git index)", false)
+  .action(async (opts: { staged?: boolean }) => {
+    process.exitCode = await cmdValidate({ staged: Boolean(opts.staged) });
   });
 
 program
@@ -301,6 +320,36 @@ program
       dryRun: Boolean(opts.dryRun),
     });
   });
+
+const anglesCmd = program
+  .command("angles")
+  .description("Work with Commentray Angles (multi-companion layout under .commentray/source/)");
+
+anglesCmd
+  .command("add")
+  .description(
+    "Register a new angle in .commentray.toml and create its companion Markdown file for the chosen primary",
+  )
+  .argument("<angleId>", "New angle id (letters, digits, underscores, hyphens)")
+  .option(
+    "--source <path>",
+    "Repo-relative primary path (defaults to [static_site].source_file from .commentray.toml)",
+  )
+  .option("--title <text>", "Angle label in the UI (defaults to a title-cased angle id)")
+  .option("--make-default", "Set angles.default_angle to this id after registration", false)
+  .action(
+    async (
+      angleId: string,
+      opts: { source?: string; title?: string; makeDefault?: boolean },
+    ): Promise<void> => {
+      process.exitCode = await runAnglesAddFromCwd({
+        angleId,
+        sourcePath: typeof opts.source === "string" ? opts.source : undefined,
+        title: typeof opts.title === "string" ? opts.title : undefined,
+        makeDefault: Boolean(opts.makeDefault),
+      });
+    },
+  );
 
 program
   .command("sync-moved-paths")

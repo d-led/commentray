@@ -128,6 +128,28 @@ describe("Cross-file search manifest — index and fallback", () => {
 });
 
 describe("Cross-file search manifest — disk merge", () => {
+  it("should still list disk companions when the index exists but has no entries yet", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cr-nav-empty-idx-"));
+    await mkdir(path.join(dir, ".commentray", "metadata"), { recursive: true });
+    await mkdir(path.join(dir, ".commentray", "source", "src"), { recursive: true });
+    await writeFile(
+      path.join(dir, ".commentray", "metadata", "index.json"),
+      JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION, byCommentrayPath: {} }, null, 2),
+      "utf8",
+    );
+    await writeFile(
+      path.join(dir, ".commentray", "source", "src", "solo.ts.md"),
+      "# Solo\n",
+      "utf8",
+    );
+
+    const doc = await buildCommentrayNavSearchDocument(dir);
+
+    expect(doc.documentedPairs).toEqual([
+      { sourcePath: "src/solo.ts", commentrayPath: ".commentray/source/src/solo.ts.md" },
+    ]);
+  });
+
   it("should merge disk-only companions with index-backed pairs for search rows and documentedPairs", async () => {
     const cr = ".commentray/source/src/a.ts.md";
     const dir = await setupRepoWithIndexedPair({

@@ -30,6 +30,37 @@ describe("Markdown to HTML pipeline", () => {
     expect(html).toContain("world");
   });
 
+  it("should emit GitHub-flavored Markdown constructs that readers expect", async () => {
+    const md = [
+      "## Heading slug",
+      "",
+      "| a | b |",
+      "| - | - |",
+      "| 1 | 2 |",
+      "",
+      "- [ ] todo",
+      "- [x] done",
+      "",
+      "~~gone~~",
+      "",
+      "https://example.com",
+      "",
+      "Ref[^1]",
+      "",
+      "[^1]: footnote body",
+      "",
+    ].join("\n");
+    const html = await renderMarkdownToHtml(md);
+    expect(html).toMatch(/<h2[^>]*id="heading-slug"/);
+    expect(html).toContain("<table>");
+    expect(html).toContain('class="contains-task-list"');
+    expect(html).toContain('type="checkbox"');
+    expect(html).toContain("<del>gone</del>");
+    expect(html).toContain('href="https://example.com"');
+    expect(html).toContain('class="footnotes"');
+    expect(html).toContain("footnote body");
+  });
+
   it("should keep mermaid source as plain text under pre.mermaid so the browser runtime can parse it", async () => {
     const md = "```mermaid\nflowchart LR\n  A --> B\n```";
     const html = await renderMarkdownToHtml(md);

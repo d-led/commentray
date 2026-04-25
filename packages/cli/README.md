@@ -21,9 +21,11 @@ commentray init            # dirs + index if missing; migrate/normalize; VS Code
 commentray init config     # ensure .commentray.toml exists (with --force to replace)
 commentray init scm        # install/refresh a marked block in .git/hooks/pre-commit
 commentray validate        # schema + anchor integrity + Git staleness evidence
+commentray validate --staged   # same checks limited to index pairs touched by staged files (Git index)
 commentray doctor          # validate plus environment checks
 commentray migrate         # migrate metadata JSON to the current schema
 commentray migrate-angles    # flat .commentray/source/*.md → Angles folders + [angles] + index keys (see --dry-run)
+commentray angles add ID [--source PATH] [--title T] [--make-default]   # register angle + create companion under Angles layout
 commentray sync-moved-paths # rewrite index paths after Git renames (uses git diff)
 commentray convert-source-markers --file PATH --language LANG  # rewrite region comment style (optional --dry-run)
 commentray serve [--port 4173]     # watch inputs; rebuild _site; HTTP serve with browser livereload

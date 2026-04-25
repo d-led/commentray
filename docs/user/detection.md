@@ -5,7 +5,7 @@ Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. E
 ## Pre-commit hook (`commentray init scm`)
 
 - **When:** Every `git commit`, at **pre-commit** stage, if the hook block is present and **`commentray`** is on `PATH`.
-- **What:** Runs **`commentray validate`** against the working tree (same scope as standalone validate today—**full project** scan, not staged-only yet).
+- **What:** Runs **`commentray validate --staged`** so only **Git-staged** paths drive marker and index checks (faster on large trees). Use plain **`commentray validate`** in CI when you want a full scan.
 - **Exit:** Non-zero on **errors** (schema, broken anchors, marker pairing, and similar)—the commit is blocked. Warnings do not fail the hook.
 - **Coexistence:** The fragment is a **marked, idempotent block** inside `.git/hooks/pre-commit`; it is safe alongside other hook logic if you merge hooks carefully.
 
@@ -14,7 +14,7 @@ Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. E
 - **When:** You run it manually, in CI, or from the pre-commit hook.
 - **What:** Schema validation for **`.commentray/metadata/index.json`**, anchor integrity (including symbol presence and line ranges where applicable), marker pairing and uniqueness rules, alignment between index keys and paths, and staleness evidence via the **Git** SCM adapter (blob SHA / last-known commit fields) for recorded sources.
 - **Exit:** **0** if there are no **errors**; **1** if any error exists. Warnings print but do not change exit code.
-- **Scope:** Full repo scan (staged-files-only optimization is a possible future improvement).
+- **Scope:** Full repo by default; pass **`--staged`** to limit checks to index entries whose primary or companion path matches staged files (unless `index.json` or `.commentray.toml` itself is staged, in which case the full index is validated).
 
 ## CLI `commentray doctor`
 

@@ -1446,6 +1446,37 @@ const CODE_BROWSER_STYLES = `
       .block-stretch td.stretch-doc .stretch-doc-inner tbody tr:nth-child(even) :where(td) {
         background: color-mix(in oklab, CanvasText 3.5%, Canvas);
       }
+      .pane--doc .doc-pane-body :where(ul.contains-task-list),
+      .shell--stretch-rows .stretch-preamble :where(ul.contains-task-list),
+      .block-stretch td.stretch-doc .stretch-doc-inner :where(ul.contains-task-list) {
+        list-style: none;
+        padding-inline-start: 1.2em;
+      }
+      .pane--doc .doc-pane-body :where(li.task-list-item),
+      .shell--stretch-rows .stretch-preamble :where(li.task-list-item),
+      .block-stretch td.stretch-doc .stretch-doc-inner :where(li.task-list-item) {
+        position: relative;
+      }
+      .pane--doc .doc-pane-body :where(li.task-list-item input[type="checkbox"]),
+      .shell--stretch-rows .stretch-preamble :where(li.task-list-item input[type="checkbox"]),
+      .block-stretch td.stretch-doc .stretch-doc-inner :where(li.task-list-item input[type="checkbox"]) {
+        position: absolute;
+        margin-inline-start: -1.35em;
+        margin-top: 0.2em;
+      }
+      .pane--doc .doc-pane-body :where(del),
+      .shell--stretch-rows .stretch-preamble :where(del),
+      .block-stretch td.stretch-doc .stretch-doc-inner :where(del) {
+        opacity: 0.82;
+      }
+      .pane--doc .doc-pane-body :where(section.footnotes),
+      .shell--stretch-rows .stretch-preamble :where(section.footnotes),
+      .block-stretch td.stretch-doc .stretch-doc-inner :where(section.footnotes) {
+        margin-top: 1.5em;
+        padding-top: 0.75em;
+        border-top: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
+        font-size: 0.92em;
+      }
       .pane--doc .doc-pane-body .commentray-mermaid {
         overflow-x: auto;
         max-width: 100%;

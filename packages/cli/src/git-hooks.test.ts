@@ -12,8 +12,8 @@ describe("Merging the Commentray pre-commit hook script", () => {
     expect(out).toContain("#!/bin/sh");
     expect(out).toContain(COMMENTRAY_HOOK_BEGIN);
     expect(out).toContain("packages/cli/dist/cli.js");
-    expect(out).toContain('node "$dev_cli" validate');
-    expect(out).toContain("node_modules/.bin/commentray");
+    expect(out).toContain('node "$dev_cli" validate --staged');
+    expect(out).toMatch(/commentray" validate --staged/);
   });
 
   it("appends a block to an existing hook without markers", () => {
@@ -46,7 +46,7 @@ describe("Merging the Commentray pre-commit hook script", () => {
     const out = mergeCommentrayPreCommitHook(legacy);
     expect(out).not.toContain("commentary-cli-hook");
     expect(out).toContain(COMMENTRAY_HOOK_BEGIN);
-    expect(out).toContain("node_modules/.bin/commentray");
+    expect(out).toMatch(/commentray" validate --staged/);
   });
 });
 

@@ -22,6 +22,40 @@ export type ValidationResult = {
   issues: ValidationIssue[];
 };
 
+export type ValidateProjectOptions = {
+  /**
+   * When non-empty, only validate `index.json` entries whose primary or companion path matches one
+   * of these repo-relative paths (after {@link normalizeRepoRelativePath}), unless the staged set
+   * includes `.commentray/metadata/index.json` or `.commentray.toml` (then the full index is used).
+   */
+  stagedRepoRelativePaths?: readonly string[];
+};
+
+function stagedPathsSet(paths: readonly string[]): Set<string> {
+  return new Set(paths.map((p) => normalizeRepoRelativePath(p)));
+}
+
+function stagedScopeNeedsFullIndexValidation(staged: ReadonlySet<string>): boolean {
+  const indexJson = normalizeRepoRelativePath(".commentray/metadata/index.json");
+  const toml = normalizeRepoRelativePath(".commentray.toml");
+  return staged.has(indexJson) || staged.has(toml);
+}
+
+function indexFilteredForStaged(
+  index: CommentrayIndex,
+  staged: ReadonlySet<string>,
+): CommentrayIndex {
+  const next: CommentrayIndex["byCommentrayPath"] = {};
+  for (const [crPath, entry] of Object.entries(index.byCommentrayPath)) {
+    const sp = normalizeRepoRelativePath(entry.sourcePath);
+    const cp = normalizeRepoRelativePath(crPath);
+    if (staged.has(sp) || staged.has(cp)) {
+      next[crPath] = entry;
+    }
+  }
+  return { ...index, byCommentrayPath: next };
+}
+
 async function collectIssuesForLoadedIndex(
   repoRoot: string,
   index: CommentrayIndex,
@@ -103,7 +137,10 @@ async function collectIssuesForLoadedIndex(
   return issues;
 }
 
-export async function validateProject(repoRoot: string): Promise<ValidationResult> {
+export async function validateProject(
+  repoRoot: string,
+  options?: ValidateProjectOptions,
+): Promise<ValidationResult> {
   const issues: ValidationIssue[] = [];
   let config: ResolvedCommentrayConfig;
   try {
@@ -142,8 +179,27 @@ export async function validateProject(repoRoot: string): Promise<ValidationResul
     });
   }
 
-  if (index) {
-    issues.push(...(await collectIssuesForLoadedIndex(repoRoot, index)));
+  let indexForMarkers: CommentrayIndex | null = index;
+  const staged = options?.stagedRepoRelativePaths;
+  if (index && staged && staged.length > 0) {
+    const stagedSet = stagedPathsSet(staged);
+    if (!stagedScopeNeedsFullIndexValidation(stagedSet)) {
+      const narrowed = indexFilteredForStaged(index, stagedSet);
+      if (Object.keys(narrowed.byCommentrayPath).length === 0) {
+        issues.push({
+          level: "warn",
+          message:
+            "validate --staged: staged files do not match any indexed Commentray pairs; skipping marker checks for index entries.",
+        });
+        indexForMarkers = null;
+      } else {
+        indexForMarkers = narrowed;
+      }
+    }
+  }
+
+  if (indexForMarkers) {
+    issues.push(...(await collectIssuesForLoadedIndex(repoRoot, indexForMarkers)));
   }
 
   pushRelativeGithubLinkConfigWarnings(config, issues);

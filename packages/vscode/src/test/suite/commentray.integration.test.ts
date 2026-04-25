@@ -39,6 +39,20 @@ describe("Commentray in VS Code (integration)", () => {
     await resetGeneratedCommentrayStorage(workspaceRoot);
   });
 
+  describe("Extension command surface", () => {
+    before(async () => {
+      const editor = await openFixtureSourceFile(workspaceRoot);
+      await vscode.commands.executeCommand("commentray.openSideBySide");
+      await vscode.window.showTextDocument(editor.document, { preview: false });
+    });
+
+    it("Given the extension is active, when querying VS Code commands, then Angles-related Commentray commands are registered.", async () => {
+      const cmds = await vscode.commands.getCommands(true);
+      assert.ok(cmds.includes("commentray.openCommentrayAngle"));
+      assert.ok(cmds.includes("commentray.addAngleDefinition"));
+    });
+  });
+
   describe("Open paired markdown beside the source editor", () => {
     it('Given a workspace with Commentray configured, when the user runs "Commentray: Open paired markdown beside editor" from a source file, then the paired Markdown file exists under `.commentray/source/` and starts with a Commentray heading.', async () => {
       await openFixtureSourceFile(workspaceRoot);

@@ -19,9 +19,9 @@ export const COMMENTRAY_PRE_COMMIT_BODY = `root=$(git rev-parse --show-toplevel)
 if [ -f "$root/.commentray.toml" ]; then
   dev_cli="$root/packages/cli/dist/cli.js"
   if [ -f "$dev_cli" ]; then
-    node "$dev_cli" validate || exit $?
+    node "$dev_cli" validate --staged || exit $?
   elif [ -x "$root/node_modules/.bin/commentray" ]; then
-    "$root/node_modules/.bin/commentray" validate || exit $?
+    "$root/node_modules/.bin/commentray" validate --staged || exit $?
   fi
 fi`;
 

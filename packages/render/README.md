@@ -1,6 +1,6 @@
 # @commentray/render
 
-Markdown → HTML rendering stack for [Commentray](https://github.com/d-led/commentray): remark + GFM, `rehype-sanitize`, `rehype-highlight` (lowlight), Mermaid containers, and ready-made HTML shells (side-by-side and a client-side interactive code browser with in-page token search).
+Markdown → HTML rendering stack for [Commentray](https://github.com/d-led/commentray): `remark-parse` + `remark-gfm` (tables, task lists, strikethrough, autolink literals, footnotes), `rehype-slug` on headings, `rehype-sanitize`, `rehype-highlight` (lowlight), Mermaid containers, and ready-made HTML shells (side-by-side and a client-side interactive code browser with in-page token search).
 
 ## Install
 

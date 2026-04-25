@@ -5,6 +5,7 @@ import type { Element, Root as HastRoot, Text } from "hast";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import rehypeSlug from "rehype-slug";
 import rehypeStringify from "rehype-stringify";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
@@ -339,7 +340,8 @@ export async function renderMarkdownToHtml(
   const outUrls = options?.commentrayOutputUrls;
   const file = await unified()
     .use(remarkParse)
-    .use(remarkGfm)
+    /** GFM: autolink literals, footnotes, strikethrough, tables, task lists (see `remark-gfm`). */
+    .use(remarkGfm, { singleTilde: false })
     .use(function remarkGithubBlobMaybe() {
       return (tree: MdastRoot) => {
         const gh = outUrls?.githubBlobRepo;
@@ -350,6 +352,7 @@ export async function renderMarkdownToHtml(
     .use(remarkMermaidPlaceholders)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeRaw)
+    .use(rehypeSlug)
     .use(rehypeSanitize, sanitizeSchema)
     .use(function rehypeOutputUrlsMaybe() {
       return (tree: HastRoot) => {
