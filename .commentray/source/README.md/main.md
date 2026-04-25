@@ -4,6 +4,8 @@
 
 _You have the main [`README.md`](https://github.com/d-led/commentray/blob/main/README.md) in the left column: packages, scripts, release flow. This file **is** commentray for that README—the voice-over beside the facts, not a second brochure._
 
+If this is your first pass, try a quick interaction: scroll either pane and watch the other follow, then tap the **Help** button in the top bar if you want the guided tour again.
+
 <!-- commentray:page-break -->
 
 <!-- commentray:block id=readme-why -->
