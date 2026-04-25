@@ -59,7 +59,8 @@ jobs:
           NODE_OPTIONS: --dns-result-order=ipv4first
 
       - name: Upload test results
-        if: always()
+        # Keep artifacts on test failures, but skip during concurrency cancellations.
+        if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: test-results
