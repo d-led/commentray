@@ -51,6 +51,15 @@ import {
   clearOpenWideModeIntroTourUi,
   createWideIntroElements,
 } from "./code-browser-wide-intro-ui.js";
+import {
+  type WideIntroStep,
+  wideIntroStepsForShell,
+  wideIntroVisibleTargetsForCurrentStep,
+} from "./code-browser-wide-intro-steps.js";
+import {
+  renderWideIntroArrows,
+  repositionWideIntroBubble,
+} from "./code-browser-wide-intro-layout.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
 /**
@@ -1920,224 +1929,8 @@ function normalizedDualMobilePane(v: string | null | undefined): "code" | "doc" 
   return v === "code" ? "code" : "doc";
 }
 
-type WideIntroStep = {
-  targetSelector?: string;
-  targetSelectors?: string[];
-  title: string;
-  body: string;
-  fallbackActionLabel?: string;
-  fallbackAction?: () => void;
-};
-
 function isNarrowViewport(): boolean {
   return globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ).matches;
-}
-
-function wideIntroStepsForShell(shell: HTMLElement): WideIntroStep[] {
-  const narrowActive = isNarrowViewport();
-  const introTargetSelector = narrowActive ? "#mobile-pane-flip" : "#shell";
-  const shellSelector =
-    shell.id.trim().length > 0 && typeof globalThis.CSS?.escape === "function"
-      ? `#${globalThis.CSS.escape(shell.id)}`
-      : "#shell";
-  const shellOrIntroTargetSelector =
-    introTargetSelector === "#shell" ? shellSelector : introTargetSelector;
-  return [
-    {
-      targetSelectors: narrowActive ? [shellOrIntroTargetSelector] : ["#code-pane", "#doc-pane"],
-      title: "Welcome",
-      body: "Welcome to commentray, a system to create and view commentaries next to the source tree. Angles are different aspects of these commentaries, so switch between them and keep scrolling while both panes stay aligned.",
-    },
-    {
-      targetSelectors: narrowActive ? [shellOrIntroTargetSelector] : ["#code-pane", "#doc-pane"],
-      title: "Two views",
-      body: narrowActive
-        ? "You are in narrow view now. Use the pane flip to switch code and commentary. Wide view shows both panes side by side."
-        : "You are in wide view now. It shows code and commentary side by side. Narrow view uses one pane and a flip control.",
-    },
-    {
-      targetSelectors: narrowActive
-        ? ["#mobile-pane-flip", "#doc-pane"]
-        : ["#code-pane", "#doc-pane"],
-      title: narrowActive ? "Scroll and toggle" : "Scroll both panes",
-      body: narrowActive
-        ? "Try scrolling commentary, then use the pane flip to switch to source and keep exploring."
-        : "Try scrolling in either pane. Source and commentary stay aligned while you read side by side.",
-    },
-    {
-      targetSelector: "#search-q",
-      title: "Search quickly",
-      body: "Use this search input to jump to documented source lines and markdown snippets.",
-    },
-    {
-      targetSelector: "#angle-select",
-      title: "Angle switch",
-      body: "Change the Commentray angle to view a different narrative for this same source file.",
-    },
-    {
-      targetSelector: "#source-markdown-pane-flip",
-      title: "Source view mode",
-      body: "Toggle between raw source and rendered markdown in the source pane.",
-    },
-    {
-      targetSelector: "#wrap-lines",
-      title: "Readability controls",
-      body: "Wrap lines to reduce horizontal scrolling in both source and commentary panes.",
-      fallbackActionLabel: "Switch to markdown source",
-      fallbackAction: () => {
-        const sourceModeFlip = document.getElementById("source-markdown-pane-flip");
-        if (sourceModeFlip instanceof HTMLButtonElement) sourceModeFlip.click();
-      },
-    },
-    {
-      targetSelector: "#commentray-theme-trigger",
-      title: "Appearance",
-      body: "Change theme mode from this trigger (menu on left-click, quick cycle on right-click).",
-    },
-    {
-      targetSelector: "#commentray-share-link",
-      title: "Share this view",
-      body: "Use this link button to copy a shareable permalink to the exact page and state you are viewing.",
-    },
-    {
-      targetSelector: "#commentray-help-tour",
-      title: "Need a refresher?",
-      body: "You can always go back to this tutorial via the help button.",
-    },
-  ];
-}
-
-function wideIntroTargetsForCurrentStep(steps: WideIntroStep[], current: number): HTMLElement[] {
-  const step = steps[current];
-  if (!step) return [];
-  const selectors =
-    Array.isArray(step.targetSelectors) && step.targetSelectors.length > 0
-      ? step.targetSelectors
-      : step.targetSelector
-        ? [step.targetSelector]
-        : [];
-  const targets: HTMLElement[] = [];
-  const seen = new Set<HTMLElement>();
-  for (const selector of selectors) {
-    const found = document.querySelector(selector);
-    if (!(found instanceof HTMLElement) || seen.has(found)) continue;
-    seen.add(found);
-    targets.push(found);
-  }
-  return targets;
-}
-
-function isWideIntroTargetVisible(target: HTMLElement): boolean {
-  if (target.hidden) return false;
-  const style = globalThis.getComputedStyle(target);
-  if (style.display === "none" || style.visibility === "hidden") return false;
-  const rect = target.getBoundingClientRect();
-  return rect.width > 0 && rect.height > 0;
-}
-
-function wideIntroVisibleTargetsForCurrentStep(
-  steps: WideIntroStep[],
-  current: number,
-): HTMLElement[] {
-  return wideIntroTargetsForCurrentStep(steps, current).filter((target) =>
-    isWideIntroTargetVisible(target),
-  );
-}
-
-function repositionWideIntroBubble(bubble: HTMLElement, target: HTMLElement): void {
-  const rect = target.getBoundingClientRect();
-  const vw = globalThis.innerWidth;
-  const vh = globalThis.innerHeight;
-  const bubbleRect = bubble.getBoundingClientRect();
-  const bubbleWidth = bubbleRect.width > 0 ? bubbleRect.width : 340;
-  const bubbleHeight = bubbleRect.height > 0 ? bubbleRect.height : 160;
-  const margin = 8;
-  const canPlaceBelow = rect.bottom + 12 + bubbleHeight <= vh - margin;
-  const top = canPlaceBelow
-    ? Math.max(margin, rect.bottom + 12)
-    : Math.max(margin, rect.top - bubbleHeight - 12);
-  const left = clamp(rect.left, margin, vw - bubbleWidth - margin);
-  bubble.style.top = `${String(Math.round(top))}px`;
-  bubble.style.left = `${String(Math.round(left))}px`;
-  bubble.dataset.side = canPlaceBelow ? "below" : "above";
-  const pointerLeft = clamp(rect.left + rect.width / 2 - left - 8, 10, bubbleWidth - 22);
-  bubble.style.setProperty("--pointer-left", `${String(Math.round(pointerLeft))}px`);
-}
-
-function renderWideIntroArrows(
-  bubble: HTMLElement,
-  arrowLayer: HTMLElement,
-  targets: HTMLElement[],
-): void {
-  arrowLayer.replaceChildren();
-  if (targets.length === 0) return;
-
-  const bubbleRect = bubble.getBoundingClientRect();
-  const bubbleCenterX = bubbleRect.left + bubbleRect.width / 2;
-  const bubbleCenterY = bubbleRect.top + bubbleRect.height / 2;
-  const edgePadding = 12;
-  const sideInset = 8;
-  const spread = 12;
-  const side = bubble.dataset.side;
-  const pointerLeftRaw = parseFloat(bubble.style.getPropertyValue("--pointer-left"));
-  const pointerCenterX = Number.isFinite(pointerLeftRaw)
-    ? bubbleRect.left + pointerLeftRaw + 8
-    : bubbleCenterX;
-  const pointerTipY =
-    side === "below"
-      ? bubbleRect.top - sideInset
-      : side === "above"
-        ? bubbleRect.bottom + sideInset
-        : bubbleCenterY;
-
-  for (const [index, target] of targets.entries()) {
-    const rect = target.getBoundingClientRect();
-    // Point to the middle of each target element.
-    const endX = rect.left + rect.width / 2;
-    const endY = rect.top + rect.height / 2;
-    const toTargetX = endX - bubbleCenterX;
-    const toTargetY = endY - bubbleCenterY;
-    const horizontalDominant = Math.abs(toTargetX) >= Math.abs(toTargetY);
-    const spreadOffset = index - (targets.length - 1) / 2;
-
-    let startX: number;
-    let startY: number;
-    if (targets.length === 1 && (side === "below" || side === "above")) {
-      // Single-target tours look cleaner when the arrow starts from the bubble pointer notch.
-      startX = pointerCenterX;
-      startY = pointerTipY;
-    } else if (horizontalDominant) {
-      startX = toTargetX >= 0 ? bubbleRect.right + sideInset : bubbleRect.left - sideInset;
-      startY = clamp(
-        endY + spreadOffset * spread,
-        bubbleRect.top + edgePadding,
-        bubbleRect.bottom - edgePadding,
-      );
-    } else {
-      startY = toTargetY >= 0 ? bubbleRect.bottom + sideInset : bubbleRect.top - sideInset;
-      startX = clamp(
-        endX + spreadOffset * spread,
-        bubbleRect.left + edgePadding,
-        bubbleRect.right - edgePadding,
-      );
-    }
-
-    const dx = endX - startX;
-    const dy = endY - startY;
-    const length = Math.hypot(dx, dy);
-    if (!Number.isFinite(length) || length < 12) continue;
-
-    const arrow = document.createElement("span");
-    arrow.className = "commentray-wide-intro-arrow";
-    arrow.style.left = `${String(Math.round(startX))}px`;
-    arrow.style.top = `${String(Math.round(startY))}px`;
-    arrow.style.width = `${String(Math.round(length))}px`;
-    arrow.style.setProperty("--wide-intro-arrow-angle", `${String(Math.atan2(dy, dx))}rad`);
-    const head = document.createElement("span");
-    head.className = "commentray-wide-intro-arrow-head";
-    arrow.appendChild(head);
-    arrowLayer.appendChild(arrow);
-  }
 }
 
 type WideIntroRuntime = {
@@ -2153,7 +1946,7 @@ function refreshWideIntroSteps(runtime: WideIntroRuntime): void {
   const nextMode: "narrow" | "wide" = isNarrowViewport() ? "narrow" : "wide";
   if (nextMode === runtime.viewportMode) return;
   runtime.viewportMode = nextMode;
-  runtime.steps = wideIntroStepsForShell(runtime.shell);
+  runtime.steps = wideIntroStepsForShell(runtime.shell, nextMode === "narrow");
 }
 
 function repositionWideIntro(runtime: WideIntroRuntime): void {
@@ -2236,7 +2029,7 @@ function wireWideModeIntroTour(shell: HTMLElement, opts?: { force?: boolean }): 
   if (!elements) return;
   const runtime: WideIntroRuntime = {
     shell,
-    steps: wideIntroStepsForShell(shell),
+    steps: wideIntroStepsForShell(shell, isNarrowViewport()),
     viewportMode: isNarrowViewport() ? "narrow" : "wide",
     current: 0,
     highlighted: [],
