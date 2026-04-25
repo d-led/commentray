@@ -273,6 +273,8 @@ function buildDocToCodeFlipPlanBlockAware(
   getLinks: () => BlockScrollLink[],
 ): DocToCodeFlipPlan {
   const winRatio = windowScrollRatio();
+  const pulledSrc0 = pulledSourceLine0FromPageBreak(docPane);
+  if (pulledSrc0 !== null) return { k: "block", src0: pulledSrc0, winRatio };
   const links = getLinks();
   const mdLine0 = probeCommentrayLine0FromDoc(docPane);
   const src0 = pickSourceLine0ForCommentrayScroll(links, mdLine0);
@@ -1054,6 +1056,59 @@ function probeCommentrayLine0FromDoc(docPane: HTMLElement): number {
   const dr = docPane.getBoundingClientRect();
   const y = dr.top + docPane.clientTop + 2;
   return bestCommentrayAnchorLine0AtOrAboveY(anchors, y);
+}
+
+function pageBreakPullEnabled(): boolean {
+  const shell = document.getElementById("shell");
+  if (!(shell instanceof HTMLElement)) return false;
+  return shell.getAttribute("data-page-breaks-enabled") === "true";
+}
+
+function docProbeTopY(docPane: HTMLElement): number {
+  if (!paneUsesInternalYScroll(docPane)) {
+    const dr = docPane.getBoundingClientRect();
+    const vh = globalThis.innerHeight;
+    const clipT = Math.max(0, dr.top);
+    const clipB = Math.min(vh, dr.bottom);
+    return clipT + Math.max(2, Math.min(40, (clipB - clipT) * 0.15));
+  }
+  const dr = docPane.getBoundingClientRect();
+  return dr.top + docPane.clientTop + 2;
+}
+
+/**
+ * In long synthetic page-break gaps, shift source toward the next block once
+ * the break itself occupies the top reading position.
+ */
+function pulledSourceLine0FromPageBreak(docPane: HTMLElement): number | null {
+  if (!pageBreakPullEnabled()) return null;
+  const topY = docProbeTopY(docPane);
+  const breaks = Array.from(
+    docPane.querySelectorAll<HTMLElement>(".commentray-page-break[data-next-source-start]"),
+  );
+  for (const pageBreak of breaks) {
+    const nextSourceStartRaw = pageBreak.getAttribute("data-next-source-start");
+    if (!nextSourceStartRaw) continue;
+    const nextSourceStart = Number.parseInt(nextSourceStartRaw, 10);
+    if (!Number.isFinite(nextSourceStart) || nextSourceStart <= 0) continue;
+
+    const breakTop = pageBreak.getBoundingClientRect().top;
+    const nextLineRaw = pageBreak.getAttribute("data-next-commentray-line");
+    const nextLine0 = nextLineRaw ? Number.parseInt(nextLineRaw, 10) : Number.NaN;
+    const nextAnchor =
+      Number.isFinite(nextLine0) && nextLine0 >= 0
+        ? docPane.querySelector<HTMLElement>(`[data-commentray-line="${String(nextLine0)}"]`)
+        : null;
+    const nextTop = nextAnchor
+      ? nextAnchor.getBoundingClientRect().top
+      : breakTop + pageBreak.clientHeight;
+    if (!(breakTop <= topY && topY < nextTop)) continue;
+    const denom = Math.max(1, nextTop - breakTop);
+    const progress = clamp((topY - breakTop) / denom, 0, 1);
+    if (progress < 0.45) return null;
+    return nextSourceStart - 1;
+  }
+  return null;
 }
 
 type SyncPane = "none" | "code" | "doc";
@@ -1908,6 +1963,7 @@ const STORAGE_SPLIT_PCT = "commentray.codeCommentrayStatic.splitPct";
 const STORAGE_WRAP_LINES = "commentray.codeCommentrayStatic.wrap";
 const STORAGE_DUAL_MOBILE_PANE = "commentray.codeCommentrayStatic.dualMobilePane";
 const STORAGE_SOURCE_MARKDOWN_PANE_MODE = "commentray.codeCommentrayStatic.sourceMarkdownPaneMode";
+const STORAGE_PAGE_BREAKS_ENABLED = "commentray.codeCommentrayStatic.pageBreaksEnabled";
 /** Matches `code-browser.ts` `@media (max-width: 767px)` (dual column from 768px up). */
 const DUAL_MOBILE_SINGLE_PANE_MQ = "(max-width: 767px)";
 
@@ -1931,6 +1987,35 @@ function sourcePaneModeForShell(shell: HTMLElement): "source" | "rendered-markdo
   return shell.getAttribute("data-source-pane-mode") === "rendered-markdown"
     ? "rendered-markdown"
     : "source";
+}
+
+function pageBreaksEnabledFromStorage(raw: string | null): boolean {
+  const t = (raw ?? "").trim().toLowerCase();
+  if (t === "0" || t === "false" || t === "off") return false;
+  return true;
+}
+
+function applyPageBreakFeatureToggle(shell: HTMLElement): void {
+  const enabled = pageBreaksEnabledFromStorage(
+    readWebStorageItem(localStorage, STORAGE_PAGE_BREAKS_ENABLED),
+  );
+  shell.setAttribute("data-page-breaks-enabled", enabled ? "true" : "false");
+}
+
+function wireResponsivePageBreakHeight(shell: HTMLElement): void {
+  const setHeight = (): void => {
+    const viewportHeight = Math.max(
+      globalThis.innerHeight,
+      document.documentElement?.clientHeight ?? 0,
+    );
+    if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) return;
+    const minHeightPx = Math.round(clamp(viewportHeight * 0.72, 260, 820));
+    shell.style.setProperty("--commentray-page-break-min-height", `${String(minHeightPx)}px`);
+  };
+  globalThis.addEventListener("resize", setHeight, { passive: true });
+  globalThis.addEventListener("orientationchange", setHeight, { passive: true });
+  globalThis.visualViewport?.addEventListener("resize", setHeight, { passive: true });
+  setHeight();
 }
 
 function syncWrapLinesVisibilityForSourcePaneMode(shell: HTMLElement): void {
@@ -3048,6 +3133,8 @@ function main(): void {
   if (!shell || !codePane) {
     return;
   }
+  applyPageBreakFeatureToggle(shell);
+  wireResponsivePageBreakHeight(shell);
   wireWideModeIntroTrigger(shell);
 
   const layout = shell.getAttribute("data-layout") || "dual";

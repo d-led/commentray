@@ -476,6 +476,81 @@ describe("Code browser page — companion Markdown rendering", () => {
     expect(html).toContain(':root[data-commentray-theme="dark"] .pane--doc .doc-pane-body');
     expect(html).toContain("#doc-pane-body.wrap pre code");
   });
+
+  it("renders deliberate page breaks from comment markers without breaking markdown flow", async () => {
+    const md = [
+      "# Chapter one",
+      "",
+      "Lead in.",
+      "",
+      "<!-- commentray:page-break -->",
+      "",
+      "## Chapter two",
+      "",
+      "Continuation.",
+    ].join("\n");
+    const html = await renderCodeBrowserHtml({
+      code: "x",
+      language: "txt",
+      commentrayMarkdown: md,
+    });
+    expect(html).toContain('class="commentray-page-break"');
+    expect(html).toContain('data-commentray-page-break="true"');
+    expect(html).toContain("Chapter two");
+  });
+
+  it("annotates page breaks with next block metadata when block links are available", async () => {
+    const crPath = ".commentray/source/pkg/x.txt.md";
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [crPath]: {
+          sourcePath: "pkg/x.txt",
+          commentrayPath: crPath,
+          blocks: [
+            { id: "b1", anchor: "lines:1-4" },
+            { id: "b2", anchor: "lines:20-25" },
+          ],
+        },
+      },
+    };
+    const md = [
+      "<!-- commentray:block id=b1 -->",
+      "",
+      "one",
+      "",
+      "<!-- commentray:page-break -->",
+      "",
+      "<!-- commentray:block id=b2 -->",
+      "",
+      "two",
+    ].join("\n");
+    const html = await renderCodeBrowserHtml({
+      code: "a\nb\nc\nd",
+      language: "txt",
+      commentrayMarkdown: md,
+      codeBrowserLayout: "dual",
+      blockStretchRows: {
+        index,
+        sourceRelative: "pkg/x.txt",
+        commentrayPathRel: crPath,
+      },
+    });
+    expect(html).toContain('class="commentray-page-break"');
+    expect(html).toContain('data-next-commentray-line="6"');
+    expect(html).toContain('data-next-source-start="20"');
+  });
+
+  it("does not turn fenced commentray:page-break text into layout separators", async () => {
+    const md = ["```md", "<!-- commentray:page-break -->", "```"].join("\n");
+    const html = await renderCodeBrowserHtml({
+      code: "x",
+      language: "txt",
+      commentrayMarkdown: md,
+    });
+    expect(html).not.toContain('class="commentray-page-break"');
+    expect(html).toContain("commentray:page-break -->");
+  });
 });
 
 describe("Code browser page — multi-angle browsing", () => {

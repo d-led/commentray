@@ -118,7 +118,13 @@
           "when": "resourceScheme == file"
         }
       ]
-    }
+    },
+    "snippets": [
+      {
+        "language": "markdown",
+        "path": "./snippets/commentray-markdown.code-snippets"
+      }
+    ]
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node ./esbuild.extension.mjs",

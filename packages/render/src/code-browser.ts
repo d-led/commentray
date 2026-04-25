@@ -181,6 +181,7 @@ const BLOCK_MARKER_HTML_LINE = new RegExp(
   `^<!--\\s*commentray:block\\s+id=(${MARKER_ID_BODY})\\s*-->$`,
   "i",
 );
+const PAGE_BREAK_MARKER_HTML_LINE = /^<!--\s*commentray:page-break\s*-->$/i;
 
 function trimEndSpacesTabs(s: string): string {
   let end = s.length;
@@ -300,6 +301,33 @@ function appendSourceMdLineAnchorWhenAllowed(line: string, line0: number): strin
   return `${line}${sourceLineAnchorHtml(line0)}`;
 }
 
+type PageBreakNextBlockMeta = {
+  commentrayLine: number;
+  sourceStart?: number;
+};
+
+function pageBreakNextBlockMetaByLine(
+  lines: string[],
+  byId?: Map<string, BlockScrollLink>,
+): Map<number, PageBreakNextBlockMeta> {
+  const out = new Map<number, PageBreakNextBlockMeta>();
+  let nextMeta: PageBreakNextBlockMeta | null = null;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i] ?? "";
+    const blockMatch = BLOCK_MARKER_HTML_LINE.exec(line);
+    if (blockMatch?.[1]) {
+      const id = blockMatch[1];
+      const sourceStart = byId?.get(id)?.sourceStart;
+      nextMeta =
+        sourceStart !== undefined ? { commentrayLine: i, sourceStart } : { commentrayLine: i };
+      continue;
+    }
+    if (!PAGE_BREAK_MARKER_HTML_LINE.test(line) || nextMeta === null) continue;
+    out.set(i, nextMeta);
+  }
+  return out;
+}
+
 /**
  * Inserts per-line anchors for search / hash jumps and block separator anchors after each
  * `<!-- commentray:block … -->` line (optional index attrs).
@@ -313,6 +341,7 @@ function appendSourceMdLineAnchorWhenAllowed(line: string, line0: number): strin
 function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[]): string {
   const byId = links ? new Map(links.map((l) => [l.id, l])) : undefined;
   const lines = markdown.split("\n");
+  const pageBreakNextByLine = pageBreakNextBlockMetaByLine(lines, byId);
   const skipLineAnchor = gfmTableLineIndicesWithoutAnchors(lines);
   let fence: FenceState | null = null;
   const out: string[] = [];
@@ -350,6 +379,23 @@ function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[])
       out.push("");
       out.push(
         `<div id="commentray-block-${escapeHtml(id)}" class="commentray-block-anchor" aria-hidden="true"${attrs}></div>`,
+      );
+      out.push("");
+      continue;
+    }
+
+    if (PAGE_BREAK_MARKER_HTML_LINE.test(line)) {
+      const next = pageBreakNextByLine.get(i);
+      const nextCommentrayAttr =
+        next !== undefined ? ` data-next-commentray-line="${String(next.commentrayLine)}"` : "";
+      const nextSourceAttr =
+        next?.sourceStart !== undefined
+          ? ` data-next-source-start="${String(next.sourceStart)}"`
+          : "";
+      out.push(`${line}${lineAnchorHtml(i)}`);
+      out.push("");
+      out.push(
+        `<div class="commentray-page-break" data-commentray-page-break="true"${nextCommentrayAttr}${nextSourceAttr} aria-hidden="true"><div class="commentray-page-break__rule"></div></div>`,
       );
       out.push("");
       continue;
@@ -1765,6 +1811,23 @@ ${CODE_BROWSER_INTRO_STYLES}
       #doc-pane-body:not(.wrap) {
         overflow-wrap: normal;
         word-break: normal;
+      }
+      #doc-pane-body .commentray-page-break {
+        position: relative;
+        min-height: var(--commentray-page-break-min-height, clamp(260px, 56vh, 620px));
+        margin: 24px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+      }
+      #doc-pane-body .commentray-page-break__rule {
+        width: 100%;
+        border-top: 1px dashed var(--border);
+        opacity: 0.38;
+      }
+      #shell[data-page-breaks-enabled="false"] .commentray-page-break {
+        display: none;
       }
       .toolbar-angle-picker {
         display: inline-flex;

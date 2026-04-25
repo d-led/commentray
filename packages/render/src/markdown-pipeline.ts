@@ -330,6 +330,9 @@ sanitizeSchema.attributes = {
     /** Block scroll sync markers from `injectCommentrayDocAnchors` (hast property names). */
     "dataSourceStart",
     "dataCommentrayLine",
+    "dataCommentrayPageBreak",
+    "dataNextCommentrayLine",
+    "dataNextSourceStart",
   ],
 };
 
