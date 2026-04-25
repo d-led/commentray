@@ -12,7 +12,9 @@ Turn docs/logos/2.jpg-style assets into a clean transparent PNG:
 
 Dependencies: Python 3.10+, Pillow, NumPy (no SciPy).
 
-Example:
+Full pipeline (PNG + SVG + VS Code icon): `bash scripts/refresh-logo-assets.sh`
+
+Example (PNG only):
   python3 docs/logos/scripts/jpg-to-clean-transparent-png.py \\
     --input docs/logos/2.jpg --output docs/logos/2.png
 """

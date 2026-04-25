@@ -9,7 +9,9 @@ raster pipeline).
 
 Dependencies: Pillow, NumPy, Matplotlib.
 
-Example:
+Full pipeline (JPEG → PNG → SVG → VS Code icon): `bash scripts/refresh-logo-assets.sh`
+
+Example (SVG trace only):
   python3 docs/logos/scripts/png-to-svg-trace.py \\
     --input docs/logos/2.png --output docs/logos/2.svg
 """
