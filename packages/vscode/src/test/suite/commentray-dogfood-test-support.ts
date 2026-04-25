@@ -1,7 +1,29 @@
 import * as assert from "node:assert";
+import { before, beforeEach } from "mocha";
 import * as vscode from "vscode";
 
 export const pairedMarkdownPath = ".commentray/source/src/sample.ts.md";
+
+export type DogfoodWorkspaceAccessor = {
+  /** Dogfood workspace folder URI; valid after the suite `before` hook runs. */
+  root(): vscode.Uri;
+};
+
+/**
+ * Registers suite-level `before` / `beforeEach` that resolve the dogfood folder and reset `.commentray/`.
+ */
+export function registerDogfoodWorkspaceLifecycle(): DogfoodWorkspaceAccessor {
+  let workspaceRoot!: vscode.Uri;
+  before(() => {
+    workspaceRoot = dogfoodWorkspaceRoot();
+  });
+  beforeEach(async () => {
+    await resetGeneratedCommentrayStorage(workspaceRoot);
+  });
+  return {
+    root: () => workspaceRoot,
+  };
+}
 
 /** Bytes of `fixtures/dogfood/.commentray.toml` (restored after Angles tests mutate it). */
 const DOGFOOD_COMMENTRAY_TOML_BYTES = new TextEncoder().encode(
