@@ -11,8 +11,8 @@ describe("Resolving static render CLI inputs", () => {
   it("falls back to .commentray.toml [static_site] when every flag is omitted", () => {
     const cfg = configFrom({
       static_site: {
-        source_file: "README.md",
-        commentray_markdown: ".commentray/source/README.md.md",
+        default_source_file: "README.md",
+        default_angle: "main",
       },
     });
 
@@ -20,7 +20,7 @@ describe("Resolving static render CLI inputs", () => {
 
     expect(inputs).toEqual({
       source: "README.md",
-      markdown: ".commentray/source/README.md.md",
+      markdown: ".commentray/source/README.md/main.md",
       out: DEFAULT_RENDER_OUT,
     });
   });

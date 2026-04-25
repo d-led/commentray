@@ -4,7 +4,7 @@ import { parse as parseToml } from "@iarna/toml";
 
 import { assertValidAngleId } from "./angles.js";
 import { githubRepoBlobFileUrl, parseGithubRepoWebUrl } from "./github-url.js";
-import { normalizeRepoRelativePath } from "./paths.js";
+import { commentrayMarkdownPathForAngle, normalizeRepoRelativePath } from "./paths.js";
 
 export type CommentrayToml = {
   storage?: { dir?: string };
@@ -40,7 +40,15 @@ export type CommentrayToml = {
     intro?: string;
     github_url?: string;
     /** Repo-relative path to the source file shown in the code pane (default README.md). */
+    default_source_file?: string;
+    /** Repo-relative path to the source file shown in the code pane (default README.md). */
+    /** @deprecated Renamed to `default_source_file`. */
     source_file?: string;
+    /**
+     * Angle id used for the default companion when rendering the static hub's primary pair.
+     * This intentionally does not control editor defaults (`[angles].default_angle`).
+     */
+    default_angle?: string;
     /** Repo-relative path to additional commentray Markdown (optional). */
     commentray_markdown?: string;
     /** @deprecated Renamed to `commentray_markdown`. */
@@ -64,6 +72,7 @@ export type ResolvedStaticSite = {
   /** Branch used when building `relatedGithubNav` blob URLs. */
   githubBlobBranch: string;
   sourceFile: string;
+  defaultAngleId: string | null;
   commentrayMarkdownFile: string;
   /** Toolbar “Also on GitHub …” links for the static code browser. */
   relatedGithubNav: ResolvedGithubNavLink[];
@@ -92,6 +101,7 @@ const defaultStaticSite: ResolvedStaticSite = {
   githubUrl: null,
   githubBlobBranch: "main",
   sourceFile: "README.md",
+  defaultAngleId: null,
   commentrayMarkdownFile: "",
   relatedGithubNav: [],
 };
@@ -208,26 +218,54 @@ function mergeRelatedGithubNav(
   return out;
 }
 
-function resolvedStaticSiteMarkdownFile(ss: CommentrayToml["static_site"] | undefined): string {
+function resolvedStaticSiteSourceFile(ss: CommentrayToml["static_site"] | undefined): string {
   return (
-    ss?.commentray_markdown?.trim() ??
-    ss?.commentary_markdown?.trim() ??
-    defaultStaticSite.commentrayMarkdownFile
+    nonEmptyTrimmed(ss?.default_source_file) ??
+    nonEmptyTrimmed(ss?.source_file) ??
+    defaultStaticSite.sourceFile
   );
 }
 
-function resolveStaticSite(parsed: CommentrayToml): ResolvedStaticSite {
+function resolvedStaticSiteDefaultAngleId(
+  ss: CommentrayToml["static_site"] | undefined,
+): string | null {
+  const raw = nonEmptyTrimmed(ss?.default_angle);
+  return raw ? assertValidAngleId(raw) : null;
+}
+
+function resolvedStaticSiteMarkdownFile(
+  ss: CommentrayToml["static_site"] | undefined,
+  sourceFile: string,
+  storageDir: string,
+  defaultAngleId: string | null,
+): string {
+  const explicit =
+    nonEmptyTrimmed(ss?.commentray_markdown) ?? nonEmptyTrimmed(ss?.commentary_markdown) ?? null;
+  if (explicit) return explicit;
+  if (!defaultAngleId) return defaultStaticSite.commentrayMarkdownFile;
+  return commentrayMarkdownPathForAngle(sourceFile, defaultAngleId, storageDir);
+}
+
+function resolveStaticSite(parsed: CommentrayToml, storageDir: string): ResolvedStaticSite {
   const ss = parsed.static_site;
   const githubUrl = nonEmptyTrimmed(ss?.github_url);
   const githubBlobBranch =
     nonEmptyTrimmed(ss?.github_blob_branch) ?? defaultStaticSite.githubBlobBranch;
+  const sourceFile = resolvedStaticSiteSourceFile(ss);
+  const defaultAngleId = resolvedStaticSiteDefaultAngleId(ss);
   return {
     title: nonEmptyTrimmed(ss?.title) ?? defaultStaticSite.title,
     introMarkdown: ss?.intro ?? defaultStaticSite.introMarkdown,
     githubUrl,
     githubBlobBranch,
-    sourceFile: nonEmptyTrimmed(ss?.source_file) ?? defaultStaticSite.sourceFile,
-    commentrayMarkdownFile: resolvedStaticSiteMarkdownFile(ss),
+    sourceFile,
+    defaultAngleId,
+    commentrayMarkdownFile: resolvedStaticSiteMarkdownFile(
+      ss,
+      sourceFile,
+      storageDir,
+      defaultAngleId,
+    ),
     relatedGithubNav: mergeRelatedGithubNav(githubUrl, githubBlobBranch, ss?.related_github_files),
   };
 }
@@ -236,6 +274,7 @@ function assertSafeConfigPaths(parsed: CommentrayToml): void {
   assertSafeRepoRelativePath("storage.dir", parsed.storage?.dir);
   assertStorageDirNotInsideGit(parsed.storage?.dir);
   const ss = parsed.static_site;
+  assertSafeRepoRelativePath("static_site.default_source_file", ss?.default_source_file);
   assertSafeRepoRelativePath("static_site.source_file", ss?.source_file);
   assertSafeRepoRelativePath("static_site.commentray_markdown", ss?.commentray_markdown);
   assertSafeRepoRelativePath("static_site.commentary_markdown", ss?.commentary_markdown);
@@ -254,8 +293,9 @@ export function mergeCommentrayConfig(parsed: CommentrayToml | null): ResolvedCo
     throw new Error(`Unsupported scm.provider: ${String(scm)} (only "git" is implemented)`);
   }
   assertSafeConfigPaths(parsed);
+  const storageDir = parsed.storage?.dir ?? defaultConfig.storageDir;
   return {
-    storageDir: parsed.storage?.dir ?? defaultConfig.storageDir,
+    storageDir,
     scmProvider: "git",
     render: {
       mermaid: parsed.render?.mermaid ?? defaultConfig.render.mermaid,
@@ -267,7 +307,7 @@ export function mergeCommentrayConfig(parsed: CommentrayToml | null): ResolvedCo
       defaultStrategy: parsed.anchors?.defaultStrategy ?? defaultConfig.anchors.defaultStrategy,
     },
     angles: resolveAngles(parsed),
-    staticSite: resolveStaticSite(parsed),
+    staticSite: resolveStaticSite(parsed, storageDir),
   };
 }
 

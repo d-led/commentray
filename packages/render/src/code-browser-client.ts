@@ -37,6 +37,7 @@ import {
   isSameDocumentedPair,
   normPosixPath,
   resolveStaticBrowseHref,
+  siteRootPathnameFromPathname,
   staticBrowseHrefForShellDataAttribute,
 } from "./code-browser-pair-nav.js";
 import {
@@ -2533,7 +2534,196 @@ function wireColorThemeToolbar(): void {
   syncUi();
 }
 
+function safePermalinkHref(raw: string): string | null {
+  const t = raw.trim();
+  if (t.length === 0) return null;
+  if (/^(javascript|data):/i.test(t)) return null;
+  try {
+    return new URL(t, globalThis.location.href).toString();
+  } catch {
+    return null;
+  }
+}
+
+function humaneBrowseAliasPathForSource(sourcePath: string): string {
+  return sourcePath
+    .split("/")
+    .filter((seg) => seg.length > 0)
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
+}
+
+function companionStemFromCommentrayPath(commentrayPath: string): string {
+  const norm = normPosixPath(commentrayPath);
+  const last = norm.split("/").filter(Boolean).at(-1) ?? "";
+  return last.replace(/\.md$/i, "").trim();
+}
+
+function makeAbsoluteUrlAgainst(raw: string, baseHref: string): string {
+  return new URL(raw, baseHref).toString();
+}
+
+function shellEligibleForHumaneBackfill(shell: HTMLElement, pathname: string): boolean {
+  if ((shell.getAttribute("data-layout") ?? "dual") !== "dual") return false;
+  if (pathname.includes("/browse/")) return false;
+  return pathname.endsWith("/") || pathname.endsWith("/index.html");
+}
+
+function nextHumaneBrowsePathForShell(shell: HTMLElement, pathname: string): string | null {
+  const sourcePath = normPosixPath(shell.getAttribute("data-commentray-pair-source-path") ?? "");
+  if (sourcePath.length === 0) return null;
+  const alias = humaneBrowseAliasPathForSource(sourcePath);
+  if (alias.length === 0) return null;
+  const angleSel = document.getElementById("angle-select");
+  const selectedAngle = angleSel instanceof HTMLSelectElement ? angleSel.value.trim() : "";
+  const commentrayPath = shell.getAttribute("data-commentray-pair-commentray-path") ?? "";
+  const stem = companionStemFromCommentrayPath(commentrayPath);
+  const angleName = selectedAngle.length > 0 ? selectedAngle : stem;
+  if (angleName.length === 0) return null;
+  const angleAlias = `${alias}@${encodeURIComponent(angleName)}.html`;
+  const siteRoot = siteRootPathnameFromPathname(pathname);
+  return siteRoot === "/" ? `/browse/${angleAlias}` : `${siteRoot}/browse/${angleAlias}`;
+}
+
+function absolutizeNavJsonUrls(shell: HTMLElement, beforeHref: string): void {
+  const navSearchRaw = shell.getAttribute("data-nav-search-json-url")?.trim() ?? "";
+  if (navSearchRaw.length > 0) {
+    shell.setAttribute(
+      "data-nav-search-json-url",
+      makeAbsoluteUrlAgainst(navSearchRaw, beforeHref),
+    );
+  }
+  const navTree = document.getElementById("documented-files-hub");
+  if (navTree instanceof HTMLElement) {
+    const navRaw = navTree.getAttribute("data-nav-json-url")?.trim() ?? "";
+    if (navRaw.length > 0) {
+      navTree.setAttribute("data-nav-json-url", makeAbsoluteUrlAgainst(navRaw, beforeHref));
+    }
+  }
+}
+
+function normalizePairBrowseHrefForCurrentPath(shell: HTMLElement, pathname: string): void {
+  const pairBrowseRaw = shell.getAttribute("data-commentray-pair-browse-href")?.trim() ?? "";
+  if (pairBrowseRaw.length > 0 && isHubRelativeStaticBrowseHref(pairBrowseRaw)) {
+    shell.setAttribute(
+      "data-commentray-pair-browse-href",
+      resolveStaticBrowseHref(pairBrowseRaw, pathname, globalThis.location.origin),
+    );
+  }
+}
+
+function maybeBackfillAddressBarWithHumanePairLink(): void {
+  const shell = document.getElementById("shell");
+  if (!(shell instanceof HTMLElement)) return;
+  const pathname = globalThis.location.pathname;
+  if (!shellEligibleForHumaneBackfill(shell, pathname)) return;
+  const nextPath = nextHumaneBrowsePathForShell(shell, pathname);
+  if (nextPath === null) return;
+  const beforeHref = globalThis.location.href;
+  absolutizeNavJsonUrls(shell, beforeHref);
+  normalizePairBrowseHrefForCurrentPath(shell, pathname);
+  globalThis.history.replaceState(
+    null,
+    "",
+    `${nextPath}${globalThis.location.search}${globalThis.location.hash}`,
+  );
+}
+
+function permalinkHashSuffixFromUi(): string {
+  const tokens: string[] = [];
+  const pushUnique = (token: string): void => {
+    const t = token.trim();
+    if (t.length === 0) return;
+    if (!tokens.includes(t)) tokens.push(t);
+  };
+  let selectedAngleToken = "";
+  const angleSel = document.getElementById("angle-select");
+  if (angleSel instanceof HTMLSelectElement) {
+    const id = angleSel.value.trim();
+    if (id.length > 0) {
+      selectedAngleToken = `angle-${encodeURIComponent(id)}`;
+      pushUnique(selectedAngleToken);
+    }
+  }
+  const rawHash = globalThis.location.hash.replace(/^#/, "").trim();
+  if (rawHash.length > 0) {
+    for (const part of rawHash.split("--")) {
+      if (part.startsWith("angle-")) {
+        // Keep exactly one angle token: prefer the current angle selector value.
+        if (selectedAngleToken.length > 0) continue;
+      }
+      pushUnique(part);
+    }
+  }
+  return tokens.length > 0 ? `#${tokens.join("--")}` : "";
+}
+
+function sharePermalinkFromShell(shell: HTMLElement): string {
+  const raw = shell.getAttribute("data-commentray-pair-browse-href") ?? "";
+  const canonical =
+    isHubRelativeStaticBrowseHref(raw.trim()) && raw.trim().length > 0
+      ? resolveStaticBrowseHref(
+          raw.trim(),
+          globalThis.location.pathname,
+          globalThis.location.origin,
+        )
+      : safePermalinkHref(raw);
+  const base = canonical ?? globalThis.location.href;
+  const u = new URL(base, globalThis.location.href);
+  const hash = permalinkHashSuffixFromUi();
+  u.hash = hash.length > 0 ? hash.slice(1) : "";
+  return u.toString();
+}
+
+async function writeTextToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "true");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.left = "-1000px";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      return document.execCommand("copy");
+    } catch {
+      return false;
+    } finally {
+      document.body.removeChild(ta);
+    }
+  }
+}
+
+function wireSharePermalinkButton(): void {
+  const shell = document.getElementById("shell");
+  const btn = document.getElementById("commentray-share-link");
+  if (!(shell instanceof HTMLElement) || !(btn instanceof HTMLButtonElement)) return;
+  const baseLabel = "Copy shareable permalink";
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  btn.addEventListener("click", () => {
+    void (async () => {
+      const shareUrl = sharePermalinkFromShell(shell);
+      const copied = await writeTextToClipboard(shareUrl);
+      if (!copied) return;
+      btn.dataset.copied = "true";
+      btn.setAttribute("aria-label", "Permalink copied");
+      btn.title = "Permalink copied";
+      if (copiedTimer !== undefined) globalThis.clearTimeout(copiedTimer);
+      copiedTimer = globalThis.setTimeout(() => {
+        delete btn.dataset.copied;
+        btn.setAttribute("aria-label", baseLabel);
+        btn.title = baseLabel;
+      }, 1200);
+    })();
+  });
+}
+
 function main(): void {
+  wireSharePermalinkButton();
   wireColorThemeToolbar();
   wireDocumentedFilesTree();
 
@@ -2550,6 +2740,7 @@ function main(): void {
   }
 
   wireDualPaneCodeBrowser(shell, codePane);
+  maybeBackfillAddressBarWithHumanePairLink();
 }
 
 if (document.readyState === "loading") {

@@ -31,17 +31,32 @@ describe("Merging Commentray TOML configuration", () => {
         title: "Docs",
         intro: "## Hello",
         github_url: "https://github.com/a/b",
-        source_file: "src/index.ts",
-        commentray_markdown: "docs/x.md",
+        default_source_file: "src/index.ts",
+        default_angle: "architecture",
       },
     });
     expect(cfg.staticSite.title).toBe("Docs");
     expect(cfg.staticSite.introMarkdown).toBe("## Hello");
     expect(cfg.staticSite.githubUrl).toBe("https://github.com/a/b");
     expect(cfg.staticSite.sourceFile).toBe("src/index.ts");
-    expect(cfg.staticSite.commentrayMarkdownFile).toBe("docs/x.md");
+    expect(cfg.staticSite.defaultAngleId).toBe("architecture");
+    expect(cfg.staticSite.commentrayMarkdownFile).toBe(
+      ".commentray/source/src/index.ts/architecture.md",
+    );
     expect(cfg.staticSite.githubBlobBranch).toBe("main");
     expect(cfg.staticSite.relatedGithubNav).toEqual([]);
+  });
+
+  it("keeps backward compatibility for source_file + commentray_markdown", () => {
+    const cfg = mergeCommentrayConfig({
+      static_site: {
+        source_file: "src/index.ts",
+        commentray_markdown: "docs/x.md",
+      },
+    });
+    expect(cfg.staticSite.sourceFile).toBe("src/index.ts");
+    expect(cfg.staticSite.defaultAngleId).toBeNull();
+    expect(cfg.staticSite.commentrayMarkdownFile).toBe("docs/x.md");
   });
 
   it("builds related_github_nav from github_url and repo-relative paths", () => {
@@ -103,6 +118,14 @@ commentray_markdown = """
     expect(cfg.staticSite.commentrayMarkdownFile).toBe("legacy.md");
   });
 
+  it("rejects invalid static_site.default_angle", () => {
+    expect(() =>
+      mergeCommentrayConfig({
+        static_site: { default_source_file: "README.md", default_angle: "bad angle id" },
+      }),
+    ).toThrow(/angle id/i);
+  });
+
   it("rejects a storage.dir that escapes the repository root", () => {
     expect(() => mergeCommentrayConfig({ storage: { dir: "../evil" } })).toThrow(
       /storage\.dir.*repository-relative/,
@@ -110,6 +133,9 @@ commentray_markdown = """
   });
 
   it("rejects static_site paths that escape the repository root", () => {
+    expect(() =>
+      mergeCommentrayConfig({ static_site: { default_source_file: "../../../etc/passwd" } }),
+    ).toThrow(/static_site\.default_source_file/);
     expect(() =>
       mergeCommentrayConfig({ static_site: { source_file: "../../../etc/passwd" } }),
     ).toThrow(/static_site\.source_file/);

@@ -15,8 +15,8 @@ defaultStrategy = [ "symbol", "lines" ]
 [static_site]
 title = "Commentray"
 github_url = "https://github.com/d-led/commentray"
-source_file = "README.md"
-commentray_markdown = ".commentray/source/README.md/main.md"
+default_source_file = "README.md"
+default_angle = "main"
 github_blob_branch = "main"
 
 [angles]

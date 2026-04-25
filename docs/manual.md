@@ -1,0 +1,141 @@
+# Commentray Manual
+
+This manual is the operator-focused reference for running Commentray day to day:
+authoring, validating, rendering, sharing, and maintaining companion docs.
+
+For conceptual background and trade-offs, open this file side-by-side with its
+commentray companion:
+[`/.commentray/source/docs/manual.md/main.md`](../.commentray/source/docs/manual.md/main.md)
+
+## 1) What Commentray Is
+
+Commentray keeps narrative documentation in repository-tracked Markdown files
+paired to source paths under `.commentray/source/`, plus machine metadata in
+`.commentray/metadata/index.json`.
+
+- **Primary source**: your code / README / docs file.
+- **Companion commentray**: the paired Markdown file.
+- **Index metadata**: structured block anchors, snippets, and validation inputs.
+
+Canonical storage semantics:
+[`docs/spec/storage.md`](./spec/storage.md)
+
+## 2) Install And Bootstrap
+
+Install and setup paths:
+
+- User install guide: [`docs/user/install.md`](./user/install.md)
+- Clone + maintainer setup: [`docs/development.md`](./development.md)
+
+Typical bootstrap from repo root:
+
+```bash
+npm ci
+npm run setup
+```
+
+## 3) Core CLI Workflows
+
+CLI command reference:
+[`docs/user/cli.md`](./user/cli.md)
+
+Common lifecycle:
+
+1. `commentray init` to create storage/config baseline.
+2. Author companions in `.commentray/source/`.
+3. Run `commentray validate` (or `validate --staged`) before commit.
+4. Render static view (`commentray render` or `npm run pages:build`).
+
+## 4) Authoring In VS Code / Cursor
+
+Extension guide:
+[`packages/vscode/README.md`](../packages/vscode/README.md)
+
+Key commands:
+
+- Open paired markdown beside source
+- Add commentary block from selection
+- Open paired markdown (choose angle)
+- Add angle to project
+- Validate workspace
+
+## 5) Blocks, Anchors, And Drift
+
+Read these together:
+
+- Blocks spec: [`docs/spec/blocks.md`](./spec/blocks.md)
+- Anchors spec: [`docs/spec/anchors.md`](./spec/anchors.md)
+- Operations guide: [`docs/user/keeping-blocks-in-sync.md`](./user/keeping-blocks-in-sync.md)
+
+Principle: block IDs and source anchors are behavioral contracts. Keep them
+stable, update metadata intentionally, and validate before merge.
+
+## 6) Angles (Multiple Perspectives)
+
+Angles let one source path have multiple companion files, e.g. `main`,
+`architecture`, `review-notes`.
+
+Operational semantics:
+
+- Storage/paths: [`docs/spec/storage.md#angles-named-perspectives-on-the-same-source`](./spec/storage.md#angles-named-perspectives-on-the-same-source)
+- Config keys: [`docs/user/config.md`](./user/config.md)
+- Migration command: `commentray migrate-angles`
+
+## 7) Static Site, Permalinks, And Sharing
+
+Build and preview:
+
+- `npm run pages:build`
+- `npm run pages:serve` (or `npm run serve`)
+
+Static browser behavior:
+
+- Stable pair browse permalinks under `/browse/`
+- Humane alias paths (source-shaped browse routes)
+- Share/copy permalink control in toolbar
+- Main hub backfills address bar to humane browse path for current pair
+
+Related docs:
+
+- Development notes: [`docs/development.md`](./development.md)
+- Storage spec (Pages details): [`docs/spec/storage.md`](./spec/storage.md)
+
+## 8) Configuration Reference
+
+Primary config reference:
+[`docs/user/config.md`](./user/config.md)
+
+Important distinction:
+
+- **`[static_site].default_angle`** chooses the default hub pair.
+- **`[angles].default_angle`** chooses default angle for tooling/editor flows.
+
+## 9) Validation And Quality Gate
+
+Required maintainer discipline:
+
+- Unit tests: `npm run test:unit`
+- Extension tests when touching extension: `npm run test:vscode-extension`
+- Full quality gate: `npm run quality:gate`
+
+Guide:
+[`docs/development.md#quality-gate`](./development.md#quality-gate)
+
+## 10) Troubleshooting
+
+Troubleshooting catalog:
+[`docs/user/troubleshooting.md`](./user/troubleshooting.md)
+
+High-frequency issues:
+
+- path mapping confusion (flat vs angle layout)
+- stale markers / index drift
+- static-site link resolution expectations
+- environment/toolchain mismatch for binaries
+
+## 11) Security And Contribution Contract
+
+- Security model: [`SECURITY.md`](../SECURITY.md)
+- Contribution expectations: [`CONTRIBUTING.md`](../CONTRIBUTING.md)
+
+Do not bypass validation by loosening checks; fix root causes in code/tests.

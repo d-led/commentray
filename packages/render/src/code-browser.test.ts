@@ -84,6 +84,9 @@ describe("Code browser page — layout shell and search", () => {
     expect(banner).toMatch(/role="menuitemradio"[^>]*>System</);
     expect(banner).toMatch(/role="menuitemradio"[^>]*>Light</);
     expect(banner).toMatch(/role="menuitemradio"[^>]*>Dark</);
+    expect(banner).toContain('id="commentray-share-link"');
+    expect(banner).toContain('aria-label="Copy shareable permalink"');
+    expect(banner).toMatch(/id="commentray-share-link"[\s\S]*id="commentray-theme-trigger"/);
     expect(html).toMatch(/<html[^>]*data-commentray-theme="system"/i);
     expect(html).toContain(COMMENTRAY_COLOR_THEME_STORAGE_KEY);
   });
@@ -121,6 +124,7 @@ describe("Code browser page — document shell and chrome", () => {
     expect(html).toContain('for="search-q"');
     expect(banner).toContain("Wrap lines");
     expect(banner).toContain("toolbar-wrap-lines__box");
+    expect(banner).toContain('id="commentray-share-link"');
     expect(html).toContain('id="mobile-pane-flip"');
     expect(html).toContain('id="mobile-pane-flip-scroll"');
     expect(html).toContain('aria-label="Switch between source code and commentary"');
@@ -453,6 +457,17 @@ describe("Code browser page — companion Markdown rendering", () => {
     expect(html).toContain('href="https://example.com"');
     expect(html).toContain('id="commentray-md-line-0"');
     expect(html).not.toContain("const fenced = 1<span ");
+  });
+
+  it("styles inline code chips for light and dark themes without touching fenced blocks", async () => {
+    const html = await renderCodeBrowserHtml({
+      code: "x",
+      language: "txt",
+      commentrayMarkdown: "Use `commentray validate` first.\n\n```bash\ncommentray validate\n```",
+    });
+    expect(html).toContain(":where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code");
+    expect(html).toContain(':root[data-commentray-theme="dark"] .pane--doc .doc-pane-body');
+    expect(html).toContain("#doc-pane-body.wrap pre code");
   });
 });
 

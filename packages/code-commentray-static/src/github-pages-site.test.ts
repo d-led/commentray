@@ -55,6 +55,12 @@ async function runWritesSiteAndNavFromFlatCompanions(): Promise<string> {
   expect(nav.documentedPairs?.[0]?.staticBrowseUrl).toMatch(/^\.\/browse\/.+\.html$/);
   const browseFiles = await readdir(path.join(r, "_site", "browse"));
   expect(browseFiles.some((f) => f.endsWith(".html"))).toBe(true);
+  const humaneAliasHtml = await readFile(
+    path.join(r, "_site", "browse", "src", "x.ts", "index.html"),
+    "utf8",
+  );
+  expect(humaneAliasHtml).toContain("Redirecting");
+  expect(humaneAliasHtml).toContain(".html");
   expect(html).toContain('aria-label="Documentation home"');
   expect(html).toContain('href="./"');
   const browseName = browseFiles.find((f) => f.endsWith(".html"));
@@ -116,13 +122,29 @@ async function runAngleSelectorOnBrowsePermalinks(): Promise<string> {
   await buildGithubPagesStaticSite({ repoRoot: r });
 
   const browseDir = path.join(r, "_site", "browse");
-  const browseFiles = (await readdir(browseDir)).filter((f) => f.endsWith(".html"));
+  const browseFiles = (await readdir(browseDir)).filter((f) => /^[A-Za-z0-9_-]+\.html$/.test(f));
   expect(browseFiles.length).toBeGreaterThanOrEqual(2);
   for (const name of browseFiles) {
     const browseHtml = await readFile(path.join(browseDir, name), "utf8");
     expect(browseHtml).toContain('aria-label="Commentray angle"');
     expect(browseHtml).toContain('id="commentray-multi-angle-b64"');
   }
+  const sourceAliasHtml = await readFile(
+    path.join(r, "_site", "browse", "README.md", "index.html"),
+    "utf8",
+  );
+  expect(sourceAliasHtml).toContain("Redirecting");
+  expect(sourceAliasHtml).toMatch(/\.\.\/[^/]+\.html/);
+  const angleAliasMainHtml = await readFile(
+    path.join(r, "_site", "browse", "README.md@main.html"),
+    "utf8",
+  );
+  expect(angleAliasMainHtml).toContain("Redirecting");
+  const angleAliasArchitectureHtml = await readFile(
+    path.join(r, "_site", "browse", "README.md@architecture.html"),
+    "utf8",
+  );
+  expect(angleAliasArchitectureHtml).toContain("Redirecting");
   return r;
 }
 
@@ -155,6 +177,11 @@ async function runGithubToolbarUsesBlobUrlsForRealisticHost(): Promise<string> {
   const browseHtml = await readFile(path.join(r, "_site", "browse", browseName), "utf8");
   expect(browseHtml).toMatch(/data-commentray-pair-browse-href="\.\/browse\/[^"]+\.html"/);
   expect(browseHtml).not.toContain("/browse/browse/");
+  const humaneAliasHtml = await readFile(
+    path.join(r, "_site", "browse", "src", "x.ts", "index.html"),
+    "utf8",
+  );
+  expect(humaneAliasHtml).toContain(".html");
   return r;
 }
 

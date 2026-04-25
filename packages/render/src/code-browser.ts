@@ -398,6 +398,13 @@ const TOOLBAR_ICON_FLIP_PANES_SVG =
   '<path d="M13.5 12H18l-2.5-2.5M18 12l-2.5 2.5"/>' +
   "</svg>";
 
+/** Link/share glyph for copying a permalink to the current documentation pair. */
+const TOOLBAR_ICON_SHARE_LINK_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M10 14a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L10 6"/>' +
+  '<path d="M14 10a5 5 0 0 0-7.07 0L4.1 12.83a5 5 0 0 0 7.07 7.07L14 17"/>' +
+  "</svg>";
+
 function safeExternalHttpUrl(url: string | undefined): string | null {
   const t = url?.trim();
   if (!t) return null;
@@ -577,6 +584,9 @@ const TOOLBAR_COLOR_THEME_HTML = `          <div class="toolbar-theme">
               <button type="button" role="menuitemradio" class="toolbar-theme__menuitem" data-commentray-theme-value="dark" aria-checked="false">Dark</button>
             </div>
           </div>
+`;
+
+const TOOLBAR_SHARE_LINK_HTML = `          <button type="button" id="commentray-share-link" class="toolbar-theme__trigger toolbar-share-link-btn" aria-label="Copy shareable permalink" title="Copy shareable permalink">${TOOLBAR_ICON_SHARE_LINK_SVG}</button>
 `;
 
 const CODE_BROWSER_STYLES = `
@@ -1080,6 +1090,16 @@ const CODE_BROWSER_STYLES = `
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
         outline-offset: 2px;
       }
+      .toolbar-theme__trigger svg {
+        width: var(--cr-icon-inner);
+        height: var(--cr-icon-inner);
+        display: block;
+        flex: 0 0 auto;
+      }
+      .toolbar-share-link-btn[data-copied="true"] {
+        background: color-mix(in oklab, #2ea043 24%, Canvas);
+        border-color: color-mix(in oklab, #2ea043 48%, CanvasText);
+      }
       .toolbar-theme__trigger .toolbar-theme__icon {
         display: none;
         flex: 0 0 auto;
@@ -1421,6 +1441,32 @@ const CODE_BROWSER_STYLES = `
       }
       .doc-pane-body {
         flex: 1 1 auto; min-height: 0; overflow: auto;
+      }
+      /* Inline backtick code chips (GitHub-like): prose context only, never fenced pre/code blocks. */
+      .pane--doc .doc-pane-body :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code,
+      .shell--stretch-rows .stretch-preamble :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code,
+      .block-stretch td.stretch-doc .stretch-doc-inner :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 0.92em;
+        padding: 0.12em 0.36em;
+        border-radius: 6px;
+        border: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+        background: color-mix(in oklab, CanvasText 8%, Canvas);
+        color: inherit;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) .pane--doc .doc-pane-body :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code,
+        :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) .shell--stretch-rows .stretch-preamble :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code,
+        :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) .block-stretch td.stretch-doc .stretch-doc-inner :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code {
+          border-color: color-mix(in oklab, CanvasText 26%, Canvas);
+          background: color-mix(in oklab, CanvasText 16%, Canvas);
+        }
+      }
+      :root[data-commentray-theme="dark"] .pane--doc .doc-pane-body :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code,
+      :root[data-commentray-theme="dark"] .shell--stretch-rows .stretch-preamble :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code,
+      :root[data-commentray-theme="dark"] .block-stretch td.stretch-doc .stretch-doc-inner :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code {
+        border-color: color-mix(in oklab, CanvasText 26%, Canvas);
+        background: color-mix(in oklab, CanvasText 16%, Canvas);
       }
       /**
        * GFM tables in rendered Markdown (doc pane, stretch preamble, per-block doc cells).
@@ -2037,6 +2083,7 @@ ${CODE_BROWSER_STYLES}
           </div>
           <div class="toolbar__primary-trail">
         ${p.toolbarEndHtml}
+${TOOLBAR_SHARE_LINK_HTML}
 ${TOOLBAR_COLOR_THEME_HTML}
           </div>
         </div>

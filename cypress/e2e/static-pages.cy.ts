@@ -10,6 +10,10 @@ describe("The Commentray GitHub Pages static build", () => {
       cy.GoToStaticSiteHome();
     });
 
+    it("backfills the hub URL to a humane browse path for the current pair", () => {
+      cy.location("pathname").should("match", /\/browse\/README\.md@main\.html$/);
+    });
+
     it("presents a coherent browsable documentation workspace", () => {
       cy.CurrentPageShouldDisplayCodeBrowserShell();
       cy.CommentrayPaneReadmeLinksShouldUseGithubBlobUrls();
@@ -45,6 +49,23 @@ describe("The Commentray GitHub Pages static build", () => {
       cy.location("pathname").should("not.match", /\/browse\/browse\//);
       cy.get('a[aria-label="Documentation home"]').should("have.attr", "href", "../index.html");
       cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
+    });
+
+    it("serves humane source browse paths as real pages on static hosts", () => {
+      cy.visit("/browse/README.md@main.html");
+      cy.CurrentPageShouldDisplayCodeBrowserShell();
+      cy.location("pathname").should("match", /\/browse\/README\.md@main\.html$/);
+      cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
+    });
+
+    it("returns 404 for humane browse paths without a documented pair", () => {
+      cy.request({
+        method: "GET",
+        url: "/browse/this-path-has-no-commentray.md",
+        failOnStatusCode: false,
+      })
+        .its("status")
+        .should("eq", 404);
     });
 
     it("clears in-page search and hides hits when Escape is pressed", () => {
