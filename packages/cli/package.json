@@ -1,6 +1,6 @@
 {
   "name": "@commentray/cli",
-  "version": "0.0.9",
+  "version": "0.1.0",
   "publishConfig": {
     "access": "public"
   },
@@ -21,9 +21,9 @@
     "commentray": "node ./dist/cli.js"
   },
   "dependencies": {
-    "@commentray/code-commentray-static": "0.0.9",
-    "@commentray/core": "0.0.9",
-    "@commentray/render": "0.0.9",
+    "@commentray/code-commentray-static": "0.1.0",
+    "@commentray/core": "0.1.0",
+    "@commentray/render": "0.1.0",
     "chokidar": "^5.0.0",
     "commander": "^14.0.3",
     "serve": "^14.2.6"
