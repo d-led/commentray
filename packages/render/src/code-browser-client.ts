@@ -953,11 +953,23 @@ function parseScrollBlockLinksFromShell(b64: string): BlockScrollLink[] {
         typeof o.sourceStart === "number" &&
         typeof o.sourceEnd === "number"
       ) {
+        const mvRaw = o.markerViewportHalfOpen1Based;
+        const mv =
+          typeof mvRaw === "object" &&
+          mvRaw !== null &&
+          typeof (mvRaw as { lo?: unknown }).lo === "number" &&
+          typeof (mvRaw as { hiExclusive?: unknown }).hiExclusive === "number"
+            ? {
+                lo: (mvRaw as { lo: number }).lo,
+                hiExclusive: (mvRaw as { hiExclusive: number }).hiExclusive,
+              }
+            : { lo: o.sourceStart, hiExclusive: o.sourceEnd + 1 };
         out.push({
           id: o.id,
           commentrayLine: o.commentrayLine,
           sourceStart: o.sourceStart,
           sourceEnd: o.sourceEnd,
+          markerViewportHalfOpen1Based: mv,
         });
       }
     }

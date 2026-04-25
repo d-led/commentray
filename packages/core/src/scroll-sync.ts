@@ -3,7 +3,7 @@ import type { BlockScrollLink } from "./block-scroll-pickers.js";
 import { MARKER_ID_BODY } from "./marker-ids.js";
 import type { CommentrayIndex } from "./model.js";
 import { normalizeRepoRelativePath } from "./paths.js";
-import { sourceLineRangeForMarkerId } from "./source-markers.js";
+import { markerViewportHalfOpen1Based, sourceLineRangeForMarkerId } from "./source-markers.js";
 
 export type { BlockScrollLink } from "./block-scroll-pickers.js";
 export {
@@ -48,23 +48,28 @@ export function buildBlockScrollLinks(
     const commentrayLine = markerLineById.get(block.id);
     if (commentrayLine === undefined) continue;
     if (anchor.kind === "lines") {
+      const lo = anchor.range.start;
+      const hiExclusive = anchor.range.end + 1;
       links.push({
         id: block.id,
         commentrayLine,
         sourceStart: anchor.range.start,
         sourceEnd: anchor.range.end,
+        markerViewportHalfOpen1Based: { lo, hiExclusive },
       });
       continue;
     }
     if (anchor.kind === "marker") {
       if (sourceText === undefined) continue;
       const range = sourceLineRangeForMarkerId(sourceText, anchor.id);
-      if (range === null) continue;
+      const mv = markerViewportHalfOpen1Based(sourceText, anchor.id);
+      if (range === null || mv === null) continue;
       links.push({
         id: block.id,
         commentrayLine,
         sourceStart: range.start,
         sourceEnd: range.end,
+        markerViewportHalfOpen1Based: mv,
       });
     }
   }

@@ -26,6 +26,28 @@ const md =
   "text\n\n" +
   "<!-- commentray:block id=b2 -->\n## block 2\n";
 
+const linesViewport = (start: number, end: number) => ({
+  lo: start,
+  hiExclusive: end + 1,
+});
+
+const idxMarkerB1 = {
+  schemaVersion: CURRENT_SCHEMA_VERSION,
+  byCommentrayPath: {
+    [crPath]: {
+      sourcePath: "src/a.ts",
+      commentrayPath: crPath,
+      blocks: [{ id: "b1", anchor: "marker:b1", markerId: "b1" }],
+    },
+  },
+};
+
+const sourceMarkerB1Region = [
+  "//#region commentray:b1",
+  "const x = 1;",
+  "//#endregion commentray:b1",
+].join("\n");
+
 describe("Block scroll link derivation from index and markers", () => {
   it("returns an empty list when there is no index entry", () => {
     expect(buildBlockScrollLinks(undefined, "src/a.ts", crPath, md)).toEqual([]);
@@ -35,8 +57,20 @@ describe("Block scroll link derivation from index and markers", () => {
 
   it("pairs markers in the markdown with line anchors from the index", () => {
     expect(buildBlockScrollLinks(index, "src/a.ts", crPath, md)).toEqual([
-      { id: "b1", commentrayLine: 0, sourceStart: 1, sourceEnd: 5 },
-      { id: "b2", commentrayLine: 5, sourceStart: 20, sourceEnd: 25 },
+      {
+        id: "b1",
+        commentrayLine: 0,
+        sourceStart: 1,
+        sourceEnd: 5,
+        markerViewportHalfOpen1Based: linesViewport(1, 5),
+      },
+      {
+        id: "b2",
+        commentrayLine: 5,
+        sourceStart: 20,
+        sourceEnd: 25,
+        markerViewportHalfOpen1Based: linesViewport(20, 25),
+      },
     ]);
   });
 
@@ -57,21 +91,16 @@ describe("Block scroll link derivation from index and markers", () => {
   });
 
   it("resolves marker: anchors using Region Marker-style #region delimiters in source", () => {
-    const idx = {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      byCommentrayPath: {
-        [crPath]: {
-          sourcePath: "src/a.ts",
-          commentrayPath: crPath,
-          blocks: [{ id: "b1", anchor: "marker:b1", markerId: "b1" }],
-        },
+    expect(
+      buildBlockScrollLinks(idxMarkerB1, "src/a.ts", crPath, md, sourceMarkerB1Region),
+    ).toEqual([
+      {
+        id: "b1",
+        commentrayLine: 0,
+        sourceStart: 2,
+        sourceEnd: 2,
+        markerViewportHalfOpen1Based: { lo: 1, hiExclusive: 3 },
       },
-    };
-    const source = ["//#region commentray:b1", "const x = 1;", "//#endregion commentray:b1"].join(
-      "\n",
-    );
-    expect(buildBlockScrollLinks(idx, "src/a.ts", crPath, md, source)).toEqual([
-      { id: "b1", commentrayLine: 0, sourceStart: 2, sourceEnd: 2 },
     ]);
   });
 });
@@ -93,6 +122,42 @@ describe("Choosing a companion scroll position from a source viewport", () => {
   });
 });
 
+describe("Marker viewport: prelude line and start delimiter belong to the next block", () => {
+  const crToml = ".commentray/source/x.toml.md";
+  const idxToml = {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    byCommentrayPath: {
+      [crToml]: {
+        sourcePath: "x.toml",
+        commentrayPath: crToml,
+        blocks: [
+          { id: "scm", anchor: "marker:toml-scm", markerId: "toml-scm" },
+          { id: "render", anchor: "marker:toml-render", markerId: "toml-render" },
+        ],
+      },
+    },
+  };
+  const mdToml = "<!-- commentray:block id=scm -->\n\n" + "<!-- commentray:block id=render -->\n\n";
+  const sourceToml = [
+    "# commentray:start id=toml-scm",
+    "[scm]",
+    "x = 1",
+    "# commentray:end id=toml-scm",
+    "",
+    "# commentray:start id=toml-render",
+    "[render]",
+    "y = 2",
+    "# commentray:end id=toml-render",
+  ].join("\n");
+
+  it("maps the second block’s prelude line and start delimiter to the second companion", () => {
+    const links = buildBlockScrollLinks(idxToml, "x.toml", crToml, mdToml, sourceToml);
+    expect(links).toHaveLength(2);
+    expect(pickCommentrayLineForSourceScroll(links, 6)).toBe(2);
+    expect(pickCommentrayLineForSourceScroll(links, 7)).toBe(2);
+  });
+});
+
 describe("Choosing a source line from a companion scroll position", () => {
   const blocks = buildBlockScrollLinks(index, "src/a.ts", crPath, md);
 
@@ -102,5 +167,12 @@ describe("Choosing a source line from a companion scroll position", () => {
     expect(pickSourceLine0ForCommentrayScroll(blocks, 4)).toBe(0);
     expect(pickSourceLine0ForCommentrayScroll(blocks, 5)).toBe(19);
     expect(pickSourceLine0ForCommentrayScroll(blocks, 99)).toBe(19);
+  });
+});
+
+describe("Choosing source scroll for a marker block includes the delimiter prelude", () => {
+  it("reveals the line above the inner body when the companion is at that block", () => {
+    const blocks = buildBlockScrollLinks(idxMarkerB1, "src/a.ts", crPath, md, sourceMarkerB1Region);
+    expect(pickSourceLine0ForCommentrayScroll(blocks, 0)).toBe(0);
   });
 });

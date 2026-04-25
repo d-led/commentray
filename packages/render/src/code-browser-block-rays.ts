@@ -198,12 +198,12 @@ export function activeBlockIdForCommentrayLine0(
   topCommentrayLine0Based: number,
 ): string | null {
   if (links.length === 0) return null;
-  const sorted = sortBlockLinksByCommentrayLine(links);
-  let best = sorted[0];
-  if (!best) return null;
+  const sorted = sortBlockLinksByCommentrayLine([...links]);
+  const head = sorted[0];
+  if (head === undefined) return null;
+  let best = head;
   for (const b of sorted) {
     if (b.commentrayLine <= topCommentrayLine0Based) best = b;
-    else break;
   }
   return best.id;
 }
@@ -247,33 +247,23 @@ function isInsidePageBreakHost(el: HTMLElement): boolean {
  * strictly before `endBefore`, excluding page-break hosts and their descendants (same visual intent
  * as a `Range` over the gap, without relying on `Range#getClientRects`, which jsdom omits).
  */
+/**
+ * Walks laid-out descendants of `docScrollEl` strictly after `startAfter`; when `endBefore` is set,
+ * only elements strictly before that node contribute. Shared by bounded segments and the
+ * open-ended tail after the last page break.
+ */
 function maxContentBottomByElementWalk(
   docScrollEl: HTMLElement,
   startAfter: HTMLElement,
-  endBefore: HTMLElement,
+  endBefore: HTMLElement | null,
 ): number {
   let maxBottom = startAfter.getBoundingClientRect().top + 2;
   for (const el of Array.from(docScrollEl.querySelectorAll("*"))) {
     if (!(el instanceof HTMLElement)) continue;
-    if (el === endBefore) continue;
-    if (!elementFollowsInDocumentOrder(startAfter, el)) continue;
-    if (!elementFollowsInDocumentOrder(el, endBefore)) continue;
-    if (isInsidePageBreakHost(el)) continue;
-    if (el.matches(PAGE_BREAK_HOST_SELECTOR)) continue;
-    const br = el.getBoundingClientRect();
-    if (br.width < MIN_LAYOUT_RECT_SIDE || br.height < MIN_LAYOUT_RECT_SIDE) continue;
-    maxBottom = Math.max(maxBottom, br.bottom);
-  }
-  return maxBottom;
-}
-
-function maxContentBottomByElementWalkOpenEnded(
-  docScrollEl: HTMLElement,
-  startAfter: HTMLElement,
-): number {
-  let maxBottom = startAfter.getBoundingClientRect().top + 2;
-  for (const el of Array.from(docScrollEl.querySelectorAll("*"))) {
-    if (!(el instanceof HTMLElement)) continue;
+    if (endBefore !== null) {
+      if (el === endBefore) continue;
+      if (!elementFollowsInDocumentOrder(el, endBefore)) continue;
+    }
     if (!elementFollowsInDocumentOrder(startAfter, el)) continue;
     if (isInsidePageBreakHost(el)) continue;
     if (el.matches(PAGE_BREAK_HOST_SELECTOR)) continue;
@@ -310,7 +300,7 @@ export function maxRenderableCommentaryContentBottomViewport(
       maxContentBottomByElementWalk(docScrollEl, cursor, endExclusive),
     );
   } else {
-    maxBottom = Math.max(maxBottom, maxContentBottomByElementWalkOpenEnded(docScrollEl, cursor));
+    maxBottom = Math.max(maxBottom, maxContentBottomByElementWalk(docScrollEl, cursor, null));
   }
   return maxBottom;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   commentrayRegionInsertions,
+  markerViewportHalfOpen1Based,
   parseCommentrayRegionBoundary,
   sourceLineRangeForMarkerId,
 } from "./source-markers.js";
@@ -92,5 +93,12 @@ describe("Resolving source line ranges for a marker id", () => {
   it("supports CSS block comment markers", () => {
     const src = ["/* commentray:start id=bb */", "x{}", "/* commentray:end id=bb */"].join("\n");
     expect(sourceLineRangeForMarkerId(src, "bb")).toEqual({ start: 2, end: 2 });
+  });
+});
+
+describe("Marker viewport half-open range", () => {
+  it("extends one line above the start delimiter and stops before the end delimiter", () => {
+    const src = ["pad", "# commentray:start id=aa", "[a]", "# commentray:end id=aa"].join("\n");
+    expect(markerViewportHalfOpen1Based(src, "aa")).toEqual({ lo: 1, hiExclusive: 4 });
   });
 });

@@ -235,16 +235,10 @@ export function parseCommentrayRegionBoundary(
   return null;
 }
 
-/**
- * 1-based inclusive source lines **between** paired region / generic / legacy marker lines.
- */
-export function sourceLineRangeForMarkerId(
+function findFirstMarkerPairBoundaryIndices(
   sourceText: string,
   markerId: string,
-): {
-  start: number;
-  end: number;
-} | null {
+): { startIdx: number; endIdx: number } | null {
   const id = assertValidMarkerId(markerId);
   const lines = sourceText.split("\n");
   let startIdx = -1;
@@ -256,8 +250,45 @@ export function sourceLineRangeForMarkerId(
     else if (hit.kind === "end" && startIdx >= 0 && endIdx < 0) endIdx = i;
   }
   if (startIdx < 0 || endIdx < 0 || endIdx < startIdx + 2) return null;
+  return { startIdx, endIdx };
+}
+
+/**
+ * 1-based inclusive source lines **between** paired region / generic / legacy marker lines.
+ */
+export function sourceLineRangeForMarkerId(
+  sourceText: string,
+  markerId: string,
+): {
+  start: number;
+  end: number;
+} | null {
+  const pair = findFirstMarkerPairBoundaryIndices(sourceText, markerId);
+  if (pair === null) return null;
+  const { startIdx, endIdx } = pair;
   const start = startIdx + 2;
   const end = endIdx;
   if (end < start) return null;
   return { start, end };
+}
+
+/**
+ * 1-based half-open `[lo, hiExclusive)` for viewport / scroll sync: includes one physical line
+ * above the start delimiter and the delimiter line itself, runs through the last inner line, and
+ * **excludes** the end delimiter line. The blank between a block’s end marker and the next block’s
+ * start marker therefore belongs to the next block (same as the line above the next start).
+ */
+export function markerViewportHalfOpen1Based(
+  sourceText: string,
+  markerId: string,
+): { lo: number; hiExclusive: number } | null {
+  const pair = findFirstMarkerPairBoundaryIndices(sourceText, markerId);
+  if (pair === null) return null;
+  const { startIdx, endIdx } = pair;
+  const startMarker1Based = startIdx + 1;
+  const endMarker1Based = endIdx + 1;
+  const lo = Math.max(1, startMarker1Based - 1);
+  const hiExclusive = endMarker1Based;
+  if (hiExclusive <= lo) return null;
+  return { lo, hiExclusive };
 }

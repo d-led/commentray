@@ -820,7 +820,15 @@ describe("Code browser page — block markers and scroll sync payload", () => {
       throw new Error("expected data-scroll-block-links-b64 attribute with a value");
     }
     const links = JSON.parse(Buffer.from(m[1], "base64").toString("utf8")) as unknown[];
-    expect(links).toEqual([{ id: "b1", commentrayLine: 0, sourceStart: 1, sourceEnd: 2 }]);
+    expect(links).toEqual([
+      {
+        id: "b1",
+        commentrayLine: 0,
+        sourceStart: 1,
+        sourceEnd: 2,
+        markerViewportHalfOpen1Based: { lo: 1, hiExclusive: 3 },
+      },
+    ]);
   });
 
   it("should choose stretch layout with one shared scroll when the block table can be built", async () => {

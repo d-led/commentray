@@ -104,7 +104,8 @@ export async function tryBuildBlockStretchTableHtml(
   const lines = opts.code.split("\n");
   const lineToBlock = new Map<number, BlockScrollLink>();
   for (const b of links) {
-    for (let L = b.sourceStart; L <= b.sourceEnd; L++) {
+    const { lo, hiExclusive } = b.markerViewportHalfOpen1Based;
+    for (let L = lo; L < hiExclusive; L++) {
       lineToBlock.set(L, b);
     }
   }

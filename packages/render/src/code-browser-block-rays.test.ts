@@ -1,3 +1,4 @@
+import type { BlockScrollLink } from "@commentray/core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -13,6 +14,21 @@ import {
   sortBlockLinksByCommentrayLine,
   sortBlockLinksBySource,
 } from "./code-browser-block-rays.js";
+
+function scrollLink(
+  id: string,
+  commentrayLine: number,
+  sourceStart: number,
+  sourceEnd: number,
+): BlockScrollLink {
+  return {
+    id,
+    commentrayLine,
+    sourceStart,
+    sourceEnd,
+    markerViewportHalfOpen1Based: { lo: sourceStart, hiExclusive: sourceEnd + 1 },
+  };
+}
 
 describe("clampViewportYToGutterLocal", () => {
   it("maps viewport Y into gutter-local space when inside the band", () => {
@@ -79,28 +95,22 @@ describe("splitCubicAtT", () => {
 
 describe("sortBlockLinksBySource", () => {
   it("orders by sourceStart", () => {
-    const out = sortBlockLinksBySource([
-      { id: "b2", commentrayLine: 5, sourceStart: 20, sourceEnd: 25 },
-      { id: "b1", commentrayLine: 0, sourceStart: 1, sourceEnd: 5 },
-    ]);
+    const out = sortBlockLinksBySource([scrollLink("b2", 5, 20, 25), scrollLink("b1", 0, 1, 5)]);
     expect(out.map((x) => x.id)).toEqual(["b1", "b2"]);
   });
 });
 
 describe("dedupeBlockScrollLinksById", () => {
   it("keeps the earliest source span when the same id appears twice", () => {
-    const out = dedupeBlockScrollLinksById([
-      { id: "x", commentrayLine: 0, sourceStart: 10, sourceEnd: 12 },
-      { id: "x", commentrayLine: 0, sourceStart: 1, sourceEnd: 3 },
-    ]);
-    expect(out).toEqual([{ id: "x", commentrayLine: 0, sourceStart: 1, sourceEnd: 3 }]);
+    const out = dedupeBlockScrollLinksById([scrollLink("x", 0, 10, 12), scrollLink("x", 0, 1, 3)]);
+    expect(out).toEqual([scrollLink("x", 0, 1, 3)]);
   });
 });
 
 describe("nextBlockLinkInCommentrayOrder", () => {
   it("uses companion line order, not source order", () => {
-    const a = { id: "static", commentrayLine: 100, sourceStart: 1, sourceEnd: 10 };
-    const b = { id: "angles", commentrayLine: 50, sourceStart: 20, sourceEnd: 30 };
+    const a = scrollLink("static", 100, 1, 10);
+    const b = scrollLink("angles", 50, 20, 30);
     const both = [a, b];
     expect(sortBlockLinksByCommentrayLine(both).map((x) => x.id)).toEqual(["angles", "static"]);
     expect(nextBlockLinkInCommentrayOrder(both, b)?.id).toBe("static");
@@ -109,10 +119,7 @@ describe("nextBlockLinkInCommentrayOrder", () => {
 });
 
 describe("activeBlockIdForViewport", () => {
-  const links = [
-    { id: "b1", commentrayLine: 0, sourceStart: 1, sourceEnd: 5 },
-    { id: "b2", commentrayLine: 5, sourceStart: 20, sourceEnd: 25 },
-  ];
+  const links = [scrollLink("b1", 0, 1, 5), scrollLink("b2", 5, 20, 25)];
 
   it("returns the block id that contains the top source line", () => {
     expect(activeBlockIdForViewport(links, 3)).toBe("b1");
@@ -125,10 +132,7 @@ describe("activeBlockIdForViewport", () => {
 });
 
 describe("activeBlockIdForCommentrayLine0", () => {
-  const links = [
-    { id: "b1", commentrayLine: 2, sourceStart: 1, sourceEnd: 5 },
-    { id: "b2", commentrayLine: 12, sourceStart: 20, sourceEnd: 25 },
-  ];
+  const links = [scrollLink("b1", 2, 1, 5), scrollLink("b2", 12, 20, 25)];
 
   it("returns the block whose marker is at or above the probed companion line", () => {
     expect(activeBlockIdForCommentrayLine0(links, 2)).toBe("b1");
@@ -138,10 +142,7 @@ describe("activeBlockIdForCommentrayLine0", () => {
   });
 
   it("uses markdown order, not source line order, when ids are inverted", () => {
-    const inverted = [
-      { id: "lateInFile", commentrayLine: 0, sourceStart: 100, sourceEnd: 110 },
-      { id: "earlyInFile", commentrayLine: 8, sourceStart: 1, sourceEnd: 20 },
-    ];
+    const inverted = [scrollLink("lateInFile", 0, 100, 110), scrollLink("earlyInFile", 8, 1, 20)];
     expect(activeBlockIdForCommentrayLine0(inverted, 0)).toBe("lateInFile");
     expect(activeBlockIdForCommentrayLine0(inverted, 8)).toBe("earlyInFile");
   });

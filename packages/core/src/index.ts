@@ -106,6 +106,7 @@ export {
 export {
   commentrayRegionInsertions,
   lineCommentLeaderForLanguage,
+  markerViewportHalfOpen1Based,
   parseCommentrayRegionBoundary,
   sourceLineRangeForMarkerId,
 } from "./source-markers.js";
