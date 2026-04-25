@@ -328,6 +328,19 @@ function pageBreakNextBlockMetaByLine(
   return out;
 }
 
+function blockAnchorAttrs(link: BlockScrollLink | undefined): string {
+  if (link === undefined) return "";
+  return ` data-source-start="${String(link.sourceStart)}" data-commentray-line="${String(link.commentrayLine)}"`;
+}
+
+function pageBreakNextAttrs(next: PageBreakNextBlockMeta | undefined): string {
+  if (next === undefined) return "";
+  const nextCommentrayAttr = ` data-next-commentray-line="${String(next.commentrayLine)}"`;
+  const nextSourceAttr =
+    next.sourceStart !== undefined ? ` data-next-source-start="${String(next.sourceStart)}"` : "";
+  return `${nextCommentrayAttr}${nextSourceAttr}`;
+}
+
 /**
  * Inserts per-line anchors for search / hash jumps and block separator anchors after each
  * `<!-- commentray:block … -->` line (optional index attrs).
@@ -369,11 +382,7 @@ function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[])
     const m = BLOCK_MARKER_HTML_LINE.exec(line);
     if (m?.[1]) {
       const id = m[1];
-      const link = byId?.get(id);
-      const attrs =
-        link !== undefined
-          ? ` data-source-start="${String(link.sourceStart)}" data-commentray-line="${String(link.commentrayLine)}"`
-          : "";
+      const attrs = blockAnchorAttrs(byId?.get(id));
       /** One `push` with embedded `\n\n` merged poorly with `join("\\n")`; keep real blank lines around raw `<div>`. */
       out.push(`${line}${lineAnchorHtml(i)}`);
       out.push("");
@@ -385,17 +394,11 @@ function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[])
     }
 
     if (PAGE_BREAK_MARKER_HTML_LINE.test(line)) {
-      const next = pageBreakNextByLine.get(i);
-      const nextCommentrayAttr =
-        next !== undefined ? ` data-next-commentray-line="${String(next.commentrayLine)}"` : "";
-      const nextSourceAttr =
-        next?.sourceStart !== undefined
-          ? ` data-next-source-start="${String(next.sourceStart)}"`
-          : "";
+      const nextAttrs = pageBreakNextAttrs(pageBreakNextByLine.get(i));
       out.push(`${line}${lineAnchorHtml(i)}`);
       out.push("");
       out.push(
-        `<div class="commentray-page-break" data-commentray-page-break="true"${nextCommentrayAttr}${nextSourceAttr} aria-hidden="true"><div class="commentray-page-break__rule"></div></div>`,
+        `<div class="commentray-page-break" data-commentray-page-break="true"${nextAttrs} aria-hidden="true"><div class="commentray-page-break__rule"></div></div>`,
       );
       out.push("");
       continue;

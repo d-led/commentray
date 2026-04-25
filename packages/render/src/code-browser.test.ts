@@ -443,7 +443,7 @@ describe("Code browser page — toolbar link policy", () => {
   });
 });
 
-describe("Code browser page — companion Markdown rendering", () => {
+describe("Code browser page — companion Markdown rendering basics", () => {
   it("should render headings, emphasis, and links without corrupting fenced code", async () => {
     const md = [
       "# Title",
@@ -476,7 +476,9 @@ describe("Code browser page — companion Markdown rendering", () => {
     expect(html).toContain(':root[data-commentray-theme="dark"] .pane--doc .doc-pane-body');
     expect(html).toContain("#doc-pane-body.wrap pre code");
   });
+});
 
+describe("Code browser page — companion Markdown page-break rendering", () => {
   it("renders deliberate page breaks from comment markers without breaking markdown flow", async () => {
     const md = [
       "# Chapter one",
