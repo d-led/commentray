@@ -78,10 +78,9 @@ In one line: **core** holds paths and index truth; **render** holds safe HTML; *
 - Storage layout: [`docs/spec/storage.md`](https://github.com/d-led/commentray/blob/main/docs/spec/storage.md)
 - Anchor strategies: [`docs/spec/anchors.md`](https://github.com/d-led/commentray/blob/main/docs/spec/anchors.md)
 - Block grammar: [`docs/spec/blocks.md`](https://github.com/d-led/commentray/blob/main/docs/spec/blocks.md)
-- Roadmap: [`docs/plan/plan.md`](https://github.com/d-led/commentray/blob/main/docs/plan/plan.md)
-- Debugging the extension: [`docs/development.md`](https://github.com/d-led/commentray/blob/main/docs/development.md)
+- Maintainer guide (CI, Pages, extension tests, releases, quality gate): [`docs/development.md`](https://github.com/d-led/commentray/blob/main/docs/development.md); backlog: **GitHub Issues**
 - Trust model & parsing guarantees: [`SECURITY.md`](https://github.com/d-led/commentray/blob/main/SECURITY.md)
-- Contributing contract: [`CONTRIBUTING.md`](https://github.com/d-led/commentray/blob/main/CONTRIBUTING.md); day-to-day commands & releases: [`docs/development.md`](https://github.com/d-led/commentray/blob/main/docs/development.md)
+- Contributing contract: [`CONTRIBUTING.md`](https://github.com/d-led/commentray/blob/main/CONTRIBUTING.md)
 
 ## What Commentray is not (one beat each)
 

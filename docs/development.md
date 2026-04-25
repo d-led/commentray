@@ -71,7 +71,9 @@ The repo is developed with **npm**. **Yarn** is an alternative path via `.yarnrc
 
 ## CLI, binaries, and Pages
 
-**Permalinks:** the static hub and `_site/browse/` pages are meant to provide **stable, working URLs** for sharing. Policy and constraints are in [`docs/plan/plan.md` § Permalinks and stable URLs](plan/plan.md#permalinks-and-stable-urls-design-intent). When you change URL shape or client navigation, update tests and note breaking changes in the PR.
+### Static hub permalinks
+
+The static hub and `_site/browse/` pages are meant to provide **stable, working URLs** for sharing. Keep hub (`index.html`), browse HTML, and location hashes working across typical rebuilds of the same revision on GitHub Pages; prefer **same-origin** browse/search over sending readers to raw hosts unless they opt out. Changing slug schemes for `(sourcePath, commentrayPath)` is a **breaking** bookmark change—treat it as rare, document it, and consider redirects. When you change URL shape or client navigation, update automated tests (including Cypress under `cypress/e2e/`) and call out breaking changes in the PR.
 
 - **Init:** `npm run commentray -- init` is idempotent (storage, seed `index.json` / `.commentray.toml` when missing). Use `npm run commentray -- init config` for TOML defaults, or `init config --force` to replace. `npm run commentray -- init scm` refreshes the marked `pre-commit` block that runs `commentray validate --staged` when the linked CLI exists at the repo root.
 - **Standalone binaries / CI:** [`.github/workflows/binaries.yml`](../.github/workflows/binaries.yml); workflow artifacts expire; **`v*`** tags attach builds to [GitHub Releases](https://github.com/d-led/commentray/releases). Local builds, smoke tests, and macOS quarantine: see subsections below (README **Standalone CLI binaries**).
