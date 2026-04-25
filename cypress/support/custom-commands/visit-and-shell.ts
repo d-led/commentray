@@ -1,11 +1,21 @@
 import { shellA11y } from "../shell-a11y";
 
+const WIDE_MODE_INTRO_STORAGE_KEY = "commentray.codeCommentrayStatic.wideModeIntro.v1";
+
 Cypress.Commands.add("GoToStaticSiteHome", () => {
-  cy.visit("/");
+  cy.visit("/", {
+    onBeforeLoad(win) {
+      win.localStorage.setItem(WIDE_MODE_INTRO_STORAGE_KEY, "1");
+    },
+  });
 });
 
 Cypress.Commands.add("GoToE2eDualScrollFixturePage", () => {
-  cy.visit("/__e2e__/dual-scroll-sync/");
+  cy.visit("/__e2e__/dual-scroll-sync/", {
+    onBeforeLoad(win) {
+      win.localStorage.setItem(WIDE_MODE_INTRO_STORAGE_KEY, "1");
+    },
+  });
 });
 
 Cypress.Commands.add("CurrentPageShouldDisplayCodeBrowserShell", () => {

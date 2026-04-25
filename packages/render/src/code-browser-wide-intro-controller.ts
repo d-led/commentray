@@ -2,7 +2,11 @@ import {
   renderWideIntroArrows,
   repositionWideIntroBubble,
 } from "./code-browser-wide-intro-layout.js";
-import { type WideIntroStep, wideIntroStepsForShell } from "./code-browser-wide-intro-steps.js";
+import {
+  type WideIntroStep,
+  wideIntroStepsForShell,
+  wideIntroVisibleTargetsForCurrentStep,
+} from "./code-browser-wide-intro-steps.js";
 import {
   clearOpenWideModeIntroTourUi,
   createWideIntroElements,
@@ -22,31 +26,6 @@ type WideIntroRuntime = {
   isNarrowViewport: () => boolean;
 };
 
-function visibleTargetsForCurrentStep(steps: WideIntroStep[], current: number): HTMLElement[] {
-  const step = steps[current];
-  if (!step) return [];
-  const selectors =
-    Array.isArray(step.targetSelectors) && step.targetSelectors.length > 0
-      ? step.targetSelectors
-      : step.targetSelector
-        ? [step.targetSelector]
-        : [];
-  const targets: HTMLElement[] = [];
-  const seen = new Set<HTMLElement>();
-  for (const selector of selectors) {
-    const found = document.querySelector(selector);
-    if (!(found instanceof HTMLElement) || seen.has(found)) continue;
-    if (found.hidden) continue;
-    const style = globalThis.getComputedStyle(found);
-    if (style.display === "none" || style.visibility === "hidden") continue;
-    const rect = found.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) continue;
-    seen.add(found);
-    targets.push(found);
-  }
-  return targets;
-}
-
 function refreshWideIntroSteps(runtime: WideIntroRuntime): void {
   const nextMode: "narrow" | "wide" = runtime.isNarrowViewport() ? "narrow" : "wide";
   if (nextMode === runtime.viewportMode) return;
@@ -57,7 +36,7 @@ function refreshWideIntroSteps(runtime: WideIntroRuntime): void {
 function repositionWideIntro(runtime: WideIntroRuntime): void {
   const { bubble, arrowLayer } = runtime.elements;
   refreshWideIntroSteps(runtime);
-  const targets = visibleTargetsForCurrentStep(runtime.steps, runtime.current);
+  const targets = wideIntroVisibleTargetsForCurrentStep(runtime.steps, runtime.current);
   const primary = targets[0];
   if (!primary) {
     bubble.dataset.side = "none";
@@ -75,7 +54,7 @@ function advanceWideIntroToRenderableStep(runtime: WideIntroRuntime): void {
   while (runtime.current < runtime.steps.length) {
     const step = runtime.steps[runtime.current];
     if (!step) break;
-    const visibleTargets = visibleTargetsForCurrentStep(runtime.steps, runtime.current);
+    const visibleTargets = wideIntroVisibleTargetsForCurrentStep(runtime.steps, runtime.current);
     const hasFallbackAction = typeof step.fallbackAction === "function";
     if (visibleTargets.length > 0 || hasFallbackAction) break;
     runtime.current++;
@@ -112,7 +91,7 @@ function renderWideIntro(runtime: WideIntroRuntime, closeTour: () => void): void
   }
   const step = runtime.steps[runtime.current];
   if (!step) return;
-  const targets = visibleTargetsForCurrentStep(runtime.steps, runtime.current);
+  const targets = wideIntroVisibleTargetsForCurrentStep(runtime.steps, runtime.current);
   for (const el of runtime.highlighted) el.classList.remove("commentray-wide-intro-target");
   runtime.highlighted = targets;
   for (const el of runtime.highlighted) el.classList.add("commentray-wide-intro-target");

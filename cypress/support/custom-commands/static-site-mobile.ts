@@ -3,11 +3,16 @@ import { shellA11y } from "../shell-a11y";
 /** Matches `code-browser.ts` / client `DUAL_MOBILE_SINGLE_PANE_MQ` (dual panes from 768px up). */
 const MOBILE_VIEWPORT_WIDTH = 390;
 const MOBILE_VIEWPORT_HEIGHT = 844;
+const WIDE_MODE_INTRO_STORAGE_KEY = "commentray.codeCommentrayStatic.wideModeIntro.v1";
 
 Cypress.Commands.add("PrepareStaticSiteHomeAtMobileViewport", () => {
   cy.clearLocalStorage();
   cy.viewport(MOBILE_VIEWPORT_WIDTH, MOBILE_VIEWPORT_HEIGHT);
-  cy.visit("/");
+  cy.visit("/", {
+    onBeforeLoad(win) {
+      win.localStorage.setItem(WIDE_MODE_INTRO_STORAGE_KEY, "1");
+    },
+  });
 });
 
 Cypress.Commands.add("MobileStaticSiteCodeBrowserChromeShouldBeReady", () => {
