@@ -209,4 +209,55 @@ describe("Markdown source rendering modes", () => {
       "be.visible",
     );
   });
+
+  it("ends with a help-button reminder and introduces share link", () => {
+    cy.viewport(1280, 900);
+    cy.visit("/", {
+      onBeforeLoad(win) {
+        win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
+      },
+    });
+    cy.get("#commentray-wide-intro").should("be.visible");
+
+    for (let i = 0; i < 9; i += 1) {
+      cy.get('#commentray-wide-intro button[data-wide-intro="next"]').click();
+    }
+
+    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Need a refresher?").should(
+      "be.visible",
+    );
+    cy.contains(
+      "#commentray-wide-intro .commentray-wide-intro-body",
+      "You can always go back to this tutorial via the help button.",
+    ).should("be.visible");
+    cy.get("#commentray-wide-intro-arrows .commentray-wide-intro-arrow").should("have.length", 1);
+  });
+
+  it("shows a fallback intro action when wrap-lines toggle is hidden", () => {
+    cy.viewport(1280, 900);
+    cy.visit("/", {
+      onBeforeLoad(win) {
+        win.localStorage.removeItem(WIDE_MODE_INTRO_STORAGE_KEY);
+      },
+    });
+
+    cy.get(shellA11y.shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
+    cy.get(shellA11y.wrapLinesLabel).should("not.be.visible");
+
+    for (let i = 0; i < 6; i += 1) {
+      cy.get('#commentray-wide-intro button[data-wide-intro="next"]').click();
+    }
+    cy.contains(
+      "#commentray-wide-intro .commentray-wide-intro-title",
+      "Readability controls",
+    ).should("be.visible");
+    cy.get("#commentray-wide-intro .commentray-wide-intro-step-action")
+      .should("be.visible")
+      .and("contain.text", "Switch to markdown source")
+      .click();
+
+    cy.get(shellA11y.shell).should("have.attr", "data-source-pane-mode", "source");
+    cy.get(shellA11y.wrapLinesLabel).should("be.visible");
+    cy.get("#commentray-wide-intro-arrows .commentray-wide-intro-arrow").should("have.length", 1);
+  });
 });

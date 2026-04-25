@@ -47,6 +47,10 @@ import {
   parseCommentrayColorThemeMode,
   type CommentrayColorThemeMode,
 } from "./code-browser-color-theme.js";
+import {
+  clearOpenWideModeIntroTourUi,
+  createWideIntroElements,
+} from "./code-browser-wide-intro-ui.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
 /**
@@ -1921,31 +1925,12 @@ type WideIntroStep = {
   targetSelectors?: string[];
   title: string;
   body: string;
-};
-
-type WideIntroElements = {
-  bubble: HTMLElement;
-  arrowLayer: HTMLElement;
-  titleEl: HTMLElement;
-  bodyEl: HTMLElement;
-  progressEl: HTMLElement;
-  backBtn: HTMLButtonElement;
-  nextBtn: HTMLButtonElement;
-  skipBtn: HTMLButtonElement;
+  fallbackActionLabel?: string;
+  fallbackAction?: () => void;
 };
 
 function isNarrowViewport(): boolean {
   return globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ).matches;
-}
-
-function clearOpenWideModeIntroTour(): void {
-  for (const el of Array.from(document.querySelectorAll(".commentray-wide-intro-target"))) {
-    if (el instanceof HTMLElement) el.classList.remove("commentray-wide-intro-target");
-  }
-  const open = document.getElementById("commentray-wide-intro");
-  if (open instanceof HTMLElement) open.remove();
-  const arrows = document.getElementById("commentray-wide-intro-arrows");
-  if (arrows instanceof HTMLElement) arrows.remove();
 }
 
 function wideIntroStepsForShell(shell: HTMLElement): WideIntroStep[] {
@@ -1971,6 +1956,15 @@ function wideIntroStepsForShell(shell: HTMLElement): WideIntroStep[] {
         : "You are in wide view now. It shows code and commentary side by side. Narrow view uses one pane and a flip control.",
     },
     {
+      targetSelectors: narrowActive
+        ? ["#mobile-pane-flip", "#doc-pane"]
+        : ["#code-pane", "#doc-pane"],
+      title: narrowActive ? "Scroll and toggle" : "Scroll both panes",
+      body: narrowActive
+        ? "Try scrolling commentary, then use the pane flip to switch to source and keep exploring."
+        : "Try scrolling in either pane. Source and commentary stay aligned while you read side by side.",
+    },
+    {
       targetSelector: "#search-q",
       title: "Search quickly",
       body: "Use this search input to jump to documented source lines and markdown snippets.",
@@ -1989,59 +1983,28 @@ function wideIntroStepsForShell(shell: HTMLElement): WideIntroStep[] {
       targetSelector: "#wrap-lines",
       title: "Readability controls",
       body: "Wrap lines to reduce horizontal scrolling in both source and commentary panes.",
+      fallbackActionLabel: "Switch to markdown source",
+      fallbackAction: () => {
+        const sourceModeFlip = document.getElementById("source-markdown-pane-flip");
+        if (sourceModeFlip instanceof HTMLButtonElement) sourceModeFlip.click();
+      },
     },
     {
       targetSelector: "#commentray-theme-trigger",
       title: "Appearance",
       body: "Change theme mode from this trigger (menu on left-click, quick cycle on right-click).",
     },
+    {
+      targetSelector: "#commentray-share-link",
+      title: "Share this view",
+      body: "Use this link button to copy a shareable permalink to the exact page and state you are viewing.",
+    },
+    {
+      targetSelector: "#commentray-help-tour",
+      title: "Need a refresher?",
+      body: "You can always go back to this tutorial via the help button.",
+    },
   ];
-}
-
-function createWideIntroElements(): WideIntroElements | null {
-  const arrowLayer = document.createElement("div");
-  arrowLayer.id = "commentray-wide-intro-arrows";
-  arrowLayer.setAttribute("aria-hidden", "true");
-  document.body.appendChild(arrowLayer);
-
-  const bubble = document.createElement("section");
-  bubble.id = "commentray-wide-intro";
-  bubble.setAttribute("role", "dialog");
-  bubble.setAttribute("aria-live", "polite");
-  bubble.innerHTML = `
-    <span class="commentray-wide-intro-pointer" aria-hidden="true"></span>
-    <p class="commentray-wide-intro-title"></p>
-    <p class="commentray-wide-intro-body"></p>
-    <div class="commentray-wide-intro-footer">
-      <span class="commentray-wide-intro-progress"></span>
-      <div class="commentray-wide-intro-actions">
-        <button type="button" data-wide-intro="back">Back</button>
-        <button type="button" data-wide-intro="next">Next</button>
-        <button type="button" data-wide-intro="skip">Skip</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(bubble);
-
-  const titleEl = bubble.querySelector(".commentray-wide-intro-title");
-  const bodyEl = bubble.querySelector(".commentray-wide-intro-body");
-  const progressEl = bubble.querySelector(".commentray-wide-intro-progress");
-  const backBtn = bubble.querySelector('button[data-wide-intro="back"]');
-  const nextBtn = bubble.querySelector('button[data-wide-intro="next"]');
-  const skipBtn = bubble.querySelector('button[data-wide-intro="skip"]');
-  if (
-    !(titleEl instanceof HTMLElement) ||
-    !(bodyEl instanceof HTMLElement) ||
-    !(progressEl instanceof HTMLElement) ||
-    !(backBtn instanceof HTMLButtonElement) ||
-    !(nextBtn instanceof HTMLButtonElement) ||
-    !(skipBtn instanceof HTMLButtonElement)
-  ) {
-    arrowLayer.remove();
-    bubble.remove();
-    return null;
-  }
-  return { bubble, arrowLayer, titleEl, bodyEl, progressEl, backBtn, nextBtn, skipBtn };
 }
 
 function wideIntroTargetsForCurrentStep(steps: WideIntroStep[], current: number): HTMLElement[] {
@@ -2062,6 +2025,23 @@ function wideIntroTargetsForCurrentStep(steps: WideIntroStep[], current: number)
     targets.push(found);
   }
   return targets;
+}
+
+function isWideIntroTargetVisible(target: HTMLElement): boolean {
+  if (target.hidden) return false;
+  const style = globalThis.getComputedStyle(target);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  const rect = target.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function wideIntroVisibleTargetsForCurrentStep(
+  steps: WideIntroStep[],
+  current: number,
+): HTMLElement[] {
+  return wideIntroTargetsForCurrentStep(steps, current).filter((target) =>
+    isWideIntroTargetVisible(target),
+  );
 }
 
 function repositionWideIntroBubble(bubble: HTMLElement, target: HTMLElement): void {
@@ -2145,23 +2125,113 @@ function renderWideIntroArrows(
   }
 }
 
+type WideIntroRuntime = {
+  shell: HTMLElement;
+  steps: WideIntroStep[];
+  viewportMode: "narrow" | "wide";
+  current: number;
+  highlighted: HTMLElement[];
+  elements: NonNullable<ReturnType<typeof createWideIntroElements>>;
+};
+
+function refreshWideIntroSteps(runtime: WideIntroRuntime): void {
+  const nextMode: "narrow" | "wide" = isNarrowViewport() ? "narrow" : "wide";
+  if (nextMode === runtime.viewportMode) return;
+  runtime.viewportMode = nextMode;
+  runtime.steps = wideIntroStepsForShell(runtime.shell);
+}
+
+function repositionWideIntro(runtime: WideIntroRuntime): void {
+  const { bubble, arrowLayer } = runtime.elements;
+  refreshWideIntroSteps(runtime);
+  const targets = wideIntroVisibleTargetsForCurrentStep(runtime.steps, runtime.current);
+  const primary = targets[0];
+  if (!primary) {
+    bubble.dataset.side = "none";
+    bubble.style.top = "12px";
+    bubble.style.left = "12px";
+    arrowLayer.replaceChildren();
+    return;
+  }
+  repositionWideIntroBubble(bubble, primary);
+  renderWideIntroArrows(bubble, arrowLayer, targets);
+}
+
+function advanceWideIntroToRenderableStep(runtime: WideIntroRuntime): void {
+  refreshWideIntroSteps(runtime);
+  while (runtime.current < runtime.steps.length) {
+    const step = runtime.steps[runtime.current];
+    if (!step) break;
+    const visibleTargets = wideIntroVisibleTargetsForCurrentStep(runtime.steps, runtime.current);
+    const hasFallbackAction = typeof step.fallbackAction === "function";
+    if (visibleTargets.length > 0 || hasFallbackAction) break;
+    runtime.current++;
+  }
+}
+
+function syncWideIntroStepActionUi(
+  runtime: WideIntroRuntime,
+  step: WideIntroStep,
+  targets: HTMLElement[],
+): void {
+  const { stepActionBtn } = runtime.elements;
+  if (
+    targets.length === 0 &&
+    typeof step.fallbackAction === "function" &&
+    step.fallbackActionLabel
+  ) {
+    stepActionBtn.hidden = false;
+    stepActionBtn.textContent = step.fallbackActionLabel;
+    stepActionBtn.disabled = false;
+    return;
+  }
+  stepActionBtn.hidden = true;
+  stepActionBtn.textContent = "";
+  stepActionBtn.disabled = true;
+}
+
+function renderWideIntro(runtime: WideIntroRuntime, closeTour: () => void): void {
+  const { titleEl, bodyEl, progressEl, backBtn, nextBtn } = runtime.elements;
+  advanceWideIntroToRenderableStep(runtime);
+  if (runtime.current >= runtime.steps.length) {
+    closeTour();
+    return;
+  }
+  const step = runtime.steps[runtime.current];
+  if (!step) return;
+  const targets = wideIntroVisibleTargetsForCurrentStep(runtime.steps, runtime.current);
+  for (const el of runtime.highlighted) el.classList.remove("commentray-wide-intro-target");
+  runtime.highlighted = targets;
+  for (const el of runtime.highlighted) el.classList.add("commentray-wide-intro-target");
+  titleEl.textContent = step.title;
+  bodyEl.textContent = step.body;
+  syncWideIntroStepActionUi(runtime, step, targets);
+  progressEl.textContent = `${String(runtime.current + 1)} / ${String(runtime.steps.length)}`;
+  backBtn.disabled = runtime.current === 0;
+  nextBtn.textContent = runtime.current === runtime.steps.length - 1 ? "Done" : "Next";
+  repositionWideIntro(runtime);
+}
+
 function wireWideModeIntroTour(shell: HTMLElement, opts?: { force?: boolean }): void {
   if (!opts?.force && readWebStorageItem(localStorage, STORAGE_WIDE_MODE_INTRO_DONE) === "1")
     return;
-  clearOpenWideModeIntroTour();
-  let steps = wideIntroStepsForShell(shell);
-  let viewportMode: "narrow" | "wide" = isNarrowViewport() ? "narrow" : "wide";
+  clearOpenWideModeIntroTourUi();
 
   const elements = createWideIntroElements();
   if (!elements) return;
-
-  let current = 0;
-  let highlighted: HTMLElement[] = [];
-  const { bubble, arrowLayer, titleEl, bodyEl, progressEl, backBtn, nextBtn, skipBtn } = elements;
+  const runtime: WideIntroRuntime = {
+    shell,
+    steps: wideIntroStepsForShell(shell),
+    viewportMode: isNarrowViewport() ? "narrow" : "wide",
+    current: 0,
+    highlighted: [],
+    elements,
+  };
+  const { bubble, arrowLayer, stepActionBtn, backBtn, nextBtn, skipBtn } = runtime.elements;
 
   const closeTour = (): void => {
-    for (const el of highlighted) el.classList.remove("commentray-wide-intro-target");
-    highlighted = [];
+    for (const el of runtime.highlighted) el.classList.remove("commentray-wide-intro-target");
+    runtime.highlighted = [];
     arrowLayer.remove();
     bubble.remove();
     globalThis.removeEventListener("resize", onResize);
@@ -2170,45 +2240,12 @@ function wireWideModeIntroTour(shell: HTMLElement, opts?: { force?: boolean }): 
     writeWebStorageItem(localStorage, STORAGE_WIDE_MODE_INTRO_DONE, "1");
   };
 
-  const refreshStepsForViewportMode = (): void => {
-    const nextMode: "narrow" | "wide" = isNarrowViewport() ? "narrow" : "wide";
-    if (nextMode === viewportMode) return;
-    viewportMode = nextMode;
-    steps = wideIntroStepsForShell(shell);
-  };
-
   const reposition = (): void => {
-    refreshStepsForViewportMode();
-    const targets = wideIntroTargetsForCurrentStep(steps, current);
-    const primary = targets[0];
-    if (!primary) {
-      arrowLayer.replaceChildren();
-      return;
-    }
-    repositionWideIntroBubble(bubble, primary);
-    renderWideIntroArrows(bubble, arrowLayer, targets);
+    repositionWideIntro(runtime);
   };
 
   const render = (): void => {
-    refreshStepsForViewportMode();
-    while (current < steps.length && wideIntroTargetsForCurrentStep(steps, current).length === 0)
-      current++;
-    if (current >= steps.length) {
-      closeTour();
-      return;
-    }
-    const step = steps[current];
-    const targets = wideIntroTargetsForCurrentStep(steps, current);
-    if (!step || targets.length === 0) return;
-    for (const el of highlighted) el.classList.remove("commentray-wide-intro-target");
-    highlighted = targets;
-    for (const el of highlighted) el.classList.add("commentray-wide-intro-target");
-    titleEl.textContent = step.title;
-    bodyEl.textContent = step.body;
-    progressEl.textContent = `${String(current + 1)} / ${String(steps.length)}`;
-    backBtn.disabled = current === 0;
-    nextBtn.textContent = current === steps.length - 1 ? "Done" : "Next";
-    reposition();
+    renderWideIntro(runtime, closeTour);
   };
 
   const onResize = (): void => {
@@ -2222,15 +2259,21 @@ function wireWideModeIntroTour(shell: HTMLElement, opts?: { force?: boolean }): 
   };
 
   backBtn.addEventListener("click", () => {
-    if (current > 0) current--;
+    if (runtime.current > 0) runtime.current--;
+    render();
+  });
+  stepActionBtn.addEventListener("click", () => {
+    const step = runtime.steps[runtime.current];
+    if (!step || typeof step.fallbackAction !== "function") return;
+    step.fallbackAction();
     render();
   });
   nextBtn.addEventListener("click", () => {
-    if (current >= steps.length - 1) {
+    if (runtime.current >= runtime.steps.length - 1) {
       closeTour();
       return;
     }
-    current++;
+    runtime.current++;
     render();
   });
   skipBtn.addEventListener("click", closeTour);

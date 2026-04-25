@@ -1,7 +1,5 @@
 .commentray-wide-intro-target {
-  outline: 2px solid color-mix(in oklab, #d6b300 62%, CanvasText);
-  outline-offset: 3px;
-  border-radius: 6px;
+  outline: none;
 }
 
 #commentray-wide-intro {
@@ -23,6 +21,8 @@
 }
 
 #commentray-wide-intro-arrows {
+  --commentray-intro-note-bg: #fff4b3;
+
   position: fixed;
   inset: 0;
   z-index: 91;
@@ -31,35 +31,48 @@
 
 .commentray-wide-intro-arrow {
   --wide-intro-arrow-angle: 0rad;
+  --wide-intro-arrow-fill: var(--commentray-intro-note-bg);
+  --wide-intro-arrow-outline: color-mix(in oklab, CanvasText 34%, transparent);
 
   position: fixed;
-  height: 10px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, #fff4b3 72%, #c4a200) 0%,
-    color-mix(in oklab, #fff4b3 45%, #b79800) 100%
-  );
+  height: 8px;
+  background: var(--wide-intro-arrow-fill);
   border-radius: 999px;
   transform-origin: 0 50%;
   transform: rotate(var(--wide-intro-arrow-angle));
-  opacity: 0.68;
+  opacity: 0.78;
   box-shadow:
-    0 0 0 1px rgb(255 244 179 / 16%),
+    0 0 0 1px var(--wide-intro-arrow-outline),
     0 2px 10px rgb(168 137 0 / 12%);
+}
+
+.commentray-wide-intro-arrow::before {
+  display: none;
 }
 
 .commentray-wide-intro-arrow-head {
   position: absolute;
-  right: -3px;
+  right: -10px;
   top: 50%;
-  width: 15px;
-  height: 15px;
-  border-top: 4px solid color-mix(in oklab, #fff4b3 40%, #b79800);
-  border-right: 4px solid color-mix(in oklab, #fff4b3 40%, #b79800);
-  border-radius: 2px;
-  transform: translateY(-50%) rotate(45deg);
-  background: color-mix(in oklab, #fff4b3 75%, transparent);
-  opacity: 0.86;
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 11px solid var(--wide-intro-arrow-fill);
+  transform: translateY(-50%);
+}
+
+.commentray-wide-intro-arrow-head::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: -8px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 12px solid var(--wide-intro-arrow-outline);
+  z-index: -1;
 }
 
 .commentray-wide-intro-pointer {
@@ -76,12 +89,34 @@
   border-bottom: 8px solid var(--commentray-intro-note-bg);
 }
 
+#commentray-wide-intro[data-side="below"] .commentray-wide-intro-pointer::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  top: -1px;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 9px solid color-mix(in oklab, CanvasText 32%, transparent);
+  z-index: -1;
+}
+
 #commentray-wide-intro[data-side="above"] .commentray-wide-intro-pointer {
   bottom: -8px;
   left: var(--pointer-left, 18px);
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
   border-top: 8px solid var(--commentray-intro-note-bg);
+}
+
+#commentray-wide-intro[data-side="above"] .commentray-wide-intro-pointer::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  bottom: -1px;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 9px solid color-mix(in oklab, CanvasText 32%, transparent);
+  z-index: -1;
 }
 
 .commentray-wide-intro-title {
@@ -94,6 +129,27 @@
   margin: 0 0 10px;
   font-size: 13px;
   line-height: 1.45;
+}
+
+.commentray-wide-intro-step-action {
+  margin: 0 0 10px;
+  border: 1px solid var(--commentray-intro-note-btn-border);
+  border-radius: 8px;
+  background: var(--commentray-intro-note-btn-bg);
+  color: var(--commentray-intro-note-text);
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.commentray-wide-intro-step-action:hover {
+  background: color-mix(in oklab, var(--commentray-intro-note-btn-bg) 88%, CanvasText);
+}
+
+.commentray-wide-intro-step-action:focus-visible {
+  outline: 2px solid color-mix(in oklab, #5c5200 58%, Canvas);
+  outline-offset: 1px;
 }
 
 .commentray-wide-intro-footer {
