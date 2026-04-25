@@ -2228,11 +2228,25 @@ function wireDualPaneCommentrayLocationHash(
   docScrollEl: HTMLElement,
   mdLineCount: () => number,
 ): void {
+  function commentrayMdLineFromLocationHash(rawHash: string): number | null {
+    const hash = rawHash.replace(/^#/, "").trim();
+    if (hash.length === 0) return null;
+    const tokens = hash
+      .split(/--|&/)
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+    for (const token of tokens) {
+      const m = /^commentray-md-line-(\d+)$/.exec(token);
+      if (!m?.[1]) continue;
+      const line0 = Number.parseInt(m[1], 10);
+      if (Number.isFinite(line0)) return line0;
+    }
+    return null;
+  }
+
   function applyCommentrayLocationHash(): void {
-    const m = /^commentray-md-line-(\d+)$/.exec(globalThis.location.hash.slice(1));
-    if (!m?.[1]) return;
-    const line0 = Number.parseInt(m[1], 10);
-    if (!Number.isFinite(line0)) return;
+    const line0 = commentrayMdLineFromLocationHash(globalThis.location.hash);
+    if (line0 === null) return;
     scrollDocToMarkdownLine0(docScrollEl, line0, mdLineCount());
   }
   globalThis.addEventListener("hashchange", applyCommentrayLocationHash);
@@ -2657,7 +2671,7 @@ function permalinkHashSuffixFromUi(): string {
   }
   const activeAnchor = activeCommentrayHashTokenFromViewport();
   if (activeAnchor) pushUnique(activeAnchor);
-  return tokens.length > 0 ? `#${tokens.join("--")}` : "";
+  return tokens.length > 0 ? `#${tokens.join("&")}` : "";
 }
 
 function sharePermalinkFromShell(shell: HTMLElement): string {
