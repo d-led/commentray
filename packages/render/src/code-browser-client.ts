@@ -193,6 +193,7 @@ function applyDocToCodeFlipPlanImpl(
   plan: DocToCodeFlipPlan,
   lineIdPrefix = "code-line-",
 ): void {
+  const narrowSinglePane = globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ).matches;
   if (plan.k === "block") {
     const exact = codePane.querySelector(`#${lineIdPrefix}${String(plan.src0)}`);
     const el =
@@ -210,6 +211,7 @@ function applyDocToCodeFlipPlanImpl(
     if (paneUsesInternalYScroll(codePane)) {
       const maxC = Math.max(0, codePane.scrollHeight - codePane.clientHeight);
       applyScrollTopClamped(codePane, plan.ratio * maxC);
+      if (narrowSinglePane) applyWindowScrollRatio(plan.ratio);
     } else {
       applyWindowScrollRatio(plan.ratio);
     }
@@ -224,6 +226,10 @@ function applyDocToCodeFlipPlanImpl(
   );
   if (paneUsesInternalYScroll(codePane)) {
     applyScrollTopClamped(codePane, nextTop);
+    if (narrowSinglePane) {
+      const denom = Math.max(1, codePane.scrollHeight - codePane.clientHeight);
+      applyWindowScrollRatio(clamp(nextTop / denom, 0, 1));
+    }
     return;
   }
   const denom = Math.max(1, codePane.scrollHeight - codePane.clientHeight);
@@ -272,7 +278,9 @@ function buildDocToCodeFlipPlanBlockAware(
   docPane: HTMLElement,
   getLinks: () => BlockScrollLink[],
 ): DocToCodeFlipPlan {
-  const winRatio = windowScrollRatio();
+  const winRatio = paneUsesInternalYScroll(docPane)
+    ? clamp(docPane.scrollTop / Math.max(1, docPane.scrollHeight - docPane.clientHeight), 0, 1)
+    : windowScrollRatio();
   const pulledSrc0 = pulledSourceLine0FromPageBreak(docPane);
   if (pulledSrc0 !== null) return { k: "block", src0: pulledSrc0, winRatio };
   const links = getLinks();
@@ -1105,7 +1113,9 @@ function pulledSourceLine0FromPageBreak(docPane: HTMLElement): number | null {
     if (!(breakTop <= topY && topY < nextTop)) continue;
     const denom = Math.max(1, nextTop - breakTop);
     const progress = clamp((topY - breakTop) / denom, 0, 1);
-    if (progress < 0.45) return null;
+    const narrow = globalThis.matchMedia("(max-width: 767px)").matches;
+    const pullThreshold = narrow ? 0.2 : 0.35;
+    if (progress < pullThreshold) return null;
     return nextSourceStart - 1;
   }
   return null;
@@ -1197,6 +1207,7 @@ function wireBlockAwareScrollSync(
   docPane: HTMLElement,
   getLinks: () => BlockScrollLink[],
   lineIdPrefix: () => string,
+  shouldUseProportionalDocToCodeOnMobileFlip?: () => boolean,
 ): DualPaneScrollSyncRunners {
   let pendingDocToCode: DocToCodeFlipPlan | null = null;
   let pendingCodeToDoc: CodeToDocFlipPlan | null = null;
@@ -1217,6 +1228,10 @@ function wireBlockAwareScrollSync(
     );
   };
   const prepareMobileFlipToCode = (): void => {
+    if (shouldUseProportionalDocToCodeOnMobileFlip?.() === true) {
+      pendingDocToCode = { k: "mirrorW", ratio: windowScrollRatio() };
+      return;
+    }
     pendingDocToCode = buildDocToCodeFlipPlanBlockAware(docPane, getLinks);
   };
   const finishMobileFlipToCode = (): void => {
@@ -2205,6 +2220,7 @@ function wireDualMobilePaneFlip(
     if (!mq.matches) return;
     const cur = normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane"));
     const next = cur === "code" ? "doc" : "code";
+    const rootTopBeforeFlip = rootScrollingElement().scrollTop;
     if (next === "code") {
       scrollRunners.prepareMobileFlipToCode();
     } else {
@@ -2216,6 +2232,11 @@ function wireDualMobilePaneFlip(
       globalThis.requestAnimationFrame(() => {
         if (next === "code") {
           scrollRunners.finishMobileFlipToCode();
+          const root = rootScrollingElement();
+          if (rootTopBeforeFlip > 5 && root.scrollTop <= 1) {
+            const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
+            root.scrollTop = clamp(rootTopBeforeFlip, 0, maxY);
+          }
         } else {
           scrollRunners.finishMobileFlipToDoc();
         }
@@ -2536,6 +2557,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
       docScrollEl,
       () => scrollLinksRef.current,
       () => sourceLineIdPrefixForShell(shell),
+      () => sourcePaneModeForShell(shell) === "rendered-markdown",
     );
     const angleSel = document.getElementById("angle-select") as HTMLSelectElement | null;
     if (angleSel && docBody) {
@@ -2563,6 +2585,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
       docScrollEl,
       () => scrollLinksRef.current,
       () => sourceLineIdPrefixForShell(shell),
+      () => sourcePaneModeForShell(shell) === "rendered-markdown",
     );
   }
   return wireProportionalScrollSync(codePane, docScrollEl);
