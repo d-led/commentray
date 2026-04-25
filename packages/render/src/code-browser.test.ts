@@ -53,6 +53,8 @@ describe("Code browser page — layout shell and search", () => {
     expect(m[0]).toContain("data-raw-code-b64=");
     expect(m[0]).toContain("data-raw-md-b64=");
     expect(m[0]).not.toContain("data-search-scope=");
+    expect(m[0]).toContain('data-source-pane-mode="source"');
+    expect(html).not.toContain('id="source-markdown-pane-flip"');
   });
 
   it("should narrow search to commentray paths when staticSearchScope requests it", async () => {
@@ -348,6 +350,11 @@ describe("Code browser page — file path display", () => {
       commentrayMarkdown: "body",
     });
     expect(html).toContain("README.md");
+    expect(html).toContain('data-source-pane-mode="rendered-markdown"');
+    expect(html).toContain('id="source-markdown-pane-flip"');
+    expect(html).toContain('id="source-markdown-pane-flip-scroll"');
+    expect(html).toContain('id="code-pane-markdown-body"');
+    expect(html).toContain('id="code-md-line-0"');
   });
 
   it("should escape file path labels so angle brackets cannot inject markup", async () => {
@@ -505,6 +512,34 @@ describe("Code browser page — multi-angle browsing", () => {
     expect(html).toContain('id="commentray-multi-angle-b64"');
     expect(html).toContain("Main angle");
     expect(html).toContain("<strong>one</strong>");
+  });
+
+  it("should keep markdown-source render mode and flip controls for markdown files with multi-angle docs", async () => {
+    const html = await renderCodeBrowserHtml({
+      filePath: "README.md",
+      code: "# Source title\n\nSome text.",
+      language: "md",
+      commentrayMarkdown: "## Default pane\n",
+      multiAngleBrowsing: {
+        defaultAngleId: "main",
+        angles: [
+          {
+            id: "main",
+            markdown: "## Main\n",
+            commentrayPathRel: ".commentray/source/README.md/main.md",
+          },
+          {
+            id: "alt",
+            markdown: "## Alt\n",
+            commentrayPathRel: ".commentray/source/README.md/alt.md",
+          },
+        ],
+      },
+    });
+    expect(html).toContain('data-source-pane-mode="rendered-markdown"');
+    expect(html).toContain('id="source-markdown-pane-flip"');
+    expect(html).toContain('id="code-pane-markdown-body"');
+    expect(html).toContain('id="code-md-line-0"');
   });
 });
 

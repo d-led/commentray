@@ -282,11 +282,22 @@ function lineAnchorHtml(mdLine0: number): string {
   return `<span class="commentray-line-anchor" data-commentray-md-line="${mdLine}" id="commentray-md-line-${mdLine}" aria-hidden="true"></span>`;
 }
 
+function sourceLineAnchorHtml(line0: number): string {
+  const s = String(line0);
+  return `<span class="commentray-line-anchor commentray-line-anchor--source" data-source-md-line="${s}" id="code-md-line-${s}" aria-hidden="true"></span>`;
+}
+
 function appendMdLineAnchorWhenAllowed(line: string, mdLine0: number): string {
   if (isSetextUnderlineLine(line) || isThematicBreakLine(line)) return line;
   /** Blank lines must stay blank: a line that is only `<span …>` breaks CommonMark HTML / paragraph starts after block markers. */
   if (line === "") return "";
   return `${line}${lineAnchorHtml(mdLine0)}`;
+}
+
+function appendSourceMdLineAnchorWhenAllowed(line: string, line0: number): string {
+  if (isSetextUnderlineLine(line) || isThematicBreakLine(line)) return line;
+  if (line === "") return "";
+  return `${line}${sourceLineAnchorHtml(line0)}`;
 }
 
 /**
@@ -355,6 +366,41 @@ function injectCommentrayDocAnchors(markdown: string, links?: BlockScrollLink[])
   return out.join("\n");
 }
 
+/**
+ * Adds stable source-line anchors (`id="code-line-N"`) to Markdown so rendered-source mode can
+ * preserve block-aware scroll sync and block ray geometry.
+ */
+function injectSourceMarkdownAnchors(markdown: string): string {
+  const lines = markdown.split("\n");
+  const skipLineAnchor = gfmTableLineIndicesWithoutAnchors(lines);
+  let fence: FenceState | null = null;
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const delim = parseFenceDelimiter(line);
+    if (fence) {
+      if (delim && isClosingFenceLine(delim, fence)) {
+        fence = null;
+        out.push(line);
+        continue;
+      }
+      out.push(line);
+      continue;
+    }
+    if (delim) {
+      fence = { ch: delim.ch, len: delim.runLen };
+      out.push(line);
+      continue;
+    }
+    if (skipLineAnchor.has(i)) {
+      out.push(line);
+      continue;
+    }
+    out.push(appendSourceMdLineAnchorWhenAllowed(line, i));
+  }
+  return out.join("\n");
+}
+
 /** GitHub “mark” glyph (Octicons-style path), MIT-licensed silhouette. */
 const GITHUB_MARK_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true">' +
@@ -396,6 +442,16 @@ const TOOLBAR_ICON_FLIP_PANES_SVG =
   '<path d="M12 4v16"/>' +
   '<path d="M10.5 12H6l2.5-2.5M6 12l2.5 2.5"/>' +
   '<path d="M13.5 12H18l-2.5-2.5M18 12l-2.5 2.5"/>' +
+  "</svg>";
+
+/** Source markdown mode flip: rendered page <-> plain markdown rows. */
+const TOOLBAR_ICON_FLIP_SOURCE_MARKDOWN_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<rect x="3" y="4" width="8" height="16" rx="1.5"/>' +
+  '<path d="M6 8h2M6 11h2M6 14h2"/>' +
+  '<rect x="13" y="4" width="8" height="16" rx="1.5"/>' +
+  '<path d="m15.5 12 2-2 2 2"/>' +
+  '<path d="m19.5 12-2 2-2-2"/>' +
   "</svg>";
 
 /** Link/share glyph for copying a permalink to the current documentation pair. */
@@ -508,10 +564,19 @@ function renderToolbarDocHubHtml(opts: {
   return { toolbarDocHubHtml, navRailDocumentedHtml };
 }
 
-function dualPanePanesInnerHtml(codeHtml: string, commentrayHtml: string): string {
+function dualPanePanesInnerHtml(
+  codeHtml: string,
+  commentrayHtml: string,
+  sourceMarkdownRenderedHtml?: string,
+): string {
+  const sourceRenderedPaneHtml =
+    typeof sourceMarkdownRenderedHtml === "string" && sourceMarkdownRenderedHtml.trim().length > 0
+      ? `          <div class="source-pane source-pane--rendered-md" id="code-pane-markdown-body">${sourceMarkdownRenderedHtml}</div>\n`
+      : "";
   return (
     `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
-    `          ${codeHtml}\n` +
+    `          <div class="source-pane source-pane--code" id="code-pane-code-body">${codeHtml}</div>\n` +
+    sourceRenderedPaneHtml +
     `        </section>\n` +
     `        <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-label="Resize panes"></div>\n` +
     `        <section class="pane--doc commentray" id="doc-pane" aria-label="Commentray">\n` +
@@ -520,6 +585,30 @@ function dualPanePanesInnerHtml(codeHtml: string, commentrayHtml: string): strin
     `          </div>\n` +
     `        </section>\n`
   );
+}
+
+function sourceMarkdownToggleControlsHtml(enabled: boolean): {
+  sourceMarkdownToggleHtml: string;
+  sourceMarkdownFlipScrollAffordanceHtml: string;
+} {
+  if (!enabled) {
+    return { sourceMarkdownToggleHtml: "", sourceMarkdownFlipScrollAffordanceHtml: "" };
+  }
+  const label = "Switch source pane between rendered markdown and markdown source";
+  const title = "Switch source pane between rendered markdown and markdown source";
+  const btn = `<button type="button" id="source-markdown-pane-flip" class="toolbar-icon-btn toolbar-icon-btn--source-markdown" aria-controls="code-pane" aria-pressed="false" aria-label="${label}" title="${title}">${TOOLBAR_ICON_FLIP_SOURCE_MARKDOWN_SVG}</button>`;
+  const floating = `<button type="button" id="source-markdown-pane-flip-scroll" class="toolbar-icon-btn toolbar-icon-btn--source-markdown-scroll-narrow" hidden aria-controls="code-pane" aria-pressed="false" aria-label="${label}" title="${title}">${TOOLBAR_ICON_FLIP_SOURCE_MARKDOWN_SVG}</button>`;
+  return {
+    sourceMarkdownToggleHtml: btn,
+    sourceMarkdownFlipScrollAffordanceHtml: floating,
+  };
+}
+
+function isMarkdownLikeSource(opts: CodeBrowserPageOptions): boolean {
+  const lang = opts.language.trim().toLowerCase();
+  if (lang === "md" || lang === "markdown" || lang === "mdx") return true;
+  const path = (opts.filePath ?? "").trim().toLowerCase();
+  return path.endsWith(".md") || path.endsWith(".mdx") || path.endsWith(".markdown");
 }
 
 /** Plain-text Src/Doc labels above the panes; column widths track the resizable split via `--split-pct`. */
@@ -1052,6 +1141,9 @@ const CODE_BROWSER_STYLES = `
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
         outline-offset: 2px;
       }
+      .toolbar-icon-btn--source-markdown {
+        display: inline-flex;
+      }
       .toolbar label input:focus-visible {
         outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
         outline-offset: 2px;
@@ -1341,6 +1433,31 @@ const CODE_BROWSER_STYLES = `
         border-right: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
         --code-line-font-size: 13px;
         --code-line-height: 1.5;
+      }
+      .source-pane {
+        min-width: 0;
+      }
+      .source-pane--rendered-md {
+        font-size: 15px;
+        line-height: 1.45;
+      }
+      .source-pane--rendered-md img {
+        max-width: 100%;
+        height: auto;
+      }
+      .source-pane--rendered-md .commentray-mermaid {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      .source-pane--rendered-md .commentray-line-anchor--source {
+        display: inline;
+        vertical-align: baseline;
+      }
+      #shell[data-source-pane-mode="rendered-markdown"] .source-pane--code {
+        display: none;
+      }
+      #shell[data-source-pane-mode="source"] .source-pane--rendered-md {
+        display: none;
       }
       .pane--code .code-line-stack { --code-ln-min-ch: 3; }
       .pane--code .code-line {
@@ -1767,6 +1884,19 @@ const CODE_BROWSER_STYLES = `
             0 1px 2px color-mix(in oklab, CanvasText 12%, transparent),
             0 4px 14px color-mix(in oklab, CanvasText 18%, transparent);
         }
+        .toolbar-icon-btn--source-markdown-scroll-narrow {
+          display: none;
+        }
+        #source-markdown-pane-flip-scroll.toolbar-icon-btn--source-markdown-scroll-narrow.is-visible {
+          display: inline-flex;
+          position: fixed;
+          top: calc(10px + env(safe-area-inset-top, 0px));
+          left: calc(12px + env(safe-area-inset-left, 0px));
+          z-index: 50;
+          box-shadow:
+            0 1px 2px color-mix(in oklab, CanvasText 12%, transparent),
+            0 4px 14px color-mix(in oklab, CanvasText 18%, transparent);
+        }
         /** Region connector lines are not needed on the narrow single-pane layout (gutter is hidden). */
         .shell:not(.shell--stretch-rows) .gutter .gutter__rays {
           opacity: 0 !important;
@@ -2029,6 +2159,10 @@ type CodeBrowserPageParts = {
   shellSearchAttrs: string;
   /** Base64 JSON payload for multi-angle static browsing (see `code-browser-client.ts`). */
   multiAngleScriptBlock: string;
+  /** Markdown source pages can flip between rendered/source in the source pane. */
+  sourceMarkdownToggleHtml: string;
+  sourceMarkdownFlipScrollAffordanceHtml: string;
+  sourcePaneModeAttr: string;
 };
 
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
@@ -2078,6 +2212,7 @@ ${CODE_BROWSER_STYLES}
             <span class="toolbar-wrap-lines__caption">Wrap lines</span>
           </label>
           ${dualFlipControlHtml}
+          ${p.sourceMarkdownToggleHtml}
           ${p.toolbarDocHubHtml}
           ${p.relatedNavHtml}
           </div>
@@ -2089,6 +2224,7 @@ ${TOOLBAR_COLOR_THEME_HTML}
         </div>
       </header>
       ${dualFlipScrollAffordanceHtml}
+      ${p.sourceMarkdownFlipScrollAffordanceHtml}
       <header class="app__chrome" role="region" aria-label="Search">
         <div class="chrome__search-row">
           <label class="chrome__search-label" for="search-q" aria-label="Search" title="Search"><span class="chrome__search-label__caption nav-rail__search-label">Search</span><span class="chrome__search-label__glyph" aria-hidden="true">${CHROME_ICON_SEARCH_SVG}</span></label>
@@ -2098,7 +2234,7 @@ ${TOOLBAR_COLOR_THEME_HTML}
         <div class="search-results" id="search-results" hidden aria-live="polite"></div>
       </header>
       <main id="main-content" class="app__main" tabindex="-1">
-        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" ? ' data-dual-mobile-pane="doc"' : ""} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairIdentityDataAttrs}${p.shellPairDocDataAttr}>
+        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" ? ' data-dual-mobile-pane="doc"' : ""}${p.sourcePaneModeAttr} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairIdentityDataAttrs}${p.shellPairDocDataAttr}>
 ${p.shellInner}
         </div>
       </main>
@@ -2119,6 +2255,8 @@ type CodeBrowserShell = {
   scrollBlockLinksB64: string;
   angleSelectHtml: string;
   multiAnglePayloadB64: string;
+  sourceMarkdownToggleEnabled: boolean;
+  sourcePaneDefaultMode: "source" | "rendered-markdown";
   /** When multi-angle browsing is active, overrides shell `data-raw-md-b64` / search path / GitHub link. */
   multiShell?: {
     rawMdB64: string;
@@ -2185,6 +2323,8 @@ async function buildMultiAngleDualPaneShell(
   multiShell: NonNullable<CodeBrowserShell["multiShell"]>;
   angleSelectHtml: string;
   multiAnglePayloadB64: string;
+  sourceMarkdownToggleEnabled: boolean;
+  sourcePaneDefaultMode: "source" | "rendered-markdown";
 }> {
   const defaultId = multi.angles.some((a) => a.id === multi.defaultAngleId)
     ? multi.defaultAngleId
@@ -2197,7 +2337,16 @@ async function buildMultiAngleDualPaneShell(
   let defaultStaticBrowse = (opts.commentrayStaticBrowseUrl ?? "").trim();
   let defaultPaneHtml = "";
 
-  const codeHtml = await renderHighlightedCodeLineRows(opts.code, opts.language);
+  const sourceMarkdownEnabled = isMarkdownLikeSource(opts);
+  const sourceMdForPane = sourceMarkdownEnabled ? injectSourceMarkdownAnchors(opts.code) : "";
+  const [codeHtml, sourceMarkdownPaneHtml] = await Promise.all([
+    renderHighlightedCodeLineRows(opts.code, opts.language),
+    sourceMarkdownEnabled
+      ? renderMarkdownToHtml(sourceMdForPane, {
+          commentrayOutputUrls: opts.commentrayOutputUrls,
+        })
+      : Promise.resolve(""),
+  ]);
 
   for (const spec of multi.angles) {
     const { jsonRow, commentrayHtml, scrollB64 } = await multiAngleJsonRowAndDocHtml(opts, spec);
@@ -2226,7 +2375,7 @@ async function buildMultiAngleDualPaneShell(
   const pairHtml = renderShellPairContextHtml(opts.filePath, defaultPathSearch);
   const shellInner = wrapDualShellInner(
     pairHtml,
-    dualPanePanesInnerHtml(codeHtml, defaultPaneHtml),
+    dualPanePanesInnerHtml(codeHtml, defaultPaneHtml, sourceMarkdownPaneHtml),
   );
 
   const payloadObj = { defaultAngleId: defaultId, angles: jsonAngles };
@@ -2243,6 +2392,8 @@ async function buildMultiAngleDualPaneShell(
     },
     angleSelectHtml,
     multiAnglePayloadB64,
+    sourceMarkdownToggleEnabled: sourceMarkdownEnabled,
+    sourcePaneDefaultMode: sourceMarkdownEnabled ? "rendered-markdown" : "source",
   };
 }
 
@@ -2266,6 +2417,8 @@ async function buildCodeBrowserShell(
       scrollBlockLinksB64: ms.scrollBlockLinksB64,
       angleSelectHtml: built.angleSelectHtml,
       multiAnglePayloadB64: built.multiAnglePayloadB64,
+      sourceMarkdownToggleEnabled: built.sourceMarkdownToggleEnabled,
+      sourcePaneDefaultMode: built.sourcePaneDefaultMode,
       multiShell: ms,
     };
   }
@@ -2304,17 +2457,36 @@ async function buildCodeBrowserShell(
     if (links.length > 0) {
       scrollBlockLinksB64 = Buffer.from(JSON.stringify(links), "utf8").toString("base64");
     }
-    const [codeHtml, commentrayHtml] = await Promise.all([
+    const sourceMarkdownEnabled = isMarkdownLikeSource(opts);
+    const sourceMdForPane = sourceMarkdownEnabled ? injectSourceMarkdownAnchors(opts.code) : "";
+    const [codeHtml, commentrayHtml, sourceMarkdownPaneHtml] = await Promise.all([
       renderHighlightedCodeLineRows(opts.code, opts.language),
       renderMarkdownToHtml(mdForDoc, {
         commentrayOutputUrls: opts.commentrayOutputUrls,
       }),
+      sourceMarkdownEnabled
+        ? renderMarkdownToHtml(sourceMdForPane, {
+            commentrayOutputUrls: opts.commentrayOutputUrls,
+          })
+        : Promise.resolve(""),
     ]);
     const pairHtml = renderShellPairContextHtml(
       opts.filePath,
       (opts.commentrayPathForSearch ?? "").trim(),
     );
-    shellInner = wrapDualShellInner(pairHtml, dualPanePanesInnerHtml(codeHtml, commentrayHtml));
+    shellInner = wrapDualShellInner(
+      pairHtml,
+      dualPanePanesInnerHtml(codeHtml, commentrayHtml, sourceMarkdownPaneHtml),
+    );
+    return {
+      layout,
+      shellInner,
+      scrollBlockLinksB64,
+      angleSelectHtml: "",
+      multiAnglePayloadB64: "",
+      sourceMarkdownToggleEnabled: sourceMarkdownEnabled,
+      sourcePaneDefaultMode: sourceMarkdownEnabled ? "rendered-markdown" : "source",
+    };
   }
 
   return {
@@ -2323,6 +2495,8 @@ async function buildCodeBrowserShell(
     scrollBlockLinksB64,
     angleSelectHtml: "",
     multiAnglePayloadB64: "",
+    sourceMarkdownToggleEnabled: false,
+    sourcePaneDefaultMode: "source",
   };
 }
 
@@ -2472,6 +2646,8 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   );
   const pairDocDataAttr = shellPairDocDataAttr(shell, opts);
   const pairIdentityDataAttrs = shellPairIdentityDataAttrs(shell, opts);
+  const sourceMarkdownToggles = sourceMarkdownToggleControlsHtml(shell.sourceMarkdownToggleEnabled);
+  const sourcePaneModeAttr = ` data-source-pane-mode="${shell.sourcePaneDefaultMode}"`;
 
   return buildCodeBrowserPageHtml({
     title,
@@ -2498,5 +2674,9 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     searchPlaceholder,
     shellSearchAttrs,
     multiAngleScriptBlock: shell.multiAnglePayloadB64,
+    sourceMarkdownToggleHtml: sourceMarkdownToggles.sourceMarkdownToggleHtml,
+    sourceMarkdownFlipScrollAffordanceHtml:
+      sourceMarkdownToggles.sourceMarkdownFlipScrollAffordanceHtml,
+    sourcePaneModeAttr,
   });
 }

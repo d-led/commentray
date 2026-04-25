@@ -190,9 +190,10 @@ function applyDocToCodeFlipPlanImpl(
   codePane: HTMLElement,
   _docPane: HTMLElement,
   plan: DocToCodeFlipPlan,
+  lineIdPrefix = "code-line-",
 ): void {
   if (plan.k === "block") {
-    const el = codePane.querySelector(`#code-line-${String(plan.src0)}`);
+    const el = codePane.querySelector(`#${lineIdPrefix}${String(plan.src0)}`);
     if (el) {
       applyRevealChildInPane(codePane, el, 2);
     } else {
@@ -286,10 +287,11 @@ function buildCodeToDocFlipPlanBlockAware(
   codePane: HTMLElement,
   _docPane: HTMLElement,
   getLinks: () => BlockScrollLink[],
+  lineIdPrefix = "code-line-",
 ): CodeToDocFlipPlan {
   const winRatio = windowScrollRatio();
   const links = getLinks();
-  const line1 = probeCodeLine1FromViewport(codePane);
+  const line1 = probeCodeLine1FromViewport(codePane, lineIdPrefix);
   const mdLine0 = pickCommentrayLineForSourceScroll(links, line1);
   if (mdLine0 === null) {
     if (paneUsesInternalYScroll(codePane)) {
@@ -981,14 +983,14 @@ function lastCommentrayAnchorLine0(anchors: NodeListOf<HTMLElement>): number {
   return readCommentrayLine0FromAnchor(last) ?? 0;
 }
 
-function probeCodeLine1FromViewport(codePane: HTMLElement): number {
-  const rows = codePane.querySelectorAll<HTMLElement>('[id^="code-line-"]');
+function probeCodeLine1FromViewport(codePane: HTMLElement, lineIdPrefix = "code-line-"): number {
+  const rows = codePane.querySelectorAll<HTMLElement>(`[id^="${lineIdPrefix}"]`);
   if (rows.length === 0) return 1;
 
   if (!paneUsesInternalYScroll(codePane)) {
     if (rootScrollNearDocumentEnd()) {
       const last = rows[rows.length - 1];
-      const m = /^code-line-(\d+)$/.exec(last.id);
+      const m = /^(?:code-line-|code-md-line-)(\d+)$/.exec(last.id);
       if (m) return Number(m[1]) + 1;
       return rows.length;
     }
@@ -1000,7 +1002,7 @@ function probeCodeLine1FromViewport(codePane: HTMLElement): number {
     for (const el of rows) {
       const r = el.getBoundingClientRect();
       if (r.bottom > y - 1e-3) {
-        const m = /^code-line-(\d+)$/.exec(el.id);
+        const m = /^(?:code-line-|code-md-line-)(\d+)$/.exec(el.id);
         if (m) return Number(m[1]) + 1;
         return 1;
       }
@@ -1010,7 +1012,7 @@ function probeCodeLine1FromViewport(codePane: HTMLElement): number {
 
   if (paneScrollNearEnd(codePane)) {
     const last = rows[rows.length - 1];
-    const m = /^code-line-(\d+)$/.exec(last.id);
+    const m = /^(?:code-line-|code-md-line-)(\d+)$/.exec(last.id);
     if (m) return Number(m[1]) + 1;
     return rows.length;
   }
@@ -1020,7 +1022,7 @@ function probeCodeLine1FromViewport(codePane: HTMLElement): number {
   for (const el of rows) {
     const r = el.getBoundingClientRect();
     if (r.bottom > y - 1e-3) {
-      const m = /^code-line-(\d+)$/.exec(el.id);
+      const m = /^(?:code-line-|code-md-line-)(\d+)$/.exec(el.id);
       if (m) return Number(m[1]) + 1;
       return 1;
     }
@@ -1134,6 +1136,7 @@ function wireBlockAwareScrollSync(
   codePane: HTMLElement,
   docPane: HTMLElement,
   getLinks: () => BlockScrollLink[],
+  lineIdPrefix: () => string,
 ): DualPaneScrollSyncRunners {
   let pendingDocToCode: DocToCodeFlipPlan | null = null;
   let pendingCodeToDoc: CodeToDocFlipPlan | null = null;
@@ -1142,7 +1145,7 @@ function wireBlockAwareScrollSync(
     applyCodeToDocFlipPlanImpl(
       codePane,
       docPane,
-      buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks),
+      buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks, lineIdPrefix()),
     );
   };
   const syncFromDocToCode = (): void => {
@@ -1150,6 +1153,7 @@ function wireBlockAwareScrollSync(
       codePane,
       docPane,
       buildDocToCodeFlipPlanBlockAware(docPane, getLinks),
+      lineIdPrefix(),
     );
   };
   const prepareMobileFlipToCode = (): void => {
@@ -1159,10 +1163,15 @@ function wireBlockAwareScrollSync(
     if (!pendingDocToCode) return;
     const p = pendingDocToCode;
     pendingDocToCode = null;
-    applyDocToCodeFlipPlanImpl(codePane, docPane, p);
+    applyDocToCodeFlipPlanImpl(codePane, docPane, p, lineIdPrefix());
   };
   const prepareMobileFlipToDoc = (): void => {
-    pendingCodeToDoc = buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks);
+    pendingCodeToDoc = buildCodeToDocFlipPlanBlockAware(
+      codePane,
+      docPane,
+      getLinks,
+      lineIdPrefix(),
+    );
   };
   const finishMobileFlipToDoc = (): void => {
     if (!pendingCodeToDoc) return;
@@ -1279,6 +1288,7 @@ function drawBlockRaysIntoSvg(
   docScrollEl: HTMLElement,
   getLinks: () => BlockScrollLink[],
   probeTopSourceLine1Based: () => number,
+  lineIdPrefix = "code-line-",
 ): void {
   const links = getLinks();
   const sorted = sortBlockLinksBySource(links);
@@ -1303,8 +1313,8 @@ function drawBlockRaysIntoSvg(
 
     const i0 = codeLineDomIndex0(link.sourceStart);
     const i1 = codeLineDomIndex0(link.sourceEnd);
-    const codeTop = document.getElementById(`code-line-${String(i0)}`);
-    const codeBot = document.getElementById(`code-line-${String(i1)}`);
+    const codeTop = document.getElementById(`${lineIdPrefix}${String(i0)}`);
+    const codeBot = document.getElementById(`${lineIdPrefix}${String(i1)}`);
     const docTop = document.getElementById(`commentray-block-${link.id}`);
     if (!codeTop || !codeBot || !docTop) continue;
 
@@ -1363,8 +1373,10 @@ function wireBlockRayConnectors(args: {
   docScrollEl: HTMLElement;
   getLinks: () => BlockScrollLink[];
   probeTopSourceLine1Based: () => number;
+  lineIdPrefix?: string;
 }): () => void {
   const { gutter, codePane, docScrollEl, getLinks, probeTopSourceLine1Based } = args;
+  const lineIdPrefix = args.lineIdPrefix ?? "code-line-";
 
   const svgNs = "http://www.w3.org/2000/svg";
   const host = document.createElement("div");
@@ -1379,7 +1391,14 @@ function wireBlockRayConnectors(args: {
     if (raf !== 0) return;
     raf = globalThis.requestAnimationFrame(() => {
       raf = 0;
-      drawBlockRaysIntoSvg(svg, gutter, docScrollEl, getLinks, probeTopSourceLine1Based);
+      drawBlockRaysIntoSvg(
+        svg,
+        gutter,
+        docScrollEl,
+        getLinks,
+        probeTopSourceLine1Based,
+        lineIdPrefix,
+      );
     });
   }
 
@@ -1820,12 +1839,23 @@ function wireSplitter(
 const STORAGE_SPLIT_PCT = "commentray.codeCommentrayStatic.splitPct";
 const STORAGE_WRAP_LINES = "commentray.codeCommentrayStatic.wrap";
 const STORAGE_DUAL_MOBILE_PANE = "commentray.codeCommentrayStatic.dualMobilePane";
+const STORAGE_SOURCE_MARKDOWN_PANE_MODE = "commentray.codeCommentrayStatic.sourceMarkdownPaneMode";
 
 /** Matches `code-browser.ts` `@media (max-width: 767px)` (dual column from 768px up). */
 const DUAL_MOBILE_SINGLE_PANE_MQ = "(max-width: 767px)";
 
 function normalizedDualMobilePane(v: string | null | undefined): "code" | "doc" {
   return v === "code" ? "code" : "doc";
+}
+
+function sourcePaneModeForShell(shell: HTMLElement): "source" | "rendered-markdown" {
+  return shell.getAttribute("data-source-pane-mode") === "rendered-markdown"
+    ? "rendered-markdown"
+    : "source";
+}
+
+function sourceLineIdPrefixForShell(shell: HTMLElement): "code-line-" | "code-md-line-" {
+  return sourcePaneModeForShell(shell) === "rendered-markdown" ? "code-md-line-" : "code-line-";
 }
 
 /** When the commentary pane is visible, (re)run Mermaid so diagrams are not laid out under display:none. */
@@ -1877,6 +1907,109 @@ function wireDualMobilePaneFlipScrollAffordance(
   globalThis.addEventListener("resize", tick, { passive: true });
   mq.addEventListener("change", tick);
   globalThis.requestAnimationFrame(tick);
+}
+
+function wireSourceMarkdownPaneFlipAffordance(
+  primaryFlip: HTMLButtonElement,
+  scrollFlip: HTMLButtonElement,
+): void {
+  const hideScroll = (): void => {
+    scrollFlip.hidden = true;
+    scrollFlip.classList.remove("is-visible");
+  };
+  const showScroll = (): void => {
+    scrollFlip.hidden = false;
+    scrollFlip.classList.add("is-visible");
+  };
+  const tick = (): void => {
+    const r = primaryFlip.getBoundingClientRect();
+    const vh = globalThis.innerHeight;
+    const margin = 10;
+    const offScreen = r.bottom < margin || r.top > vh - margin;
+    if (offScreen) showScroll();
+    else hideScroll();
+  };
+  globalThis.addEventListener("scroll", tick, { passive: true });
+  globalThis.addEventListener("resize", tick, { passive: true });
+  globalThis.requestAnimationFrame(tick);
+}
+
+function closestSourceLine0ForPaneTop(codePane: HTMLElement, idPrefix: string): number | null {
+  const rows = codePane.querySelectorAll<HTMLElement>(`[id^="${idPrefix}"]`);
+  if (rows.length === 0) return null;
+  const y = paneUsesInternalYScroll(codePane)
+    ? codePane.getBoundingClientRect().top + codePane.clientTop + 2
+    : Math.max(0, codePane.getBoundingClientRect().top) + 2;
+  for (const el of rows) {
+    const r = el.getBoundingClientRect();
+    if (r.bottom > y - 1e-3) {
+      const m = /^(?:code-line-|code-md-line-)(\d+)$/.exec(el.id);
+      if (!m?.[1]) return null;
+      return Number.parseInt(m[1], 10);
+    }
+  }
+  const last = rows[rows.length - 1];
+  if (!last) return null;
+  const m = /^(?:code-line-|code-md-line-)(\d+)$/.exec(last.id);
+  if (!m?.[1]) return null;
+  return Number.parseInt(m[1], 10);
+}
+
+function wireSourceMarkdownPaneFlip(
+  shell: HTMLElement,
+  codePane: HTMLElement,
+  flipBtn: HTMLButtonElement,
+  flipScrollBtn: HTMLButtonElement | null,
+): void {
+  function syncSourceMarkdownFlipA11y(): void {
+    const mode = sourcePaneModeForShell(shell);
+    const renderedActive = mode === "rendered-markdown";
+    const nextModeLabel = renderedActive ? "markdown source" : "rendered markdown";
+    const ariaLabel = `Switch source pane to ${nextModeLabel}`;
+    const title = `Source pane: ${renderedActive ? "rendered markdown" : "markdown source"} (click to switch)`;
+    const apply = (btn: HTMLButtonElement | null): void => {
+      if (!(btn instanceof HTMLButtonElement)) return;
+      btn.setAttribute("aria-pressed", renderedActive ? "true" : "false");
+      btn.setAttribute("aria-label", ariaLabel);
+      btn.title = title;
+    };
+    apply(flipBtn);
+    apply(flipScrollBtn);
+  }
+
+  const initial = readWebStorageItem(localStorage, STORAGE_SOURCE_MARKDOWN_PANE_MODE);
+  if (initial === "source" || initial === "rendered-markdown") {
+    shell.setAttribute("data-source-pane-mode", initial);
+  }
+  syncSourceMarkdownFlipA11y();
+  const runFlip = (): void => {
+    const cur = sourcePaneModeForShell(shell);
+    const currentPrefix = cur === "rendered-markdown" ? "code-md-line-" : "code-line-";
+    const line0 = closestSourceLine0ForPaneTop(codePane, currentPrefix);
+    const next = cur === "rendered-markdown" ? "source" : "rendered-markdown";
+    const nextPrefix = next === "rendered-markdown" ? "code-md-line-" : "code-line-";
+    shell.setAttribute("data-source-pane-mode", next);
+    writeWebStorageItem(localStorage, STORAGE_SOURCE_MARKDOWN_PANE_MODE, next);
+    syncSourceMarkdownFlipA11y();
+    if (line0 !== null) {
+      const row = codePane.querySelector(`#${nextPrefix}${String(line0)}`);
+      if (row instanceof HTMLElement) {
+        applyRevealChildInPane(codePane, row, 2);
+      }
+    }
+    if (next === "rendered-markdown") {
+      const sourceMdBody = document.getElementById("code-pane-markdown-body");
+      if (sourceMdBody instanceof HTMLElement) {
+        runMermaidOnFreshDocNodes(sourceMdBody);
+        rewriteHubRelativeBrowseAnchorsIn(sourceMdBody);
+      }
+    }
+  };
+  flipBtn.addEventListener("click", runFlip);
+  if (flipScrollBtn) {
+    flipScrollBtn.addEventListener("click", runFlip);
+    wireSourceMarkdownPaneFlipAffordance(flipBtn, flipScrollBtn);
+  }
 }
 
 function wireDualMobilePaneFlip(
@@ -2131,6 +2264,74 @@ function wireDualPaneNavSearchFetch(
   })();
 }
 
+function applySelectedMultiAngle(args: {
+  angle: NonNullable<MultiAngleClientPayload>["angles"][number];
+  docBody: HTMLElement;
+  mutable: MutableSearchFields;
+  rebuildSearcher: () => void;
+  scrollLinksRef: { current: BlockScrollLink[] };
+  shell: HTMLElement;
+  searchInput: HTMLInputElement;
+  searchResults: HTMLElement;
+  requestBlockRayRedraw?: () => void;
+}): void {
+  const {
+    angle,
+    docBody,
+    mutable,
+    rebuildSearcher,
+    scrollLinksRef,
+    shell,
+    searchInput,
+    searchResults,
+    requestBlockRayRedraw,
+  } = args;
+  docBody.innerHTML = decodeBase64Utf8(angle.docInnerHtmlB64);
+  runMermaidOnFreshDocNodes(docBody);
+  rewriteHubRelativeBrowseAnchorsIn(docBody);
+  mutable.rawMd = decodeBase64Utf8(angle.rawMdB64);
+  mutable.mdLines = mutable.rawMd.split("\n");
+  mutable.commentrayPathLabel = angle.commentrayPathForSearch;
+  rebuildSearcher();
+  scrollLinksRef.current = parseScrollBlockLinksFromShell(angle.scrollBlockLinksB64);
+  shell.setAttribute("data-scroll-block-links-b64", angle.scrollBlockLinksB64);
+  shell.setAttribute("data-search-commentray-path", angle.commentrayPathForSearch);
+  const crIdentity = normPosixPath(angle.commentrayPathForSearch);
+  if (crIdentity.length > 0) shell.setAttribute("data-commentray-pair-commentray-path", crIdentity);
+  else shell.removeAttribute("data-commentray-pair-commentray-path");
+  applyDocumentedTreeCurrentPairHighlight();
+  const docPathEl = document.getElementById("nav-rail-doc-path");
+  if (docPathEl) {
+    const path = angle.commentrayPathForSearch.trim();
+    docPathEl.textContent = path.length > 0 ? path : "—";
+    if (path.length > 0) docPathEl.setAttribute("title", path);
+    else docPathEl.removeAttribute("title");
+  }
+  const browse = angle.staticBrowseUrl?.trim() ?? "";
+  if (browse.length > 0) {
+    const resolved = staticBrowseHrefForShellDataAttribute(
+      browse,
+      globalThis.location.pathname,
+      globalThis.location.origin,
+    );
+    shell.setAttribute("data-commentray-pair-browse-href", resolved);
+  } else {
+    const ghu = angle.commentrayOnGithubUrl?.trim();
+    if (ghu) shell.setAttribute("data-commentray-pair-browse-href", ghu);
+    else shell.removeAttribute("data-commentray-pair-browse-href");
+  }
+  searchInput.value = "";
+  searchResults.innerHTML = "";
+  searchResults.hidden = true;
+  requestBlockRayRedraw?.();
+  globalThis.requestAnimationFrame(() => {
+    requestBlockRayRedraw?.();
+    globalThis.requestAnimationFrame(() => {
+      requestBlockRayRedraw?.();
+    });
+  });
+}
+
 function wireDualPaneMultiAngleAndScroll(args: {
   codePane: HTMLElement;
   docScrollEl: HTMLElement;
@@ -2158,68 +2359,39 @@ function wireDualPaneMultiAngleAndScroll(args: {
     requestBlockRayRedraw,
   } = args;
   if (multiPayload) {
-    const runners = wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinksRef.current);
+    const runners = wireBlockAwareScrollSync(
+      codePane,
+      docScrollEl,
+      () => scrollLinksRef.current,
+      () => sourceLineIdPrefixForShell(shell),
+    );
     const angleSel = document.getElementById("angle-select") as HTMLSelectElement | null;
     if (angleSel && docBody) {
       angleSel.addEventListener("change", () => {
         const a = multiPayload.angles.find((x) => x.id === angleSel.value);
         if (!a) return;
-        docBody.innerHTML = decodeBase64Utf8(a.docInnerHtmlB64);
-        runMermaidOnFreshDocNodes(docBody);
-        rewriteHubRelativeBrowseAnchorsIn(docBody);
-        mutable.rawMd = decodeBase64Utf8(a.rawMdB64);
-        mutable.mdLines = mutable.rawMd.split("\n");
-        mutable.commentrayPathLabel = a.commentrayPathForSearch;
-        rebuildSearcher();
-        scrollLinksRef.current = parseScrollBlockLinksFromShell(a.scrollBlockLinksB64);
-        shell.setAttribute("data-scroll-block-links-b64", a.scrollBlockLinksB64);
-        shell.setAttribute("data-search-commentray-path", a.commentrayPathForSearch);
-        const crIdentity = normPosixPath(a.commentrayPathForSearch);
-        if (crIdentity.length > 0) {
-          shell.setAttribute("data-commentray-pair-commentray-path", crIdentity);
-        } else {
-          shell.removeAttribute("data-commentray-pair-commentray-path");
-        }
-        applyDocumentedTreeCurrentPairHighlight();
-        const docPathEl = document.getElementById("nav-rail-doc-path");
-        if (docPathEl) {
-          const path = a.commentrayPathForSearch.trim();
-          docPathEl.textContent = path.length > 0 ? path : "—";
-          if (path.length > 0) docPathEl.setAttribute("title", path);
-          else docPathEl.removeAttribute("title");
-        }
-        const browse = a.staticBrowseUrl?.trim() ?? "";
-        if (browse.length > 0) {
-          const resolved = staticBrowseHrefForShellDataAttribute(
-            browse,
-            globalThis.location.pathname,
-            globalThis.location.origin,
-          );
-          shell.setAttribute("data-commentray-pair-browse-href", resolved);
-        } else {
-          const ghu = a.commentrayOnGithubUrl?.trim();
-          if (ghu) {
-            shell.setAttribute("data-commentray-pair-browse-href", ghu);
-          } else {
-            shell.removeAttribute("data-commentray-pair-browse-href");
-          }
-        }
-        searchInput.value = "";
-        searchResults.innerHTML = "";
-        searchResults.hidden = true;
-        requestBlockRayRedraw?.();
-        globalThis.requestAnimationFrame(() => {
-          requestBlockRayRedraw?.();
-          globalThis.requestAnimationFrame(() => {
-            requestBlockRayRedraw?.();
-          });
+        applySelectedMultiAngle({
+          angle: a,
+          docBody,
+          mutable,
+          rebuildSearcher,
+          scrollLinksRef,
+          shell,
+          searchInput,
+          searchResults,
+          requestBlockRayRedraw,
         });
       });
     }
     return runners;
   }
   if (scrollLinksRef.current.length > 0) {
-    return wireBlockAwareScrollSync(codePane, docScrollEl, () => scrollLinksRef.current);
+    return wireBlockAwareScrollSync(
+      codePane,
+      docScrollEl,
+      () => scrollLinksRef.current,
+      () => sourceLineIdPrefixForShell(shell),
+    );
   }
   return wireProportionalScrollSync(codePane, docScrollEl);
 }
@@ -2267,6 +2439,27 @@ type DualPaneSearcherBundle = {
   mutable: MutableSearchFields;
   rebuildSearcher: () => void;
 };
+
+function initializeSourceMarkdownPane(shell: HTMLElement): void {
+  if (sourcePaneModeForShell(shell) !== "rendered-markdown") return;
+  const sourceMdBody = document.getElementById("code-pane-markdown-body");
+  if (!(sourceMdBody instanceof HTMLElement)) return;
+  runMermaidOnFreshDocNodes(sourceMdBody);
+  rewriteHubRelativeBrowseAnchorsIn(sourceMdBody);
+}
+
+function wireSourceMarkdownControls(shell: HTMLElement, codePane: HTMLElement): void {
+  const sourceMdFlip = document.getElementById("source-markdown-pane-flip");
+  const sourceMdFlipScroll = document.getElementById("source-markdown-pane-flip-scroll");
+  if (!(sourceMdFlip instanceof HTMLButtonElement)) return;
+  wireSourceMarkdownPaneFlip(
+    shell,
+    codePane,
+    sourceMdFlip,
+    sourceMdFlipScroll instanceof HTMLButtonElement ? sourceMdFlipScroll : null,
+  );
+  initializeSourceMarkdownPane(shell);
+}
 
 function buildDualPaneSearcherBundle(
   shell: HTMLElement,
@@ -2369,6 +2562,7 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
 
   const docPaneEl = document.getElementById("doc-pane");
   const docPaneForWrap = docPaneEl instanceof HTMLElement ? docPaneEl : null;
+  const sourceMdBodyForWrap = document.getElementById("code-pane-markdown-body");
 
   const blockRayRedraw: { request?: () => void } = {};
   wireWrapToggle(
@@ -2377,11 +2571,10 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     wrapCb,
     () => {
       blockRayRedraw.request?.();
-      codePane.dispatchEvent(new Event("scroll"));
-      docScrollEl.dispatchEvent(new Event("scroll"));
     },
     docPaneForWrap,
     docBody,
+    sourceMdBodyForWrap instanceof HTMLElement ? sourceMdBodyForWrap : null,
   );
   wireSplitter(STORAGE_SPLIT_PCT, shell, codePane, gutter, pct);
 
@@ -2394,7 +2587,9 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
         codePane,
         docScrollEl,
         getLinks: () => bundle.scrollLinksRef.current,
-        probeTopSourceLine1Based: () => probeCodeLine1FromViewport(codePane),
+        probeTopSourceLine1Based: () =>
+          probeCodeLine1FromViewport(codePane, sourceLineIdPrefixForShell(shell)),
+        lineIdPrefix: sourceLineIdPrefixForShell(shell),
       })
     : undefined;
   blockRayRedraw.request = requestBlockRayRedraw;
@@ -2422,6 +2617,7 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
       flipScrollBtn instanceof HTMLButtonElement ? flipScrollBtn : null,
     );
   }
+  wireSourceMarkdownControls(shell, codePane);
 
   wireDualPaneCommentrayLocationHash(docScrollEl, () => bundle.mutable.mdLines.length);
 }
