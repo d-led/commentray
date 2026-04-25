@@ -187,7 +187,130 @@ export function activeBlockIdForViewport(
   return b?.id ?? null;
 }
 
+/**
+ * Which index-backed block owns the companion line at/above `topCommentrayLine0Based`, in
+ * markdown order. Matches {@link pickSourceLine0ForCommentrayScroll}’s block choice so gutter
+ * “active” emphasis tracks the **doc** viewport (what the reader is reading), not only the code
+ * pane’s top line — which can disagree briefly (e.g. tall page-break gaps).
+ */
+export function activeBlockIdForCommentrayLine0(
+  links: BlockScrollLink[],
+  topCommentrayLine0Based: number,
+): string | null {
+  if (links.length === 0) return null;
+  const sorted = sortBlockLinksByCommentrayLine(links);
+  let best = sorted[0];
+  if (!best) return null;
+  for (const b of sorted) {
+    if (b.commentrayLine <= topCommentrayLine0Based) best = b;
+    else break;
+  }
+  return best.id;
+}
+
 /** 0-based index into `code-line-*` ids from 1-based inclusive source line numbers. */
 export function codeLineDomIndex0(sourceLine1Based: number): number {
   return Math.max(0, sourceLine1Based - 1);
+}
+
+const PAGE_BREAK_HOST_SELECTOR = '.commentray-page-break[data-commentray-page-break="true"]';
+
+function elementFollowsInDocumentOrder(a: Element, b: Element): boolean {
+  return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
+/**
+ * Page-break hosts rendered between a block anchor and the next block anchor (or all breaks after
+ * `docTop` when `endExclusive` is null), in tree order.
+ */
+export function pageBreakHostsBetweenAnchors(
+  docScrollEl: HTMLElement,
+  docTop: HTMLElement,
+  endExclusive: HTMLElement | null,
+): HTMLElement[] {
+  return Array.from(docScrollEl.querySelectorAll<HTMLElement>(PAGE_BREAK_HOST_SELECTOR)).filter(
+    (pb) =>
+      elementFollowsInDocumentOrder(docTop, pb) &&
+      (endExclusive === null || elementFollowsInDocumentOrder(pb, endExclusive)),
+  );
+}
+
+const MIN_LAYOUT_RECT_SIDE = 0.5;
+
+function isInsidePageBreakHost(el: HTMLElement): boolean {
+  const host = el.closest(PAGE_BREAK_HOST_SELECTOR);
+  return Boolean(host && !el.isSameNode(host));
+}
+
+/**
+ * Lowest `getBoundingClientRect().bottom` among laid-out elements strictly after `startAfter` and
+ * strictly before `endBefore`, excluding page-break hosts and their descendants (same visual intent
+ * as a `Range` over the gap, without relying on `Range#getClientRects`, which jsdom omits).
+ */
+function maxContentBottomByElementWalk(
+  docScrollEl: HTMLElement,
+  startAfter: HTMLElement,
+  endBefore: HTMLElement,
+): number {
+  let maxBottom = startAfter.getBoundingClientRect().top + 2;
+  for (const el of Array.from(docScrollEl.querySelectorAll("*"))) {
+    if (!(el instanceof HTMLElement)) continue;
+    if (el === endBefore) continue;
+    if (!elementFollowsInDocumentOrder(startAfter, el)) continue;
+    if (!elementFollowsInDocumentOrder(el, endBefore)) continue;
+    if (isInsidePageBreakHost(el)) continue;
+    if (el.matches(PAGE_BREAK_HOST_SELECTOR)) continue;
+    const br = el.getBoundingClientRect();
+    if (br.width < MIN_LAYOUT_RECT_SIDE || br.height < MIN_LAYOUT_RECT_SIDE) continue;
+    maxBottom = Math.max(maxBottom, br.bottom);
+  }
+  return maxBottom;
+}
+
+function maxContentBottomByElementWalkOpenEnded(
+  docScrollEl: HTMLElement,
+  startAfter: HTMLElement,
+): number {
+  let maxBottom = startAfter.getBoundingClientRect().top + 2;
+  for (const el of Array.from(docScrollEl.querySelectorAll("*"))) {
+    if (!(el instanceof HTMLElement)) continue;
+    if (!elementFollowsInDocumentOrder(startAfter, el)) continue;
+    if (isInsidePageBreakHost(el)) continue;
+    if (el.matches(PAGE_BREAK_HOST_SELECTOR)) continue;
+    const br = el.getBoundingClientRect();
+    if (br.width < MIN_LAYOUT_RECT_SIDE || br.height < MIN_LAYOUT_RECT_SIDE) continue;
+    maxBottom = Math.max(maxBottom, br.bottom);
+  }
+  return maxBottom;
+}
+
+/**
+ * Lowest viewport Y of rendered companion content for one block, **excluding** synthetic
+ * `.commentray-page-break` regions. Used so gutter splines do not extend through tall page-break
+ * gaps toward the next block.
+ *
+ * When `endExclusive` is the next block’s `commentray-block-*` anchor, ranges stop before that
+ * node. When it is `null` (last block), the final segment runs to the end of `docScrollEl`.
+ */
+export function maxRenderableCommentaryContentBottomViewport(
+  docScrollEl: HTMLElement,
+  docTop: HTMLElement,
+  endExclusive: HTMLElement | null,
+): number {
+  const breaks = pageBreakHostsBetweenAnchors(docScrollEl, docTop, endExclusive);
+  let maxBottom = docTop.getBoundingClientRect().top + 2;
+  let cursor: HTMLElement = docTop;
+  for (const pb of breaks) {
+    maxBottom = Math.max(maxBottom, maxContentBottomByElementWalk(docScrollEl, cursor, pb));
+    cursor = pb;
+  }
+  if (endExclusive) {
+    maxBottom = Math.max(
+      maxBottom,
+      maxContentBottomByElementWalk(docScrollEl, cursor, endExclusive),
+    );
+  } else {
+    maxBottom = Math.max(maxBottom, maxContentBottomByElementWalkOpenEnded(docScrollEl, cursor));
+  }
+  return maxBottom;
 }

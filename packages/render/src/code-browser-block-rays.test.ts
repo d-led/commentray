@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activeBlockIdForCommentrayLine0,
   activeBlockIdForViewport,
   clampViewportYToGutterLocal,
   codeLineDomIndex0,
@@ -120,6 +121,29 @@ describe("activeBlockIdForViewport", () => {
 
   it("returns the nearest preceding block in gaps", () => {
     expect(activeBlockIdForViewport(links, 10)).toBe("b1");
+  });
+});
+
+describe("activeBlockIdForCommentrayLine0", () => {
+  const links = [
+    { id: "b1", commentrayLine: 2, sourceStart: 1, sourceEnd: 5 },
+    { id: "b2", commentrayLine: 12, sourceStart: 20, sourceEnd: 25 },
+  ];
+
+  it("returns the block whose marker is at or above the probed companion line", () => {
+    expect(activeBlockIdForCommentrayLine0(links, 2)).toBe("b1");
+    expect(activeBlockIdForCommentrayLine0(links, 11)).toBe("b1");
+    expect(activeBlockIdForCommentrayLine0(links, 12)).toBe("b2");
+    expect(activeBlockIdForCommentrayLine0(links, 99)).toBe("b2");
+  });
+
+  it("uses markdown order, not source line order, when ids are inverted", () => {
+    const inverted = [
+      { id: "lateInFile", commentrayLine: 0, sourceStart: 100, sourceEnd: 110 },
+      { id: "earlyInFile", commentrayLine: 8, sourceStart: 1, sourceEnd: 20 },
+    ];
+    expect(activeBlockIdForCommentrayLine0(inverted, 0)).toBe("lateInFile");
+    expect(activeBlockIdForCommentrayLine0(inverted, 8)).toBe("earlyInFile");
   });
 });
 

@@ -50,13 +50,48 @@ Slow lane (integration + expensive suites) on top of the gate:
 npm run ci:full
 ```
 
+### Full local test run (`test:all`)
+
+Use this when you want one command before a big push or when mirroring most of
+what CI exercises locally. It does **not** replace `npm run quality:gate` for
+everyday PRs (that stays the minimum bar in `CONTRIBUTING.md`).
+
+**What runs (in order):**
+
+1. **`npm run ci:full`** — quality gate, then integration Vitest, then expensive Vitest (same as [`scripts/ci-full.sh`](../scripts/ci-full.sh)).
+2. **VS Code extension tests** — [`scripts/test-vscode-extension.sh`](../scripts/test-vscode-extension.sh) (`npm run test:vscode` in `packages/vscode`), unless skipped below.
+3. **Cypress E2E** — `npm run e2e:ci` (static Pages build runs via the `e2e` lifecycle), unless skipped below.
+
+**Coverage** is unchanged: use `npm run test:coverage` or `npm run test:coverage:all` when you want Vitest HTML/lcov; this script does not merge Cypress or extension coverage.
+
+**Commands:**
+
+```bash
+npm run test:all
+# same:
+bash scripts/test-all.sh
+```
+
+**Skip steps** (set to `1` to skip; you can combine both):
+
+| Variable                   | Skips                                                          |
+| -------------------------- | -------------------------------------------------------------- |
+| `COMMENTRAY_SKIP_VSCODE=1` | VS Code / Electron extension host (no GUI or faster iteration) |
+| `COMMENTRAY_SKIP_E2E=1`    | Cypress / Chrome                                               |
+
+```bash
+COMMENTRAY_SKIP_VSCODE=1 npm run test:all
+COMMENTRAY_SKIP_E2E=1 npm run test:all
+COMMENTRAY_SKIP_VSCODE=1 COMMENTRAY_SKIP_E2E=1 npm run test:all   # only ci:full
+```
+
 If a check is failing, fix the root cause. Do not widen ignore lists or
 raise thresholds to hide it. `CONTRIBUTING.md` states the social contract;
 the bullets below are the day-to-day detail.
 
 ## Contributor expectations
 
-- **Slow lane:** `npm run ci:full` — quality gate, integration tests, then expensive tests (no Cypress).
+- **Slow lane:** `npm run ci:full` — quality gate, integration tests, then expensive tests (no Cypress). **`npm run test:all`** adds VS Code extension tests and Cypress on top; see [Full local test run](#full-local-test-run-testall) above.
 - **Tests:** run `npm run test:unit` before every PR; add `npm run test:integration` when you touch the Git SCM adapter, `.commentray/` layout, or fixture-backed behavior; use `npm run test:expensive` for fuzzed / large-repo suites when relevant. Never silence failures with `.skip`, swallowed errors, or widened thresholds — fix code or fix tests. When you change **`packages/vscode`**, run **`npm run test:vscode-extension`** and keep **`engines.vscode`**, **`@types/vscode`**, and the **minimum** row in [`.github/workflows/ci-vscode-extension.yml`](../.github/workflows/ci-vscode-extension.yml) aligned (see **VS Code engine compatibility** under Editor extension workflows below).
 - **Lint / dupes:** `npm run lint` (ESLint + shellcheck on `scripts/` + refactor metrics); `npm run dupes` (`jscpd`); `npm run quality` runs lint + dupes. Treat findings as design feedback.
 - **Dependencies:** preview with `npm run deps:upgrade -- --check`; apply with `npm run deps:upgrade` (`patch` / `minor` / `major` / `latest`). The script re-pins `@commentray/*` via `scripts/sync-workspace-deps.mjs` and refreshes the lockfile — then run `npm run quality:gate`. Triage `npm audit` seriously; avoid blanket `--force`.

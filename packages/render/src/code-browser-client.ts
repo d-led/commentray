@@ -6,11 +6,13 @@ import {
   SubstringSearcher,
 } from "@m31coding/fuzzy-search";
 import {
+  activeBlockIdForCommentrayLine0,
   activeBlockIdForViewport,
   clampViewportYToGutterLocal,
   codeLineDomIndex0,
   dedupeBlockScrollLinksById,
   gutterRayBezierPaths,
+  maxRenderableCommentaryContentBottomViewport,
   nextBlockLinkInCommentrayOrder,
   sortBlockLinksBySource,
 } from "./code-browser-block-rays.js";
@@ -20,6 +22,7 @@ import {
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
 } from "./code-browser-scroll-sync.js";
+import { maxCommentrayAnchorLine0AtOrAboveViewportY } from "./commentray-anchor-viewport-probe.js";
 import { decodeBase64Utf8 } from "./code-browser-encoding.js";
 import { readEmbeddedRawB64Strings } from "./code-browser-embedded-payload.js";
 import {
@@ -982,16 +985,14 @@ function readCommentrayLine0FromAnchor(el: HTMLElement): number | null {
   return Number(lineAttr);
 }
 
-/** Greatest marker line whose anchor sits at or above viewport Y `y`. */
 function bestCommentrayAnchorLine0AtOrAboveY(anchors: NodeListOf<HTMLElement>, y: number): number {
-  let best = 0;
+  const readings: { line0: number; top: number }[] = [];
   for (const a of anchors) {
     const line0 = readCommentrayLine0FromAnchor(a);
     if (line0 === null) continue;
-    if (a.getBoundingClientRect().top <= y + 1 + 1e-3) best = line0;
-    else break;
+    readings.push({ line0, top: a.getBoundingClientRect().top });
   }
-  return best;
+  return maxCommentrayAnchorLine0AtOrAboveViewportY(readings, y);
 }
 
 function lastCommentrayAnchorLine0(anchors: NodeListOf<HTMLElement>): number {
@@ -1064,7 +1065,8 @@ function probeCommentrayLine0FromDoc(docPane: HTMLElement): number {
   if (paneScrollNearEnd(docPane)) return lastCommentrayAnchorLine0(anchors);
 
   const dr = docPane.getBoundingClientRect();
-  const y = dr.top + docPane.clientTop + 2;
+  /** Same band as the root-scroll branch: a few px below the pane top so block anchors sit inside `top <= y` while their prose is what the reader sees first. */
+  const y = dr.top + docPane.clientTop + Math.max(2, Math.min(40, docPane.clientHeight * 0.15));
   return bestCommentrayAnchorLine0AtOrAboveY(anchors, y);
 }
 
@@ -1329,15 +1331,26 @@ function commentaryBandEndYViewport(
   docScrollEl: HTMLElement,
   next: BlockScrollLink | undefined,
   docTop: HTMLElement,
+  clipThroughPageBreakGaps: boolean,
 ): number {
   if (next) {
     const nextEl = document.getElementById(`commentray-block-${next.id}`);
-    return nextEl ? nextEl.getBoundingClientRect().top - 3 : centerYInViewport(docTop);
+    if (!nextEl) return centerYInViewport(docTop);
+    const nextTop = nextEl.getBoundingClientRect().top - 3;
+    if (!clipThroughPageBreakGaps) return nextTop;
+    const docBandTop = docTop.getBoundingClientRect().top + 4;
+    const contentBottom = maxRenderableCommentaryContentBottomViewport(docScrollEl, docTop, nextEl);
+    return Math.min(nextTop, Math.max(docBandTop, contentBottom));
   }
   const dr = docScrollEl.getBoundingClientRect();
   let bottom = dr.bottom - 4;
   const lastKid = docScrollEl.children[docScrollEl.children.length - 1];
   if (lastKid) bottom = Math.min(bottom, lastKid.getBoundingClientRect().bottom - 4);
+  if (clipThroughPageBreakGaps) {
+    const docBandTop = docTop.getBoundingClientRect().top + 4;
+    const contentBottom = maxRenderableCommentaryContentBottomViewport(docScrollEl, docTop, null);
+    bottom = Math.min(bottom, Math.max(docBandTop, contentBottom));
+  }
   return bottom;
 }
 
@@ -1430,7 +1443,12 @@ function drawBlockRaysIntoSvg(
     return;
   }
 
-  const activeId = activeBlockIdForViewport(links, probeTopSourceLine1Based());
+  /** Doc-aligned active block matches visible commentary; code-only probe can lag in page gaps. */
+  const activeId =
+    docScrollEl.querySelector(".commentray-block-anchor") !== null
+      ? activeBlockIdForCommentrayLine0(links, probeCommentrayLine0FromDoc(docScrollEl))
+      : activeBlockIdForViewport(links, probeTopSourceLine1Based());
+  const clipGutterRaysThroughPageBreakGaps = pageBreakPullEnabled();
   svg.setAttribute("viewBox", `0 0 ${String(w)} ${String(h)}`);
   svg.setAttribute("preserveAspectRatio", "none");
 
@@ -1458,7 +1476,12 @@ function drawBlockRaysIntoSvg(
     const docTop = document.getElementById(`commentray-block-${link.id}`);
     if (!codeTop || !codeBot || !docTop) continue;
 
-    const docEndYViewport = commentaryBandEndYViewport(docScrollEl, next, docTop);
+    const docEndYViewport = commentaryBandEndYViewport(
+      docScrollEl,
+      next,
+      docTop,
+      clipGutterRaysThroughPageBreakGaps,
+    );
     const yCodeTop = codeLineHighlightCenterYViewport(codeTop);
     const yCodeBot = codeLineHighlightCenterYViewport(codeBot);
     const yDocTop = docTop.getBoundingClientRect().top + 2;
@@ -1502,8 +1525,8 @@ function drawBlockRaysIntoSvg(
 
 /**
  * Splines in the gutter between each block’s source range and its commentary band (dual pane,
- * index-backed blocks). Emphasizes the block aligned with the current source viewport; clamps
- * off-screen endpoints so readers see which way to scroll.
+ * index-backed blocks). Emphasizes the block aligned with the **doc** viewport when block anchors
+ * exist; otherwise the source viewport. Clamps off-screen endpoints so readers see which way to scroll.
  *
  * @returns Request a redraw after DOM changes that do not resize the panes (e.g. multi-angle body swap).
  */
