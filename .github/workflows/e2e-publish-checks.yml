@@ -22,10 +22,10 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     steps:
       # Default-branch checkout only (no workflow_run.head_sha). test-reporter runs git and fails without .git/
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Download E2E artifacts from CI run
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: e2e-ci-bundle
           path: .
