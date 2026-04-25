@@ -2078,6 +2078,17 @@ function renderWideIntroArrows(
   const edgePadding = 12;
   const sideInset = 8;
   const spread = 12;
+  const side = bubble.dataset.side;
+  const pointerLeftRaw = parseFloat(bubble.style.getPropertyValue("--pointer-left"));
+  const pointerCenterX = Number.isFinite(pointerLeftRaw)
+    ? bubbleRect.left + pointerLeftRaw + 8
+    : bubbleCenterX;
+  const pointerTipY =
+    side === "below"
+      ? bubbleRect.top - sideInset
+      : side === "above"
+        ? bubbleRect.bottom + sideInset
+        : bubbleCenterY;
 
   for (const [index, target] of targets.entries()) {
     const rect = target.getBoundingClientRect();
@@ -2091,7 +2102,11 @@ function renderWideIntroArrows(
 
     let startX: number;
     let startY: number;
-    if (horizontalDominant) {
+    if (targets.length === 1 && (side === "below" || side === "above")) {
+      // Single-target tours look cleaner when the arrow starts from the bubble pointer notch.
+      startX = pointerCenterX;
+      startY = pointerTipY;
+    } else if (horizontalDominant) {
       startX = toTargetX >= 0 ? bubbleRect.right + sideInset : bubbleRect.left - sideInset;
       startY = clamp(
         endY + spreadOffset * spread,
