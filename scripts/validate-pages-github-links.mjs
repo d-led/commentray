@@ -68,6 +68,15 @@ function assertDocPairHref(label, href) {
   }
 }
 
+function isBrowseRedirectShimHtml(html) {
+  const hasRefresh = /<meta\s+http-equiv="refresh"\s+content="0;url=[^"]+\.html"\s*\/?>/i.test(
+    html,
+  );
+  const hasRedirectTitle = /<title>\s*Redirecting…\s*<\/title>/i.test(html);
+  const hasReplaceCall = /window\.location\.replace\(/i.test(html);
+  return hasRefresh && hasRedirectTitle && hasReplaceCall;
+}
+
 async function maybeHeadGithub(url) {
   if (process.env.COMMENTRAY_VALIDATE_PAGES_LIVE !== "1") return;
   const ac = new AbortController();
@@ -123,12 +132,14 @@ async function validateHubIndex(indexHtml) {
 
 async function validateBrowsePage(name, html) {
   assertNoBrowseStack(html, `browse/${name}`);
+  const doc = shellAttr(html, "data-commentray-pair-browse-href");
+  if (!doc) {
+    if (isBrowseRedirectShimHtml(html)) return;
+    fail(`browse/${name}: missing data-commentray-pair-browse-href on #shell`);
+  }
 
   const src = firstGithubBlobHrefIn(html);
   if (src) assertGithubBlobUrl(`browse/${name} (first GitHub blob link)`, src);
-
-  const doc = shellAttr(html, "data-commentray-pair-browse-href");
-  if (!doc) fail(`browse/${name}: missing data-commentray-pair-browse-href on #shell`);
   assertDocPairHref(`browse/${name} shell data-commentray-pair-browse-href`, doc);
 
   if (!existsSync(pairNavPath) || !BROWSE_HTML_RE.test(doc)) return;

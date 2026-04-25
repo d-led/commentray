@@ -2278,6 +2278,63 @@ type MultiAngleJsonRow = {
   staticBrowseUrl?: string;
 };
 
+type MultiAngleDefaultSelection = {
+  defaultMarkdown: string;
+  defaultScrollB64: string;
+  defaultPathSearch: string;
+  defaultGh: string | undefined;
+  defaultStaticBrowse: string;
+  defaultPaneHtml: string;
+};
+
+function firstNonEmpty(values: string[]): string | undefined {
+  return values.find((v) => v.trim().length > 0);
+}
+
+function resolveMultiAngleDefaultSelection(args: {
+  multi: CodeBrowserMultiAngleBrowsing;
+  defaultId: string;
+  opts: CodeBrowserPageOptions;
+  builtAngles: Array<{
+    spec: CodeBrowserMultiAngleSpec;
+    commentrayHtml: string;
+    scrollB64: string;
+  }>;
+}): MultiAngleDefaultSelection {
+  const { multi, defaultId, opts, builtAngles } = args;
+  let defaultMarkdown = opts.commentrayMarkdown;
+  let defaultScrollB64 = "";
+  let defaultPathSearch = (opts.commentrayPathForSearch ?? "").trim();
+  let defaultGh = opts.commentrayOnGithubUrl;
+  let defaultStaticBrowse = (opts.commentrayStaticBrowseUrl ?? "").trim();
+  let defaultPaneHtml = "";
+  for (const b of builtAngles) {
+    if (b.spec.id !== defaultId) continue;
+    defaultMarkdown = b.spec.markdown;
+    defaultScrollB64 = b.scrollB64;
+    defaultPathSearch = b.spec.commentrayPathRel.trim();
+    defaultGh = b.spec.commentrayOnGithubUrl;
+    defaultStaticBrowse = (b.spec.staticBrowseUrl ?? "").trim();
+    defaultPaneHtml = b.commentrayHtml;
+    break;
+  }
+  if (defaultStaticBrowse.length === 0) {
+    defaultStaticBrowse =
+      firstNonEmpty(multi.angles.map((a) => (a.staticBrowseUrl ?? "").trim())) ?? "";
+  }
+  if ((defaultGh ?? "").trim().length === 0) {
+    defaultGh = firstNonEmpty(multi.angles.map((a) => (a.commentrayOnGithubUrl ?? "").trim()));
+  }
+  return {
+    defaultMarkdown,
+    defaultScrollB64,
+    defaultPathSearch,
+    defaultGh,
+    defaultStaticBrowse,
+    defaultPaneHtml,
+  };
+}
+
 async function multiAngleJsonRowAndDocHtml(
   opts: CodeBrowserPageOptions,
   spec: CodeBrowserMultiAngleSpec,
@@ -2330,12 +2387,11 @@ async function buildMultiAngleDualPaneShell(
     ? multi.defaultAngleId
     : (multi.angles[0]?.id ?? "main");
   const jsonAngles: MultiAngleJsonRow[] = [];
-  let defaultMarkdown = opts.commentrayMarkdown;
-  let defaultScrollB64 = "";
-  let defaultPathSearch = (opts.commentrayPathForSearch ?? "").trim();
-  let defaultGh = opts.commentrayOnGithubUrl;
-  let defaultStaticBrowse = (opts.commentrayStaticBrowseUrl ?? "").trim();
-  let defaultPaneHtml = "";
+  const builtAngles: Array<{
+    spec: CodeBrowserMultiAngleSpec;
+    commentrayHtml: string;
+    scrollB64: string;
+  }> = [];
 
   const sourceMarkdownEnabled = isMarkdownLikeSource(opts);
   const sourceMdForPane = sourceMarkdownEnabled ? injectSourceMarkdownAnchors(opts.code) : "";
@@ -2350,19 +2406,17 @@ async function buildMultiAngleDualPaneShell(
 
   for (const spec of multi.angles) {
     const { jsonRow, commentrayHtml, scrollB64 } = await multiAngleJsonRowAndDocHtml(opts, spec);
-    if (spec.id === defaultId) {
-      defaultMarkdown = spec.markdown;
-      defaultScrollB64 = scrollB64;
-      defaultPathSearch = spec.commentrayPathRel.trim();
-      defaultGh = spec.commentrayOnGithubUrl;
-      {
-        const sb = (spec.staticBrowseUrl ?? "").trim();
-        if (sb.length > 0) defaultStaticBrowse = sb;
-      }
-      defaultPaneHtml = commentrayHtml;
-    }
+    builtAngles.push({ spec, commentrayHtml, scrollB64 });
     jsonAngles.push(jsonRow);
   }
+  const {
+    defaultMarkdown,
+    defaultScrollB64,
+    defaultPathSearch,
+    defaultGh,
+    defaultStaticBrowse,
+    defaultPaneHtml,
+  } = resolveMultiAngleDefaultSelection({ multi, defaultId, opts, builtAngles });
 
   const selOpts = multi.angles
     .map((a) => {

@@ -10,6 +10,7 @@ set -euo pipefail
 #   - tsc -b across the monorepo
 #   - unit tests (includes ArchUnitTS rules under packages/architecture/ vs
 #     tsconfig.archunit.json — see .commentray/source/README.md/architecture.md)
+#   - static pages build + link-shape validation (`npm run pages:build` + `npm run pages:validate`)
 #
 # Stops at the first failing step and prints which step failed (see messages
 # above the failing tool output — e.g. format:check names the first drifted file).
@@ -118,6 +119,7 @@ run_step "lint" npm run lint
 run_step "dupes" npm run dupes
 run_step "typecheck" npm run typecheck
 run_step "test (unit)" env COMMENTRAY_TEST_MODE=unit npm run test
+run_step "pages (build + validate)" bash -c "npm run pages:build && npm run pages:validate"
 
 echo "" >&2
 echo "Quality gate passed." >&2
