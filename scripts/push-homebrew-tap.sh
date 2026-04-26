@@ -1,16 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Clone d-led/homebrew-d-led, regenerate commentray.rb from GitHub Release assets, commit, push.
-# Intended for CI after binaries.yml attaches release assets. Exits 0 when HOMEBREW_TAP_PUSH_TOKEN is unset.
+# Intended for CI after binaries.yml attaches release assets.
 #
 # Env:
-#   HOMEBREW_TAP_PUSH_TOKEN — PAT with contents write on d-led/homebrew-d-led (unset = skip)
+#   HOMEBREW_TAP_PUSH_TOKEN — PAT with contents write on d-led/homebrew-d-led (required in CI)
 #   GITHUB_REF_NAME         — tag e.g. v0.2.0
+#
+# When HOMEBREW_TAP_PUSH_TOKEN is unset: exits 1 in GitHub Actions (so tag releases cannot
+# silently skip the tap). Outside CI, exits 0 without cloning (local convenience).
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 if [ -z "${HOMEBREW_TAP_PUSH_TOKEN:-}" ]; then
+  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+    echo "HOMEBREW_TAP_PUSH_TOKEN is not set; cannot push commentray.rb to d-led/homebrew-d-led." >&2
+    echo "Add an Actions secret named HOMEBREW_TAP_PUSH_TOKEN (Contents: Read and write on that tap only)." >&2
+    echo "See docs/development.md (Homebrew tap)." >&2
+    exit 1
+  fi
   echo "HOMEBREW_TAP_PUSH_TOKEN unset; skipping Homebrew tap update."
   exit 0
 fi

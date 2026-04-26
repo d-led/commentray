@@ -120,8 +120,8 @@ jobs:
           generate_release_notes: true
 
   # Pushes an updated binary-style `commentray.rb` to https://github.com/d-led/homebrew-d-led
-  # (macOS + Linux only — matches the build matrix, excluding Windows). Skips when
-  # HOMEBREW_TAP_PUSH_TOKEN is unset (see docs/development.md).
+  # (macOS + Linux only — matches the build matrix, excluding Windows). Requires
+  # HOMEBREW_TAP_PUSH_TOKEN (see docs/development.md); the push script fails in CI if unset.
   update-homebrew-tap:
     needs: [release]
     if: github.repository == 'd-led/commentray' && startsWith(github.ref, 'refs/tags/v')
