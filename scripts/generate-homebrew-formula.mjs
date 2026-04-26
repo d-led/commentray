@@ -131,19 +131,43 @@ async function defaultFetch(url) {
   return res.arrayBuffer();
 }
 
-function parseArgs(argv) {
-  let outputPath = "";
-  let stdout = false;
-  let tag = "";
-  for (let i = 2; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--stdout") stdout = true;
-    else if (a.startsWith("--output=")) outputPath = a.slice("--output=".length);
-    else if (a === "--output") outputPath = argv[++i] ?? "";
-    else if (a.startsWith("--tag=")) tag = a.slice("--tag=".length);
-    else if (a === "--tag") tag = argv[++i] ?? "";
-    else throw new Error(`Unknown argument: ${a}`);
+/**
+ * @param {string[]} argv
+ * @param {number} i
+ * @param {{ outputPath: string; stdout: boolean; tag: string }} state
+ * @returns {number} index of last consumed argv element
+ */
+function applyCliArg(argv, i, state) {
+  const a = argv[i];
+  if (a === "--stdout") {
+    state.stdout = true;
+    return i;
   }
+  if (a.startsWith("--output=")) {
+    state.outputPath = a.slice("--output=".length);
+    return i;
+  }
+  if (a === "--output") {
+    state.outputPath = argv[i + 1] ?? "";
+    return i + 1;
+  }
+  if (a.startsWith("--tag=")) {
+    state.tag = a.slice("--tag=".length);
+    return i;
+  }
+  if (a === "--tag") {
+    state.tag = argv[i + 1] ?? "";
+    return i + 1;
+  }
+  throw new Error(`Unknown argument: ${a}`);
+}
+
+function parseArgs(argv) {
+  const state = { outputPath: "", stdout: false, tag: "" };
+  for (let i = 2; i < argv.length; i++) {
+    i = applyCliArg(argv, i, state);
+  }
+  let { outputPath, stdout, tag } = state;
   if (!tag) tag = process.env.GITHUB_REF_NAME ?? "";
   if (!tag) {
     throw new Error("Set GITHUB_REF_NAME (e.g. v1.2.3) or pass --tag=v1.2.3");
