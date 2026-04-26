@@ -2,9 +2,11 @@
 set -euo pipefail
 
 # Build, package, and install the Commentray extension into your regular
-# Cursor / VS Code (not the Extension Development Host). Before install, any
-# existing `d-led.commentray-vscode` copy is uninstalled so Marketplace / old
-# .vsix builds cannot linger beside the new package.
+# Cursor / VS Code (not the Extension Development Host). Workspace packages
+# the extension depends on (@commentray/core, @commentray/render) are cleaned
+# then rebuilt so local runs never reuse stale dist or .tsbuildinfo output.
+# Before install, any existing `d-led.commentray-vscode` copy is uninstalled
+# so Marketplace / old .vsix builds cannot linger beside the new package.
 #
 # Usage:
 #   bash scripts/install-extension.sh                  # build + install
@@ -49,8 +51,16 @@ fi
 echo "Rendering Marketplace icon from canonical SVG..."
 bash "$REPO_ROOT/scripts/build-vscode-icon.sh"
 
-echo "Building @commentray/core and bundling the extension..."
+echo "Cleaning extension dependency workspaces (fresh dist + TS incremental state)..."
+npm run clean -w @commentray/core -w @commentray/render -w commentray-vscode
+rm -f \
+  "$REPO_ROOT/packages/core"/tsconfig*.tsbuildinfo \
+  "$REPO_ROOT/packages/render"/tsconfig*.tsbuildinfo \
+  "$REPO_ROOT/packages/vscode"/tsconfig*.tsbuildinfo
+
+echo "Building workspace packages the extension depends on, then bundling..."
 npm run build -w @commentray/core
+npm run build -w @commentray/render
 npm run build -w commentray-vscode
 
 # `--no-dependencies` skips vsce's node_modules traversal: the bundle has
