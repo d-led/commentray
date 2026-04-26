@@ -51,16 +51,8 @@ const DEFAULT_TOOL_HOME = "https://github.com/d-led/commentray";
  */
 const SERVE_JSON_FOR_LOCAL_PREVIEW = `${JSON.stringify({ renderSingle: true }, null, 2)}\n`;
 
-async function writeHumanBrowseAliasDirIndex(input: {
-  outDir: string;
-  aliasRelPath: string;
-  slug: string;
-}): Promise<void> {
-  const aliasDir = path.join(input.outDir, "browse", ...input.aliasRelPath.split("/"));
-  await mkdir(aliasDir, { recursive: true });
-  const aliasPath = path.join(aliasDir, "index.html");
-  const canonicalHref = canonicalHumaneBrowseRedirectHref(input.aliasRelPath, input.slug);
-  const redirectHtml = `<!doctype html>
+function humanBrowseAliasRedirectDocument(canonicalHref: string): string {
+  return `<!doctype html>
 <meta charset="utf-8" />
 <title>Redirecting…</title>
 <meta http-equiv="refresh" content="0;url=${canonicalHref}" />
@@ -73,7 +65,18 @@ async function writeHumanBrowseAliasDirIndex(input: {
 </script>
 <a href="${canonicalHref}">Open documentation pair</a>
 `;
-  await writeFile(aliasPath, redirectHtml, "utf8");
+}
+
+async function writeHumanBrowseAliasDirIndex(input: {
+  outDir: string;
+  aliasRelPath: string;
+  slug: string;
+}): Promise<void> {
+  const aliasDir = path.join(input.outDir, "browse", ...input.aliasRelPath.split("/"));
+  await mkdir(aliasDir, { recursive: true });
+  const aliasPath = path.join(aliasDir, "index.html");
+  const canonicalHref = canonicalHumaneBrowseRedirectHref(input.aliasRelPath, input.slug);
+  await writeFile(aliasPath, humanBrowseAliasRedirectDocument(canonicalHref), "utf8");
 }
 
 async function writeHumanBrowseAliasHtmlFile(input: {
@@ -84,20 +87,7 @@ async function writeHumanBrowseAliasHtmlFile(input: {
   const aliasPath = path.join(input.outDir, "browse", ...input.aliasRelPath.split("/"));
   await mkdir(path.dirname(aliasPath), { recursive: true });
   const canonicalHref = canonicalHumaneBrowseRedirectHref(input.aliasRelPath, input.slug);
-  const redirectHtml = `<!doctype html>
-<meta charset="utf-8" />
-<title>Redirecting…</title>
-<meta http-equiv="refresh" content="0;url=${canonicalHref}" />
-<script>
-  (function () {
-    var to = ${JSON.stringify(canonicalHref)};
-    var suffix = window.location.search + window.location.hash;
-    window.location.replace(to + suffix);
-  })();
-</script>
-<a href="${canonicalHref}">Open documentation pair</a>
-`;
-  await writeFile(aliasPath, redirectHtml, "utf8");
+  await writeFile(aliasPath, humanBrowseAliasRedirectDocument(canonicalHref), "utf8");
 }
 
 async function writeHumanBrowseSourceAliasPage(input: {
