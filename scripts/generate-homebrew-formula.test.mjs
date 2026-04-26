@@ -31,7 +31,7 @@ describe("renderHomebrewCommentrayFormula", () => {
     expect(body).toContain("commentray-linux-x64");
     expect(body).toContain("on_macos");
     expect(body).toContain("on_linux");
-    expect(body).toContain("shell_output(\"#{bin}/commentray --version\")");
+    expect(body).toContain('shell_output("#{bin}/commentray --version")');
     expect(body).not.toContain("windows");
     expect(HOMEBREW_COMMENTRAY_ASSETS).toHaveLength(4);
   });
