@@ -4,7 +4,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "Commentray command-line interface",
+  "description": "Commentray command-line interface. Run with npx commentray; npx commentray --help prints Usage: commentray [options] [command].",
   "license": "MPL-2.0",
   "type": "module",
   "bin": {

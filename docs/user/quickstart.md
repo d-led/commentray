@@ -5,7 +5,7 @@ Goal: a **clean primary file** stays in place; **commentray** (Markdown under `.
 ## Prerequisites
 
 - A **Git** checkout (recommended): hooks and many diagnostics assume `.git` exists.
-- The **CLI** installed one of the ways described in [Install](install.md).
+- The **CLI** available one of the ways in [Install](install.md)—including **`npx commentray`** (no global install); **`npx commentray --help`** shows `Usage: commentray [options] [command]`.
 
 Commands below assume your **shell’s current directory** is the **repository root** (or a subdirectory—Commentray walks up for `.commentray.toml`, then `.git`, then falls back to cwd for first-time `init`).
 

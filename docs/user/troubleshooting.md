@@ -15,6 +15,7 @@ Initialize Git first (`git init`) or run the command from the **repository root*
 
 - Confirm **`commentray`** is on **`PATH`** in the same environment Git uses for hooks (GUI clients sometimes differ).
 - Open **`.git/hooks/pre-commit`** and verify the **Commentray** block is present and not short-circuited by an earlier **`exit`**.
+- For ad hoc or CI runs without a global install, **`npx commentray …`** works the same way; **`npx commentray --help`** prints **`Usage: commentray [options] [command]`** (hooks still need either **`PATH`** or an explicit **`npx`** / full path in the hook script).
 
 ## macOS blocks the downloaded CLI binary
 

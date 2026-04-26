@@ -6,6 +6,9 @@ set -euo pipefail
 # subsequent `npm run build -w commentray` updates are picked up
 # without reinstalling.
 #
+# For the published CLI without linking, use: npx commentray …
+# (npx commentray --help → "Usage: commentray [options] [command]").
+#
 # Usage:
 #   bash scripts/install-cli.sh            # link
 #   bash scripts/install-cli.sh --unlink   # remove the global symlink

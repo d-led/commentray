@@ -37,7 +37,7 @@ Short guides live under docs/user—install, first setup, keeping blocks aligned
 
 ## Get it
 
-The [install guide](docs/user/install.md) walks through npm, release binaries, and the Marketplace extension. Clone workflows, local binary builds, and macOS quarantine sit in [Development → CLI, binaries, and Pages](docs/development.md#cli-binaries-and-pages). If you want Node-free installs, use [GitHub Releases](https://github.com/d-led/commentray/releases); [Development](docs/development.md#cli-binaries-and-pages) explains which artifacts are meant to last.
+The [install guide](docs/user/install.md) walks through npm global, **`npx commentray`** (one-off; **`npx commentray --help`** → `Usage: commentray [options] [command]`), release binaries, and the Marketplace extension. Clone workflows, local binary builds, and macOS quarantine sit in [Development → CLI, binaries, and Pages](docs/development.md#cli-binaries-and-pages). If you want Node-free installs, use [GitHub Releases](https://github.com/d-led/commentray/releases); [Development](docs/development.md#cli-binaries-and-pages) explains which artifacts are meant to last.
 
 ## Ecosystem & this repo
 

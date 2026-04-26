@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Also runnable as `npx commentray`; `--help` prints Usage: commentray [options] [command].
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";

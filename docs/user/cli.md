@@ -2,7 +2,9 @@
 
 All commands resolve the **repository root** from the current working directory: nearest **`.commentray.toml`**, else nearest **`.git`**, else **cwd** (so first-time **`commentray init`** can bootstrap a fresh folder).
 
-Global **`commentray --help`** and **`commentray <command> --help`** list flags.
+**How to invoke:** global **`commentray`** (see [Install](install.md)), a project **`node_modules/.bin/commentray`**, or **`npx commentray`** for a one-off run against the published package. **`npx commentray --help`** (or **`commentray --help`** when on `PATH`) prints **`Usage: commentray [options] [command]`** and lists subcommands.
+
+**`commentray <command> --help`** lists flags for that command.
 
 ## Commands
 

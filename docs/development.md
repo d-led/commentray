@@ -15,7 +15,7 @@ This repository pairs the root **`README.md`** with longer commentary under **`.
 - `packages/render` — Markdown → HTML renderer + client-side bundle for
   the static site.
 - `packages/cli` — the `commentray` CLI (also packaged as a standalone
-  Node SEA binary).
+  Node SEA binary). Published consumers often run **`npx commentray`**; **`npx commentray --help`** shows `Usage: commentray [options] [command]`.
 - `packages/code-commentray-static` (`@commentray/code-commentray-static` on npm) — static-site generator for the
   rendered commentary pages.
 - `packages/vscode` — VS Code / Cursor extension.

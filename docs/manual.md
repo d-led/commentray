@@ -24,7 +24,7 @@ Canonical storage semantics:
 
 Install and setup paths:
 
-- User install guide: [`docs/user/install.md`](./user/install.md)
+- User install guide: [`docs/user/install.md`](./user/install.md) (includes **`npx commentray`**; **`npx commentray --help`** prints `Usage: commentray [options] [command]`.)
 - Clone + maintainer setup: [`docs/development.md`](./development.md)
 
 Typical bootstrap from repo root:

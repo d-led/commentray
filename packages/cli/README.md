@@ -12,6 +12,8 @@ npm install -D commentray
 npm install -g commentray
 ```
 
+**Without installing:** `npx commentray` runs the published CLI on demand. `npx commentray --help` prints `Usage: commentray [options] [command]` and lists commands (same as a global `commentray` on `PATH`).
+
 Standalone, self-contained binaries (no Node install needed) for Linux x64/arm64, macOS x64/arm64, and Windows x64 ship on **[GitHub Releases](https://github.com/d-led/commentray/releases)** with each **`v*`** tag. CI workflow artifacts expire after a short retention period—prefer **Release** assets for anything you rely on long term.
 
 ## Use

@@ -1,6 +1,6 @@
 # Install Commentray
 
-Pick one path: **release binary** (no Node — assets on [GitHub Releases](https://github.com/d-led/commentray/releases) under **`v*`** tags), **npm global** (needs Node), or **clone the repo** for extension packaging / full development ([Development → Clone and workspace setup](../development.md#clone-and-workspace-setup)).
+Pick one path: **release binary** (no Node — assets on [GitHub Releases](https://github.com/d-led/commentray/releases) under **`v*`** tags), **npm global** or **[`npx`](#npx-one-off-no-global-install)** (needs Node), or **clone the repo** for extension packaging / full development ([Development → Clone and workspace setup](../development.md#clone-and-workspace-setup)).
 
 ## Standalone CLI binaries (GitHub Releases)
 
@@ -28,6 +28,16 @@ commentray --version
 ```
 
 Upgrade later with the same `npm install -g` command.
+
+## npx (one-off, no global install)
+
+With Node/npm available, you can run the published CLI without a global install:
+
+```bash
+npx commentray --help
+```
+
+That prints `Usage: commentray [options] [command]` and lists subcommands—the same surface as a global `commentray`. Examples: `npx commentray validate`, `npx commentray init`.
 
 ## VS Code / Cursor extension
 

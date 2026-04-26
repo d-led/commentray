@@ -63,6 +63,7 @@ You may be reading a **generated** page: `@commentray/code-commentray-static`, [
 ## Cookbook (tone, not a second README)
 
 - **Greenfield adopt** — `commentray init` is idempotent; nothing in the primary tree has to move first.
+- **One-off CLI** — `npx commentray …` needs no global install; `npx commentray --help` prints `Usage: commentray [options] [command]` (same as [Install](https://github.com/d-led/commentray/blob/main/docs/user/install.md) describes for npm).
 - **Hook paranoia** — `init scm` runs `validate` before merge; opt-in because hooks are a team contract.
 - **“Why is my tree red?”** — `doctor` stacks environment checks on `validate`.
 - **Binaries** — standalone CLI assets ship on **[GitHub Releases](https://github.com/d-led/commentray/releases)** with each **`v*`** tag; CI artifacts from [`.github/workflows/binaries.yml`](../../../.github/workflows/binaries.yml) expire after 14 days by design.

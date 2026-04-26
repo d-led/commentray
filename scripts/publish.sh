@@ -16,6 +16,9 @@ set -euo pipefail
 #
 # Skips the private 'commentray-vscode' package.
 #
+# After a successful publish, consumers can run the CLI with npx, e.g. npx commentray
+# --help (prints "Usage: commentray [options] [command]") without a global npm install.
+#
 # Usage:
 #   bash scripts/publish.sh                    # real publish to npm
 #   bash scripts/publish.sh --dry-run          # npm publish --dry-run
