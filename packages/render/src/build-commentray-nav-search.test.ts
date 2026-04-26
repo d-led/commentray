@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { CURRENT_SCHEMA_VERSION } from "@commentray/core";
+import { CURRENT_SCHEMA_VERSION, commentrayAnglesSentinelPath } from "@commentray/core";
 import { describe, expect, it } from "vitest";
 
 import { buildCommentrayNavSearchDocument } from "./build-commentray-nav-search.js";
@@ -13,6 +13,9 @@ async function setupRepoWithIndexedPair(opts: {
   commentrayBody: string;
 }): Promise<string> {
   const dir = await mkdtemp(path.join(os.tmpdir(), "cr-nav-"));
+  const srcDir = path.join(dir, path.dirname(opts.sourcePath));
+  await mkdir(srcDir, { recursive: true });
+  await writeFile(path.join(dir, opts.sourcePath), "// indexed source\n", "utf8");
   await mkdir(path.join(dir, path.dirname(opts.commentrayPath)), { recursive: true });
   await writeFile(path.join(dir, opts.commentrayPath), opts.commentrayBody, "utf8");
   await mkdir(path.join(dir, ".commentray/metadata"), { recursive: true });
@@ -77,6 +80,8 @@ describe("Cross-file search manifest — index and fallback", () => {
 
   it("should build from a lone companion when metadata is missing and still skip source bodies", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cr-nav-"));
+    await mkdir(path.join(dir, "lib"), { recursive: true });
+    await writeFile(path.join(dir, "lib", "x.ts"), "// fallback source\n", "utf8");
     const mdAbs = path.join(dir, "notes.md");
     await writeFile(mdAbs, "One\nTwo\n", "utf8");
 
@@ -102,6 +107,8 @@ describe("Cross-file search manifest — index and fallback", () => {
 
   it("should still emit documentedPairs for fallback-only pairs when GitHub metadata is present", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "cr-nav-"));
+    await mkdir(path.join(dir, "lib"), { recursive: true });
+    await writeFile(path.join(dir, "lib", "x.ts"), "// fallback source\n", "utf8");
     const mdAbs = path.join(dir, "notes.md");
     await writeFile(mdAbs, "One\n", "utf8");
 
@@ -142,6 +149,8 @@ describe("Cross-file search manifest — disk merge", () => {
       "# Solo\n",
       "utf8",
     );
+    await mkdir(path.join(dir, "src"), { recursive: true });
+    await writeFile(path.join(dir, "src", "solo.ts"), "// solo\n", "utf8");
 
     const doc = await buildCommentrayNavSearchDocument(dir);
 
@@ -158,10 +167,11 @@ describe("Cross-file search manifest — disk merge", () => {
       commentrayBody: "# A\n",
     });
     await writeFile(
-      path.join(dir, ".commentray/source/README.md.md"),
+      path.join(dir, ".commentray", "source", "README.md.md"),
       "# Readme companion\n",
       "utf8",
     );
+    await writeFile(path.join(dir, "README.md"), "# root readme\n", "utf8");
 
     const doc = await buildCommentrayNavSearchDocument(dir, undefined, {
       owner: "acme",
@@ -195,5 +205,27 @@ describe("Cross-file search manifest — disk merge", () => {
       (r) => r.kind === "commentrayLine" && r.commentrayPath === ".commentray/source/README.md.md",
     );
     expect(readmeLines.map((r) => r.text)).toEqual(["# Readme companion", ""]);
+  });
+
+  it("omits pairs whose companion exists on disk but the primary source file does not", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cr-nav-missing-src-"));
+    const storage = ".commentray";
+    await mkdir(path.join(dir, storage, "metadata"), { recursive: true });
+    await writeFile(
+      path.join(dir, storage, "metadata", "index.json"),
+      JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION, byCommentrayPath: {} }, null, 2),
+      "utf8",
+    );
+    const sentinel = commentrayAnglesSentinelPath(storage);
+    await mkdir(path.join(dir, path.dirname(sentinel)), { recursive: true });
+    await writeFile(path.join(dir, ...sentinel.split("/")), "", "utf8");
+    const cr = `${storage}/source/docs/plan/plan.md/main.md`;
+    await mkdir(path.join(dir, path.dirname(cr)), { recursive: true });
+    await writeFile(path.join(dir, cr), "# no matching source on disk\n", "utf8");
+
+    const doc = await buildCommentrayNavSearchDocument(dir);
+
+    expect(doc.documentedPairs ?? []).toHaveLength(0);
+    expect(doc.rows).toHaveLength(0);
   });
 });

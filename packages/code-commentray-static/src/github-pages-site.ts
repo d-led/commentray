@@ -34,6 +34,7 @@ import {
 import { pathExists } from "./github-pages-site-shared.js";
 import {
   browsePairStaticBrowseRelUrl,
+  canonicalHumaneBrowseRedirectHref,
   commentrayFileStem,
   humanBrowseAliasPathFromPair,
   normPosixPath,
@@ -41,6 +42,14 @@ import {
 } from "./browse-pair-static-url.js";
 
 const DEFAULT_TOOL_HOME = "https://github.com/d-led/commentray";
+
+/**
+ * `vercel/serve` + `serve-handler`: humane browse shims are `browse/<source-segments>/index.html`
+ * inside a directory whose last segment looks like a file (`manual.md`). Without this, a request
+ * to that path is treated as a directory listing instead of serving the lone `index.html`
+ * (GitHub Pages serves the index; local `commentray serve` / Cypress static server must match).
+ */
+const SERVE_JSON_FOR_LOCAL_PREVIEW = `${JSON.stringify({ renderSingle: true }, null, 2)}\n`;
 
 async function writeHumanBrowseAliasDirIndex(input: {
   outDir: string;
@@ -50,11 +59,7 @@ async function writeHumanBrowseAliasDirIndex(input: {
   const aliasDir = path.join(input.outDir, "browse", ...input.aliasRelPath.split("/"));
   await mkdir(aliasDir, { recursive: true });
   const aliasPath = path.join(aliasDir, "index.html");
-  const canonicalRelFromAliasPath = path.posix.relative(
-    path.posix.join("browse", input.aliasRelPath),
-    path.posix.join("browse", `${input.slug}.html`),
-  );
-  const canonicalHref = canonicalRelFromAliasPath || `../${input.slug}.html`;
+  const canonicalHref = canonicalHumaneBrowseRedirectHref(input.aliasRelPath, input.slug);
   const redirectHtml = `<!doctype html>
 <meta charset="utf-8" />
 <title>Redirecting…</title>
@@ -78,11 +83,7 @@ async function writeHumanBrowseAliasHtmlFile(input: {
 }): Promise<void> {
   const aliasPath = path.join(input.outDir, "browse", ...input.aliasRelPath.split("/"));
   await mkdir(path.dirname(aliasPath), { recursive: true });
-  const canonicalRelFromAliasPath = path.posix.relative(
-    path.posix.dirname(path.posix.join("browse", input.aliasRelPath)),
-    path.posix.join("browse", `${input.slug}.html`),
-  );
-  const canonicalHref = canonicalRelFromAliasPath || `./${input.slug}.html`;
+  const canonicalHref = canonicalHumaneBrowseRedirectHref(input.aliasRelPath, input.slug);
   const redirectHtml = `<!doctype html>
 <meta charset="utf-8" />
 <title>Redirecting…</title>
@@ -575,6 +576,7 @@ async function emitGithubPagesSiteArtifacts(input: {
 
   await buildCommentrayStatic(staticOpts);
   await writeFile(input.navSearchPath, `${JSON.stringify(navDoc, null, 2)}\n`, "utf8");
+  await writeFile(path.join(input.outDir, "serve.json"), SERVE_JSON_FOR_LOCAL_PREVIEW, "utf8");
   return navDoc;
 }
 

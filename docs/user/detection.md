@@ -1,6 +1,6 @@
 # What Commentray detects (and where)
 
-Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. Each layer catches different failures at different moments. None of them replace the others: use **hooks** and, in **your own** CI, **`commentray validate`** on pull requests when you want blocking checks; run **`validate`** manually or from scripts; use **`doctor`** for troubleshooting; use the **extension** for feedback while you type. (This monorepo’s default GitHub Actions **quick** job runs the **quality gate** and tests—it does not invoke `commentray validate` unless you add a step. A later job builds the static site and runs Cypress end-to-end checks; that job also does not run `commentray validate` unless you add a step.)
+Commentray spreads checks across **local hooks**, **CLI**, and the **editor**. Each layer catches different failures at different moments. None of them replace the others: use **hooks** on commits, **`commentray validate`** in CI or scripts for a full-tree scan, and **`doctor`** for troubleshooting; use the **extension** for feedback while you type. In **this** repository, **`bash scripts/quality-gate.sh`** (and therefore the GitHub Actions **quick** job) runs **`commentray validate`** after typecheck—the same command as the pre-commit hook, but without **`--staged`**, so the whole index and companion tree must be consistent before CI passes. A later job builds the static site and runs Cypress end-to-end checks; it does not repeat `commentray validate` because the quick job already did.
 
 ## Pre-commit hook (`commentray init scm`)
 
@@ -47,7 +47,7 @@ These are intentionally **out of scope for the current feature set** (or not imp
 - **Non-default branches:** Staleness evidence is oriented around the **Git** checkout you have; comparing against arbitrary remote branches is not the default story.
 - **Content beyond blob SHA:** Large narrative drift without line/symbol/marker changes may not surface until humans re-read or you adopt richer review metadata.
 
-**Mitigations:** run **`commentray validate` in CI** on pull requests; use **`commentray doctor`** locally; keep blocks aligned per [Keeping blocks in sync](keeping-blocks-in-sync.md); use the extension for fast feedback.
+**Mitigations:** run **`commentray validate` in CI** on pull requests (this repo does so via **`scripts/quality-gate.sh`**); use **`commentray doctor`** locally; keep blocks aligned per [Keeping blocks in sync](keeping-blocks-in-sync.md); use the extension for fast feedback.
 
 ## Related
 

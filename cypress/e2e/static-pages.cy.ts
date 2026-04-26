@@ -93,14 +93,6 @@ describe("The Commentray GitHub Pages static build", () => {
       cy.SearchResultsHitMarksShouldExist();
     });
 
-    it("lists indexed sources after ArrowDown on an empty search field", () => {
-      cy.FocusOnSearchField();
-      cy.PressArrowDownInSearchField();
-      cy.SearchResultsPanelShouldBeVisible();
-      cy.SearchResultsShouldMentionIndexedSourceFiles();
-      cy.SearchResultsHitButtonsShouldExist();
-    });
-
     it("switches documentation angle while keeping on-site pair-browse targets", () => {
       cy.OptionsOfAngleSelectShouldIncludeMainAndArchitecture();
       cy.DisplayedValueOfAngleSelectShouldBe("main");

@@ -121,7 +121,7 @@ Cypress.Commands.add("SearchResultsShouldMentionIndexedSourceFiles", () => {
 });
 
 Cypress.Commands.add("SearchResultsHitButtonsShouldExist", () => {
-  cy.get("#search-results button.hit").should("have.length.at.least", 1);
+  cy.get(shellA11y.search.hitButton).should("have.length.at.least", 1);
 });
 
 Cypress.Commands.add("OptionsOfAngleSelectShouldIncludeMainAndArchitecture", () => {

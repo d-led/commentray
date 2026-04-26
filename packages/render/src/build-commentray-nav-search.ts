@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import {
+  commentrayPairSourceFileExistsOnDisk,
   discoverCommentrayPairsOnDisk,
   githubRepoBlobFileUrl,
   readIndex,
@@ -171,7 +172,11 @@ export async function buildCommentrayNavSearchDocument(
       : [];
 
   const diskPairs = await discoverCommentrayPairsOnDisk(repoRoot, storageDir);
-  const merged = mergeNavSearchPairs(indexPairs, diskPairs, fallback);
+  const mergedRaw = mergeNavSearchPairs(indexPairs, diskPairs, fallback);
+  const merged: typeof mergedRaw = [];
+  for (const p of mergedRaw) {
+    if (await commentrayPairSourceFileExistsOnDisk(repoRoot, p.sourcePath)) merged.push(p);
+  }
 
   if (merged.length === 0) {
     return { schemaVersion: COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION, rows };

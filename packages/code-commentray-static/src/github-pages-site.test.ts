@@ -165,20 +165,27 @@ async function runWritesSiteAndNavFromFlatCompanions(): Promise<string> {
   expect(nav.documentedPairs?.[0]?.staticBrowseUrl).toMatch(/^\.\/browse\/.+\.html$/);
   const browseFiles = await readdir(path.join(r, "_site", "browse"));
   expect(browseFiles.some((f) => f.endsWith(".html"))).toBe(true);
+  const serveJson = JSON.parse(await readFile(path.join(r, "_site", "serve.json"), "utf8")) as {
+    renderSingle?: boolean;
+  };
+  expect(serveJson.renderSingle).toBe(true);
+  const slugFile = browseFiles.find((f) => f.endsWith(".html"));
+  if (slugFile === undefined) {
+    throw new Error("expected a .html file under _site/browse");
+  }
+  const slugStem = path.basename(slugFile, ".html");
   const humaneAliasHtml = await readFile(
     path.join(r, "_site", "browse", "src", "x.ts", "index.html"),
     "utf8",
   );
   expect(humaneAliasHtml).toContain("Redirecting");
-  expect(humaneAliasHtml).toContain(".html");
+  expect(humaneAliasHtml).toContain(`content="0;url=../${slugStem}.html"`);
+  expect(new URL(`../${slugStem}.html`, "http://localhost:4173/browse/src/x.ts").pathname).toBe(
+    `/browse/${slugStem}.html`,
+  );
   expect(html).toContain('aria-label="Documentation home"');
   expect(html).toContain('href="./"');
-  const browseName = browseFiles.find((f) => f.endsWith(".html"));
-  expect(browseName).toBeTruthy();
-  if (browseName === undefined) {
-    throw new Error("expected a .html file under _site/browse");
-  }
-  const browseHtml = await readFile(path.join(r, "_site", "browse", browseName), "utf8");
+  const browseHtml = await readFile(path.join(r, "_site", "browse", slugFile), "utf8");
   expect(browseHtml).toContain('href="../index.html"');
   expect(browseHtml).toContain('aria-label="Documentation home"');
   expect(browseHtml).toMatch(
@@ -206,7 +213,13 @@ async function runAngleSelectorOnBrowsePermalinks(): Promise<string> {
     "utf8",
   );
   expect(sourceAliasHtml).toContain("Redirecting");
-  expect(sourceAliasHtml).toMatch(/\.\.\/[^/]+\.html/);
+  const readmeRefreshTarget = sourceAliasHtml.match(/content="0;url=([^"]+)"/)?.[1];
+  if (readmeRefreshTarget === undefined || readmeRefreshTarget.length === 0) {
+    throw new Error("expected humane README alias redirect target in meta refresh");
+  }
+  expect(new URL(readmeRefreshTarget, "http://localhost:4173/browse/README.md").pathname).toMatch(
+    /^\/browse\/[A-Za-z0-9_-]+\.html$/,
+  );
   const angleAliasMainHtml = await readFile(
     path.join(r, "_site", "browse", "README.md@main.html"),
     "utf8",

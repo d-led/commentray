@@ -1240,6 +1240,11 @@ ${CODE_BROWSER_INTRO_STYLES}
         margin: -1px -3px;
         background: color-mix(in oklab, CanvasText 10%, Canvas);
       }
+      .documented-files-tree .tree-file-link:focus-visible {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
+        border-radius: 3px;
+      }
       .toolbar button {
         font: inherit;
         font-size: var(--cr-ui-fs);
@@ -1272,6 +1277,10 @@ ${CODE_BROWSER_INTRO_STYLES}
         font: inherit;
       }
       .search-results button.hit:hover { background: color-mix(in oklab, CanvasText 10%, Canvas); }
+      .search-results button.hit:focus-visible {
+        outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+        outline-offset: 2px;
+      }
       .search-results button.hit .meta { opacity: 0.8; font-size: 12px; }
       .search-results button.hit .src-tag { opacity: 0.75; font-weight: 500; font-size: 11px; }
       .search-results button.hit .snippet {

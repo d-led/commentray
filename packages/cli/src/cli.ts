@@ -17,6 +17,7 @@ import {
   resolveCommentrayMarkdownPath,
   runCommanderMain,
   type ValidationIssue,
+  pruneOrphanCompanionMarkdown,
   validateProject,
   type ValidateProjectOptions,
   writeIndex,
@@ -83,9 +84,21 @@ async function cmdValidate(opts?: { staged?: boolean }): Promise<number> {
   return 1;
 }
 
-async function cmdDoctor(): Promise<number> {
-  const code = await cmdValidate();
+async function cmdDoctor(opts?: { allowDeletions?: boolean }): Promise<number> {
   const repoRoot = await repoRootFromCwd();
+  if (opts?.allowDeletions) {
+    const cfg = await loadCommentrayConfig(repoRoot);
+    const { removedAbsPaths } = await pruneOrphanCompanionMarkdown(repoRoot, cfg.storageDir);
+    if (removedAbsPaths.length > 0) {
+      console.log(
+        `doctor --allow-deletions: removed ${String(removedAbsPaths.length)} orphan companion path(s).`,
+      );
+      for (const abs of removedAbsPaths) {
+        console.log(`  - ${path.relative(repoRoot, abs).replaceAll("\\", "/")}`);
+      }
+    }
+  }
+  const code = await cmdValidate();
   const gitPath = path.join(repoRoot, ".git");
   try {
     await fs.access(gitPath);
@@ -301,9 +314,16 @@ program
 
 program
   .command("doctor")
-  .description("Validate plus environment checks")
-  .action(async () => {
-    process.exitCode = await cmdDoctor();
+  .description(
+    "Validate plus environment checks; optionally delete companion Markdown with no primary source file",
+  )
+  .option(
+    "--allow-deletions",
+    "Remove orphan companion trees/files under [storage]/source/ (no matching repo primary source); then run validate",
+    false,
+  )
+  .action(async (opts: { allowDeletions?: boolean }) => {
+    process.exitCode = await cmdDoctor({ allowDeletions: Boolean(opts.allowDeletions) });
   });
 
 program

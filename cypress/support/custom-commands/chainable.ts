@@ -79,6 +79,21 @@ declare global {
       PressArrowDownInSearchField(): Chainable<void>;
       SearchResultsShouldMentionIndexedSourceFiles(): Chainable<void>;
       SearchResultsHitButtonsShouldExist(): Chainable<void>;
+      SearchResultsHitButtonCountShouldBeAtLeast(min: number): Chainable<void>;
+      FirstSearchHitButtonShouldBeFocused(): Chainable<void>;
+      SearchHitButtonAtIndexShouldBeFocused(zeroBasedIndex: number): Chainable<void>;
+      MoveSearchKeyboardFocusFromFieldToFirstHit(): Chainable<void>;
+      PressArrowUpInFocusedElement(): Chainable<void>;
+      PressArrowDownInFocusedElement(): Chainable<void>;
+      PressEnterInFocusedSearchField(): Chainable<void>;
+
+      FocusCommentRayedFilesFilter(): Chainable<void>;
+      CommentRayedFilesFilterShouldBeFocused(): Chainable<void>;
+      MoveKeyboardFocusFromCommentRayedFilterToFirstTreeLink(): Chainable<void>;
+      FirstCommentRayedTreeFileLinkShouldBeFocused(): Chainable<void>;
+      CommentRayedTreeFileLinkAtIndexShouldBeFocused(zeroBasedIndex: number): Chainable<void>;
+      CommentRayedFilesTreeFileLinksShouldBeAtLeast(min: number): Chainable<void>;
+      OpenCommentRayedFilesHubWithTreeVisible(): Chainable<void>;
 
       OptionsOfAngleSelectShouldIncludeMainAndArchitecture(): Chainable<void>;
       DisplayedValueOfAngleSelectShouldBe(value: string): Chainable<void>;

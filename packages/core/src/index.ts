@@ -42,10 +42,20 @@ export {
 } from "./paths.js";
 export { findMonorepoPackagesDir, monorepoLayoutStartDir } from "./monorepo-layout.js";
 export {
+  commentrayPairSourceFileExistsOnDisk,
   discoverCommentrayPairsOnDisk,
   pairFromCommentraySourceRel,
 } from "./commentray-disk-pairs.js";
 export type { DiskCommentrayPair } from "./commentray-disk-pairs.js";
+export {
+  collectOrphanCompanionMarkdownTargets,
+  orphanCompanionCleanupAbsPath,
+  pruneOrphanCompanionMarkdown,
+} from "./orphan-companion-markdown.js";
+export type {
+  OrphanCompanionMarkdownTarget,
+  PruneOrphanCompanionMarkdownResult,
+} from "./orphan-companion-markdown.js";
 export type {
   CommentrayToml,
   ResolvedAngleDefinition,

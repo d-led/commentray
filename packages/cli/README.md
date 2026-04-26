@@ -23,6 +23,7 @@ commentray init scm        # install/refresh a marked block in .git/hooks/pre-co
 commentray validate        # schema + anchor integrity + Git staleness evidence
 commentray validate --staged   # same checks limited to index pairs touched by staged files (Git index)
 commentray doctor          # validate plus environment checks
+commentray doctor --allow-deletions   # same, but first removes orphan companion Markdown (no primary source file)
 commentray migrate         # migrate metadata JSON to the current schema
 commentray migrate-angles    # flat .commentray/source/*.md → Angles folders + [angles] + index keys (see --dry-run)
 commentray angles add ID [--source PATH] [--title T] [--make-default]   # register angle + create companion under Angles layout

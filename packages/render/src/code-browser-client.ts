@@ -724,6 +724,18 @@ function findSearchHitButton(
   return null;
 }
 
+function listSearchHitButtons(searchResults: HTMLElement): HTMLButtonElement[] {
+  return [...searchResults.querySelectorAll("button.hit")].filter(
+    (el): el is HTMLButtonElement => el instanceof HTMLButtonElement,
+  );
+}
+
+function listDocumentedTreeFileLinks(treeHost: HTMLElement): HTMLAnchorElement[] {
+  return [...treeHost.querySelectorAll("a.tree-file-link")].filter(
+    (el): el is HTMLAnchorElement => el instanceof HTMLAnchorElement,
+  );
+}
+
 function scrollCodeHitToView(line: number): void {
   const el = document.getElementById(`code-line-${String(line)}`);
   if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -802,6 +814,77 @@ function emptyBrowsePreviewInnerHtml(
   return emptySearchBrowsePreviewInnerHtml(hint, fb, hitCtx);
 }
 
+function wireSearchResultsHitListKeyboard(
+  searchResults: HTMLElement,
+  searchInput: HTMLInputElement,
+): void {
+  searchResults.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.isComposing || searchResults.hidden) return;
+    const hits = listSearchHitButtons(searchResults);
+    if (hits.length === 0) return;
+    const active = document.activeElement;
+    if (!(active instanceof HTMLButtonElement) || !active.classList.contains("hit")) return;
+    const idx = hits.indexOf(active);
+    if (idx < 0) return;
+    if (e.key === "ArrowDown" && idx < hits.length - 1) {
+      hits[idx + 1].focus({ preventScroll: true });
+      e.preventDefault();
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      if (idx > 0) {
+        hits[idx - 1].focus({ preventScroll: true });
+        e.preventDefault();
+        return;
+      }
+      searchInput.focus({ preventScroll: true });
+      e.preventDefault();
+    }
+  });
+}
+
+type SearchInputKeyboardActions = {
+  renderEmptyBrowsePreview: () => void;
+  runSearch: () => void;
+  cancelDebounceTimer: () => void;
+  hitClickDeps: SearchHitClickDeps;
+};
+
+function wireSearchInputKeyboard(
+  searchInput: HTMLInputElement,
+  searchResults: HTMLElement,
+  actions: SearchInputKeyboardActions,
+): void {
+  const { renderEmptyBrowsePreview, runSearch, cancelDebounceTimer, hitClickDeps } = actions;
+  searchInput.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.isComposing) return;
+    if (e.key === "ArrowDown") {
+      if (!searchResults.hidden) {
+        const hits = listSearchHitButtons(searchResults);
+        if (hits.length > 0 && document.activeElement === searchInput) {
+          hits[0].focus({ preventScroll: true });
+          e.preventDefault();
+          return;
+        }
+      }
+      if (tokenizeQuery(searchInput.value).length > 0) return;
+      renderEmptyBrowsePreview();
+      e.preventDefault();
+      return;
+    }
+    if (e.key !== "Enter") return;
+    cancelDebounceTimer();
+    if (tokenizeQuery(searchInput.value).length > 0) {
+      runSearch();
+    }
+    const hits = listSearchHitButtons(searchResults);
+    if (!searchResults.hidden && hits.length > 0 && document.activeElement === searchInput) {
+      e.preventDefault();
+      handleSearchHitButtonClick(hits[0], hitClickDeps);
+    }
+  });
+}
+
 function wireSearchUi(ctx: SearchUiContext): void {
   const {
     scope,
@@ -816,9 +899,13 @@ function wireSearchUi(ctx: SearchUiContext): void {
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function clearSearch(): void {
+  function cancelDebounceTimer(): void {
     clearTimeout(debounceTimer);
     debounceTimer = undefined;
+  }
+
+  function clearSearch(): void {
+    cancelDebounceTimer();
     searchInput.value = "";
     searchResults.innerHTML = "";
     searchResults.hidden = true;
@@ -865,15 +952,17 @@ function wireSearchUi(ctx: SearchUiContext): void {
     handleSearchHitButtonClick(hit, hitClickDeps);
   });
 
+  wireSearchResultsHitListKeyboard(searchResults, searchInput);
+
   searchInput.addEventListener("input", () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(runSearch, 200);
   });
-  searchInput.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key !== "ArrowDown") return;
-    if (tokenizeQuery(searchInput.value).length > 0) return;
-    renderEmptyBrowsePreview();
-    e.preventDefault();
+  wireSearchInputKeyboard(searchInput, searchResults, {
+    renderEmptyBrowsePreview,
+    runSearch,
+    cancelDebounceTimer,
+    hitClickDeps,
   });
   searchClear.addEventListener("click", clearSearch);
 
@@ -1977,10 +2066,45 @@ function wireDocumentedFilesTree(): void {
   }
   document.addEventListener("keydown", onDocumentedFilesHubEscape, true);
 
+  treeMount.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (!detailsHub.open || e.isComposing) return;
+    const t = e.target;
+    if (!(t instanceof HTMLAnchorElement) || !t.classList.contains("tree-file-link")) return;
+    const links = listDocumentedTreeFileLinks(treeMount);
+    if (links.length === 0) return;
+    const idx = links.indexOf(t);
+    if (idx < 0) return;
+    if (e.key === "ArrowDown") {
+      if (idx < links.length - 1) {
+        links[idx + 1].focus({ preventScroll: true });
+        e.preventDefault();
+      }
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      if (idx > 0) {
+        links[idx - 1].focus({ preventScroll: true });
+        e.preventDefault();
+        return;
+      }
+      if (filterInput instanceof HTMLInputElement) {
+        filterInput.focus({ preventScroll: true });
+        e.preventDefault();
+      }
+    }
+  });
+
   if (filterInput instanceof HTMLInputElement) {
     filterInput.addEventListener("input", () => {
       if (!detailsHub.open || cachedPairs === null) return;
       applyFilterAndRender();
+    });
+    filterInput.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (!detailsHub.open || e.isComposing || e.key !== "ArrowDown") return;
+      const links = listDocumentedTreeFileLinks(treeMount);
+      if (links.length === 0) return;
+      links[0].focus({ preventScroll: true });
+      e.preventDefault();
     });
   }
 }

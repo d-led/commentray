@@ -36,6 +36,16 @@ export const shellA11y = {
     label: 'label[for="search-q"]',
     clearButton: "#search-clear",
     results: "#search-results",
+    /** In-page search hit rows (`code-browser-client.ts` `button.hit`). */
+    hitButton: "#search-results button.hit",
+  },
+  /** Comment-rayed files hub (`code-browser.ts` nav rail). */
+  documentedFiles: {
+    hub: "#documented-files-hub",
+    filter: "#documented-files-filter",
+    /** Tree mount: `#documented-files-tree` carries `role="tree"`. */
+    tree: "#documented-files-tree",
+    fileLink: "#documented-files-tree a.tree-file-link",
   },
   panes: {
     source: '[aria-label="Source code"]',

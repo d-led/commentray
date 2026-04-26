@@ -4,5 +4,6 @@ import "./document-and-landmarks";
 import "./a11y-forms-and-links";
 import "./dual-scroll";
 import "./static-site-behavior";
+import "./code-browser-keyboard";
 import "./static-site-mobile";
 import "./mobile-flip-end";

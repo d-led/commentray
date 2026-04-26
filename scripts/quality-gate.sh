@@ -8,9 +8,12 @@ set -euo pipefail
 #   - ESLint (project + refactor metrics) and Stylelint (first-party CSS)
 #   - duplicate detection (jscpd)
 #   - tsc -b across the monorepo
+#   - commentray validate (full workspace — same checks as the pre-commit hook,
+#     but not --staged, so any index/companion/orphan inconsistency fails CI)
 #   - unit tests (includes ArchUnitTS rules under packages/architecture/ vs
 #     tsconfig.archunit.json — see .commentray/source/README.md/architecture.md)
-#   - static pages build + link-shape validation (`npm run pages:build` + `npm run pages:validate`)
+#   - static pages build + link-shape validation (`npm run pages:build` + `npm run pages:validate`,
+#     including humane browse redirect targets + `_site/serve.json` for local static parity)
 #
 # Stops at the first failing step and prints which step failed (see messages
 # above the failing tool output — e.g. format:check names the first drifted file).
@@ -118,6 +121,7 @@ run_step "actionlint" bash scripts/actionlint.sh
 run_step "lint" npm run lint
 run_step "dupes" npm run dupes
 run_step "typecheck" npm run typecheck
+run_step "commentray validate" bash -c "npm run build -w @commentray/cli && npm run commentray -- validate"
 run_step "test (unit)" env COMMENTRAY_TEST_MODE=unit npm run test
 run_step "pages (build + validate)" bash -c "npm run pages:build && npm run pages:validate"
 

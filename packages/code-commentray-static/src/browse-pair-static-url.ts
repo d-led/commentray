@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { browsePageSlugFromPair } from "@commentray/render";
 
 /** Normalise repo-relative paths for browse alias and URL construction. */
@@ -37,6 +39,21 @@ export function sourceBrowseAliasPath(sourcePath: string): string {
     .filter(Boolean)
     .map((seg) => browseAliasSegment(seg));
   return sourceSegments.length > 0 ? sourceSegments.join("/") : "pair";
+}
+
+/**
+ * Relative `href` from `_site/browse/<alias>/index.html` (or `…/<alias>.html` shim) to the
+ * canonical `_site/browse/<slug>.html`. The `from` path must be the alias **directory**
+ * (`path.posix.dirname(join("browse", aliasRelPath))`), not `join("browse", aliasRelPath)` as a
+ * faux file — otherwise `../../slug.html` resolves from `/browse/docs/manual.md` (no trailing
+ * slash) to `/slug.html` and static hosts 404.
+ */
+export function canonicalHumaneBrowseRedirectHref(aliasRelPath: string, slug: string): string {
+  const rel = path.posix.relative(
+    path.posix.dirname(path.posix.join("browse", aliasRelPath)),
+    path.posix.join("browse", `${slug}.html`),
+  );
+  return rel.length > 0 ? rel : `./${slug}.html`;
 }
 
 export function humanBrowseAliasPathFromPair(

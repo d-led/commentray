@@ -15,6 +15,7 @@ import {
 } from "./marker-validation.js";
 import { loadGitTrackedSourceTextsOutsideIndex } from "./git-relocation-scan.js";
 import { relocationHintMessages } from "./relocation-hints.js";
+import { collectOrphanCompanionMarkdownTargets } from "./orphan-companion-markdown.js";
 import { GitScmProvider } from "./scm/git-scm-provider.js";
 
 export type ValidationIssue = { level: "error" | "warn"; message: string };
@@ -168,6 +169,52 @@ async function collectIssuesForLoadedIndex(
   return issues;
 }
 
+async function pushMissingStorageSubdirWarnings(
+  repoRoot: string,
+  storageDir: string,
+  issues: ValidationIssue[],
+): Promise<void> {
+  const storageAbs = path.join(repoRoot, storageDir);
+  for (const sub of ["source", "metadata"]) {
+    const p = path.join(storageAbs, sub);
+    try {
+      await fs.stat(p);
+    } catch {
+      issues.push({
+        level: "warn",
+        message: `Missing directory: ${path.join(storageDir, sub)}`,
+      });
+    }
+  }
+}
+
+async function pushOrphanCompanionMarkdownIssues(
+  repoRoot: string,
+  storageDir: string,
+  issues: ValidationIssue[],
+): Promise<void> {
+  try {
+    const orphans = await collectOrphanCompanionMarkdownTargets(repoRoot, storageDir);
+    for (const o of orphans) {
+      const relCleanup = normalizeRepoRelativePath(
+        path.relative(repoRoot, o.absCleanupPath).replaceAll("\\", "/"),
+      );
+      issues.push({
+        level: "error",
+        message:
+          `Orphan companion Markdown: primary source "${o.sourcePath}" is not a readable file, but ` +
+          `companion storage exists (${o.commentrayPath}). Static browse and search would advertise a broken pair. ` +
+          `Delete this orphan with: commentray doctor --allow-deletions (removes ${relCleanup})`,
+      });
+    }
+  } catch (err) {
+    issues.push({
+      level: "warn",
+      message: `Could not scan for orphan companion Markdown: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+}
+
 export async function validateProject(
   repoRoot: string,
   options?: ValidateProjectOptions,
@@ -184,18 +231,8 @@ export async function validateProject(
     return { issues };
   }
 
-  const storageAbs = path.join(repoRoot, config.storageDir);
-  for (const sub of ["source", "metadata"]) {
-    const p = path.join(storageAbs, sub);
-    try {
-      await fs.stat(p);
-    } catch {
-      issues.push({
-        level: "warn",
-        message: `Missing directory: ${path.join(config.storageDir, sub)}`,
-      });
-    }
-  }
+  await pushMissingStorageSubdirWarnings(repoRoot, config.storageDir, issues);
+  await pushOrphanCompanionMarkdownIssues(repoRoot, config.storageDir, issues);
 
   let index: CommentrayIndex | null = null;
   try {

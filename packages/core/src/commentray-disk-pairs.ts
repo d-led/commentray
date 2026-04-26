@@ -1,12 +1,36 @@
+import { stat } from "node:fs/promises";
 import path from "node:path";
 
-import { commentrayAnglesLayoutEnabled, normalizeRepoRelativePath } from "./paths.js";
+import {
+  commentrayAnglesLayoutEnabled,
+  normalizeRepoRelativePath,
+  resolvePathUnderRepoRoot,
+} from "./paths.js";
 import { collectMdRelPathsUnderSourceAbs } from "./walk-commentray-source-md.js";
 
 export type DiskCommentrayPair = {
   sourcePath: string;
   commentrayPath: string;
 };
+
+/**
+ * True when `sourcePath` resolves to a regular file under `repoRoot`.
+ * Used so nav / browse never advertise pairs whose companion exists but the primary source is missing
+ * (otherwise static browse emits URLs with no backing HTML).
+ */
+export async function commentrayPairSourceFileExistsOnDisk(
+  repoRoot: string,
+  sourcePath: string,
+): Promise<boolean> {
+  const rel = sourcePath.trim();
+  if (rel.length === 0) return false;
+  try {
+    const st = await stat(resolvePathUnderRepoRoot(repoRoot, rel));
+    return st.isFile();
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Maps a Markdown path relative to `{storage}/source/` to `(sourcePath, commentrayPath)` using
@@ -54,6 +78,7 @@ export async function discoverCommentrayPairsOnDisk(
   for (const rel of rels) {
     const pair = pairFromCommentraySourceRel(storageNorm, rel, anglesOn);
     if (!pair || seen.has(pair.commentrayPath)) continue;
+    if (!(await commentrayPairSourceFileExistsOnDisk(repoRoot, pair.sourcePath))) continue;
     seen.add(pair.commentrayPath);
     out.push(pair);
   }
