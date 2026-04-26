@@ -1,6 +1,18 @@
 # Install Commentray
 
-Pick one path: **release binary** (no Node — assets on [GitHub Releases](https://github.com/d-led/commentray/releases) under **`v*`** tags), **npm global** or **[`npx`](#npx-one-off-no-global-install)** (needs Node), or **clone the repo** for extension packaging / full development ([Development → Clone and workspace setup](../development.md#clone-and-workspace-setup)).
+Pick one path: **release binary** (no Node — assets on [GitHub Releases](https://github.com/d-led/commentray/releases) under **`v*`** tags), **[Homebrew](#homebrew-d-led-tap-binary)** (macOS or Linux, same release binaries), **npm global** or **[`npx`](#npx-one-off-no-global-install)** (needs Node), or **clone the repo** for extension packaging / full development ([Development → Clone and workspace setup](../development.md#clone-and-workspace-setup)).
+
+## Homebrew (`d-led` tap, binary)
+
+If you use [Homebrew](https://brew.sh/), install from the maintainer tap [d-led/homebrew-d-led](https://github.com/d-led/homebrew-d-led) (formula `commentray.rb` installs the same standalone SEA builds as Releases — **darwin-arm64**, **darwin-x64**, **linux-arm64**, **linux-x64** only):
+
+```bash
+brew tap d-led/d-led
+brew install commentray
+commentray --version
+```
+
+Upgrade after a new release: `brew update && brew upgrade commentray`.
 
 ## Standalone CLI binaries (GitHub Releases)
 

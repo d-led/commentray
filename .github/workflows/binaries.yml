@@ -118,3 +118,26 @@ jobs:
         with:
           files: release-binaries/*
           generate_release_notes: true
+
+  # Pushes an updated binary-style `commentray.rb` to https://github.com/d-led/homebrew-d-led
+  # (macOS + Linux only — matches the build matrix, excluding Windows). Skips when
+  # HOMEBREW_TAP_PUSH_TOKEN is unset (see docs/development.md).
+  update-homebrew-tap:
+    needs: [release]
+    if: github.repository == 'd-led/commentray' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+
+      - name: Update Homebrew tap
+        env:
+          HOMEBREW_TAP_PUSH_TOKEN: ${{ secrets.HOMEBREW_TAP_PUSH_TOKEN }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: bash scripts/push-homebrew-tap.sh
