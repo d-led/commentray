@@ -2,7 +2,8 @@
 // Keep intra-monorepo dependency pins in lockstep with the current Commentray
 // version (as recorded in packages/core/package.json).
 //
-// Rewrites every `@commentray/*` workspace package entry found in
+// Rewrites every first-party workspace package entry (@commentray/* and the
+// unscoped `commentray` CLI) found in
 // `dependencies`, `devDependencies`, `peerDependencies`, or `optionalDependencies`
 // across all workspace packages (and the monorepo root) to that version.
 //
@@ -23,7 +24,7 @@ const REPO_ROOT = dirname(HERE);
 const WORKSPACE_NAMES = new Set([
   "@commentray/core",
   "@commentray/render",
-  "@commentray/cli",
+  "commentray",
   "@commentray/code-commentray-static",
 ]);
 
@@ -77,7 +78,7 @@ for (const file of files) {
 
 if (check) {
   if (drifted.length === 0) {
-    console.log(`All workspace deps already pin @commentray/* at ${targetVersion}.`);
+    console.log(`All workspace deps already pin first-party packages at ${targetVersion}.`);
     process.exit(0);
   }
   console.error(`Workspace deps drifted from ${targetVersion}:`);
@@ -87,8 +88,8 @@ if (check) {
 }
 
 if (drifted.length === 0) {
-  console.log(`All workspace deps already pin @commentray/* at ${targetVersion}.`);
+  console.log(`All workspace deps already pin first-party packages at ${targetVersion}.`);
 } else {
-  console.log(`Synced @commentray/* pins to ${targetVersion} in:`);
+  console.log(`Synced first-party workspace pins to ${targetVersion} in:`);
   for (const f of drifted) console.log(`  ${f}`);
 }

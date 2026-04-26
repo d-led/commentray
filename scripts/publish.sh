@@ -45,12 +45,13 @@ for a in "$@"; do
   esac
 done
 
-# Public workspaces, in dependency order (core -> render -> cli -> static site).
+# Public workspaces, in dependency order (core -> render -> static site -> cli;
+# the CLI depends on @commentray/code-commentray-static).
 PUBLIC_WORKSPACES=(
   "@commentray/core"
   "@commentray/render"
-  "@commentray/cli"
   "@commentray/code-commentray-static"
+  "commentray"
 )
 
 version=$(node -e "process.stdout.write(require('./packages/core/package.json').version)")

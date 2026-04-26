@@ -95,8 +95,8 @@ async function assertCliAndVscodePackageJsonHaveNoCrossReferences(): Promise<voi
   }
 
   expect(
-    vscodeKeys.has("@commentray/cli"),
-    'Remove "@commentray/cli" from packages/vscode/package.json (dependencies / devDependencies / peerDependencies / optionalDependencies). The extension must not depend on the CLI package.',
+    vscodeKeys.has("commentray"),
+    'Remove "commentray" from packages/vscode/package.json (dependencies / devDependencies / peerDependencies / optionalDependencies). The extension must not depend on the CLI package.',
   ).toBe(false);
 }
 
@@ -147,12 +147,12 @@ describe("monorepo package dependency rules", () => {
     });
   });
 
-  it("keeps @commentray/cli from depending on the VS Code extension package", async () => {
+  it("keeps the commentray CLI package from depending on the VS Code extension package", async () => {
     await assertFirstPartyPackageDoesNotImportFolders({
       sourceGlob: "packages/cli/**",
       forbiddenFolders: ["packages/vscode"],
       failureMessage: () =>
-        "@commentray/cli must not import packages/vscode — CLI is Node tooling; the extension is a separate host",
+        "commentray (CLI) must not import packages/vscode — CLI is Node tooling; the extension is a separate host",
     });
   });
 

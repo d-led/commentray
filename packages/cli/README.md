@@ -1,4 +1,4 @@
-# @commentray/cli
+# commentray
 
 Command-line interface for [Commentray](https://github.com/d-led/commentray) — a side-by-side "commentary track" for code. Provides idempotent workspace setup, validation, staleness doctoring, metadata migration, and HTML rendering.
 
@@ -7,9 +7,9 @@ Command-line interface for [Commentray](https://github.com/d-led/commentray) —
 ## Install
 
 ```bash
-npm install -D @commentray/cli
+npm install -D commentray
 # or globally:
-npm install -g @commentray/cli
+npm install -g commentray
 ```
 
 Standalone, self-contained binaries (no Node install needed) for Linux x64/arm64, macOS x64/arm64, and Windows x64 ship on **[GitHub Releases](https://github.com/d-led/commentray/releases)** with each **`v*`** tag. CI workflow artifacts expire after a short retention period—prefer **Release** assets for anything you rely on long term.

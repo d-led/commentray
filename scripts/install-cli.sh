@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Install the Commentray CLI globally by symlinking the local workspace
 # build via `npm link`. Fastest path for local use and dogfooding:
-# subsequent `npm run build -w @commentray/cli` updates are picked up
+# subsequent `npm run build -w commentray` updates are picked up
 # without reinstalling.
 #
 # Usage:
@@ -17,19 +17,19 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 if [[ "${1:-}" == "--unlink" ]]; then
-  npm rm -g @commentray/cli
-  echo "Unlinked @commentray/cli (global)."
+  npm rm -g commentray
+  echo "Unlinked commentray (global)."
   exit 0
 fi
 
-echo "Building @commentray/core, @commentray/render, @commentray/cli..."
+echo "Building @commentray/core, @commentray/render, commentray..."
 npm run build -w @commentray/core
 npm run build -w @commentray/render
-npm run build -w @commentray/cli
+npm run build -w commentray
 
 chmod +x packages/cli/dist/cli.js
 
-echo "Linking @commentray/cli globally..."
+echo "Linking commentray globally..."
 (cd packages/cli && npm link)
 
 if ! command -v commentray >/dev/null 2>&1; then

@@ -9,7 +9,7 @@ flowchart TB
   core["commentray/core"]
   pkgRender["commentray/render"]
   ccStatic["commentray/code-commentray-static"]
-  cli["commentray/cli"]
+  cli["commentray"]
   vscode["commentray-vscode"]
 
   core -->|npm dep| pkgRender
@@ -23,7 +23,7 @@ flowchart TB
 
 - **[@commentray/core](https://www.npmjs.com/package/@commentray/core)** — paths, index, config merge, Angles resolution, Git-backed evidence.
 - **[@commentray/render](https://www.npmjs.com/package/@commentray/render)** — Markdown → safe HTML, static code browser shell (dual panes, optional multi-angle selector, block-aware scroll when the index agrees).
-- **[@commentray/cli](https://www.npmjs.com/package/@commentray/cli)** — `init`, `validate`, **`migrate-angles`** (flat → per-source folders), `render`, `pages` inputs.
+- **[commentray](https://www.npmjs.com/package/commentray)** — `init`, `validate`, **`migrate-angles`** (flat → per-source folders), `render`, `pages` inputs.
 - **[@commentray/code-commentray-static](https://www.npmjs.com/package/@commentray/code-commentray-static)** — thin consumer that feeds `renderCodeBrowserHtml` for GitHub Pages.
 
 Use **Angle** on the static site when this file exists alongside `main.md` and both are listed under `[angles].definitions` in `.commentray.toml`.

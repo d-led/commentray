@@ -1,5 +1,5 @@
 {
-  "name": "commentray",
+  "name": "commentray-monorepo",
   "private": true,
   "description": "Commentray monorepo — out-of-file documentation anchored to code",
   "license": "MPL-2.0",
@@ -15,7 +15,7 @@
   "scripts": {
     "bootstrap": "npm install",
     "setup": "bash scripts/setup.sh",
-    "build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w @commentray/code-commentray-static && npm run build -w @commentray/cli && npm run build -w commentray-vscode",
+    "build": "npm run build -w @commentray/core && npm run build -w @commentray/render && npm run build -w @commentray/code-commentray-static && npm run build -w commentray && npm run build -w commentray-vscode",
     "clean": "npm run -ws --if-present clean",
     "format": "bash scripts/format.sh",
     "format:check": "bash scripts/format-check.sh",
@@ -37,10 +37,10 @@
     "test:all": "bash scripts/test-all.sh",
     "ci:quick": "bash scripts/quality-gate.sh",
     "ci:full": "bash scripts/ci-full.sh",
-    "commentray": "npm run commentray -w @commentray/cli --",
+    "commentray": "npm run commentray -w commentray --",
     "cli:install": "bash scripts/install-cli.sh",
     "cli:uninstall": "bash scripts/install-cli.sh --unlink",
-    "binary:build": "npm run build:bundle -w @commentray/cli && node scripts/build-binary.mjs",
+    "binary:build": "npm run build:bundle -w commentray && node scripts/build-binary.mjs",
     "binary:smoke": "node scripts/smoke-binary.mjs",
     "extension:dogfood": "bash scripts/editor-extension.sh dogfood",
     "extension:dogfood:repo": "bash scripts/editor-extension.sh dogfood .",

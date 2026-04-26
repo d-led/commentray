@@ -16,7 +16,7 @@ if [ "${COMMENTRAY_SERVE_NO_PACKAGE_WATCH:-}" = "1" ]; then
   npm run build -w @commentray/core
   npm run build -w @commentray/render
   npm run build -w @commentray/code-commentray-static
-  npm run build -w @commentray/cli
+  npm run build -w commentray
   exec node packages/cli/dist/cli.js serve "$@"
 fi
 

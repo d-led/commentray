@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 /**
  * Starting directory for locating the monorepo `packages/` folder: typically
  * `dirname(import.meta.url)` in normal ESM, or `dirname(process.argv[1])` when
- * `import.meta.url` is missing (e.g. code bundled into @commentray/cli's single
+ * `import.meta.url` is missing (e.g. code bundled into the commentray CLI's single
  * CJS file, where esbuild emits empty `import.meta` shims for nested packages).
  */
 export function monorepoLayoutStartDir(importMetaUrl: string | undefined): string {

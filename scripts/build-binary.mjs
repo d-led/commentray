@@ -6,7 +6,7 @@
  * Output: packages/cli/dist/bin/commentray-<platform>-<arch>[.exe]
  *
  * Steps:
- *   1. Ensure the CLI bundle exists (`npm run build:bundle -w @commentray/cli`).
+ *   1. Ensure the CLI bundle exists (`npm run build:bundle -w commentray`).
  *   2. Resolve a **SEA-capable** Node binary (see below).
  *   3. Generate the SEA blob via `node --experimental-sea-config`.
  *   4. Copy that Node binary to the output path.
@@ -82,8 +82,8 @@ function binarySuffix() {
 
 function ensureBundle() {
   if (existsSync(BUNDLE)) return;
-  console.log("Bundle missing; running `npm run build:bundle -w @commentray/cli`.");
-  run("npm", ["run", "build:bundle", "-w", "@commentray/cli"], {
+  console.log("Bundle missing; running `npm run build:bundle -w commentray`.");
+  run("npm", ["run", "build:bundle", "-w", "commentray"], {
     cwd: REPO_ROOT,
     shell: process.platform === "win32",
   });

@@ -23,7 +23,7 @@ If macOS blocks a downloaded binary (quarantine), see [Development → macOS qua
 Requires a supported **Node.js** version (see repo CI matrices).
 
 ```bash
-npm install -g @commentray/cli
+npm install -g commentray
 commentray --version
 ```
 

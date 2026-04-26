@@ -27,7 +27,7 @@ try {
   );
 } catch {
   console.error(
-    "[serve] chokidar not found (expected via @commentray/cli). Run `npm install` from the repo root.",
+    "[serve] chokidar not found (expected via the commentray CLI workspace). Run `npm install` from the repo root.",
   );
   process.exit(1);
 }
@@ -59,14 +59,14 @@ function buildLibsTry() {
 }
 
 function buildCliTry() {
-  return npmRunSyncTry(["run", "build", "-w", "@commentray/cli"]);
+  return npmRunSyncTry(["run", "build", "-w", "commentray"]);
 }
 
 function buildAllStrict() {
   npmRunSyncStrict(["run", "build", "-w", "@commentray/core"]);
   npmRunSyncStrict(["run", "build", "-w", "@commentray/render"]);
   npmRunSyncStrict(["run", "build", "-w", "@commentray/code-commentray-static"]);
-  npmRunSyncStrict(["run", "build", "-w", "@commentray/cli"]);
+  npmRunSyncStrict(["run", "build", "-w", "commentray"]);
 }
 
 /** @type {import('node:child_process').ChildProcess | null} */
