@@ -39,4 +39,33 @@ describe("Block-aligned stretch table HTML", () => {
     expect((out.tableInnerHtml.match(/stretch-row--gap/g) ?? []).length).toBe(1);
     expect((out.tableInnerHtml.match(/stretch-row--block/g) ?? []).length).toBe(1);
   });
+
+  it("emits gap rows for marker viewport lines before the inner source range", async () => {
+    const markerCr = ".commentray/source/marker/readme.md.md";
+    const src = ["pad", "# commentray:start id=aa", "[inner]", "# commentray:end id=aa"].join("\n");
+    const md = "<!-- commentray:block id=aa -->\n\n## Doc\n";
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [markerCr]: {
+          sourcePath: "marker/readme.md",
+          commentrayPath: markerCr,
+          blocks: [{ id: "aa", anchor: "marker:aa" }],
+        },
+      },
+    };
+    const out = await tryBuildBlockStretchTableHtml({
+      code: src,
+      language: "txt",
+      commentrayMarkdown: md,
+      index,
+      sourceRelative: "marker/readme.md",
+      commentrayPathRel: markerCr,
+    });
+    expect(out).not.toBeNull();
+    if (out === null) throw new Error("expected table");
+    /* pad + start marker are prefix gaps; inner is the block; end delimiter is an unmapped tail gap. */
+    expect((out.tableInnerHtml.match(/stretch-row--gap/g) ?? []).length).toBe(3);
+    expect((out.tableInnerHtml.match(/stretch-row--block/g) ?? []).length).toBe(1);
+  });
 });

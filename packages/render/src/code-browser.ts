@@ -173,7 +173,8 @@ export type CodeBrowserPageOptions = {
   documentedPairsEmbeddedB64?: string;
   /**
    * When **two or more** angles are listed for the same static browse session, the shell renders
-   * an Angle selector, embeds each rendered Markdown body, and disables stretch layout.
+   * an Angle selector. If every angle can build a block-stretch table (`layout` `auto`), the shell
+   * uses **stretch** (one scroll + row-aligned table); otherwise **dual** panes with client swap.
    */
   multiAngleBrowsing?: CodeBrowserMultiAngleBrowsing;
   /**
@@ -2288,6 +2289,8 @@ type MultiAngleJsonRow = {
   commentrayPathForSearch: string;
   commentrayOnGithubUrl?: string;
   staticBrowseUrl?: string;
+  /** Multi-angle stretch: base64 UTF-8 of `#shell` inner HTML for this angle (table row “arithmetics”). */
+  stretchSwapInnerB64?: string;
 };
 
 type MultiAngleDefaultSelection = {
@@ -2301,6 +2304,33 @@ type MultiAngleDefaultSelection = {
 
 function firstNonEmpty(values: string[]): string | undefined {
   return values.find((v) => v.trim().length > 0);
+}
+
+function angleBlockStretchRowsPathOk(
+  spec: CodeBrowserMultiAngleSpec,
+  opts: CodeBrowserPageOptions,
+): boolean {
+  const rows = spec.blockStretchRows;
+  if (rows === undefined) return false;
+  const angleCrNorm = normalizeRepoRelativePath(spec.commentrayPathRel.replaceAll("\\", "/"));
+  const primaryNorm = normalizeRepoRelativePath((opts.filePath ?? "").replaceAll("\\", "/"));
+  return (
+    normalizeRepoRelativePath(rows.commentrayPathRel.replaceAll("\\", "/")) === angleCrNorm &&
+    normalizeRepoRelativePath(rows.sourceRelative.replaceAll("\\", "/")) === primaryNorm
+  );
+}
+
+function multiAngleToolbarAngleSelectHtml(
+  multi: CodeBrowserMultiAngleBrowsing,
+  defaultId: string,
+): string {
+  const selOpts = multi.angles
+    .map((a) => {
+      const lab = escapeHtml(a.title?.trim() || a.id);
+      return `<option value="${escapeHtml(a.id)}"${a.id === defaultId ? " selected" : ""}>${lab}</option>`;
+    })
+    .join("");
+  return `<span class="toolbar-angle-picker"><label class="toolbar-angle-picker__lab nav-rail__search-label" for="angle-select">Angle</label><select id="angle-select" aria-label="Commentray angle">${selOpts}</select></span>`;
 }
 
 function resolveMultiAngleDefaultSelection(args: {
@@ -2352,12 +2382,8 @@ async function multiAngleJsonRowAndDocHtml(
   spec: CodeBrowserMultiAngleSpec,
 ): Promise<{ jsonRow: MultiAngleJsonRow; commentrayHtml: string; scrollB64: string }> {
   const rows = spec.blockStretchRows;
+  const rowsPathOk = angleBlockStretchRowsPathOk(spec, opts);
   const angleCrNorm = normalizeRepoRelativePath(spec.commentrayPathRel.replaceAll("\\", "/"));
-  const primaryNorm = normalizeRepoRelativePath((opts.filePath ?? "").replaceAll("\\", "/"));
-  const rowsPathOk =
-    rows !== undefined &&
-    normalizeRepoRelativePath(rows.commentrayPathRel.replaceAll("\\", "/")) === angleCrNorm &&
-    normalizeRepoRelativePath(rows.sourceRelative.replaceAll("\\", "/")) === primaryNorm;
   const links =
     rows !== undefined && rowsPathOk
       ? buildBlockScrollLinks(
@@ -2387,6 +2413,94 @@ async function multiAngleJsonRowAndDocHtml(
     },
     commentrayHtml,
     scrollB64,
+  };
+}
+
+/**
+ * When every angle has a valid block index and `tryBuildBlockStretchTableHtml` succeeds for each,
+ * emit one outer scroll (table rows = aligned block “arithmetics”) instead of dual-pane sync.
+ */
+async function buildMultiAngleBlockStretchShell(
+  opts: CodeBrowserPageOptions,
+  multi: CodeBrowserMultiAngleBrowsing,
+): Promise<CodeBrowserShell | null> {
+  const defaultId = multi.angles.some((a) => a.id === multi.defaultAngleId)
+    ? multi.defaultAngleId
+    : (multi.angles[0]?.id ?? "main");
+
+  const perAngle: Array<{
+    spec: CodeBrowserMultiAngleSpec;
+    stretched: { preambleHtml: string; tableInnerHtml: string };
+    jsonRow: MultiAngleJsonRow;
+    commentrayHtml: string;
+    scrollB64: string;
+  }> = [];
+
+  for (const spec of multi.angles) {
+    if (!angleBlockStretchRowsPathOk(spec, opts)) return null;
+    const rows = spec.blockStretchRows;
+    if (rows === undefined) return null;
+    const stretched = await tryBuildBlockStretchTableHtml({
+      code: opts.code,
+      language: opts.language,
+      commentrayMarkdown: spec.markdown,
+      index: rows.index,
+      sourceRelative: rows.sourceRelative,
+      commentrayPathRel: rows.commentrayPathRel,
+      commentrayOutputUrls: opts.commentrayOutputUrls,
+    });
+    if (stretched === null) return null;
+    const { jsonRow, commentrayHtml, scrollB64 } = await multiAngleJsonRowAndDocHtml(opts, spec);
+    const stretchSwapInner = `        ${stretched.preambleHtml}\n        ${stretched.tableInnerHtml}\n`;
+    perAngle.push({
+      spec,
+      stretched,
+      jsonRow: {
+        ...jsonRow,
+        stretchSwapInnerB64: Buffer.from(stretchSwapInner, "utf8").toString("base64"),
+      },
+      commentrayHtml,
+      scrollB64,
+    });
+  }
+
+  const builtAngles = perAngle.map((p) => ({
+    spec: p.spec,
+    commentrayHtml: p.commentrayHtml,
+    scrollB64: p.scrollB64,
+  }));
+  const { defaultMarkdown, defaultScrollB64, defaultPathSearch, defaultGh, defaultStaticBrowse } =
+    resolveMultiAngleDefaultSelection({ multi, defaultId, opts, builtAngles });
+
+  const defaultStretch = perAngle.find((p) => p.spec.id === defaultId) ?? perAngle[0];
+  if (defaultStretch === undefined) return null;
+
+  const shellInner =
+    `        ${defaultStretch.stretched.preambleHtml}\n` +
+    `        ${defaultStretch.stretched.tableInnerHtml}\n`;
+
+  const payloadObj = {
+    layoutMode: "stretch" as const,
+    defaultAngleId: defaultId,
+    angles: perAngle.map((p) => p.jsonRow),
+  };
+  const multiAnglePayloadB64 = Buffer.from(JSON.stringify(payloadObj), "utf8").toString("base64");
+
+  return {
+    layout: "stretch",
+    shellInner,
+    scrollBlockLinksB64: defaultScrollB64,
+    angleSelectHtml: multiAngleToolbarAngleSelectHtml(multi, defaultId),
+    multiAnglePayloadB64,
+    sourceMarkdownToggleEnabled: false,
+    sourcePaneDefaultMode: "source",
+    multiShell: {
+      rawMdB64: Buffer.from(defaultMarkdown, "utf8").toString("base64"),
+      scrollBlockLinksB64: defaultScrollB64,
+      commentrayPathForSearch: defaultPathSearch,
+      commentrayOnGithubUrl: defaultGh,
+      ...(defaultStaticBrowse.length > 0 ? { commentrayStaticBrowseUrl: defaultStaticBrowse } : {}),
+    },
   };
 }
 
@@ -2437,13 +2551,7 @@ async function buildMultiAngleDualPaneShell(
     defaultPaneHtml,
   } = resolveMultiAngleDefaultSelection({ multi, defaultId, opts, builtAngles });
 
-  const selOpts = multi.angles
-    .map((a) => {
-      const lab = escapeHtml(a.title?.trim() || a.id);
-      return `<option value="${escapeHtml(a.id)}"${a.id === defaultId ? " selected" : ""}>${lab}</option>`;
-    })
-    .join("");
-  const angleSelectHtml = `<span class="toolbar-angle-picker"><label class="toolbar-angle-picker__lab nav-rail__search-label" for="angle-select">Angle</label><select id="angle-select" aria-label="Commentray angle">${selOpts}</select></span>`;
+  const angleSelectHtml = multiAngleToolbarAngleSelectHtml(multi, defaultId);
 
   const pairHtml = renderShellPairContextHtml(opts.filePath, defaultPathSearch);
   const shellInner = wrapDualShellInner(
@@ -2470,31 +2578,68 @@ async function buildMultiAngleDualPaneShell(
   };
 }
 
-async function buildCodeBrowserShell(
+async function buildDualPaneSingleAngleShell(
+  opts: CodeBrowserPageOptions,
+): Promise<CodeBrowserShell> {
+  const rows = opts.blockStretchRows;
+  const links: BlockScrollLink[] =
+    rows !== undefined
+      ? buildBlockScrollLinks(
+          rows.index,
+          rows.sourceRelative,
+          rows.commentrayPathRel,
+          opts.commentrayMarkdown,
+          opts.code,
+        )
+      : [];
+  const mdForDoc = injectCommentrayDocAnchors(
+    opts.commentrayMarkdown,
+    links.length > 0 ? links : undefined,
+  );
+  let scrollBlockLinksB64 = "";
+  if (links.length > 0) {
+    scrollBlockLinksB64 = Buffer.from(JSON.stringify(links), "utf8").toString("base64");
+  }
+  const sourceMarkdownEnabled = isMarkdownLikeSource(opts);
+  const sourceMdForPane = sourceMarkdownEnabled ? injectSourceMarkdownAnchors(opts.code) : "";
+  const sourcePaneUrls = sourcePaneOutputUrls(opts);
+  const [codeHtml, commentrayHtml, sourceMarkdownPaneHtml] = await Promise.all([
+    renderHighlightedCodeLineRows(opts.code, opts.language),
+    renderMarkdownToHtml(mdForDoc, {
+      commentrayOutputUrls: opts.commentrayOutputUrls,
+    }),
+    sourceMarkdownEnabled
+      ? renderMarkdownToHtml(sourceMdForPane, {
+          commentrayOutputUrls: sourcePaneUrls,
+        })
+      : Promise.resolve(""),
+  ]);
+  const pairHtml = renderShellPairContextHtml(
+    opts.filePath,
+    (opts.commentrayPathForSearch ?? "").trim(),
+  );
+  const shellInner = wrapDualShellInner(
+    pairHtml,
+    dualPanePanesInnerHtml(codeHtml, commentrayHtml, sourceMarkdownPaneHtml),
+  );
+  return {
+    layout: "dual",
+    shellInner,
+    scrollBlockLinksB64,
+    angleSelectHtml: "",
+    multiAnglePayloadB64: "",
+    sourceMarkdownToggleEnabled: sourceMarkdownEnabled,
+    sourcePaneDefaultMode: sourceMarkdownEnabled ? "rendered-markdown" : "source",
+  };
+}
+
+async function buildSingleAngleCodeBrowserShell(
   opts: CodeBrowserPageOptions,
   layoutPref: "auto" | "dual",
 ): Promise<CodeBrowserShell> {
   let layout: "dual" | "stretch" = "dual";
   let shellInner = "";
-  let scrollBlockLinksB64 = "";
-
-  const multi = opts.multiAngleBrowsing;
-  const multiActive = Boolean(multi && multi.angles.length >= 2);
-
-  if (multiActive && multi) {
-    const built = await buildMultiAngleDualPaneShell(opts, multi);
-    const ms = built.multiShell;
-    return {
-      layout: "dual",
-      shellInner: built.shellInner,
-      scrollBlockLinksB64: ms.scrollBlockLinksB64,
-      angleSelectHtml: built.angleSelectHtml,
-      multiAnglePayloadB64: built.multiAnglePayloadB64,
-      sourceMarkdownToggleEnabled: built.sourceMarkdownToggleEnabled,
-      sourcePaneDefaultMode: built.sourcePaneDefaultMode,
-      multiShell: ms,
-    };
-  }
+  const scrollBlockLinksB64 = "";
 
   if (opts.blockStretchRows && layoutPref !== "dual") {
     const stretched = await tryBuildBlockStretchTableHtml({
@@ -2513,54 +2658,7 @@ async function buildCodeBrowserShell(
   }
 
   if (layout === "dual") {
-    const links: BlockScrollLink[] =
-      opts.blockStretchRows !== undefined
-        ? buildBlockScrollLinks(
-            opts.blockStretchRows.index,
-            opts.blockStretchRows.sourceRelative,
-            opts.blockStretchRows.commentrayPathRel,
-            opts.commentrayMarkdown,
-            opts.code,
-          )
-        : [];
-    const mdForDoc = injectCommentrayDocAnchors(
-      opts.commentrayMarkdown,
-      links.length > 0 ? links : undefined,
-    );
-    if (links.length > 0) {
-      scrollBlockLinksB64 = Buffer.from(JSON.stringify(links), "utf8").toString("base64");
-    }
-    const sourceMarkdownEnabled = isMarkdownLikeSource(opts);
-    const sourceMdForPane = sourceMarkdownEnabled ? injectSourceMarkdownAnchors(opts.code) : "";
-    const sourcePaneUrls = sourcePaneOutputUrls(opts);
-    const [codeHtml, commentrayHtml, sourceMarkdownPaneHtml] = await Promise.all([
-      renderHighlightedCodeLineRows(opts.code, opts.language),
-      renderMarkdownToHtml(mdForDoc, {
-        commentrayOutputUrls: opts.commentrayOutputUrls,
-      }),
-      sourceMarkdownEnabled
-        ? renderMarkdownToHtml(sourceMdForPane, {
-            commentrayOutputUrls: sourcePaneUrls,
-          })
-        : Promise.resolve(""),
-    ]);
-    const pairHtml = renderShellPairContextHtml(
-      opts.filePath,
-      (opts.commentrayPathForSearch ?? "").trim(),
-    );
-    shellInner = wrapDualShellInner(
-      pairHtml,
-      dualPanePanesInnerHtml(codeHtml, commentrayHtml, sourceMarkdownPaneHtml),
-    );
-    return {
-      layout,
-      shellInner,
-      scrollBlockLinksB64,
-      angleSelectHtml: "",
-      multiAnglePayloadB64: "",
-      sourceMarkdownToggleEnabled: sourceMarkdownEnabled,
-      sourcePaneDefaultMode: sourceMarkdownEnabled ? "rendered-markdown" : "source",
-    };
+    return buildDualPaneSingleAngleShell(opts);
   }
 
   return {
@@ -2572,6 +2670,35 @@ async function buildCodeBrowserShell(
     sourceMarkdownToggleEnabled: false,
     sourcePaneDefaultMode: "source",
   };
+}
+
+async function buildCodeBrowserShell(
+  opts: CodeBrowserPageOptions,
+  layoutPref: "auto" | "dual",
+): Promise<CodeBrowserShell> {
+  const multi = opts.multiAngleBrowsing;
+  const multiActive = Boolean(multi && multi.angles.length >= 2);
+
+  if (multiActive && multi) {
+    if (layoutPref !== "dual") {
+      const stretchMulti = await buildMultiAngleBlockStretchShell(opts, multi);
+      if (stretchMulti !== null) return stretchMulti;
+    }
+    const built = await buildMultiAngleDualPaneShell(opts, multi);
+    const ms = built.multiShell;
+    return {
+      layout: "dual",
+      shellInner: built.shellInner,
+      scrollBlockLinksB64: ms.scrollBlockLinksB64,
+      angleSelectHtml: built.angleSelectHtml,
+      multiAnglePayloadB64: built.multiAnglePayloadB64,
+      sourceMarkdownToggleEnabled: built.sourceMarkdownToggleEnabled,
+      sourcePaneDefaultMode: built.sourcePaneDefaultMode,
+      multiShell: ms,
+    };
+  }
+
+  return buildSingleAngleCodeBrowserShell(opts, layoutPref);
 }
 
 function searchChromeFromOptions(

@@ -11,11 +11,7 @@ export const DUAL_PANE_SCROLL_SYNC_STRATEGIES = [
   "block-aware-proportional",
   /** Block snaps only; partner is not proportionally mirrored in gaps or without an index (partner “holds” until the next snap). */
   "block-snap-only",
-  /**
-   * Reserved for height-matched filler / buffer layout so scroll ranges align without ratio mapping.
-   * Until that layout ships, the client treats this as an alias of {@link DEFAULT_DUAL_PANE_SCROLL_SYNC_STRATEGY}
-   * so the mode switch stays stable and testable.
-   */
+  /** Alias of {@link DEFAULT_DUAL_PANE_SCROLL_SYNC_STRATEGY} (reserved id for experiments). */
   "filler-blocks",
 ] as const;
 

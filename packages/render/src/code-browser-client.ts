@@ -55,11 +55,7 @@ import {
   type CommentrayColorThemeMode,
 } from "./code-browser-color-theme.js";
 import { shouldRevertPartnerScrollForMonotonicity } from "./code-browser-scroll-sync-monotonic.js";
-import {
-  SMOOTH_REVEAL_INFLIGHT_DEDUP_MS,
-  smoothRevealAlreadyInFlight,
-  type SmoothRevealInFlight,
-} from "./code-browser-smooth-reveal-dedup.js";
+import { SMOOTH_REVEAL_INFLIGHT_DEDUP_MS } from "./code-browser-smooth-reveal-dedup.js";
 import { parseDualPaneScrollSyncStrategy } from "./code-browser-scroll-sync-strategy.js";
 import {
   DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX,
@@ -143,9 +139,9 @@ function scrollTopToAlignChildTop(
  * Partner write for **proportional** mirror plans (`mirrorI` / `mirrorW`), which produce a fresh
  * target on every driver scroll event. Must be **instant** — wrapping these in `behavior: "smooth"`
  * makes the partner re-ease toward a moving target each frame, which the eye reads as up/down
- * jitter while the user keeps scrolling. Block snaps (one-shot jumps) get the smooth glide via
- * {@link applyRevealChildInPane}. Sub-pixel skip avoids feedback loops when zoom math matches the
- * current position.
+ * jitter while the user keeps scrolling. Block snaps also use instant writes (see
+ * {@link applyRevealChildInPane} and `docs/spec/dual-pane-scroll-sync.md`). Sub-pixel skip avoids
+ * feedback loops when zoom math matches the current position.
  */
 function applyScrollTopClamped(scrollEl: HTMLElement, nextTop: number): void {
   const maxY = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
@@ -219,29 +215,19 @@ function applyWindowScrollRatio(ratio: number): void {
   root.scrollTop = next;
 }
 
-const smoothRevealInFlightByPane = new WeakMap<HTMLElement, SmoothRevealInFlight>();
-let smoothRevealInFlightWindow: SmoothRevealInFlight | null = null;
-
 /**
  * Reveal `child` near the top of the reading surface: the pane’s own scrollport when it scrolls
- * internally (desktop dual-pane), otherwise the document root (narrow flow layout). Block snaps are
- * the only **jump**-shaped partner write, so this is the one place we glide with `behavior: "smooth"`
- * — the user sees how far the other column moved instead of a discrete flash. Proportional mirror
- * writes go through {@link applyScrollTopClamped} / {@link applyWindowScrollRatio} and stay instant
- * to avoid retargeting jitter while the driver keeps scrolling. Same-target re-issues during an
- * in-flight glide are dropped by {@link smoothRevealAlreadyInFlight} so the existing animation can
- * finish without being cancelled and restarted every frame.
+ * internally (desktop dual-pane), otherwise the document root (narrow flow layout).
+ *
+ * **Always instant** (`scrollTop` / `scrollTo` auto): smooth interpolation on a partner pane during
+ * bidirectional sync multiplies `scroll` events, shrinks the useful echo-suppression window, and
+ * fights {@link enforceScrollSyncMonotonic} — reads as rubber-band / desync. See
+ * `docs/spec/dual-pane-scroll-sync.md` (“Scroll-behavior on dual-pane scrollports”).
  */
 function applyRevealChildInPane(scrollport: HTMLElement, child: Element, leadCssPx: number): void {
   if (paneUsesInternalYScroll(scrollport)) {
     const target = Math.round(scrollTopToAlignChildTop(scrollport, child, leadCssPx));
-    const maxY = Math.max(0, scrollport.scrollHeight - scrollport.clientHeight);
-    const clamped = clamp(target, 0, maxY);
-    if (Math.abs(scrollport.scrollTop - clamped) < 0.25) return;
-    const last = smoothRevealInFlightByPane.get(scrollport) ?? null;
-    if (smoothRevealAlreadyInFlight(last, clamped, performance.now())) return;
-    smoothRevealInFlightByPane.set(scrollport, { target: clamped, issuedAt: performance.now() });
-    scrollport.scrollTo({ top: clamped, behavior: "smooth" });
+    applyScrollTopClamped(scrollport, target);
     return;
   }
   const root = rootScrollingElement();
@@ -250,9 +236,7 @@ function applyRevealChildInPane(scrollport: HTMLElement, child: Element, leadCss
   const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
   const clamped = clamp(targetTop, 0, maxY);
   if (Math.abs(root.scrollTop - clamped) < 0.25) return;
-  if (smoothRevealAlreadyInFlight(smoothRevealInFlightWindow, clamped, performance.now())) return;
-  smoothRevealInFlightWindow = { target: clamped, issuedAt: performance.now() };
-  globalThis.scrollTo({ top: clamped, behavior: "smooth" });
+  root.scrollTop = clamped;
 }
 
 /**
@@ -1866,8 +1850,9 @@ type PartnerScrollEchoGate = { until: number };
  */
 /**
  * Ignore partner `scroll` echoes after a driver sync. Must cover the tail of
- * `scrollTo({ behavior: "smooth" })` on the partner (often >320ms); otherwise the partner’s
- * inertial frames are treated as a code→doc driver and the panes ping-pong (“rubber band”).
+ * tail of a partner programmatic scroll; otherwise the partner’s frames can be treated as a driver
+ * and the panes ping-pong. Uses {@link SMOOTH_REVEAL_INFLIGHT_DEDUP_MS} as a conservative ceiling
+ * for any remaining smooth paths (e.g. hash navigation helpers).
  */
 const PARTNER_SCROLL_ECHO_SUPPRESS_MS = Math.max(320, SMOOTH_REVEAL_INFLIGHT_DEDUP_MS + 250);
 
@@ -3342,6 +3327,8 @@ function wireStretchLayoutChrome(codePane: HTMLElement): void {
 }
 
 type MultiAngleClientPayload = {
+  /** `stretch`: swap `#shell` inner from precomputed table HTML (one scroll; no dual sync). */
+  layoutMode?: "dual" | "stretch";
   defaultAngleId: string;
   angles: {
     id: string;
@@ -3352,8 +3339,17 @@ type MultiAngleClientPayload = {
     commentrayPathForSearch: string;
     commentrayOnGithubUrl?: string;
     staticBrowseUrl?: string;
+    stretchSwapInnerB64?: string;
   }[];
 };
+
+function multiAngleAngleRowLooksValid(row: unknown, layoutMode: "dual" | "stretch"): boolean {
+  if (row === null || typeof row !== "object") return false;
+  const a = row as { id?: unknown; docInnerHtmlB64?: unknown; stretchSwapInnerB64?: unknown };
+  if (typeof a.id !== "string" || typeof a.docInnerHtmlB64 !== "string") return false;
+  if (layoutMode !== "stretch") return true;
+  return typeof a.stretchSwapInnerB64 === "string" && a.stretchSwapInnerB64.trim().length > 0;
+}
 
 function parseMultiAnglePayload(script: HTMLElement | null): MultiAngleClientPayload | null {
   const t = script?.textContent?.trim() ?? "";
@@ -3361,13 +3357,69 @@ function parseMultiAnglePayload(script: HTMLElement | null): MultiAngleClientPay
   try {
     const raw = JSON.parse(decodeBase64Utf8(t)) as MultiAngleClientPayload;
     if (!raw || !Array.isArray(raw.angles) || raw.angles.length < 2) return null;
-    for (const a of raw.angles) {
-      if (typeof a.id !== "string" || typeof a.docInnerHtmlB64 !== "string") return null;
-    }
-    return raw;
+    const layoutMode: "dual" | "stretch" = raw.layoutMode === "stretch" ? "stretch" : "dual";
+    if (!raw.angles.every((row) => multiAngleAngleRowLooksValid(row, layoutMode))) return null;
+    return { ...raw, layoutMode };
   } catch {
     return null;
   }
+}
+
+function applyMultiAngleStretchAngleToShell(
+  shell: HTMLElement,
+  angle: MultiAngleClientPayload["angles"][number],
+): void {
+  const innerB64 = angle.stretchSwapInnerB64;
+  if (innerB64 === undefined || innerB64.trim().length === 0) return;
+  shell.innerHTML = decodeBase64Utf8(innerB64);
+  const nextCodePane = document.getElementById("code-pane");
+  if (nextCodePane instanceof HTMLElement) {
+    wireStretchLayoutChrome(nextCodePane);
+  }
+  shell.setAttribute("data-scroll-block-links-b64", angle.scrollBlockLinksB64);
+  shell.setAttribute("data-raw-md-b64", angle.rawMdB64);
+  shell.setAttribute("data-search-commentray-path", angle.commentrayPathForSearch);
+  const crIdentity = normPosixPath(angle.commentrayPathForSearch);
+  if (crIdentity.length > 0) shell.setAttribute("data-commentray-pair-commentray-path", crIdentity);
+  else shell.removeAttribute("data-commentray-pair-commentray-path");
+  const docPathEl = document.getElementById("nav-rail-doc-path");
+  if (docPathEl) {
+    const path = angle.commentrayPathForSearch.trim();
+    docPathEl.textContent = path.length > 0 ? path : "—";
+    if (path.length > 0) docPathEl.setAttribute("title", path);
+    else docPathEl.removeAttribute("title");
+  }
+  const browse = angle.staticBrowseUrl?.trim() ?? "";
+  if (browse.length > 0) {
+    const resolved = staticBrowseHrefForShellDataAttribute(
+      browse,
+      globalThis.location.pathname,
+      globalThis.location.origin,
+    );
+    shell.setAttribute("data-commentray-pair-browse-href", resolved);
+  } else {
+    const ghu = angle.commentrayOnGithubUrl?.trim();
+    if (ghu) shell.setAttribute("data-commentray-pair-browse-href", ghu);
+    else shell.removeAttribute("data-commentray-pair-browse-href");
+  }
+  applyDocumentedTreeCurrentPairHighlight();
+  assignLocationToCanonicalBrowsePermalinkIfNeeded(shell);
+  runMermaidOnFreshDocNodes(shell);
+  rewriteHubRelativeBrowseAnchorsIn(shell);
+  rootScrollingElement().scrollTop = 0;
+}
+
+function wireMultiAngleStretchAngleSelect(
+  shell: HTMLElement,
+  payload: MultiAngleClientPayload,
+): void {
+  if (payload.layoutMode !== "stretch") return;
+  const angleSel = document.getElementById("angle-select") as HTMLSelectElement | null;
+  if (!angleSel) return;
+  angleSel.addEventListener("change", () => {
+    const a = payload.angles.find((x) => x.id === angleSel.value);
+    if (a) applyMultiAngleStretchAngleToShell(shell, a);
+  });
 }
 
 type DualPaneDomBundle = {
@@ -3699,7 +3751,6 @@ function wireDualPaneMultiAngleAndScroll(
     strategy === "block-snap-only"
       ? { allowProportionalMirror: false }
       : { allowProportionalMirror: true };
-  // filler-blocks: reserved for height-matched buffers; until then same as block-aware-proportional.
   return wireDualPaneScrollIndexedOrProportional(args, blockAwareOpts);
 }
 
@@ -4248,6 +4299,11 @@ function main(): void {
   const layout = shell.getAttribute("data-layout") || "dual";
   if (layout === "stretch") {
     wireStretchLayoutChrome(codePane);
+    const multiScript = document.getElementById("commentray-multi-angle-b64");
+    const multiPayload = parseMultiAnglePayload(multiScript);
+    if (multiPayload?.layoutMode === "stretch") {
+      wireMultiAngleStretchAngleSelect(shell, multiPayload);
+    }
     return;
   }
 

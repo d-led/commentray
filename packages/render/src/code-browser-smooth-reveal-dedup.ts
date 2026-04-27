@@ -1,22 +1,13 @@
 /**
- * Dedup state for partner-pane block-snap glides.
- *
- * Why this exists: `applyRevealChildInPane` issues `scrollTo({ behavior: "smooth" })` on the partner
- * pane to glide it to a block anchor. Per CSSOM-View §15.6, every such call **cancels any in-flight
- * smooth-scroll animation and starts a new one** — even when the target is identical. While the
- * driver pane keeps scrolling inside one block, the apply function fires on every RAF with the
- * same partner target; cancelling and restarting the glide each frame resets the easing curve, so
- * the partner's velocity keeps falling back toward zero and the user sees up/down wobble.
- *
- * The predicate here lets the caller skip an issuance when an in-flight glide to the same target
- * is already running. A genuinely new target (block boundary crossed) compares unequal and goes
- * through immediately — so jumps still feel like jumps, just stable ones.
+ * Historical ceiling for smooth-scroll duration (hash / search helpers may still use `smooth`).
+ * Dual-pane block sync uses **instant** partner writes (`applyRevealChildInPane`); partner echo
+ * suppression stays above this constant so any remaining smooth paths do not masquerade as driver
+ * input mid-gesture.
  */
 
 /**
- * Ceiling on a typical native smooth-scroll duration for the reveal distances we issue.
- * Partner echo suppression in `code-browser-client` should stay above this so smooth partner
- * scrolls are not mistaken for user input mid-animation.
+ * Ceiling used when sizing partner echo suppression in `code-browser-client` so a smooth
+ * programmatic scroll (if any) is not mistaken for user input mid-animation.
  */
 export const SMOOTH_REVEAL_INFLIGHT_DEDUP_MS = 800;
 

@@ -773,6 +773,71 @@ describe("Code browser page — multi-angle browsing", () => {
   });
 });
 
+describe("Code browser page — multi-angle block stretch", () => {
+  it("should use stretch when every angle has a block table that builds", async () => {
+    const mainPath = ".commentray/source/README.md/main.md";
+    const altPath = ".commentray/source/README.md/alt.md";
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [mainPath]: {
+          sourcePath: "README.md",
+          commentrayPath: mainPath,
+          blocks: [{ id: "b1", anchor: "lines:1-2" }],
+        },
+        [altPath]: {
+          sourcePath: "README.md",
+          commentrayPath: altPath,
+          blocks: [{ id: "b1", anchor: "lines:1-2" }],
+        },
+      },
+    };
+    const html = await renderCodeBrowserHtml({
+      filePath: "README.md",
+      code: "a\nb",
+      language: "txt",
+      commentrayMarkdown: "",
+      multiAngleBrowsing: {
+        defaultAngleId: "main",
+        angles: [
+          {
+            id: "main",
+            title: "Main",
+            markdown: "<!-- commentray:block id=b1 -->\n## M\n",
+            commentrayPathRel: mainPath,
+            blockStretchRows: {
+              index,
+              sourceRelative: "README.md",
+              commentrayPathRel: mainPath,
+            },
+          },
+          {
+            id: "alt",
+            title: "Alt",
+            markdown: "<!-- commentray:block id=b1 -->\n## A\n",
+            commentrayPathRel: altPath,
+            blockStretchRows: {
+              index,
+              sourceRelative: "README.md",
+              commentrayPathRel: altPath,
+            },
+          },
+        ],
+      },
+    });
+    expect(html).toContain('data-layout="stretch"');
+    expect(html).not.toContain('id="doc-pane"');
+    const script = /<script[^>]*id="commentray-multi-angle-b64"[^>]*>([^<]*)<\/script>/i.exec(html);
+    expect(script?.[1]).toBeDefined();
+    const payload = JSON.parse(Buffer.from(script?.[1] ?? "", "base64").toString("utf8")) as {
+      layoutMode?: string;
+      angles: Array<{ stretchSwapInnerB64?: string }>;
+    };
+    expect(payload.layoutMode).toBe("stretch");
+    expect(payload.angles.every((a) => typeof a.stretchSwapInnerB64 === "string")).toBe(true);
+  });
+});
+
 describe("Code browser page — multi-angle index isolation", () => {
   it("should omit scroll links for an angle when blockStretchRows targets another companion path", async () => {
     const mainPath = ".commentray/source/README.md/main.md";

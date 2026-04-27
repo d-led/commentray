@@ -72,12 +72,29 @@ async function renderCodeLineStack(
   return `<div class="stretch-code-stack">${inner}</div>`;
 }
 
+async function appendStretchGapRow(
+  rows: string[],
+  lines: string[],
+  lineIndex0: number,
+  language: string,
+): Promise<void> {
+  const codeLineHtml = await renderHighlightedCodeLineRows(lines[lineIndex0] ?? "", language, {
+    lineIndexOffset: lineIndex0,
+    omitLineStackWrapper: true,
+  });
+  rows.push(
+    `<tr class="stretch-row stretch-row--gap"><td class="stretch-code">${codeLineHtml}</td>` +
+      `<td class="stretch-doc stretch-doc--gap"><span class="stretch-gap-mark" aria-hidden="true">—</span></td></tr>`,
+  );
+}
+
 /**
- * When index blocks + markdown markers align, builds a two-column table in the spirit of
- * GitHub **blame**: **one row per block** (plus one row per unmapped source line). The code
- * and commentary cells share the **same row height** — whichever side is taller sets the
- * row; the shorter side is top-aligned with natural empty space below inside its cell.
- * A single outer scroll (`shell--stretch-rows`) keeps both columns in lockstep.
+ * When index blocks + markdown markers align, builds a two-column **`<table>`**: each logical
+ * pair (gap line, or one indexed block) is one `<tr>`. Row height is one number — the taller cell
+ * wins; the shorter cell shows top-aligned content with empty space below (browser table layout).
+ * “Buffer” rows (`stretch-row--gap`) absorb one-sided slack the same way: one code line + a doc
+ * em-dash still share one row height. A single outer scroll (`shell--stretch-rows`) keeps both
+ * columns in lockstep — no proportional scroll sync.
  */
 export async function tryBuildBlockStretchTableHtml(
   opts: BlockStretchTableOptions,
@@ -117,22 +134,16 @@ export async function tryBuildBlockStretchTableHtml(
     const b = lineToBlock.get(L);
 
     if (!b) {
-      const codeLineHtml = await renderHighlightedCodeLineRows(lines[i] ?? "", opts.language, {
-        lineIndexOffset: i,
-        omitLineStackWrapper: true,
-      });
-      rows.push(
-        `<tr class="stretch-row stretch-row--gap"><td class="stretch-code">${codeLineHtml}</td>` +
-          `<td class="stretch-doc stretch-doc--gap"><span class="stretch-gap-mark" aria-hidden="true">—</span></td></tr>`,
-      );
+      await appendStretchGapRow(rows, lines, i, opts.language);
       i += 1;
       continue;
     }
 
-    if (i !== b.sourceStart - 1) {
-      throw new Error(
-        `block-stretch desync at 0-based index ${String(i)} (block ${b.id} should start at index ${String(b.sourceStart - 1)})`,
-      );
+    /** `markerViewportHalfOpen1Based` can include lines before `sourceStart` (region prefix). */
+    if (i < b.sourceStart - 1) {
+      await appendStretchGapRow(rows, lines, i, opts.language);
+      i += 1;
+      continue;
     }
 
     const start0 = b.sourceStart - 1;
