@@ -1445,6 +1445,70 @@ type DualPaneScrollSyncRunners = {
   finishMobileFlipToDoc: () => void;
 };
 
+type BlockAwareScrollPaneBundle = {
+  codePane: HTMLElement;
+  docPane: HTMLElement;
+  getLinks: () => BlockScrollLink[];
+  lineIdPrefix: () => string;
+};
+
+function blockAwareSyncFromCodeToDoc(
+  bundle: BlockAwareScrollPaneBundle,
+  driverDelta: number,
+): void {
+  const { codePane, docPane, getLinks, lineIdPrefix } = bundle;
+  const docBefore = readPaneVerticalScroll(docPane);
+  const prefix = lineIdPrefix();
+  const p = buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks, prefix);
+  if (scrollSyncDebugEnabled()) {
+    const links = getLinks();
+    const line1 = probeCodeLine1FromViewport(codePane, prefix);
+    const docProbe = probeCommentrayLine0FromDoc(docPane);
+    const pickedMd = pickCommentrayLineForSourceScroll(links, line1);
+    globalThis.console.info("[commentray:scroll-sync] code→doc", {
+      plan: formatCodeToDocPlanForLog(p),
+      driverDelta,
+      line1,
+      docProbe,
+      pickedMd,
+      linkCount: links.length,
+      codeScrollTop: codePane.scrollTop,
+      docScrollTop: docPane.scrollTop,
+    });
+  }
+  applyCodeToDocFlipPlanImpl(codePane, docPane, p);
+  enforceScrollSyncMonotonic({ driverDelta, partnerBefore: docBefore, partnerPane: docPane });
+}
+
+function blockAwareSyncFromDocToCode(
+  bundle: BlockAwareScrollPaneBundle,
+  driverDelta: number,
+): void {
+  const { codePane, docPane, getLinks, lineIdPrefix } = bundle;
+  const codeBefore = readPaneVerticalScroll(codePane);
+  const prefix = lineIdPrefix();
+  const p = buildDocToCodeFlipPlanBlockAware(docPane, getLinks);
+  if (scrollSyncDebugEnabled()) {
+    const links = getLinks();
+    const mdLine0 = probeCommentrayLine0FromDoc(docPane);
+    const line1 = probeCodeLine1FromViewport(codePane, prefix);
+    const link = mdLine0 !== null ? pickBlockScrollLinkForCommentrayScroll(links, mdLine0) : null;
+    globalThis.console.info("[commentray:scroll-sync] doc→code", {
+      plan: formatDocToCodePlanForLog(p),
+      driverDelta,
+      mdLine0,
+      line1,
+      blockId: link?.id ?? null,
+      markerSpan: link?.markerViewportHalfOpen1Based ?? null,
+      linkCount: links.length,
+      docScrollTop: docPane.scrollTop,
+      codeScrollTop: codePane.scrollTop,
+    });
+  }
+  applyDocToCodeFlipPlanImpl(codePane, docPane, p, prefix);
+  enforceScrollSyncMonotonic({ driverDelta, partnerBefore: codeBefore, partnerPane: codePane });
+}
+
 /** Index-backed scroll sync when `data-scroll-block-links-b64` is present; else see proportional fallback. */
 function wireBlockAwareScrollSync(
   codePane: HTMLElement,
@@ -1455,59 +1519,14 @@ function wireBlockAwareScrollSync(
 ): DualPaneScrollSyncRunners {
   let pendingDocToCode: DocToCodeFlipPlan | null = null;
   let pendingCodeToDoc: CodeToDocFlipPlan | null = null;
-
-  const syncFromCodeToDocInner = (driverDelta: number): void => {
-    const docBefore = readPaneVerticalScroll(docPane);
-    const prefix = lineIdPrefix();
-    const p = buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks, prefix);
-    if (scrollSyncDebugEnabled()) {
-      const links = getLinks();
-      const line1 = probeCodeLine1FromViewport(codePane, prefix);
-      const docProbe = probeCommentrayLine0FromDoc(docPane);
-      const pickedMd = pickCommentrayLineForSourceScroll(links, line1);
-      globalThis.console.info("[commentray:scroll-sync] code→doc", {
-        plan: formatCodeToDocPlanForLog(p),
-        driverDelta,
-        line1,
-        docProbe,
-        pickedMd,
-        linkCount: links.length,
-        codeScrollTop: codePane.scrollTop,
-        docScrollTop: docPane.scrollTop,
-      });
-    }
-    applyCodeToDocFlipPlanImpl(codePane, docPane, p);
-    enforceScrollSyncMonotonic({ driverDelta, partnerBefore: docBefore, partnerPane: docPane });
-  };
-  const syncFromDocToCodeInner = (driverDelta: number): void => {
-    const codeBefore = readPaneVerticalScroll(codePane);
-    const prefix = lineIdPrefix();
-    const p = buildDocToCodeFlipPlanBlockAware(docPane, getLinks);
-    if (scrollSyncDebugEnabled()) {
-      const links = getLinks();
-      const mdLine0 = probeCommentrayLine0FromDoc(docPane);
-      const line1 = probeCodeLine1FromViewport(codePane, prefix);
-      const link = mdLine0 !== null ? pickBlockScrollLinkForCommentrayScroll(links, mdLine0) : null;
-      globalThis.console.info("[commentray:scroll-sync] doc→code", {
-        plan: formatDocToCodePlanForLog(p),
-        driverDelta,
-        mdLine0,
-        line1,
-        blockId: link?.id ?? null,
-        markerSpan: link?.markerViewportHalfOpen1Based ?? null,
-        linkCount: links.length,
-        docScrollTop: docPane.scrollTop,
-        codeScrollTop: codePane.scrollTop,
-      });
-    }
-    applyDocToCodeFlipPlanImpl(codePane, docPane, p, prefix);
-    enforceScrollSyncMonotonic({ driverDelta, partnerBefore: codeBefore, partnerPane: codePane });
-  };
+  const bundle: BlockAwareScrollPaneBundle = { codePane, docPane, getLinks, lineIdPrefix };
+  const syncFromCodeToDocInner = (d: number): void => blockAwareSyncFromCodeToDoc(bundle, d);
+  const syncFromDocToCodeInner = (d: number): void => blockAwareSyncFromDocToCode(bundle, d);
   const syncFromCodeToDoc = (): void => {
-    syncFromCodeToDocInner(0);
+    blockAwareSyncFromCodeToDoc(bundle, 0);
   };
   const syncFromDocToCode = (): void => {
-    syncFromDocToCodeInner(0);
+    blockAwareSyncFromDocToCode(bundle, 0);
   };
   const prepareMobileFlipToCode = (): void => {
     if (shouldUseProportionalDocToCodeOnMobileFlip?.() === true) {
@@ -1733,6 +1752,20 @@ function subscribeBlockRayRedraw(
   if (shell) ro.observe(shell);
 }
 
+/** Doc-aligned active block matches visible commentary; code-only probe can lag in page gaps. */
+function activeBlockIdForGutterRays(
+  links: BlockScrollLink[],
+  docScrollEl: HTMLElement,
+  probeTopSourceLine1Based: () => number,
+): string | null {
+  const mdLine0ForRay = probeCommentrayLine0FromDoc(docScrollEl);
+  const haveAnchors = docScrollEl.querySelector(".commentray-block-anchor") !== null;
+  if (haveAnchors && mdLine0ForRay !== null) {
+    return activeBlockIdForCommentrayLine0(links, mdLine0ForRay);
+  }
+  return activeBlockIdForViewport(links, probeTopSourceLine1Based());
+}
+
 function drawBlockRaysIntoSvg(
   svg: SVGSVGElement,
   gutter: HTMLElement,
@@ -1751,12 +1784,7 @@ function drawBlockRaysIntoSvg(
     return;
   }
 
-  /** Doc-aligned active block matches visible commentary; code-only probe can lag in page gaps. */
-  const mdLine0ForRay = probeCommentrayLine0FromDoc(docScrollEl);
-  const activeId =
-    docScrollEl.querySelector(".commentray-block-anchor") !== null && mdLine0ForRay !== null
-      ? activeBlockIdForCommentrayLine0(links, mdLine0ForRay)
-      : activeBlockIdForViewport(links, probeTopSourceLine1Based());
+  const activeId = activeBlockIdForGutterRays(links, docScrollEl, probeTopSourceLine1Based);
   const clipGutterRaysThroughPageBreakGaps = pageBreakPullEnabled();
   svg.setAttribute("viewBox", `0 0 ${String(w)} ${String(h)}`);
   svg.setAttribute("preserveAspectRatio", "none");
