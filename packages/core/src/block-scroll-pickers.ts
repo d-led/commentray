@@ -72,7 +72,10 @@ export function commentrayProbeInStrictInterMarkerGap(
     if (next === undefined) {
       return topCommentrayLine0Based > cur.commentrayLine;
     }
-    if (cur.commentrayLine < topCommentrayLine0Based && topCommentrayLine0Based < next.commentrayLine) {
+    if (
+      cur.commentrayLine < topCommentrayLine0Based &&
+      topCommentrayLine0Based < next.commentrayLine
+    ) {
       return true;
     }
   }

@@ -38,7 +38,10 @@ function serveDevBuildWatchScript(buildId: string): string {
 </script>`;
 }
 
-export async function injectServeDevBuildWatchIntoSite(siteRoot: string, buildId: string): Promise<void> {
+export async function injectServeDevBuildWatchIntoSite(
+  siteRoot: string,
+  buildId: string,
+): Promise<void> {
   if (!buildId) return;
   await injectIntoDir(siteRoot, buildId);
 }

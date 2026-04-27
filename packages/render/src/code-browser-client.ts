@@ -593,7 +593,10 @@ function buildDocToCodeFlipPlanBlockAware(
     return plan;
   }
   const plan: DocToCodeFlipPlan = { k: "mirrorW", ratio: winRatio };
-  scrollSyncTrace("doc→code.plan", { reason: "no-index-mirror-window", plan: formatDocToCodePlanForLog(plan) });
+  scrollSyncTrace("doc→code.plan", {
+    reason: "no-index-mirror-window",
+    plan: formatDocToCodePlanForLog(plan),
+  });
   return plan;
 }
 
@@ -639,7 +642,11 @@ function buildCodeToDocFlipPlanBlockAware(
     );
     const first = sorted[0];
     if (!first) {
-      scrollSyncTrace("code→doc.plan", { reason: "prelude-missing-first-link", line1, lineIdPrefix });
+      scrollSyncTrace("code→doc.plan", {
+        reason: "prelude-missing-first-link",
+        line1,
+        lineIdPrefix,
+      });
       return { k: "noop" };
     }
     sticky.sourceSticky.lockedId = first.id;
@@ -1695,7 +1702,10 @@ function wireBidirectionalScroll(
     pendingCodeDriverRaf = 0;
     if (partnerScrollEchoActive(suppressCodeScrollEcho)) {
       const t = performance.now();
-      if (scrollSyncTraceFeatureFlag() && t - lastWireEchoSkipTraceCodeAt >= WIRE_ECHO_SKIP_TRACE_MIN_MS) {
+      if (
+        scrollSyncTraceFeatureFlag() &&
+        t - lastWireEchoSkipTraceCodeAt >= WIRE_ECHO_SKIP_TRACE_MIN_MS
+      ) {
         lastWireEchoSkipTraceCodeAt = t;
         scrollSyncTrace("wire.code.flush-skipped", {
           reason: "partner-echo",
@@ -1724,7 +1734,10 @@ function wireBidirectionalScroll(
     pendingDocDriverRaf = 0;
     if (partnerScrollEchoActive(suppressDocScrollEcho)) {
       const t = performance.now();
-      if (scrollSyncTraceFeatureFlag() && t - lastWireEchoSkipTraceDocAt >= WIRE_ECHO_SKIP_TRACE_MIN_MS) {
+      if (
+        scrollSyncTraceFeatureFlag() &&
+        t - lastWireEchoSkipTraceDocAt >= WIRE_ECHO_SKIP_TRACE_MIN_MS
+      ) {
         lastWireEchoSkipTraceDocAt = t;
         scrollSyncTrace("wire.doc.flush-skipped", {
           reason: "partner-echo",
