@@ -13,7 +13,11 @@
  * through immediately — so jumps still feel like jumps, just stable ones.
  */
 
-/** Ceiling on a typical native smooth-scroll duration for the reveal distances we issue. */
+/**
+ * Ceiling on a typical native smooth-scroll duration for the reveal distances we issue.
+ * Partner echo suppression in `code-browser-client` should stay above this so smooth partner
+ * scrolls are not mistaken for user input mid-animation.
+ */
 export const SMOOTH_REVEAL_INFLIGHT_DEDUP_MS = 800;
 
 /** Sub-pixel tolerance — clamp / `getBoundingClientRect` math drifts by less than this between frames. */

@@ -56,6 +56,7 @@ import {
 } from "./code-browser-color-theme.js";
 import { shouldRevertPartnerScrollForMonotonicity } from "./code-browser-scroll-sync-monotonic.js";
 import {
+  SMOOTH_REVEAL_INFLIGHT_DEDUP_MS,
   smoothRevealAlreadyInFlight,
   type SmoothRevealInFlight,
 } from "./code-browser-smooth-reveal-dedup.js";
@@ -247,6 +248,21 @@ function applyRevealChildInPane(scrollport: HTMLElement, child: Element, leadCss
   globalThis.scrollTo({ top: clamped, behavior: "smooth" });
 }
 
+/**
+ * True when `child` is already placed like {@link applyRevealChildInPane} would (same few-pixel
+ * tolerance as code→doc’s {@link commentrayBlockAnchorAlignedWithLead}).
+ */
+function revealTargetAlreadyAtLead(scrollport: HTMLElement, child: Element, leadCssPx: number): boolean {
+  if (paneUsesInternalYScroll(scrollport)) {
+    const cr = child.getBoundingClientRect();
+    const sr = scrollport.getBoundingClientRect();
+    const dist = cr.top - sr.top - scrollport.clientTop;
+    return Math.abs(dist - leadCssPx) <= 4;
+  }
+  const cr = child.getBoundingClientRect();
+  return Math.abs(cr.top - leadCssPx) <= 4;
+}
+
 /** True when the block anchor for `mdLine0` is already aligned like {@link applyRevealChildInPane} would. */
 function commentrayBlockAnchorAlignedWithLead(
   docPane: HTMLElement,
@@ -255,10 +271,48 @@ function commentrayBlockAnchorAlignedWithLead(
 ): boolean {
   const anchor = docPane.querySelector(`[data-commentray-line="${String(mdLine0)}"]`);
   if (!(anchor instanceof HTMLElement)) return false;
-  const cr = anchor.getBoundingClientRect();
-  const sr = docPane.getBoundingClientRect();
-  const dist = cr.top - sr.top - docPane.clientTop;
-  return Math.abs(dist - leadCssPx) <= 4;
+  return revealTargetAlreadyAtLead(docPane, anchor, leadCssPx);
+}
+
+/** Resolve the code line element used for doc→code block snaps (same lookup as {@link applyDocToCodeFlipPlanImpl}). */
+function findCodeLineElementForBlockSnap(
+  codePane: HTMLElement,
+  lineIdPrefix: string,
+  src0: number,
+): Element | null {
+  const exact = codePane.querySelector(`#${lineIdPrefix}${String(src0)}`);
+  if (exact instanceof HTMLElement) return exact;
+  return findAnchorAtOrAfter(sourceAnchorsFromPrefix(lineIdPrefix), src0);
+}
+
+/** True when the source line for `src0` is already aligned like {@link applyRevealChildInPane} would. */
+function sourceCodeLineAnchorAlignedWithLead(
+  codePane: HTMLElement,
+  lineIdPrefix: string,
+  src0: number,
+  leadCssPx: number,
+): boolean {
+  const el = findCodeLineElementForBlockSnap(codePane, lineIdPrefix, src0);
+  if (!el) return false;
+  return revealTargetAlreadyAtLead(codePane, el, leadCssPx);
+}
+
+/** If the code line head is already at the block-snap lead, doc→code should not re-issue a reveal (symmetric with code→doc). */
+function docToCodePlanIfCodeAnchorAlreadyAligned(
+  codePane: HTMLElement,
+  lineIdPrefix: string,
+  src0: number,
+  traceReason: string,
+  extraFields: Record<string, unknown>,
+): DocToCodeFlipPlan | null {
+  if (!sourceCodeLineAnchorAlignedWithLead(codePane, lineIdPrefix, src0, 2)) return null;
+  scrollSyncTrace("doc→code.plan", {
+    reason: traceReason,
+    ...extraFields,
+    src0,
+    lineIdPrefix,
+  });
+  return { k: "noop", skipProportionalFallbackOnFlip: true };
 }
 
 /**
@@ -287,7 +341,15 @@ function blockForCodeToDocSync(
 
 /** Captured commentary→source scroll state for a narrow single-pane flip (see {@link DualPaneScrollSyncRunners}). */
 type DocToCodeFlipPlan =
-  | { k: "noop" }
+  | {
+      k: "noop";
+      /**
+       * When true, {@link wireBlockAwareScrollSync}'s mobile flip finish must not replace this noop
+       * with a proportional plan — the partner was already block-aligned (symmetric with
+       * code→doc's anchor-aligned noop).
+       */
+      skipProportionalFallbackOnFlip?: boolean;
+    }
   | { k: "block"; src0: number; winRatio: number }
   | { k: "mirrorI"; docTop: number; docSH: number; docCH: number }
   | { k: "mirrorW"; ratio: number };
@@ -327,8 +389,8 @@ function scrollSyncDebugHashOn(): boolean {
 }
 
 /**
- * Auto-on for **dev hosts** (`commentray serve` / `localhost` / `127.0.0.1` / `0.0.0.0`).
- * Production deploys (Pages, S3, etc.) stay opt-in through {@link SCROLL_SYNC_DEBUG_FLAG}.
+ * True on common dev hostnames (`commentray serve`, local preview). Used only for the one-line
+ * boot banner — **not** for high-volume per-scroll tracing (that stays opt-in below).
  */
 function scrollSyncDebugDevHostOn(): boolean {
   const host = globalThis.location.hostname;
@@ -336,9 +398,9 @@ function scrollSyncDebugDevHostOn(): boolean {
 }
 
 /**
- * Opt-in scroll-sync tracing: `console.info` lines prefixed with `[commentray:scroll-sync]`.
- * **Static hosting** — reads the URL and Web Storage in the browser only (no HTTP server logic,
- * headers, or preview tooling required for this flag to work on published Pages or any static file host).
+ * High-volume scroll-sync tracing (`scrollSyncTrace`, `wire.*.driver`, plan/apply lines): opt-in
+ * only via URL, hash, or Web Storage — **not** implied by localhost alone (keeps DevTools quiet
+ * during normal reading).
  *
  * Turn on any one of:
  * - Query: `?commentrayDebugScroll=1` (or `=true`, or present with an empty value)
@@ -352,12 +414,11 @@ function scrollSyncDebugDevHostOn(): boolean {
  * - `wire.code.flush-skipped` / `wire.doc.flush-skipped` — flush skipped (`partner-echo` throttled ~5/s; `sync-in-progress` immediate)
  * - `monotonic.revert` — `console.warn` when the partner move was opposite the driver and was rolled back
  *
- * Tracing consults a **cached feature flag** (mirrors URL/storage here, rechecked at most every 500ms
- * and on `hashchange` / cross-tab `storage`) so hot scroll paths avoid reading storage every tick.
+ * Tracing consults a **cached feature flag** (rechecked at most every 500ms and on `hashchange` /
+ * cross-tab `storage`) so hot scroll paths avoid reading storage every tick.
  */
-function scrollSyncDebugEnabled(): boolean {
+function scrollSyncVerboseTraceEnabled(): boolean {
   try {
-    if (scrollSyncDebugDevHostOn()) return true;
     if (scrollSyncDebugQueryOn()) return true;
     if (scrollSyncDebugHashOn()) return true;
     if (scrollSyncDebugStorageOn(globalThis.sessionStorage)) return true;
@@ -372,7 +433,7 @@ function scrollSyncDebugEnabled(): boolean {
 const SCROLL_SYNC_TRACE_FLAG_RECHECK_MS = 500;
 
 /**
- * Feature flag for scroll-sync tracing: mirrors {@link scrollSyncDebugEnabled} but cached so
+ * Feature flag for scroll-sync tracing: mirrors {@link scrollSyncVerboseTraceEnabled} but cached so
  * high-frequency scroll paths do not hit Web Storage on every event.
  */
 let scrollSyncTraceFeatureOn = false;
@@ -388,7 +449,7 @@ function scrollSyncTraceFeatureFlag(): boolean {
     return scrollSyncTraceFeatureOn;
   }
   scrollSyncTraceFeatureLastCheckMs = now;
-  scrollSyncTraceFeatureOn = scrollSyncDebugEnabled();
+  scrollSyncTraceFeatureOn = scrollSyncVerboseTraceEnabled();
   return scrollSyncTraceFeatureOn;
 }
 
@@ -404,12 +465,13 @@ if (typeof globalThis.addEventListener === "function") {
  */
 function announceScrollSyncTraceOnBoot(): void {
   const devHost = scrollSyncDebugDevHostOn();
-  if (!devHost && !scrollSyncTraceFeatureFlag()) return;
+  const traceVerbose = scrollSyncVerboseTraceEnabled();
+  if (!devHost && !traceVerbose) return;
   globalThis.console.log("[commentray:scroll-sync] boot", {
     t: Math.round(performance.now()),
     href: globalThis.location.href,
     devHost,
-    traceOn: scrollSyncTraceFeatureFlag(),
+    traceVerbose,
   });
 }
 
@@ -431,7 +493,9 @@ function scrollSyncTrace(tag: string, fields: Record<string, unknown>): void {
 }
 
 function formatDocToCodePlanForLog(p: DocToCodeFlipPlan): string {
-  if (p.k === "noop") return "noop";
+  if (p.k === "noop") {
+    return p.skipProportionalFallbackOnFlip === true ? "noop(skipFlipFallback)" : "noop";
+  }
   if (p.k === "block") return `block(src0=${String(p.src0)})`;
   if (p.k === "mirrorW") return `mirrorW(ratio=${p.ratio.toFixed(4)})`;
   return `mirrorI(docTop=${String(p.docTop)})`;
@@ -453,11 +517,7 @@ function applyDocToCodeFlipPlanImpl(
   if (plan.k === "noop") return;
   const narrowSinglePane = globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ).matches;
   if (plan.k === "block") {
-    const exact = codePane.querySelector(`#${lineIdPrefix}${String(plan.src0)}`);
-    const el =
-      exact instanceof HTMLElement
-        ? exact
-        : findAnchorAtOrAfter(sourceAnchorsFromPrefix(lineIdPrefix), plan.src0);
+    const el = findCodeLineElementForBlockSnap(codePane, lineIdPrefix, plan.src0);
     if (el) {
       applyRevealChildInPane(codePane, el, 2);
     }
@@ -548,10 +608,73 @@ function resetBlockScrollStickyIfLinksChanged(
   }
 }
 
+function tryDocToCodeFlipPlanFromMdProbe(
+  codePane: HTMLElement,
+  links: BlockScrollLink[],
+  sticky: BlockAwareStickyBundle,
+  lineIdPrefix: string,
+  winRatio: number,
+  mdLine0: number | null,
+): DocToCodeFlipPlan | null {
+  if (mdLine0 === null) return null;
+  const block = pickBlockScrollLinkForCommentrayScroll(links, mdLine0);
+  const src0 = block !== null ? block.markerViewportHalfOpen1Based.lo - 1 : null;
+  if (block !== null) {
+    sticky.commentraySticky.lockedId = block.id;
+  }
+  if (src0 === null) return null;
+  const alignedNoop = docToCodePlanIfCodeAnchorAlreadyAligned(
+    codePane,
+    lineIdPrefix,
+    src0,
+    "block-code-anchor-already-aligned-noop",
+    { mdLine0, blockId: block?.id ?? null },
+  );
+  if (alignedNoop) return alignedNoop;
+  const plan: DocToCodeFlipPlan = { k: "block", src0, winRatio };
+  scrollSyncTrace("doc→code.plan", {
+    reason: "block-from-md-probe",
+    plan: formatDocToCodePlanForLog(plan),
+    mdLine0,
+    blockId: block?.id ?? null,
+    markerSpan: block?.markerViewportHalfOpen1Based ?? null,
+  });
+  return plan;
+}
+
+function tryDocToCodeFlipPlanFromPageBreakPull(
+  docPane: HTMLElement,
+  codePane: HTMLElement,
+  lineIdPrefix: string,
+  winRatio: number,
+  mdLine0: number | null,
+): DocToCodeFlipPlan | null {
+  const pulledSrc0 = pulledSourceLine0FromPageBreak(docPane);
+  if (pulledSrc0 === null) return null;
+  const pbAlignedNoop = docToCodePlanIfCodeAnchorAlreadyAligned(
+    codePane,
+    lineIdPrefix,
+    pulledSrc0,
+    "page-break-pull-code-anchor-already-aligned-noop",
+    { mdLine0, pulledSrc0 },
+  );
+  if (pbAlignedNoop) return pbAlignedNoop;
+  const plan: DocToCodeFlipPlan = { k: "block", src0: pulledSrc0, winRatio };
+  scrollSyncTrace("doc→code.plan", {
+    reason: "page-break-pull",
+    plan: formatDocToCodePlanForLog(plan),
+    pulledSrc0,
+    mdLine0,
+  });
+  return plan;
+}
+
 function buildDocToCodeFlipPlanBlockAware(
   docPane: HTMLElement,
+  codePane: HTMLElement,
   getLinks: () => BlockScrollLink[],
   sticky: BlockAwareStickyBundle,
+  lineIdPrefix: string,
 ): DocToCodeFlipPlan {
   const winRatio = paneUsesInternalYScroll(docPane)
     ? clamp(docPane.scrollTop / Math.max(1, docPane.scrollHeight - docPane.clientHeight), 0, 1)
@@ -568,35 +691,23 @@ function buildDocToCodeFlipPlanBlockAware(
   const links = getLinks();
   resetBlockScrollStickyIfLinksChanged(sticky, links);
   const mdLine0 = probeCommentrayLine0FromDoc(docPane);
-  if (mdLine0 !== null) {
-    const block = pickBlockScrollLinkForCommentrayScroll(links, mdLine0);
-    const src0 = block !== null ? block.markerViewportHalfOpen1Based.lo - 1 : null;
-    if (block !== null) {
-      sticky.commentraySticky.lockedId = block.id;
-    }
-    if (src0 !== null) {
-      const plan: DocToCodeFlipPlan = { k: "block", src0, winRatio };
-      scrollSyncTrace("doc→code.plan", {
-        reason: "block-from-md-probe",
-        plan: formatDocToCodePlanForLog(plan),
-        mdLine0,
-        blockId: block?.id ?? null,
-        markerSpan: block?.markerViewportHalfOpen1Based ?? null,
-      });
-      return plan;
-    }
-  }
-  const pulledSrc0 = pulledSourceLine0FromPageBreak(docPane);
-  if (pulledSrc0 !== null) {
-    const plan: DocToCodeFlipPlan = { k: "block", src0: pulledSrc0, winRatio };
-    scrollSyncTrace("doc→code.plan", {
-      reason: "page-break-pull",
-      plan: formatDocToCodePlanForLog(plan),
-      pulledSrc0,
-      mdLine0,
-    });
-    return plan;
-  }
+  const fromMd = tryDocToCodeFlipPlanFromMdProbe(
+    codePane,
+    links,
+    sticky,
+    lineIdPrefix,
+    winRatio,
+    mdLine0,
+  );
+  if (fromMd !== null) return fromMd;
+  const fromPb = tryDocToCodeFlipPlanFromPageBreakPull(
+    docPane,
+    codePane,
+    lineIdPrefix,
+    winRatio,
+    mdLine0,
+  );
+  if (fromPb !== null) return fromPb;
   /** Index-backed pair but no confident block anchor for this viewport — do not nudge the source. */
   if (links.length > 0) {
     scrollSyncTrace("doc→code.plan", {
@@ -1706,7 +1817,12 @@ type PartnerScrollEchoGate = { until: number };
  * exhausted mid-gesture and caused doc↔code ping-pong. We extend a **deadline** instead; each driver
  * sync pushes `until` forward so continuous scrolling stays stable.
  */
-const PARTNER_SCROLL_ECHO_SUPPRESS_MS = 320;
+/**
+ * Ignore partner `scroll` echoes after a driver sync. Must cover the tail of
+ * `scrollTo({ behavior: "smooth" })` on the partner (often >320ms); otherwise the partner’s
+ * inertial frames are treated as a code→doc driver and the panes ping-pong (“rubber band”).
+ */
+const PARTNER_SCROLL_ECHO_SUPPRESS_MS = Math.max(320, SMOOTH_REVEAL_INFLIGHT_DEDUP_MS + 250);
 
 function armPartnerScrollEchoGate(gate: PartnerScrollEchoGate): void {
   const next = performance.now() + PARTNER_SCROLL_ECHO_SUPPRESS_MS;
@@ -1941,7 +2057,7 @@ function blockAwareSyncFromDocToCode(
   const { codePane, docPane, getLinks, lineIdPrefix, sticky } = bundle;
   const codeBefore = readPaneVerticalScroll(codePane);
   const prefix = lineIdPrefix();
-  const p = buildDocToCodeFlipPlanBlockAware(docPane, getLinks, sticky);
+  const p = buildDocToCodeFlipPlanBlockAware(docPane, codePane, getLinks, sticky, prefix);
   applyDocToCodeFlipPlanImpl(codePane, docPane, p, prefix);
   const codeAfter = readPaneVerticalScroll(codePane);
   scrollSyncTrace("doc→code.apply", {
@@ -1990,13 +2106,21 @@ function wireBlockAwareScrollSync(
       pendingDocToCode = { k: "mirrorW", ratio: windowScrollRatio() };
       return;
     }
-    pendingDocToCode = buildDocToCodeFlipPlanBlockAware(docPane, getLinks, sticky);
+    pendingDocToCode = buildDocToCodeFlipPlanBlockAware(
+      docPane,
+      codePane,
+      getLinks,
+      sticky,
+      lineIdPrefix(),
+    );
   };
   const finishMobileFlipToCode = (): void => {
     if (!pendingDocToCode) return;
     let p = pendingDocToCode;
     pendingDocToCode = null;
-    if (p.k === "noop") p = buildDocToCodeFlipPlanProportional(docPane);
+    if (p.k === "noop" && p.skipProportionalFallbackOnFlip !== true) {
+      p = buildDocToCodeFlipPlanProportional(docPane);
+    }
     applyDocToCodeFlipPlanImpl(codePane, docPane, p, lineIdPrefix());
   };
   const prepareMobileFlipToDoc = (): void => {
