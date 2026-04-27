@@ -60,7 +60,6 @@ import {
   smoothRevealAlreadyInFlight,
   type SmoothRevealInFlight,
 } from "./code-browser-smooth-reveal-dedup.js";
-import { installPerBlockScrollBuffers } from "./code-browser-scroll-buffer-equalize.js";
 import { parseDualPaneScrollSyncStrategy } from "./code-browser-scroll-sync-strategy.js";
 import {
   DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX,
@@ -554,14 +553,12 @@ function applyDocToCodeFlipPlanImpl(
     }
     return;
   }
-  const nextTop = Math.round(
-    mirroredScrollTop(
-      plan.docTop,
-      plan.docSH,
-      plan.docCH,
-      codePane.scrollHeight,
-      codePane.clientHeight,
-    ),
+  const nextTop = mirroredScrollTop(
+    plan.docTop,
+    plan.docSH,
+    plan.docCH,
+    codePane.scrollHeight,
+    codePane.clientHeight,
   );
   if (paneUsesInternalYScroll(codePane)) {
     applyScrollTopClamped(codePane, nextTop);
@@ -597,14 +594,12 @@ function applyCodeToDocFlipPlanImpl(
     }
     return;
   }
-  const nextTop = Math.round(
-    mirroredScrollTop(
-      plan.codeTop,
-      plan.codeSH,
-      plan.codeCH,
-      docPane.scrollHeight,
-      docPane.clientHeight,
-    ),
+  const nextTop = mirroredScrollTop(
+    plan.codeTop,
+    plan.codeSH,
+    plan.codeCH,
+    docPane.scrollHeight,
+    docPane.clientHeight,
   );
   if (paneUsesInternalYScroll(docPane)) {
     applyScrollTopClamped(docPane, nextTop);
@@ -1607,8 +1602,7 @@ function wireWrapToggle(
   codePane: HTMLElement,
   wrapCb: HTMLInputElement,
   onAfterLayout?: () => void,
-  docWrapRoots: Array<HTMLElement | null | undefined> = [],
-  signal?: AbortSignal,
+  ...docWrapRoots: Array<HTMLElement | null | undefined>
 ): void {
   const docTargets = docWrapRoots.filter((el): el is HTMLElement => el instanceof HTMLElement);
   const wrap = readWebStorageItem(localStorage, storageWrap) === "1";
@@ -1621,31 +1615,26 @@ function wireWrapToggle(
     for (const el of docTargets) el.classList.remove("wrap");
   }
 
-  const listenOpts: AddEventListenerOptions | undefined = signal ? { signal } : undefined;
-  wrapCb.addEventListener(
-    "change",
-    () => {
-      if (wrapCb.checked) {
-        codePane.classList.add("wrap");
-        for (const el of docTargets) el.classList.add("wrap");
-        writeWebStorageItem(localStorage, storageWrap, "1");
-      } else {
-        codePane.classList.remove("wrap");
-        for (const el of docTargets) el.classList.remove("wrap");
-        writeWebStorageItem(localStorage, storageWrap, "0");
-      }
-      if (!onAfterLayout) return;
-      queueMicrotask(() => {
+  wrapCb.addEventListener("change", () => {
+    if (wrapCb.checked) {
+      codePane.classList.add("wrap");
+      for (const el of docTargets) el.classList.add("wrap");
+      writeWebStorageItem(localStorage, storageWrap, "1");
+    } else {
+      codePane.classList.remove("wrap");
+      for (const el of docTargets) el.classList.remove("wrap");
+      writeWebStorageItem(localStorage, storageWrap, "0");
+    }
+    if (!onAfterLayout) return;
+    queueMicrotask(() => {
+      requestAnimationFrame(() => {
+        onAfterLayout();
         requestAnimationFrame(() => {
           onAfterLayout();
-          requestAnimationFrame(() => {
-            onAfterLayout();
-          });
         });
       });
-    },
-    listenOpts,
-  );
+    });
+  });
 }
 
 function parseScrollBlockLinksFromShell(b64: string): BlockScrollLink[] {
@@ -2071,11 +2060,6 @@ type DualPaneScrollSyncRunners = {
   finishMobileFlipToCode: () => void;
   prepareMobileFlipToDoc: () => void;
   finishMobileFlipToDoc: () => void;
-  /**
-   * When `filler-blocks` scroll sync is active, re-run per-block + total-height buffers after
-   * layout-affecting UI (wrap, split, source-pane mode, mobile flip).
-   */
-  scheduleScrollBufferReequalize?: () => void;
 };
 
 type BlockAwareScrollPaneBundle = {
@@ -3036,7 +3020,6 @@ function wireSplitter(
   codePane: HTMLElement,
   gutter: HTMLElement,
   initialPct: number,
-  onAfterRelease?: () => void,
 ): void {
   let dragging = false;
   let lastPct = initialPct;
@@ -3056,13 +3039,6 @@ function wireSplitter(
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
     writeWebStorageItem(localStorage, storageSplit, String(lastPct));
-    if (onAfterRelease !== undefined) {
-      queueMicrotask(() => {
-        globalThis.requestAnimationFrame(() => {
-          onAfterRelease();
-        });
-      });
-    }
   }
   gutter.addEventListener("mousedown", (e) => {
     e.preventDefault();
@@ -3315,7 +3291,6 @@ function wireDualMobilePaneFlip(
     } else {
       shell.removeAttribute("data-dual-mobile-pane");
     }
-    scrollRunners.scheduleScrollBufferReequalize?.();
   }
   const runFlip = (): void => {
     if (!mq.matches) return;
@@ -3341,7 +3316,6 @@ function wireDualMobilePaneFlip(
         } else {
           scrollRunners.finishMobileFlipToDoc();
         }
-        scrollRunners.scheduleScrollBufferReequalize?.();
       });
     });
     // Only here (not on every viewport apply): avoids redundant Mermaid passes on load/resize for the default commentary-first shell.
@@ -3358,36 +3332,21 @@ function wireDualMobilePaneFlip(
   applyForViewport();
 }
 
-/** Abort previous stretch wrap wiring when `#code-pane` is replaced (multi-angle stretch swap). */
-let stretchWrapToggleAbort: AbortController | undefined;
-
 function wireStretchLayoutChrome(codePane: HTMLElement): void {
-  stretchWrapToggleAbort?.abort();
-  stretchWrapToggleAbort = new AbortController();
   const wrapCb = document.getElementById("wrap-lines") as HTMLInputElement | null;
   if (wrapCb) {
-    wireWrapToggle(
-      STORAGE_WRAP_LINES,
-      codePane,
-      wrapCb,
-      () => {
-        globalThis.dispatchEvent(new Event("resize"));
-      },
-      [],
-      stretchWrapToggleAbort.signal,
-    );
+    wireWrapToggle(STORAGE_WRAP_LINES, codePane, wrapCb, () => {
+      globalThis.dispatchEvent(new Event("resize"));
+    });
   }
 }
 
 type MultiAngleClientPayload = {
-  /** `stretch`: one block-stretch table + shell scroll per angle (no dual-pane sync). */
-  layoutMode?: "dual" | "stretch";
   defaultAngleId: string;
   angles: {
     id: string;
     title: string;
     docInnerHtmlB64: string;
-    stretchSwapInnerB64?: string;
     rawMdB64: string;
     scrollBlockLinksB64: string;
     commentrayPathForSearch: string;
@@ -3396,32 +3355,16 @@ type MultiAngleClientPayload = {
   }[];
 };
 
-function multiAngleAnglesPayloadValid(
-  angles: MultiAngleClientPayload["angles"],
-  layoutMode: "dual" | "stretch",
-): boolean {
-  for (const a of angles) {
-    if (typeof a.id !== "string") return false;
-    if (layoutMode === "stretch") {
-      if (typeof a.stretchSwapInnerB64 !== "string" || a.stretchSwapInnerB64.trim().length === 0) {
-        return false;
-      }
-    } else if (typeof a.docInnerHtmlB64 !== "string") {
-      return false;
-    }
-  }
-  return true;
-}
-
 function parseMultiAnglePayload(script: HTMLElement | null): MultiAngleClientPayload | null {
   const t = script?.textContent?.trim() ?? "";
   if (!t) return null;
   try {
     const raw = JSON.parse(decodeBase64Utf8(t)) as MultiAngleClientPayload;
     if (!raw || !Array.isArray(raw.angles) || raw.angles.length < 2) return null;
-    const layoutMode = raw.layoutMode === "stretch" ? "stretch" : "dual";
-    if (!multiAngleAnglesPayloadValid(raw.angles, layoutMode)) return null;
-    return { ...raw, layoutMode };
+    for (const a of raw.angles) {
+      if (typeof a.id !== "string" || typeof a.docInnerHtmlB64 !== "string") return null;
+    }
+    return raw;
   } catch {
     return null;
   }
@@ -3590,15 +3533,35 @@ function wireDualPaneNavSearchFetch(
   })();
 }
 
-function applyMultiAngleSharedShellAndSearchUi(args: {
+function applySelectedMultiAngle(args: {
   angle: NonNullable<MultiAngleClientPayload>["angles"][number];
+  docBody: HTMLElement;
+  mutable: MutableSearchFields;
+  rebuildSearcher: () => void;
   scrollLinksRef: { current: BlockScrollLink[] };
   shell: HTMLElement;
   searchInput: HTMLInputElement;
   searchResults: HTMLElement;
   requestBlockRayRedraw?: () => void;
 }): void {
-  const { angle, scrollLinksRef, shell, searchInput, searchResults, requestBlockRayRedraw } = args;
+  const {
+    angle,
+    docBody,
+    mutable,
+    rebuildSearcher,
+    scrollLinksRef,
+    shell,
+    searchInput,
+    searchResults,
+    requestBlockRayRedraw,
+  } = args;
+  docBody.innerHTML = decodeBase64Utf8(angle.docInnerHtmlB64);
+  runMermaidOnFreshDocNodes(docBody);
+  rewriteHubRelativeBrowseAnchorsIn(docBody);
+  mutable.rawMd = decodeBase64Utf8(angle.rawMdB64);
+  mutable.mdLines = mutable.rawMd.split("\n");
+  mutable.commentrayPathLabel = angle.commentrayPathForSearch;
+  rebuildSearcher();
   scrollLinksRef.current = parseScrollBlockLinksFromShell(angle.scrollBlockLinksB64);
   shell.setAttribute("data-scroll-block-links-b64", angle.scrollBlockLinksB64);
   shell.setAttribute("data-search-commentray-path", angle.commentrayPathForSearch);
@@ -3629,62 +3592,12 @@ function applyMultiAngleSharedShellAndSearchUi(args: {
   searchInput.value = "";
   searchResults.innerHTML = "";
   searchResults.hidden = true;
-  assignLocationToCanonicalBrowsePermalinkIfNeeded(shell);
   requestBlockRayRedraw?.();
   globalThis.requestAnimationFrame(() => {
     requestBlockRayRedraw?.();
     globalThis.requestAnimationFrame(() => {
       requestBlockRayRedraw?.();
     });
-  });
-}
-
-function applySelectedMultiAngle(args: {
-  layoutMode: "dual" | "stretch";
-  angle: NonNullable<MultiAngleClientPayload>["angles"][number];
-  /** Dual layout only; null when `layoutMode` is `stretch` (whole `#shell` inner is swapped). */
-  docBody: HTMLElement | null;
-  mutable?: MutableSearchFields;
-  rebuildSearcher?: () => void;
-  scrollLinksRef: { current: BlockScrollLink[] };
-  shell: HTMLElement;
-  searchInput: HTMLInputElement;
-  searchResults: HTMLElement;
-  requestBlockRayRedraw?: () => void;
-}): void {
-  const {
-    layoutMode,
-    angle,
-    docBody,
-    mutable,
-    rebuildSearcher,
-    scrollLinksRef,
-    shell,
-    searchInput,
-    searchResults,
-    requestBlockRayRedraw,
-  } = args;
-  if (layoutMode === "stretch" && angle.stretchSwapInnerB64) {
-    shell.innerHTML = decodeBase64Utf8(angle.stretchSwapInnerB64);
-    runMermaidOnFreshDocNodes(shell);
-    rewriteHubRelativeBrowseAnchorsIn(shell);
-  } else {
-    if (!docBody || !mutable || !rebuildSearcher) return;
-    docBody.innerHTML = decodeBase64Utf8(angle.docInnerHtmlB64);
-    runMermaidOnFreshDocNodes(docBody);
-    rewriteHubRelativeBrowseAnchorsIn(docBody);
-    mutable.rawMd = decodeBase64Utf8(angle.rawMdB64);
-    mutable.mdLines = mutable.rawMd.split("\n");
-    mutable.commentrayPathLabel = angle.commentrayPathForSearch;
-    rebuildSearcher();
-  }
-  applyMultiAngleSharedShellAndSearchUi({
-    angle,
-    scrollLinksRef,
-    shell,
-    searchInput,
-    searchResults,
-    requestBlockRayRedraw,
   });
 }
 
@@ -3709,7 +3622,6 @@ type WireDualPaneMultiAngleScrollArgs = {
 function wireDualPaneScrollIndexedOrProportional(
   args: WireDualPaneMultiAngleScrollArgs,
   blockAwareOpts: { allowProportionalMirror: boolean },
-  scrollMode: "block-aware" | "proportional",
 ): DualPaneScrollSyncRunners {
   const {
     codePane,
@@ -3725,24 +3637,20 @@ function wireDualPaneScrollIndexedOrProportional(
     requestBlockRayRedraw,
   } = args;
   if (multiPayload) {
-    const runners =
-      scrollMode === "proportional"
-        ? wireProportionalScrollSync(codePane, docScrollEl)
-        : wireBlockAwareScrollSync(
-            codePane,
-            docScrollEl,
-            () => scrollLinksRef.current,
-            () => sourceLineIdPrefixForShell(shell),
-            () => sourcePaneModeForShell(shell) === "rendered-markdown",
-            blockAwareOpts,
-          );
+    const runners = wireBlockAwareScrollSync(
+      codePane,
+      docScrollEl,
+      () => scrollLinksRef.current,
+      () => sourceLineIdPrefixForShell(shell),
+      () => sourcePaneModeForShell(shell) === "rendered-markdown",
+      blockAwareOpts,
+    );
     const angleSel = document.getElementById("angle-select") as HTMLSelectElement | null;
     if (angleSel && docBody) {
       angleSel.addEventListener("change", () => {
         const a = multiPayload.angles.find((x) => x.id === angleSel.value);
         if (!a) return;
         applySelectedMultiAngle({
-          layoutMode: multiPayload.layoutMode ?? "dual",
           angle: a,
           docBody,
           mutable,
@@ -3758,9 +3666,6 @@ function wireDualPaneScrollIndexedOrProportional(
     return runners;
   }
   if (scrollLinksRef.current.length > 0) {
-    if (scrollMode === "proportional") {
-      return wireProportionalScrollSync(codePane, docScrollEl);
-    }
     return wireBlockAwareScrollSync(
       codePane,
       docScrollEl,
@@ -3793,32 +3698,8 @@ function wireDualPaneMultiAngleAndScroll(
     strategy === "block-snap-only"
       ? { allowProportionalMirror: false }
       : { allowProportionalMirror: true };
-  /**
-   * Default `filler-blocks`: inject segment + tail height buffers so both panes share the same max
-   * scroll, then **only** proportional mirroring (`wireProportionalScrollSync`) — no per-frame
-   * block snap/reveal. Opt-in `block-aware-proportional` / `block-snap-only` keep the older
-   * index-driven mapper without buffers.
-   */
-  const useFillerBuffers =
-    strategy === "filler-blocks" &&
-    dedupeBlockScrollLinksById(args.scrollLinksRef.current).length > 0;
-  const scrollBufferHandle = useFillerBuffers
-    ? installPerBlockScrollBuffers({
-        codePane: args.codePane,
-        docScrollEl: args.docScrollEl,
-        docBody: args.docBody,
-        getLinks: () => args.scrollLinksRef.current,
-        getLineIdPrefix: () => sourceLineIdPrefixForShell(args.shell),
-      })
-    : null;
-  const scrollMode: "block-aware" | "proportional" = useFillerBuffers
-    ? "proportional"
-    : "block-aware";
-  const runners = wireDualPaneScrollIndexedOrProportional(args, blockAwareOpts, scrollMode);
-  if (scrollBufferHandle !== null) {
-    return { ...runners, scheduleScrollBufferReequalize: scrollBufferHandle.scheduleReequalize };
-  }
-  return runners;
+  // filler-blocks: reserved for height-matched buffers; until then same as block-aware-proportional.
+  return wireDualPaneScrollIndexedOrProportional(args, blockAwareOpts);
 }
 
 function wireDualPaneCommentrayLocationHash(
@@ -3995,24 +3876,18 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
   const sourceMdBodyForWrap = document.getElementById("code-pane-markdown-body");
 
   const blockRayRedraw: { request?: () => void } = {};
-  const scrollBufferAfterLayout: { schedule?: () => void } = {};
   wireWrapToggle(
     STORAGE_WRAP_LINES,
     codePane,
     wrapCb,
     () => {
       blockRayRedraw.request?.();
-      scrollBufferAfterLayout.schedule?.();
     },
-    [
-      docPaneForWrap,
-      docBody,
-      sourceMdBodyForWrap instanceof HTMLElement ? sourceMdBodyForWrap : null,
-    ],
+    docPaneForWrap,
+    docBody,
+    sourceMdBodyForWrap instanceof HTMLElement ? sourceMdBodyForWrap : null,
   );
-  wireSplitter(STORAGE_SPLIT_PCT, shell, codePane, gutter, pct, () => {
-    scrollBufferAfterLayout.schedule?.();
-  });
+  wireSplitter(STORAGE_SPLIT_PCT, shell, codePane, gutter, pct);
 
   const multiScript = document.getElementById("commentray-multi-angle-b64");
   const multiPayload = parseMultiAnglePayload(multiScript);
@@ -4042,7 +3917,6 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     searchResults,
     requestBlockRayRedraw,
   });
-  scrollBufferAfterLayout.schedule = scrollRunners.scheduleScrollBufferReequalize;
 
   const flipBtn = document.getElementById("mobile-pane-flip");
   const flipScrollBtn = document.getElementById("mobile-pane-flip-scroll");
@@ -4056,7 +3930,6 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
   }
   wireSourceMarkdownControls(shell, codePane, () => {
     requestBlockRayRedraw?.();
-    scrollBufferAfterLayout.schedule?.();
   });
   wireWideModeIntroTour(shell, isNarrowViewport);
 
@@ -4251,20 +4124,6 @@ function resolveEmbeddedStaticNavUrlsForCurrentPage(shell: HTMLElement): void {
   normalizePairBrowseHrefForCurrentPath(shell, pathname);
 }
 
-/**
- * Absolute base URL for the pair browse / permalink target from `#shell` `data-commentray-pair-browse-href`
- * (hub-relative `./browse/…` resolved via {@link resolveStaticBrowseHref}; same contract as static build).
- */
-function pairBrowsePermalinkBaseHrefFromShell(shell: HTMLElement): string {
-  const raw = shell.getAttribute("data-commentray-pair-browse-href") ?? "";
-  const t = raw.trim();
-  const canonical =
-    isHubRelativeStaticBrowseHref(t) && t.length > 0
-      ? resolveStaticBrowseHref(t, globalThis.location.pathname, globalThis.location.origin)
-      : safePermalinkHref(t);
-  return canonical ?? globalThis.location.href;
-}
-
 function permalinkHashSuffixFromUi(): string {
   const tokens: string[] = [];
   const pushUnique = (token: string): void => {
@@ -4285,29 +4144,20 @@ function permalinkHashSuffixFromUi(): string {
 }
 
 function sharePermalinkFromShell(shell: HTMLElement): string {
-  const u = new URL(pairBrowsePermalinkBaseHrefFromShell(shell), globalThis.location.href);
+  const raw = shell.getAttribute("data-commentray-pair-browse-href") ?? "";
+  const canonical =
+    isHubRelativeStaticBrowseHref(raw.trim()) && raw.trim().length > 0
+      ? resolveStaticBrowseHref(
+          raw.trim(),
+          globalThis.location.pathname,
+          globalThis.location.origin,
+        )
+      : safePermalinkHref(raw);
+  const base = canonical ?? globalThis.location.href;
+  const u = new URL(base, globalThis.location.href);
   const hash = permalinkHashSuffixFromUi();
   u.hash = hash.length > 0 ? hash.slice(1) : "";
   return u.toString();
-}
-
-/**
- * Static multi-angle: each angle has its own `/browse/…/<angle>/index.html`. After `#angle-select`
- * changes, load that URL **without** `#angle-…` — the path is the permalink; the hash is only for
- * share/copy when staying on one HTML file.
- */
-function assignLocationToCanonicalBrowsePermalinkIfNeeded(shell: HTMLElement): void {
-  let target: URL;
-  try {
-    target = new URL(pairBrowsePermalinkBaseHrefFromShell(shell), globalThis.location.href);
-  } catch {
-    return;
-  }
-  if (target.origin !== globalThis.location.origin) return;
-  target.hash = "";
-  const here = new URL(globalThis.location.href);
-  if (here.pathname === target.pathname && here.search === target.search) return;
-  globalThis.location.assign(target.toString());
 }
 
 async function writeTextToClipboard(text: string): Promise<boolean> {
@@ -4375,32 +4225,6 @@ function main(): void {
   const layout = shell.getAttribute("data-layout") || "dual";
   if (layout === "stretch") {
     wireStretchLayoutChrome(codePane);
-    const multiScript = document.getElementById("commentray-multi-angle-b64");
-    const multiPayload = parseMultiAnglePayload(multiScript);
-    if (multiPayload?.layoutMode === "stretch") {
-      const angleSel = document.getElementById("angle-select") as HTMLSelectElement | null;
-      const searchInput = document.getElementById("search-q") as HTMLInputElement | null;
-      const searchResults = document.getElementById("search-results");
-      if (angleSel && searchInput && searchResults) {
-        const noopLinks: { current: BlockScrollLink[] } = { current: [] };
-        angleSel.addEventListener("change", () => {
-          const a = multiPayload.angles.find((x) => x.id === angleSel.value);
-          if (!a) return;
-          applySelectedMultiAngle({
-            layoutMode: "stretch",
-            angle: a,
-            docBody: null,
-            scrollLinksRef: noopLinks,
-            shell,
-            searchInput,
-            searchResults,
-          });
-          const cp = document.getElementById("code-pane");
-          if (cp instanceof HTMLElement) wireStretchLayoutChrome(cp);
-        });
-      }
-    }
-    resolveEmbeddedStaticNavUrlsForCurrentPage(shell);
     return;
   }
 
