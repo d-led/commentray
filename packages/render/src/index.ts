@@ -27,6 +27,10 @@ export { renderSideBySideHtml } from "./side-by-side.js";
 export type { SideBySideOptions } from "./side-by-side.js";
 export { browsePageSlugFromPair } from "./browse-page-slug.js";
 export {
+  appendHtmlToOpaqueBrowsePathname,
+  appendHtmlToOpaqueBrowseRequestUrl,
+} from "./code-browser-pair-nav.js";
+export {
   buildCommentrayNavSearchDocument,
   COMMENTRAY_NAV_SEARCH_SCHEMA_VERSION,
 } from "./build-commentray-nav-search.js";

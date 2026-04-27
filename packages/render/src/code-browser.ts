@@ -35,9 +35,8 @@ export type CodeBrowserMultiAngleSpec = {
   commentrayOnGithubUrl?: string;
   /**
    * When the static site emits per-pair browse pages, same-tab navigation for the Doc toolbar
-   * (preferred over {@link commentrayOnGithubUrl} on the hub). Typical values are hub-relative
-   * `./browse/<human-path>/index.html` or `./browse/<source>@<angle>.html`; opaque `./browse/<hash>.html`
-   * remains valid for the canonical HTML file on disk.
+   * (preferred over {@link commentrayOnGithubUrl} on the hub). Paths mirror the companion layout
+   * under `./browse/…/index.html` (see `staticBrowseIndexRelPathFromPair` in `@commentray/core`).
    */
   staticBrowseUrl?: string;
   /**
@@ -76,8 +75,9 @@ export type CodeBrowserPageOptions = {
    */
   githubRepoUrl?: string;
   /**
-   * Same-site URL for the static documentation hub (e.g. `./` on `index.html`, `../index.html`
-   * under `browse/`). When set, the first toolbar control is a **home** link here instead of
+   * Same-site URL for the static documentation hub (e.g. `./` on `index.html`, or a
+   * depth-correct relative path to the hub from nested `browse/…` pages — see static export).
+   * When set, the first toolbar control is a **home** link here instead of
    * {@link githubRepoUrl}. Uses the same path safety rules as {@link commentrayStaticBrowseUrl}.
    */
   siteHubUrl?: string;
@@ -146,8 +146,8 @@ export type CodeBrowserPageOptions = {
    */
   commentrayOnGithubUrl?: string;
   /**
-   * When set (e.g. `./browse/…/index.html` or `./browse/<hash>.html` from the static Pages build),
-   * the Doc toolbar icon opens this URL on the **same origin** instead of GitHub.
+   * When set (e.g. `./browse/…/index.html`, `/browse/…/index.html`, or `./browse/<hash>.html` from
+   * the static Pages build), the Doc toolbar icon opens this URL on the **same origin** instead of GitHub.
    */
   commentrayStaticBrowseUrl?: string;
   /**

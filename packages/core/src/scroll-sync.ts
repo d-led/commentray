@@ -7,6 +7,7 @@ import { markerViewportHalfOpen1Based, sourceLineRangeForMarkerId } from "./sour
 
 export type { BlockScrollLink } from "./block-scroll-pickers.js";
 export {
+  pickBlockScrollLinkForCommentrayScroll,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
 } from "./block-scroll-pickers.js";

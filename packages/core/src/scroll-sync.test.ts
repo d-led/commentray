@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CURRENT_SCHEMA_VERSION } from "./model.js";
 import {
   buildBlockScrollLinks,
+  pickBlockScrollLinkForCommentrayScroll,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
 } from "./scroll-sync.js";
@@ -155,6 +156,21 @@ describe("Marker viewport: prelude line and start delimiter belong to the next b
     expect(links).toHaveLength(2);
     expect(pickCommentrayLineForSourceScroll(links, 6)).toBe(2);
     expect(pickCommentrayLineForSourceScroll(links, 7)).toBe(2);
+  });
+});
+
+describe("pickBlockScrollLinkForCommentrayScroll", () => {
+  const blocks = buildBlockScrollLinks(index, "src/a.ts", crPath, md);
+
+  it("returns the same winning block implied by pickSourceLine0ForCommentrayScroll", () => {
+    for (const top of [0, 3, 4, 5, 99]) {
+      const link = pickBlockScrollLinkForCommentrayScroll(blocks, top);
+      const src0 = pickSourceLine0ForCommentrayScroll(blocks, top);
+      expect(link).not.toBeNull();
+      if (link && src0 !== null) {
+        expect(link.markerViewportHalfOpen1Based.lo - 1).toBe(src0);
+      }
+    }
   });
 });
 

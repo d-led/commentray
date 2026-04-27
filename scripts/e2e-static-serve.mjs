@@ -1,31 +1,78 @@
 #!/usr/bin/env node
 /**
- * Serves `_site` for Cypress E2E with a stable repo-root path (see `package.json` `e2e:server`).
- * Uses a dedicated port (default **14173**) so local **`commentray serve` on 4173** does not steal
- * the listener: `serve` would otherwise fall back to a random port while Cypress still targets the
- * configured URL. Override with **`COMMENTRAY_E2E_PORT`**.
+ * Serves prebuilt `_site` for Cypress E2E (see `package.json` `e2e:server`).
  *
- * `--no-port-switching` fails fast if the port is taken instead of binding elsewhere.
+ * Uses the same `serve-handler` wiring as `commentray serve` (`packages/cli/src/serve.ts`):
+ * `serve.json` `renderSingle`, `/` → `index.html`, and opaque `/browse/…` URL normalization.
+ * That matches `npm run serve` and GitHub Pages without the external Vercel **`serve`** CLI
+ * (it is not a workspace dependency and was never required for local dev).
+ *
+ * Default port **14173** — override with **`COMMENTRAY_E2E_PORT`** so it does not collide with
+ * **`commentray serve`** on **4173**.
  */
-import { spawn } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const siteDir = path.join(repoRoot, "_site");
-const serveBin = path.join(repoRoot, "node_modules", ".bin", "serve");
-const port = (process.env.COMMENTRAY_E2E_PORT ?? "14173").trim();
+import handler from "serve-handler";
 
-const child = spawn(
-  serveBin,
-  [siteDir, "-l", `tcp://127.0.0.1:${port}`, "--no-port-switching", "-n"],
-  {
-    stdio: "inherit",
-    cwd: repoRoot,
-    shell: false,
-  },
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const siteAbs = path.join(repoRoot, "_site");
+const port = Number.parseInt((process.env.COMMENTRAY_E2E_PORT ?? "14173").trim(), 10);
+
+if (!Number.isFinite(port) || port < 1 || port > 65535) {
+  process.stderr.write("e2e-static-serve: COMMENTRAY_E2E_PORT must be 1–65535\n");
+  process.exit(1);
+}
+
+const { appendHtmlToOpaqueBrowseRequestUrl } = await import(
+  new URL("../packages/render/dist/index.js", import.meta.url).href
 );
-child.on("exit", (code, signal) => {
-  if (signal) process.kill(process.pid, signal);
-  process.exit(code ?? 1);
+
+function serveHandlerOptions() {
+  let renderSingle = true;
+  const serveJsonPath = path.join(siteAbs, "serve.json");
+  if (existsSync(serveJsonPath)) {
+    try {
+      const extra = JSON.parse(readFileSync(serveJsonPath, "utf8"));
+      if (typeof extra.renderSingle === "boolean") renderSingle = extra.renderSingle;
+    } catch {
+      /* ignore invalid serve.json */
+    }
+  }
+  return {
+    public: siteAbs,
+    etag: true,
+    cleanUrls: false,
+    renderSingle,
+    rewrites: [{ source: "/", destination: "/index.html" }],
+  };
+}
+
+const opts = serveHandlerOptions();
+
+const server = createServer((req, res) => {
+  const raw = req.url;
+  if (typeof raw === "string" && raw.length > 0) {
+    req.url = appendHtmlToOpaqueBrowseRequestUrl(raw);
+  }
+  void handler(req, res, opts).catch((err) => {
+    process.stderr.write(
+      `[e2e-static-serve] ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    if (!res.headersSent) res.statusCode = 500;
+    res.end();
+  });
+});
+
+server.on("error", (err) => {
+  process.stderr.write(
+    `[e2e-static-serve] listen failed: ${err instanceof Error ? err.message : String(err)}\n`,
+  );
+  process.exit(1);
+});
+
+server.listen(port, "127.0.0.1", () => {
+  process.stderr.write(`[e2e-static-serve] http://127.0.0.1:${String(port)}/ (_site)\n`);
 });

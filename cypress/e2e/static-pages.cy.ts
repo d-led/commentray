@@ -10,8 +10,8 @@ describe("The Commentray GitHub Pages static build", () => {
       cy.GoToStaticSiteHome();
     });
 
-    it("backfills the hub URL to a humane browse path for the current pair", () => {
-      cy.location("pathname").should("match", /\/browse\/README\.md@main\.html$/);
+    it("serves the documentation hub at the site root without client-side address-bar rewriting", () => {
+      cy.location("pathname").should("eq", "/");
     });
 
     it("presents a coherent browsable documentation workspace", () => {
@@ -44,7 +44,7 @@ describe("The Commentray GitHub Pages static build", () => {
           expect(browseHref)
             .to.be.a("string")
             .and.match(
-              /^(?:\.\/browse\/[^/]+\.html|https?:\/\/[^/]+\/browse\/[^/]+\.html)(?:\?.*)?$/,
+              /^(?:\.\/browse\/(?:[^/]+\.html|.+\/index\.html)|https?:\/\/[^/]+\/browse\/(?:[^/]+\.html|.+\/index\.html))(?:\?.*)?$/,
             );
           if (typeof browseHref !== "string") {
             throw new Error("Expected shell browse permalink href");
@@ -53,20 +53,38 @@ describe("The Commentray GitHub Pages static build", () => {
         });
 
       cy.CurrentPageShouldDisplayCodeBrowserShell();
-      cy.location("pathname").should("match", /\/browse\/[^/]+(?:\.html)?$/);
+      cy.location("pathname").should("match", /\/browse\/.+(?:\/index\.html|\.html)?$/);
       cy.location("pathname").should("not.match", /\/browse\/browse\//);
       cy.get('a[aria-label="Documentation home"]')
         .should("have.attr", "href")
-        .and("match", /^(?:\/|\/.+\/)$/)
+        .and("match", /^(?:\/|\/.+\/|(?:\.\.\/)+index\.html)$/)
         .and("not.match", /\/browse\/?$/);
       cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
     });
 
     it("serves humane source browse paths as real pages on static hosts", () => {
-      cy.visit("/browse/README.md@main.html");
+      cy.ApplyNarrowViewportForDualScrollFixture();
+      cy.visit("/browse/README.md/main/index.html", {
+        onBeforeLoad(win) {
+          win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
+        },
+      });
       cy.CurrentPageShouldDisplayCodeBrowserShell();
-      cy.location("pathname").should("match", /\/browse\/[^/]+$/);
+      cy.location("pathname").should("match", /\/browse\/README\.md\/main\/index\.html$/);
       cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
+      // Scroll sync is URL-agnostic; assert it on a real filename-readable permalink so
+      // browse URL refactors cannot regress coupling without failing CI.
+      cy.CodeAndDocPanesScrollTopShouldBeZero();
+      cy.ScrollCodePaneToMaximum();
+      cy.DocPaneBodyScrollTopShouldExceed(80);
+      cy.visit("/browse/README.md/main/index.html", {
+        onBeforeLoad(win) {
+          win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
+        },
+      });
+      cy.CodeAndDocPanesScrollTopShouldBeZero();
+      cy.ScrollDocPaneBodyToMaximum();
+      cy.CodePaneScrollTopShouldExceed(80);
     });
 
     it("returns 404 for humane browse paths without a documented pair", () => {

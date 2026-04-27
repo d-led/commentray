@@ -29,20 +29,32 @@ export function siteRootPathnameFromPathname(pathname: string): string {
   return noFile.replace(/\/+$/, "") || "/";
 }
 
-/** Flat canonical page: `./browse/<hash>.html` (opaque slug, one path segment). */
-const STATIC_BROWSE_FLAT = /^(?:\.\/)?browse\/([^/?#]+\.html)$/i;
+/** Indexed pair page: `./browse/…/index.html` or path-absolute `/browse/…/index.html`. */
+const STATIC_BROWSE_INDEXED = /^(?:\.\/|\/)?browse\/(.+)\/index\.html$/i;
 
-/** Human-readable shim: `./browse/<encoded/source/segments>/index.html` (see `browse-pair-static-url.ts`). */
-const STATIC_BROWSE_INDEXED = /^(?:\.\/)?browse\/(.+)\/index\.html$/i;
+/**
+ * Flat HTML under `browse/`: a lone `*.html` file (e.g. legacy or opaque slug). Multi-angle pairs
+ * use indexed `./browse/…/…/index.html` only. Must not match indexed URLs ending in `/index.html`
+ * (check {@link STATIC_BROWSE_INDEXED} first).
+ */
+const STATIC_BROWSE_FLAT_HTML = /^(?:\.\/|\/)?browse\/(.+\.html)$/i;
 
 /** True when `href` is hub-root-relative static browse (not same-dir `./other.html`). */
+function isStaticBrowseIndexedHref(t: string): boolean {
+  return STATIC_BROWSE_INDEXED.test(t);
+}
+
+function isStaticBrowseFlatHtmlHref(t: string): boolean {
+  return STATIC_BROWSE_FLAT_HTML.test(t) && !t.toLowerCase().endsWith("/index.html");
+}
+
 export function isHubRelativeStaticBrowseHref(href: string): boolean {
   const t = href.trim();
-  return STATIC_BROWSE_FLAT.test(t) || STATIC_BROWSE_INDEXED.test(t);
+  return isStaticBrowseIndexedHref(t) || isStaticBrowseFlatHtmlHref(t);
 }
 
 /**
- * Resolves `staticBrowseUrl` from nav JSON (typically `./browse/<slug>.html`) to an absolute href.
+ * Resolves `staticBrowseUrl` from nav JSON (`./browse/…/index.html` or legacy flat `./browse/…@….html`) to an absolute href.
  */
 export function resolveStaticBrowseHref(
   relativeBrowse: string,
@@ -52,16 +64,16 @@ export function resolveStaticBrowseHref(
   const r = relativeBrowse.trim();
   if (r.startsWith("/")) return `${origin}${r}`;
   const root = siteRootPathnameFromPathname(pathname);
-  const mFlat = STATIC_BROWSE_FLAT.exec(r);
-  if (mFlat?.[1]) {
-    const path = root === "/" ? `/browse/${mFlat[1]}` : `${root}/browse/${mFlat[1]}`;
-    return `${origin}${path}`;
-  }
   const mIdx = STATIC_BROWSE_INDEXED.exec(r);
   if (mIdx?.[1]) {
     const inner = mIdx[1];
     const path =
       root === "/" ? `/browse/${inner}/index.html` : `${root}/browse/${inner}/index.html`;
+    return `${origin}${path}`;
+  }
+  const mFlat = STATIC_BROWSE_FLAT_HTML.exec(r);
+  if (mFlat?.[1] && !r.toLowerCase().endsWith("/index.html")) {
+    const path = root === "/" ? `/browse/${mFlat[1]}` : `${root}/browse/${mFlat[1]}`;
     return `${origin}${path}`;
   }
   return new URL(r, `${origin}${pathname}`).href;
@@ -79,10 +91,10 @@ export function staticBrowseHrefForShellDataAttribute(
 ): string {
   const r = staticBrowseUrl.trim();
   if (r.length === 0) return "";
-  const flat = STATIC_BROWSE_FLAT.exec(r);
-  if (flat?.[1]) return `./browse/${flat[1]}`;
   const indexed = STATIC_BROWSE_INDEXED.exec(r);
   if (indexed?.[1]) return `./browse/${indexed[1]}/index.html`;
+  const flat = STATIC_BROWSE_FLAT_HTML.exec(r);
+  if (flat?.[1] && !r.toLowerCase().endsWith("/index.html")) return `./browse/${flat[1]}`;
   return resolveStaticBrowseHref(r, pathname, origin);
 }
 
@@ -102,6 +114,33 @@ export function findDocumentedPair<T extends DocumentedPairNavLike>(
     if (hit) return hit;
   }
   return undefined;
+}
+
+/**
+ * Opaque browse pages are files `browse/<slug>.html`. A bare `/…/browse/<slug>` (one segment after
+ * `browse/`, no `.` in the slug) has no static file on disk — append `.html` so dev server and
+ * address-bar sync match emitted assets (same link shape users should share).
+ */
+export function appendHtmlToOpaqueBrowsePathname(pathname: string): string {
+  const needle = "/browse/";
+  const idx = pathname.lastIndexOf(needle);
+  if (idx < 0) return pathname;
+  const rest = pathname.slice(idx + needle.length);
+  if (rest.length === 0 || rest.includes("/") || rest.includes(".")) return pathname;
+  return `${pathname.slice(0, idx + needle.length)}${rest}.html`;
+}
+
+/** Apply {@link appendHtmlToOpaqueBrowsePathname} to the path part of a request URL. */
+export function appendHtmlToOpaqueBrowseRequestUrl(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl, "http://localhost");
+    const nextPath = appendHtmlToOpaqueBrowsePathname(u.pathname);
+    if (nextPath === u.pathname) return rawUrl;
+    u.pathname = nextPath;
+    return `${u.pathname}${u.search}${u.hash}`;
+  } catch {
+    return rawUrl;
+  }
 }
 
 export function isSameDocumentedPair(

@@ -3,9 +3,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { CURRENT_SCHEMA_VERSION, ensureAnglesSentinelFile, writeIndex } from "@commentray/core";
-import { browsePageSlugFromPair } from "@commentray/render";
-
+import {
+  CURRENT_SCHEMA_VERSION,
+  ensureAnglesSentinelFile,
+  staticBrowseIndexRelPathFromPair,
+  writeIndex,
+} from "@commentray/core";
 import { buildGithubPagesStaticSite } from "./github-pages-site.js";
 
 async function writeMinimalPagesFixture(
@@ -162,35 +165,24 @@ async function runWritesSiteAndNavFromFlatCompanions(): Promise<string> {
     documentedPairs?: { staticBrowseUrl?: string }[];
   };
   expect(Array.isArray(nav.rows)).toBe(true);
-  expect(nav.documentedPairs?.[0]?.staticBrowseUrl).toMatch(/^\.\/browse\/.+\.html$/);
+  expect(nav.documentedPairs?.[0]?.staticBrowseUrl).toBe("./browse/src/x.ts/index.html");
+  const browseHtml = await readFile(
+    path.join(r, "_site", "browse", "src", "x.ts", "index.html"),
+    "utf8",
+  );
   const browseFiles = await readdir(path.join(r, "_site", "browse"));
-  expect(browseFiles.some((f) => f.endsWith(".html"))).toBe(true);
+  expect(browseFiles).toContain("src");
   const serveJson = JSON.parse(await readFile(path.join(r, "_site", "serve.json"), "utf8")) as {
     renderSingle?: boolean;
   };
   expect(serveJson.renderSingle).toBe(true);
-  const slugFile = browseFiles.find((f) => f.endsWith(".html"));
-  if (slugFile === undefined) {
-    throw new Error("expected a .html file under _site/browse");
-  }
-  const slugStem = path.basename(slugFile, ".html");
-  const humaneAliasHtml = await readFile(
-    path.join(r, "_site", "browse", "src", "x.ts", "index.html"),
-    "utf8",
-  );
-  expect(humaneAliasHtml).toContain("Redirecting");
-  expect(humaneAliasHtml).toContain(`content="0;url=../${slugStem}.html"`);
-  expect(new URL(`../${slugStem}.html`, "http://localhost:4173/browse/src/x.ts").pathname).toBe(
-    `/browse/${slugStem}.html`,
-  );
+  expect(browseHtml).toMatch(/hljs language-ts/);
+  expect(browseHtml).not.toContain("Redirecting…");
   expect(html).toContain('aria-label="Documentation home"');
   expect(html).toContain('href="./"');
-  const browseHtml = await readFile(path.join(r, "_site", "browse", slugFile), "utf8");
-  expect(browseHtml).toContain('href="../index.html"');
+  expect(browseHtml).toContain('href="../../../index.html"');
   expect(browseHtml).toContain('aria-label="Documentation home"');
-  expect(browseHtml).toMatch(
-    /id="shell"[^>]*data-commentray-pair-browse-href="\.\/browse\/[^"]+\.html"/,
-  );
+  expect(browseHtml).toMatch(/id="shell"[^>]*data-commentray-pair-browse-href="\/browse\/[^"]+"/);
   return r;
 }
 
@@ -201,35 +193,17 @@ async function runAngleSelectorOnBrowsePermalinks(): Promise<string> {
   await buildGithubPagesStaticSite({ repoRoot: r });
 
   const browseDir = path.join(r, "_site", "browse");
-  const browseFiles = (await readdir(browseDir)).filter((f) => /^[A-Za-z0-9_-]+\.html$/.test(f));
-  expect(browseFiles.length).toBeGreaterThanOrEqual(2);
-  for (const name of browseFiles) {
-    const browseHtml = await readFile(path.join(browseDir, name), "utf8");
+  for (const angleId of ["main", "architecture"] as const) {
+    const browseHtml = await readFile(
+      path.join(browseDir, "README.md", angleId, "index.html"),
+      "utf8",
+    );
     expect(browseHtml).toContain('aria-label="Commentray angle"');
     expect(browseHtml).toContain('id="commentray-multi-angle-b64"');
+    expect(browseHtml).not.toContain("Redirecting…");
+    expect(browseHtml).toContain('href="../../../index.html"');
+    expect(browseHtml).toContain('aria-label="Documentation home"');
   }
-  const sourceAliasHtml = await readFile(
-    path.join(r, "_site", "browse", "README.md", "index.html"),
-    "utf8",
-  );
-  expect(sourceAliasHtml).toContain("Redirecting");
-  const readmeRefreshTarget = sourceAliasHtml.match(/content="0;url=([^"]+)"/)?.[1];
-  if (readmeRefreshTarget === undefined || readmeRefreshTarget.length === 0) {
-    throw new Error("expected humane README alias redirect target in meta refresh");
-  }
-  expect(new URL(readmeRefreshTarget, "http://localhost:4173/browse/README.md").pathname).toMatch(
-    /^\/browse\/[A-Za-z0-9_-]+\.html$/,
-  );
-  const angleAliasMainHtml = await readFile(
-    path.join(r, "_site", "browse", "README.md@main.html"),
-    "utf8",
-  );
-  expect(angleAliasMainHtml).toContain("Redirecting");
-  const angleAliasArchitectureHtml = await readFile(
-    path.join(r, "_site", "browse", "README.md@architecture.html"),
-    "utf8",
-  );
-  expect(angleAliasArchitectureHtml).toContain("Redirecting");
   return r;
 }
 
@@ -244,7 +218,7 @@ async function runGithubToolbarUsesBlobUrlsForRealisticHost(): Promise<string> {
   const { outHtml, navSearchPath } = await buildGithubPagesStaticSite({ repoRoot: r });
   const html = await readFile(outHtml, "utf8");
   /** Hub `index.html` prefers same-site pair browse; GitHub blobs live in `commentray-nav-search.json`. */
-  expect(html).toMatch(/data-commentray-pair-browse-href="\.\/browse\/[^"]+\.html"/);
+  expect(html).toMatch(/data-commentray-pair-browse-href="\.\/browse\/[^"]+"/);
   expect(html).not.toContain("/browse/browse/");
   const nav = JSON.parse(await readFile(navSearchPath, "utf8")) as {
     documentedPairs?: { sourceOnGithub?: string; commentrayOnGithub?: string }[];
@@ -255,18 +229,13 @@ async function runGithubToolbarUsesBlobUrlsForRealisticHost(): Promise<string> {
   expect(nav.documentedPairs?.[0]?.commentrayOnGithub).toBe(
     "https://github.com/d-led/commentray/blob/main/.commentray/source/src/x.ts.md",
   );
-  const browseFiles = await readdir(path.join(r, "_site", "browse"));
-  const browseName = browseFiles.find((f) => f.endsWith(".html"));
-  expect(browseName).toBeTruthy();
-  if (browseName === undefined) throw new Error("expected browse html");
-  const browseHtml = await readFile(path.join(r, "_site", "browse", browseName), "utf8");
-  expect(browseHtml).toMatch(/data-commentray-pair-browse-href="\.\/browse\/[^"]+\.html"/);
-  expect(browseHtml).not.toContain("/browse/browse/");
-  const humaneAliasHtml = await readFile(
+  const browseHtml = await readFile(
     path.join(r, "_site", "browse", "src", "x.ts", "index.html"),
     "utf8",
   );
-  expect(humaneAliasHtml).toContain(".html");
+  expect(browseHtml).toMatch(/data-commentray-pair-browse-href="\/browse\/[^"]+"/);
+  expect(browseHtml).not.toContain("/browse/browse/");
+  expect(browseHtml).toMatch(/id="shell"/);
   return r;
 }
 
@@ -284,10 +253,10 @@ async function runBrowseWithoutGithubUrl(): Promise<string> {
   const nav = JSON.parse(await readFile(navSearchPath, "utf8")) as {
     documentedPairs?: { staticBrowseUrl?: string; sourceOnGithub?: string }[];
   };
-  expect(nav.documentedPairs?.[0]?.staticBrowseUrl).toMatch(/^\.\/browse\/.+\.html$/);
+  expect(nav.documentedPairs?.[0]?.staticBrowseUrl).toBe("./browse/src/x.ts/index.html");
   expect(nav.documentedPairs?.[0]?.sourceOnGithub).toBeUndefined();
   const browseFiles = await readdir(path.join(r, "_site", "browse"));
-  expect(browseFiles.some((f) => f.endsWith(".html"))).toBe(true);
+  expect(browseFiles).toContain("src");
   return r;
 }
 
@@ -307,13 +276,13 @@ async function runBrowseSingleAnglePairEmbedsScrollBlockLinks(): Promise<string>
     documentedPairs?: { sourcePath: string; staticBrowseUrl?: string }[];
   };
   const extraPair = nav.documentedPairs?.find((p) => p.sourcePath === "extra.ts");
-  expect(extraPair?.staticBrowseUrl).toMatch(/^\.\/browse\/.+\.html$/);
-  const canonicalSlug = browsePageSlugFromPair({
-    sourcePath: "extra.ts",
-    commentrayPath: extraCr,
-  });
+  expect(extraPair?.staticBrowseUrl).toBe("./browse/extra.ts/main/index.html");
+  const extraRel = staticBrowseIndexRelPathFromPair(
+    { sourcePath: "extra.ts", commentrayPath: extraCr },
+    ".commentray",
+  );
   const browseHtml = await readFile(
-    path.join(r, "_site", "browse", `${canonicalSlug}.html`),
+    path.join(r, "_site", "browse", ...extraRel.split("/")),
     "utf8",
   );
   const b64 = /data-scroll-block-links-b64="([^"]*)"/.exec(browseHtml)?.[1];
@@ -352,11 +321,11 @@ async function runBrowseIndexedPairGetsScrollLinksDiskOnlyPairGetsEmptyPayload()
   // Disk-only pair: still listed for browse/search, but not in index.json.
   expect(sources.has("orphan.ts")).toBe(true);
 
-  const extraSlug = browsePageSlugFromPair({
-    sourcePath: "extra.ts",
-    commentrayPath: extraCr,
-  });
-  const extraHtml = await readFile(path.join(r, "_site", "browse", `${extraSlug}.html`), "utf8");
+  const extraRel = staticBrowseIndexRelPathFromPair(
+    { sourcePath: "extra.ts", commentrayPath: extraCr },
+    ".commentray",
+  );
+  const extraHtml = await readFile(path.join(r, "_site", "browse", ...extraRel.split("/")), "utf8");
   const extraAttr = /data-scroll-block-links-b64="([^"]*)"/.exec(extraHtml);
   expect(extraAttr).not.toBeNull();
   if (extraAttr?.[1] === undefined) throw new Error("expected capture");
@@ -364,8 +333,14 @@ async function runBrowseIndexedPairGetsScrollLinksDiskOnlyPairGetsEmptyPayload()
   const extraLinks = JSON.parse(Buffer.from(extraAttr[1], "base64").toString("utf8")) as unknown[];
   expect(extraLinks.length).toBeGreaterThan(0);
 
-  const orphanSlug = browsePageSlugFromPair({ sourcePath: "orphan.ts", commentrayPath: orphanCr });
-  const orphanHtml = await readFile(path.join(r, "_site", "browse", `${orphanSlug}.html`), "utf8");
+  const orphanRel = staticBrowseIndexRelPathFromPair(
+    { sourcePath: "orphan.ts", commentrayPath: orphanCr },
+    ".commentray",
+  );
+  const orphanHtml = await readFile(
+    path.join(r, "_site", "browse", ...orphanRel.split("/")),
+    "utf8",
+  );
   const orphanAttr = /data-scroll-block-links-b64="([^"]*)"/.exec(orphanHtml);
   expect(orphanAttr).not.toBeNull();
   if (orphanAttr?.[1] === undefined) throw new Error("expected capture");
@@ -375,7 +350,7 @@ async function runBrowseIndexedPairGetsScrollLinksDiskOnlyPairGetsEmptyPayload()
   return r;
 }
 
-describe("GitHub Pages static site output", () => {
+describe("GitHub Pages static site output — hub, angles, and defaults", () => {
   let repo: string;
 
   afterEach(async () => {
@@ -396,10 +371,10 @@ describe("GitHub Pages static site output", () => {
     await buildGithubPagesStaticSite({ repoRoot: repo, pagesBuildCommitSha: sha });
     const hub = await readFile(path.join(repo, "_site", "index.html"), "utf8");
     expect(hub).toContain(`>${sha}</code>`);
-    const browseFiles = await readdir(path.join(repo, "_site", "browse"));
-    const browseName = browseFiles.find((f) => f.endsWith(".html"));
-    if (browseName === undefined) throw new Error("expected browse html");
-    const browseHtml = await readFile(path.join(repo, "_site", "browse", browseName), "utf8");
+    const browseHtml = await readFile(
+      path.join(repo, "_site", "browse", "src", "x.ts", "index.html"),
+      "utf8",
+    );
     expect(browseHtml).toContain(`>${sha}</code>`);
   });
 
@@ -418,9 +393,64 @@ describe("GitHub Pages static site output", () => {
   it("writes browse pages and hub nav without static_site.github_url (same-site navigation only)", async () => {
     repo = await runBrowseWithoutGithubUrl();
   });
+});
+
+describe("GitHub Pages static site output — nav pairs and toolbar", () => {
+  let repo: string;
+
+  afterEach(async () => {
+    if (repo) await rm(repo, { recursive: true, force: true });
+  });
+
+  it("does not set staticBrowseUrl when the indexed companion path is missing on disk (avoids hub 404s)", async () => {
+    repo = await mkdtemp(path.join(tmpdir(), "cr-pages-stale-cr-"));
+    await writeMinimalPagesFixture(repo, {
+      title: "Stale index",
+      githubUrl: "https://github.com/acme/demo",
+    });
+    await writeIndex(repo, {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        ".commentray/source/src/x.ts.md": {
+          sourcePath: "src/x.ts",
+          commentrayPath: ".commentray/source/src/x.ts.md",
+          blocks: [],
+        },
+        ".commentray/source/src/missing.md": {
+          sourcePath: "src/x.ts",
+          commentrayPath: ".commentray/source/src/missing.md",
+          blocks: [],
+        },
+      },
+    });
+
+    await buildGithubPagesStaticSite({ repoRoot: repo });
+
+    const nav = JSON.parse(
+      await readFile(path.join(repo, "_site", "commentray-nav-search.json"), "utf8"),
+    ) as {
+      documentedPairs?: Array<{ commentrayPath: string; staticBrowseUrl?: string }>;
+    };
+    const real = nav.documentedPairs?.find(
+      (p) => p.commentrayPath === ".commentray/source/src/x.ts.md",
+    );
+    const ghost = nav.documentedPairs?.find(
+      (p) => p.commentrayPath === ".commentray/source/src/missing.md",
+    );
+    expect(real?.staticBrowseUrl).toBe("./browse/src/x.ts/index.html");
+    expect(ghost?.staticBrowseUrl).toBeUndefined();
+  });
 
   it("writes GitHub blob toolbar URLs for d-led/commentray + main when configured", async () => {
     repo = await runGithubToolbarUsesBlobUrlsForRealisticHost();
+  });
+});
+
+describe("GitHub Pages static site output — assets and rendered hub", () => {
+  let repo: string;
+
+  afterEach(async () => {
+    if (repo) await rm(repo, { recursive: true, force: true });
   });
 
   it("mirrors companion storage images under _site/commentray-static-assets for Pages-style hosts", async () => {

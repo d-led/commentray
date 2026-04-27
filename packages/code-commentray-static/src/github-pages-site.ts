@@ -9,13 +9,13 @@ import {
   loadCommentrayConfig,
   readIndex,
   resolvePathUnderRepoRoot,
+  staticBrowseIndexRelPathFromPair,
 } from "@commentray/core";
 import {
   COMMENTRAY_STATIC_COMPANION_ASSETS_SEGMENT,
   type CodeBrowserMultiAngleBrowsing,
   type CommentrayNavSearchDocument,
   type CommentrayStaticAssetCopy,
-  browsePageSlugFromPair,
   buildCommentrayNavSearchDocument,
 } from "@commentray/render";
 
@@ -32,102 +32,16 @@ import {
   sourceAndCommentrayGithubUrls,
 } from "./github-pages-site-prep.js";
 import { pathExists } from "./github-pages-site-shared.js";
-import {
-  browsePairStaticBrowseRelUrl,
-  canonicalHumaneBrowseRedirectHref,
-  commentrayFileStem,
-  humanBrowseAliasPathFromPair,
-  normPosixPath,
-  sourceBrowseAliasPath,
-} from "./browse-pair-static-url.js";
+import { browsePairStaticBrowseRelUrl } from "./browse-pair-static-url.js";
 
 const DEFAULT_TOOL_HOME = "https://github.com/d-led/commentray";
 
 /**
- * `vercel/serve` + `serve-handler`: humane browse shims are `browse/<source-segments>/index.html`
- * inside a directory whose last segment looks like a file (`manual.md`). Without this, a request
- * to that path is treated as a directory listing instead of serving the lone `index.html`
- * (GitHub Pages serves the index; local `commentray serve` / Cypress static server must match).
+ * `vercel/serve` + `serve-handler`: canonical pair pages mirror `{storage}/source/…` under
+ * `browse/…/index.html` (or encoded `sourcePath` when the companion is not under that tree).
+ * `renderSingle: true` serves lone `index.html` in those dirs without directory listings locally.
  */
 const SERVE_JSON_FOR_LOCAL_PREVIEW = `${JSON.stringify({ renderSingle: true }, null, 2)}\n`;
-
-function humanBrowseAliasRedirectDocument(canonicalHref: string): string {
-  return `<!doctype html>
-<meta charset="utf-8" />
-<title>Redirecting…</title>
-<meta http-equiv="refresh" content="0;url=${canonicalHref}" />
-<script>
-  (function () {
-    var to = ${JSON.stringify(canonicalHref)};
-    var suffix = window.location.search + window.location.hash;
-    window.location.replace(to + suffix);
-  })();
-</script>
-<a href="${canonicalHref}">Open documentation pair</a>
-`;
-}
-
-async function writeHumanBrowseAliasDirIndex(input: {
-  outDir: string;
-  aliasRelPath: string;
-  slug: string;
-}): Promise<void> {
-  const aliasDir = path.join(input.outDir, "browse", ...input.aliasRelPath.split("/"));
-  await mkdir(aliasDir, { recursive: true });
-  const aliasPath = path.join(aliasDir, "index.html");
-  const canonicalHref = canonicalHumaneBrowseRedirectHref(input.aliasRelPath, input.slug);
-  await writeFile(aliasPath, humanBrowseAliasRedirectDocument(canonicalHref), "utf8");
-}
-
-async function writeHumanBrowseAliasHtmlFile(input: {
-  outDir: string;
-  aliasRelPath: string;
-  slug: string;
-}): Promise<void> {
-  const aliasPath = path.join(input.outDir, "browse", ...input.aliasRelPath.split("/"));
-  await mkdir(path.dirname(aliasPath), { recursive: true });
-  const canonicalHref = canonicalHumaneBrowseRedirectHref(input.aliasRelPath, input.slug);
-  await writeFile(aliasPath, humanBrowseAliasRedirectDocument(canonicalHref), "utf8");
-}
-
-async function writeHumanBrowseSourceAliasPage(input: {
-  outDir: string;
-  sourcePath: string;
-  slug: string;
-}): Promise<void> {
-  await writeHumanBrowseAliasDirIndex({
-    outDir: input.outDir,
-    aliasRelPath: sourceBrowseAliasPath(input.sourcePath),
-    slug: input.slug,
-  });
-}
-
-function sourcePathCountsFromPairs(pairs: Array<{ sourcePath: string }>): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const p of pairs) {
-    const key = normPosixPath(p.sourcePath);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return counts;
-}
-
-function preferredSourceAliasAngleId(input: {
-  cfg: ResolvedCommentrayConfig;
-  ss: ResolvedStaticSite;
-}): string {
-  return (input.ss.defaultAngleId ?? input.cfg.angles.defaultAngleId ?? "main").trim();
-}
-
-function preferredSourceAliasTarget(
-  choices: Array<{ slug: string; angleId: string; sourcePath: string }>,
-  preferredAngleId: string,
-): { slug: string; angleId: string; sourcePath: string } | undefined {
-  return (
-    choices.find((c) => c.angleId === preferredAngleId) ??
-    choices.find((c) => c.angleId === "main") ??
-    choices[0]
-  );
-}
 
 function staticSourceLinkPrefix(
   ss: ResolvedStaticSite,
@@ -141,22 +55,6 @@ function staticSourceLinkPrefix(
   return `https://github.com/${encodeURIComponent(ghNavBase.owner)}/${encodeURIComponent(
     ghNavBase.repo,
   )}/blob/${encodeURIComponent(ghNavBase.branch)}`;
-}
-
-async function writePreferredSourceAliasPages(input: {
-  outDir: string;
-  sourceAliasTargets: Map<string, Array<{ slug: string; angleId: string; sourcePath: string }>>;
-  preferredAngleId: string;
-}): Promise<void> {
-  for (const [, choices] of input.sourceAliasTargets) {
-    const preferred = preferredSourceAliasTarget(choices, input.preferredAngleId);
-    if (!preferred) continue;
-    await writeHumanBrowseSourceAliasPage({
-      outDir: input.outDir,
-      sourcePath: preferred.sourcePath,
-      slug: preferred.slug,
-    });
-  }
 }
 
 function browseCommentrayOutputUrls(input: {
@@ -182,6 +80,17 @@ function browseCommentrayOutputUrls(input: {
   };
 }
 
+/**
+ * Relative `href` from an emitted browse page to the site-root `index.html`.
+ * Nested permalinks (`browse/pkg/a.ts/main/index.html`) need more `..` segments than flat
+ * `browse/foo/index.html`; encoding depth here avoids brittle client-side URL rewriting.
+ */
+function siteHubUrlRelativeFromBrowsePageDir(browsePageDirUnderSite: string): string {
+  const segments = browsePageDirUnderSite.split("/").filter((s) => s.length > 0);
+  if (segments.length === 0) return "./index.html";
+  return `${segments.map(() => "..").join("/")}/index.html`;
+}
+
 function dualBlockStretchBrowseOpts(
   projectIndex: CommentrayIndex | null,
   p: { sourcePath: string; commentrayPath: string },
@@ -193,37 +102,6 @@ function dualBlockStretchBrowseOpts(
   );
   if (!blockStretchRows) return undefined;
   return { blockStretchRows, codeBrowserLayout: "dual" };
-}
-
-async function writeBrowseAliasesAfterStaticHtml(input: {
-  outDir: string;
-  pair: { sourcePath: string; commentrayPath: string };
-  slug: string;
-  sourcePathCounts: Map<string, number>;
-  sourceAliasTargets: Map<string, Array<{ slug: string; angleId: string; sourcePath: string }>>;
-}): Promise<void> {
-  const p = input.pair;
-  const sourceKey = normPosixPath(p.sourcePath);
-  const duplicateCount = input.sourcePathCounts.get(sourceKey) ?? 1;
-  const aliasRelPath = humanBrowseAliasPathFromPair(p, duplicateCount);
-  if (duplicateCount > 1) {
-    await writeHumanBrowseAliasHtmlFile({
-      outDir: input.outDir,
-      aliasRelPath: `${aliasRelPath}.html`,
-      slug: input.slug,
-    });
-  } else {
-    await writeHumanBrowseAliasDirIndex({
-      outDir: input.outDir,
-      aliasRelPath,
-      slug: input.slug,
-    });
-  }
-  if (duplicateCount <= 1) return;
-  const angleId = commentrayFileStem(p.commentrayPath);
-  const cur = input.sourceAliasTargets.get(sourceKey) ?? [];
-  cur.push({ slug: input.slug, angleId, sourcePath: p.sourcePath });
-  input.sourceAliasTargets.set(sourceKey, cur);
 }
 
 async function writeBrowsePageForPair(input: {
@@ -245,12 +123,19 @@ async function writeBrowsePageForPair(input: {
   projectIndex: CommentrayIndex | null;
   ghNavBase: GithubNavBase | null;
   documentedPairsEmbeddedB64?: string;
-  sourcePathCounts: Map<string, number>;
-  sourceAliasTargets: Map<string, Array<{ slug: string; angleId: string; sourcePath: string }>>;
 }): Promise<void> {
   const p = input.pair;
-  const slug = browsePageSlugFromPair(p);
-  const outPath = path.join(input.browseDir, `${slug}.html`);
+  const canonicalBrowseRelPath = staticBrowseIndexRelPathFromPair(p, input.cfg.storageDir);
+  const browsePageDirUnderSite = path.posix.dirname(
+    path.posix.join("browse", canonicalBrowseRelPath),
+  );
+  const navSearchJsonRelToPage = path.posix.relative(
+    browsePageDirUnderSite,
+    "commentray-nav-search.json",
+  );
+  const pairBrowsePathFromSiteRoot =
+    `/${path.posix.join("browse", canonicalBrowseRelPath)}`.replace(/\/+/g, "/");
+  const outPath = path.join(input.browseDir, ...canonicalBrowseRelPath.split("/"));
   const sourceAbs = resolvePathUnderRepoRoot(input.repoRoot, p.sourcePath);
   const mdAbs = resolvePathUnderRepoRoot(input.repoRoot, p.commentrayPath);
   if (!(await pathExists(mdAbs)) || !(await pathExists(sourceAbs))) return;
@@ -288,7 +173,7 @@ async function writeBrowsePageForPair(input: {
     filePath: p.sourcePath,
     includeMermaidRuntime: input.cfg.render.mermaid,
     hljsTheme: input.cfg.render.syntaxTheme,
-    siteHubUrl: "../index.html",
+    siteHubUrl: siteHubUrlRelativeFromBrowsePageDir(browsePageDirUnderSite),
     toolHomeUrl: input.toolHomeUrl,
     commentrayOutputUrls,
     relatedGithubNav: input.ss.relatedGithubNav.length > 0 ? input.ss.relatedGithubNav : undefined,
@@ -298,21 +183,14 @@ async function writeBrowsePageForPair(input: {
     ...(dualStretchOpts ?? {}),
     ...(p.sourceOnGithub ? { sourceOnGithubUrl: p.sourceOnGithub } : {}),
     ...(p.commentrayOnGithub ? { commentrayOnGithubUrl: p.commentrayOnGithub } : {}),
-    /** Hub-relative; client resolves from `/browse/…` so the Doc icon never stacks `/browse/browse/`. */
-    commentrayStaticBrowseUrl: p.staticBrowseUrl,
-    documentedNavJsonUrl: "../commentray-nav-search.json",
+    /** Path-absolute from site root so the Doc target is correct on deep `/browse/…/index.html` pages. */
+    commentrayStaticBrowseUrl: pairBrowsePathFromSiteRoot,
+    documentedNavJsonUrl: navSearchJsonRelToPage,
     builtAt: input.builtAt,
     ...(input.documentedPairsEmbeddedB64
       ? { documentedPairsEmbeddedB64: input.documentedPairsEmbeddedB64 }
       : {}),
     ...(input.pagesBuildCommitSha ? { pagesBuildCommitSha: input.pagesBuildCommitSha } : {}),
-  });
-  await writeBrowseAliasesAfterStaticHtml({
-    outDir: input.outDir,
-    pair: p,
-    slug,
-    sourcePathCounts: input.sourcePathCounts,
-    sourceAliasTargets: input.sourceAliasTargets,
   });
 }
 
@@ -342,8 +220,8 @@ async function multiAngleBrowsingForBrowsePair(
 }
 
 /**
- * Emits one static code browser HTML per documented pair under `_site/browse/*.html` and adds
- * `staticBrowseUrl` on each pair so the hub search can open the same Commentray UI for other files.
+ * Emits one static code browser HTML per documented pair under `_site/browse/…/index.html` and
+ * adds `staticBrowseUrl` on each pair so the hub search can open the same Commentray UI for other files.
  */
 async function writePerPairBrowseHtmlPages(input: {
   repoRoot: string;
@@ -360,28 +238,28 @@ async function writePerPairBrowseHtmlPages(input: {
   const pairs = input.navDoc.documentedPairs;
   if (!pairs?.length) return input.navDoc;
 
-  const sourcePathCounts = sourcePathCountsFromPairs(pairs);
-  const augmented = pairs.map((p) => ({
-    ...p,
-    staticBrowseUrl: browsePairStaticBrowseRelUrl(
-      p,
-      sourcePathCounts.get(normPosixPath(p.sourcePath)) ?? 1,
-    ),
-  }));
+  /** Only pairs whose companion + source exist get `staticBrowseUrl`; otherwise nav would link to 404s. */
+  const augmented: typeof pairs = [];
+  for (const p of pairs) {
+    const sourceAbs = resolvePathUnderRepoRoot(input.repoRoot, p.sourcePath);
+    const mdAbs = resolvePathUnderRepoRoot(input.repoRoot, p.commentrayPath);
+    const bothExist = (await pathExists(mdAbs)) && (await pathExists(sourceAbs));
+    if (!bothExist) {
+      const rest = { ...p };
+      delete rest.staticBrowseUrl;
+      augmented.push(rest);
+      continue;
+    }
+    augmented.push({
+      ...p,
+      staticBrowseUrl: browsePairStaticBrowseRelUrl(p, input.cfg.storageDir),
+    });
+  }
   const navWithUrls: CommentrayNavSearchDocument = { ...input.navDoc, documentedPairs: augmented };
   const emb = documentedPairsEmbeddedB64FromNav(navWithUrls);
 
   const browseDir = path.join(input.outDir, "browse");
   await mkdir(browseDir, { recursive: true });
-  const sourceAliasTargets = new Map<
-    string,
-    Array<{ slug: string; angleId: string; sourcePath: string }>
-  >();
-  const preferredSourceAngleId = preferredSourceAliasAngleId({
-    cfg: input.cfg,
-    ss: input.ss,
-  });
-
   for (const p of augmented) {
     await writeBrowsePageForPair({
       repoRoot: input.repoRoot,
@@ -396,16 +274,8 @@ async function writePerPairBrowseHtmlPages(input: {
       projectIndex: input.projectIndex,
       ghNavBase: input.ghNavBase,
       documentedPairsEmbeddedB64: emb,
-      sourcePathCounts,
-      sourceAliasTargets,
     });
   }
-
-  await writePreferredSourceAliasPages({
-    outDir: input.outDir,
-    sourceAliasTargets,
-    preferredAngleId: preferredSourceAngleId,
-  });
 
   return navWithUrls;
 }

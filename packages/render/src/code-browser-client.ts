@@ -19,6 +19,7 @@ import {
 import {
   type BlockScrollLink,
   mirroredScrollTop,
+  pickBlockScrollLinkForCommentrayScroll,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
 } from "./code-browser-scroll-sync.js";
@@ -42,7 +43,6 @@ import {
   isSameDocumentedPair,
   normPosixPath,
   resolveStaticBrowseHref,
-  siteRootPathnameFromPathname,
   staticBrowseHrefForShellDataAttribute,
 } from "./code-browser-pair-nav.js";
 import {
@@ -139,10 +139,56 @@ function paneUsesInternalYScroll(el: HTMLElement): boolean {
   return oy === "auto" || oy === "scroll" || oy === "overlay";
 }
 
+/** Sub-pixel noise threshold for “which direction did the user scroll?”. */
+const SCROLL_SYNC_MONOTONIC_EPS = 1.5;
+
 function rootScrollingElement(): HTMLElement {
   const s = document.scrollingElement;
   if (s instanceof HTMLElement) return s;
   return document.documentElement;
+}
+
+function readPaneVerticalScroll(pane: HTMLElement): number {
+  return paneUsesInternalYScroll(pane) ? pane.scrollTop : rootScrollingElement().scrollTop;
+}
+
+/** Monotonic revert must not use {@link applyScrollTopClamped}’s sub-pixel skip, or the partner never moves back. */
+function writePaneVerticalScrollForced(partnerPane: HTMLElement, target: number): void {
+  if (paneUsesInternalYScroll(partnerPane)) {
+    const maxY = Math.max(0, partnerPane.scrollHeight - partnerPane.clientHeight);
+    partnerPane.scrollTop = clamp(target, 0, maxY);
+    return;
+  }
+  const root = rootScrollingElement();
+  const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
+  root.scrollTop = clamp(target, 0, maxY);
+}
+
+/**
+ * If the driver pane moved down/up, the partner must not move the opposite way (static Pages UX:
+ * no backward “snap” while scrolling one column).
+ */
+function enforceScrollSyncMonotonic(args: {
+  driverDelta: number;
+  partnerBefore: number;
+  partnerPane: HTMLElement;
+}): void {
+  const { driverDelta, partnerBefore, partnerPane } = args;
+  if (Math.abs(driverDelta) < SCROLL_SYNC_MONOTONIC_EPS) return;
+  const partnerAfter = readPaneVerticalScroll(partnerPane);
+  if (
+    driverDelta > SCROLL_SYNC_MONOTONIC_EPS &&
+    partnerAfter < partnerBefore - SCROLL_SYNC_MONOTONIC_EPS
+  ) {
+    writePaneVerticalScrollForced(partnerPane, partnerBefore);
+    return;
+  }
+  if (
+    driverDelta < -SCROLL_SYNC_MONOTONIC_EPS &&
+    partnerAfter > partnerBefore + SCROLL_SYNC_MONOTONIC_EPS
+  ) {
+    writePaneVerticalScrollForced(partnerPane, partnerBefore);
+  }
 }
 
 function applyWindowScrollRatio(ratio: number): void {
@@ -176,12 +222,14 @@ function applyRevealChildInPane(scrollport: HTMLElement, child: Element, leadCss
 
 /** Captured commentary→source scroll state for a narrow single-pane flip (see {@link DualPaneScrollSyncRunners}). */
 type DocToCodeFlipPlan =
+  | { k: "noop" }
   | { k: "block"; src0: number; winRatio: number }
   | { k: "mirrorI"; docTop: number; docSH: number; docCH: number }
   | { k: "mirrorW"; ratio: number };
 
 /** Captured source→commentary scroll state for a narrow single-pane flip. */
 type CodeToDocFlipPlan =
+  | { k: "noop" }
   | { k: "block"; mdLine0: number; winRatio: number }
   | { k: "mirrorI"; codeTop: number; codeSH: number; codeCH: number }
   | { k: "mirrorW"; ratio: number };
@@ -192,12 +240,70 @@ function windowScrollRatio(): number {
   return maxY > 0 ? clamp(root.scrollTop / maxY, 0, 1) : 0;
 }
 
+const SCROLL_SYNC_DEBUG_FLAG = "commentrayDebugScroll";
+
+function scrollSyncDebugQueryOn(): boolean {
+  const v = new URLSearchParams(globalThis.location.search).get(SCROLL_SYNC_DEBUG_FLAG);
+  return v === "1" || v === "true" || v === "";
+}
+
+function scrollSyncDebugStorageOn(s: Storage): boolean {
+  try {
+    const v = s.getItem(SCROLL_SYNC_DEBUG_FLAG);
+    return v === "1" || v === "true";
+  } catch {
+    return false;
+  }
+}
+
+function scrollSyncDebugHashOn(): boolean {
+  const h = globalThis.location.hash;
+  return h === `#${SCROLL_SYNC_DEBUG_FLAG}` || h === `#${SCROLL_SYNC_DEBUG_FLAG}=1`;
+}
+
+/**
+ * Opt-in scroll-sync tracing: `console.info` lines prefixed with `[commentray:scroll-sync]`.
+ * **Static hosting** — reads the URL and Web Storage in the browser only (no HTTP server logic,
+ * headers, or preview tooling required for this flag to work on published Pages or any static file host).
+ *
+ * Turn on any one of:
+ * - Query: `?commentrayDebugScroll=1` (or `=true`, or present with an empty value)
+ * - Hash: `#commentrayDebugScroll` or `#commentrayDebugScroll=1` (fragment is not sent to the server)
+ * - DevTools, then reload: `sessionStorage.setItem("commentrayDebugScroll", "1")` or the same for `localStorage`
+ */
+function scrollSyncDebugEnabled(): boolean {
+  try {
+    if (scrollSyncDebugQueryOn()) return true;
+    if (scrollSyncDebugHashOn()) return true;
+    if (scrollSyncDebugStorageOn(globalThis.sessionStorage)) return true;
+    if (scrollSyncDebugStorageOn(globalThis.localStorage)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function formatDocToCodePlanForLog(p: DocToCodeFlipPlan): string {
+  if (p.k === "noop") return "noop";
+  if (p.k === "block") return `block(src0=${String(p.src0)})`;
+  if (p.k === "mirrorW") return `mirrorW(ratio=${p.ratio.toFixed(4)})`;
+  return `mirrorI(docTop=${String(p.docTop)})`;
+}
+
+function formatCodeToDocPlanForLog(p: CodeToDocFlipPlan): string {
+  if (p.k === "noop") return "noop";
+  if (p.k === "block") return `block(mdLine0=${String(p.mdLine0)})`;
+  if (p.k === "mirrorW") return `mirrorW(ratio=${p.ratio.toFixed(4)})`;
+  return `mirrorI(codeTop=${String(p.codeTop)})`;
+}
+
 function applyDocToCodeFlipPlanImpl(
   codePane: HTMLElement,
   _docPane: HTMLElement,
   plan: DocToCodeFlipPlan,
   lineIdPrefix = "code-line-",
 ): void {
+  if (plan.k === "noop") return;
   const narrowSinglePane = globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ).matches;
   if (plan.k === "block") {
     const exact = codePane.querySelector(`#${lineIdPrefix}${String(plan.src0)}`);
@@ -207,8 +313,6 @@ function applyDocToCodeFlipPlanImpl(
         : findAnchorAtOrAfter(sourceAnchorsFromPrefix(lineIdPrefix), plan.src0);
     if (el) {
       applyRevealChildInPane(codePane, el, 2);
-    } else {
-      applyWindowScrollRatio(plan.winRatio);
     }
     return;
   }
@@ -246,12 +350,11 @@ function applyCodeToDocFlipPlanImpl(
   docPane: HTMLElement,
   plan: CodeToDocFlipPlan,
 ): void {
+  if (plan.k === "noop") return;
   if (plan.k === "block") {
     const anchor = docPane.querySelector(`[data-commentray-line="${String(plan.mdLine0)}"]`);
     if (anchor instanceof HTMLElement) {
       applyRevealChildInPane(docPane, anchor, 2);
-    } else {
-      applyWindowScrollRatio(plan.winRatio);
     }
     return;
   }
@@ -290,8 +393,12 @@ function buildDocToCodeFlipPlanBlockAware(
   if (pulledSrc0 !== null) return { k: "block", src0: pulledSrc0, winRatio };
   const links = getLinks();
   const mdLine0 = probeCommentrayLine0FromDoc(docPane);
-  const src0 = pickSourceLine0ForCommentrayScroll(links, mdLine0);
-  if (src0 !== null) return { k: "block", src0, winRatio };
+  if (mdLine0 !== null) {
+    const src0 = pickSourceLine0ForCommentrayScroll(links, mdLine0);
+    if (src0 !== null) return { k: "block", src0, winRatio };
+  }
+  /** Index-backed pair but no confident block anchor for this viewport — do not nudge the source. */
+  if (links.length > 0) return { k: "noop" };
   if (paneUsesInternalYScroll(docPane)) {
     return {
       k: "mirrorI",
@@ -305,7 +412,7 @@ function buildDocToCodeFlipPlanBlockAware(
 
 function buildCodeToDocFlipPlanBlockAware(
   codePane: HTMLElement,
-  _docPane: HTMLElement,
+  docPane: HTMLElement,
   getLinks: () => BlockScrollLink[],
   lineIdPrefix = "code-line-",
 ): CodeToDocFlipPlan {
@@ -314,6 +421,7 @@ function buildCodeToDocFlipPlanBlockAware(
   const line1 = probeCodeLine1FromViewport(codePane, lineIdPrefix);
   const mdLine0 = pickCommentrayLineForSourceScroll(links, line1);
   if (mdLine0 === null) {
+    if (links.length > 0) return { k: "noop" };
     if (paneUsesInternalYScroll(codePane)) {
       return {
         k: "mirrorI",
@@ -323,6 +431,10 @@ function buildCodeToDocFlipPlanBlockAware(
       };
     }
     return { k: "mirrorW", ratio: winRatio };
+  }
+  const docProbe = probeCommentrayLine0FromDoc(docPane);
+  if (docProbe !== null && docProbe === mdLine0) {
+    return { k: "noop" };
   }
   return { k: "block", mdLine0, winRatio };
 }
@@ -1086,7 +1198,10 @@ function readCommentrayLine0FromAnchor(el: HTMLElement): number | null {
   return Number(lineAttr);
 }
 
-function bestCommentrayAnchorLine0AtOrAboveY(anchors: NodeListOf<HTMLElement>, y: number): number {
+function bestCommentrayAnchorLine0AtOrAboveY(
+  anchors: NodeListOf<HTMLElement>,
+  y: number,
+): number | null {
   const readings: { line0: number; top: number }[] = [];
   for (const a of anchors) {
     const line0 = readCommentrayLine0FromAnchor(a);
@@ -1096,10 +1211,14 @@ function bestCommentrayAnchorLine0AtOrAboveY(anchors: NodeListOf<HTMLElement>, y
   return maxCommentrayAnchorLine0AtOrAboveViewportY(readings, y);
 }
 
-function lastCommentrayAnchorLine0(anchors: NodeListOf<HTMLElement>): number {
-  const last = anchors[anchors.length - 1];
-  if (!last) return 0;
-  return readCommentrayLine0FromAnchor(last) ?? 0;
+function lastCommentrayAnchorLine0(anchors: NodeListOf<HTMLElement>): number | null {
+  for (let i = anchors.length - 1; i >= 0; i--) {
+    const el = anchors.item(i);
+    if (!el) continue;
+    const v = readCommentrayLine0FromAnchor(el);
+    if (v !== null) return v;
+  }
+  return null;
 }
 
 function probeCodeLine1FromViewport(codePane: HTMLElement, lineIdPrefix = "code-line-"): number {
@@ -1149,12 +1268,15 @@ function probeCodeLine1FromViewport(codePane: HTMLElement, lineIdPrefix = "code-
   return rows.length;
 }
 
-function probeCommentrayLine0FromDoc(docPane: HTMLElement): number {
+function probeCommentrayLine0FromDoc(docPane: HTMLElement): number | null {
   const anchors = docPane.querySelectorAll<HTMLElement>(".commentray-block-anchor");
-  if (anchors.length === 0) return 0;
+  if (anchors.length === 0) return null;
 
   if (!paneUsesInternalYScroll(docPane)) {
-    if (rootScrollNearDocumentEnd()) return lastCommentrayAnchorLine0(anchors);
+    if (rootScrollNearDocumentEnd()) {
+      const tail = lastCommentrayAnchorLine0(anchors);
+      if (tail !== null) return tail;
+    }
     const dr = docPane.getBoundingClientRect();
     const vh = globalThis.innerHeight;
     const clipT = Math.max(0, dr.top);
@@ -1163,7 +1285,10 @@ function probeCommentrayLine0FromDoc(docPane: HTMLElement): number {
     return bestCommentrayAnchorLine0AtOrAboveY(anchors, y);
   }
 
-  if (paneScrollNearEnd(docPane)) return lastCommentrayAnchorLine0(anchors);
+  if (paneScrollNearEnd(docPane)) {
+    const tail = lastCommentrayAnchorLine0(anchors);
+    if (tail !== null) return tail;
+  }
 
   const dr = docPane.getBoundingClientRect();
   /** Same band as the root-scroll branch: a few px below the pane top so block anchors sit inside `top <= y` while their prose is what the reader sees first. */
@@ -1229,18 +1354,22 @@ function pulledSourceLine0FromPageBreak(docPane: HTMLElement): number | null {
 type SyncPane = "none" | "code" | "doc";
 
 /**
- * Programmatic `scrollTop` on the partner pane can emit a `scroll` event after the
- * synchronous `syncing` guard is cleared; that late event would mirror back and
- * jerk the pane the user is scrolling. We arm a short-lived skip on the partner
- * before each sync-driven update, and release one skip after two rAFs if no event
- * consumed it (e.g. `applyScrollTopClamped` no-oped).
+ * Programmatic `scrollTop` on the partner pane can emit several `scroll` events, sometimes
+ * after `syncing` is already cleared; the next handler would treat that as a user scroll and
+ * apply the opposite block snap (doc↔code ping-pong). Arm a short budget on the partner before
+ * each sync-driven update; release it after three rAFs so unused skips do not accumulate.
  */
+const PARTNER_SCROLL_EVENT_SKIP_BUDGET = 6;
+
 function armIgnoreNextPaneScrollReaction(armed: { n: number }): void {
-  armed.n++;
+  armed.n += PARTNER_SCROLL_EVENT_SKIP_BUDGET;
+  const release = PARTNER_SCROLL_EVENT_SKIP_BUDGET;
   queueMicrotask(() => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        armed.n = Math.max(0, armed.n - 1);
+        requestAnimationFrame(() => {
+          armed.n = Math.max(0, armed.n - release);
+        });
       });
     });
   });
@@ -1249,24 +1378,30 @@ function armIgnoreNextPaneScrollReaction(armed: { n: number }): void {
 function wireBidirectionalScroll(
   codePane: HTMLElement,
   docPane: HTMLElement,
-  syncFromCode: () => void,
-  syncFromDoc: () => void,
+  syncFromCode: (driverDelta: number) => void,
+  syncFromDoc: (driverDelta: number) => void,
 ): void {
   let syncing: SyncPane = "none";
   const ignoreCodeScrollFromPartnerSync = { n: 0 };
   const ignoreDocScrollFromPartnerSync = { n: 0 };
+  let lastSeenCodeTop = codePane.scrollTop;
+  let lastSeenDocTop = docPane.scrollTop;
 
   codePane.addEventListener(
     "scroll",
     () => {
+      const now = codePane.scrollTop;
+      const delta = now - lastSeenCodeTop;
+      lastSeenCodeTop = now;
       if (ignoreCodeScrollFromPartnerSync.n > 0) {
         ignoreCodeScrollFromPartnerSync.n--;
         return;
       }
       if (syncing === "doc") return;
+      if (syncing === "code") return;
       syncing = "code";
       armIgnoreNextPaneScrollReaction(ignoreDocScrollFromPartnerSync);
-      syncFromCode();
+      syncFromCode(delta);
       syncing = "none";
     },
     { passive: true },
@@ -1275,14 +1410,18 @@ function wireBidirectionalScroll(
   docPane.addEventListener(
     "scroll",
     () => {
+      const now = docPane.scrollTop;
+      const delta = now - lastSeenDocTop;
+      lastSeenDocTop = now;
       if (ignoreDocScrollFromPartnerSync.n > 0) {
         ignoreDocScrollFromPartnerSync.n--;
         return;
       }
       if (syncing === "code") return;
+      if (syncing === "doc") return;
       syncing = "doc";
       armIgnoreNextPaneScrollReaction(ignoreCodeScrollFromPartnerSync);
-      syncFromDoc();
+      syncFromDoc(delta);
       syncing = "none";
     },
     { passive: true },
@@ -1317,20 +1456,58 @@ function wireBlockAwareScrollSync(
   let pendingDocToCode: DocToCodeFlipPlan | null = null;
   let pendingCodeToDoc: CodeToDocFlipPlan | null = null;
 
+  const syncFromCodeToDocInner = (driverDelta: number): void => {
+    const docBefore = readPaneVerticalScroll(docPane);
+    const prefix = lineIdPrefix();
+    const p = buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks, prefix);
+    if (scrollSyncDebugEnabled()) {
+      const links = getLinks();
+      const line1 = probeCodeLine1FromViewport(codePane, prefix);
+      const docProbe = probeCommentrayLine0FromDoc(docPane);
+      const pickedMd = pickCommentrayLineForSourceScroll(links, line1);
+      globalThis.console.info("[commentray:scroll-sync] code→doc", {
+        plan: formatCodeToDocPlanForLog(p),
+        driverDelta,
+        line1,
+        docProbe,
+        pickedMd,
+        linkCount: links.length,
+        codeScrollTop: codePane.scrollTop,
+        docScrollTop: docPane.scrollTop,
+      });
+    }
+    applyCodeToDocFlipPlanImpl(codePane, docPane, p);
+    enforceScrollSyncMonotonic({ driverDelta, partnerBefore: docBefore, partnerPane: docPane });
+  };
+  const syncFromDocToCodeInner = (driverDelta: number): void => {
+    const codeBefore = readPaneVerticalScroll(codePane);
+    const prefix = lineIdPrefix();
+    const p = buildDocToCodeFlipPlanBlockAware(docPane, getLinks);
+    if (scrollSyncDebugEnabled()) {
+      const links = getLinks();
+      const mdLine0 = probeCommentrayLine0FromDoc(docPane);
+      const line1 = probeCodeLine1FromViewport(codePane, prefix);
+      const link = mdLine0 !== null ? pickBlockScrollLinkForCommentrayScroll(links, mdLine0) : null;
+      globalThis.console.info("[commentray:scroll-sync] doc→code", {
+        plan: formatDocToCodePlanForLog(p),
+        driverDelta,
+        mdLine0,
+        line1,
+        blockId: link?.id ?? null,
+        markerSpan: link?.markerViewportHalfOpen1Based ?? null,
+        linkCount: links.length,
+        docScrollTop: docPane.scrollTop,
+        codeScrollTop: codePane.scrollTop,
+      });
+    }
+    applyDocToCodeFlipPlanImpl(codePane, docPane, p, prefix);
+    enforceScrollSyncMonotonic({ driverDelta, partnerBefore: codeBefore, partnerPane: codePane });
+  };
   const syncFromCodeToDoc = (): void => {
-    applyCodeToDocFlipPlanImpl(
-      codePane,
-      docPane,
-      buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks, lineIdPrefix()),
-    );
+    syncFromCodeToDocInner(0);
   };
   const syncFromDocToCode = (): void => {
-    applyDocToCodeFlipPlanImpl(
-      codePane,
-      docPane,
-      buildDocToCodeFlipPlanBlockAware(docPane, getLinks),
-      lineIdPrefix(),
-    );
+    syncFromDocToCodeInner(0);
   };
   const prepareMobileFlipToCode = (): void => {
     if (shouldUseProportionalDocToCodeOnMobileFlip?.() === true) {
@@ -1341,8 +1518,9 @@ function wireBlockAwareScrollSync(
   };
   const finishMobileFlipToCode = (): void => {
     if (!pendingDocToCode) return;
-    const p = pendingDocToCode;
+    let p = pendingDocToCode;
     pendingDocToCode = null;
+    if (p.k === "noop") p = buildDocToCodeFlipPlanProportional(docPane);
     applyDocToCodeFlipPlanImpl(codePane, docPane, p, lineIdPrefix());
   };
   const prepareMobileFlipToDoc = (): void => {
@@ -1355,11 +1533,12 @@ function wireBlockAwareScrollSync(
   };
   const finishMobileFlipToDoc = (): void => {
     if (!pendingCodeToDoc) return;
-    const p = pendingCodeToDoc;
+    let p = pendingCodeToDoc;
     pendingCodeToDoc = null;
+    if (p.k === "noop") p = buildCodeToDocFlipPlanProportional(codePane);
     applyCodeToDocFlipPlanImpl(codePane, docPane, p);
   };
-  wireBidirectionalScroll(codePane, docPane, syncFromCodeToDoc, syncFromDocToCode);
+  wireBidirectionalScroll(codePane, docPane, syncFromCodeToDocInner, syncFromDocToCodeInner);
   return {
     syncFromCodeToDoc,
     syncFromDocToCode,
@@ -1378,11 +1557,39 @@ function wireProportionalScrollSync(
   let pendingDocToCode: DocToCodeFlipPlan | null = null;
   let pendingCodeToDoc: CodeToDocFlipPlan | null = null;
 
+  const syncFromCodeToDocInner = (driverDelta: number): void => {
+    const docBefore = readPaneVerticalScroll(docPane);
+    const p = buildCodeToDocFlipPlanProportional(codePane);
+    if (scrollSyncDebugEnabled()) {
+      globalThis.console.info("[commentray:scroll-sync] code→doc (proportional)", {
+        plan: formatCodeToDocPlanForLog(p),
+        driverDelta,
+        codeScrollTop: codePane.scrollTop,
+        docScrollTop: docPane.scrollTop,
+      });
+    }
+    applyCodeToDocFlipPlanImpl(codePane, docPane, p);
+    enforceScrollSyncMonotonic({ driverDelta, partnerBefore: docBefore, partnerPane: docPane });
+  };
+  const syncFromDocToCodeInner = (driverDelta: number): void => {
+    const codeBefore = readPaneVerticalScroll(codePane);
+    const p = buildDocToCodeFlipPlanProportional(docPane);
+    if (scrollSyncDebugEnabled()) {
+      globalThis.console.info("[commentray:scroll-sync] doc→code (proportional)", {
+        plan: formatDocToCodePlanForLog(p),
+        driverDelta,
+        docScrollTop: docPane.scrollTop,
+        codeScrollTop: codePane.scrollTop,
+      });
+    }
+    applyDocToCodeFlipPlanImpl(codePane, docPane, p);
+    enforceScrollSyncMonotonic({ driverDelta, partnerBefore: codeBefore, partnerPane: codePane });
+  };
   const syncFromCodeToDoc = (): void => {
-    applyCodeToDocFlipPlanImpl(codePane, docPane, buildCodeToDocFlipPlanProportional(codePane));
+    syncFromCodeToDocInner(0);
   };
   const syncFromDocToCode = (): void => {
-    applyDocToCodeFlipPlanImpl(codePane, docPane, buildDocToCodeFlipPlanProportional(docPane));
+    syncFromDocToCodeInner(0);
   };
   const prepareMobileFlipToCode = (): void => {
     pendingDocToCode = buildDocToCodeFlipPlanProportional(docPane);
@@ -1402,7 +1609,7 @@ function wireProportionalScrollSync(
     pendingCodeToDoc = null;
     applyCodeToDocFlipPlanImpl(codePane, docPane, p);
   };
-  wireBidirectionalScroll(codePane, docPane, syncFromCodeToDoc, syncFromDocToCode);
+  wireBidirectionalScroll(codePane, docPane, syncFromCodeToDocInner, syncFromDocToCodeInner);
   return {
     syncFromCodeToDoc,
     syncFromDocToCode,
@@ -1545,9 +1752,10 @@ function drawBlockRaysIntoSvg(
   }
 
   /** Doc-aligned active block matches visible commentary; code-only probe can lag in page gaps. */
+  const mdLine0ForRay = probeCommentrayLine0FromDoc(docScrollEl);
   const activeId =
-    docScrollEl.querySelector(".commentray-block-anchor") !== null
-      ? activeBlockIdForCommentrayLine0(links, probeCommentrayLine0FromDoc(docScrollEl))
+    docScrollEl.querySelector(".commentray-block-anchor") !== null && mdLine0ForRay !== null
+      ? activeBlockIdForCommentrayLine0(links, mdLine0ForRay)
       : activeBlockIdForViewport(links, probeTopSourceLine1Based());
   const clipGutterRaysThroughPageBreakGaps = pageBreakPullEnabled();
   svg.setAttribute("viewBox", `0 0 ${String(w)} ${String(h)}`);
@@ -3129,46 +3337,8 @@ function safePermalinkHref(raw: string): string | null {
   }
 }
 
-function humaneBrowseAliasPathForSource(sourcePath: string): string {
-  return sourcePath
-    .split("/")
-    .filter((seg) => seg.length > 0)
-    .map((seg) =>
-      seg.startsWith(".") ? `%2E${encodeURIComponent(seg.slice(1))}` : encodeURIComponent(seg),
-    )
-    .join("/");
-}
-
-function companionStemFromCommentrayPath(commentrayPath: string): string {
-  const norm = normPosixPath(commentrayPath);
-  const last = norm.split("/").filter(Boolean).at(-1) ?? "";
-  return last.replace(/\.md$/i, "").trim();
-}
-
 function makeAbsoluteUrlAgainst(raw: string, baseHref: string): string {
   return new URL(raw, baseHref).toString();
-}
-
-function shellEligibleForHumaneBackfill(shell: HTMLElement, pathname: string): boolean {
-  if ((shell.getAttribute("data-layout") ?? "dual") !== "dual") return false;
-  if (pathname.includes("/browse/")) return false;
-  return pathname.endsWith("/") || pathname.endsWith("/index.html");
-}
-
-function nextHumaneBrowsePathForShell(shell: HTMLElement, pathname: string): string | null {
-  const sourcePath = normPosixPath(shell.getAttribute("data-commentray-pair-source-path") ?? "");
-  if (sourcePath.length === 0) return null;
-  const alias = humaneBrowseAliasPathForSource(sourcePath);
-  if (alias.length === 0) return null;
-  const angleSel = document.getElementById("angle-select");
-  const selectedAngle = angleSel instanceof HTMLSelectElement ? angleSel.value.trim() : "";
-  const commentrayPath = shell.getAttribute("data-commentray-pair-commentray-path") ?? "";
-  const stem = companionStemFromCommentrayPath(commentrayPath);
-  const angleName = selectedAngle.length > 0 ? selectedAngle : stem;
-  if (angleName.length === 0) return null;
-  const angleAlias = `${alias}@${encodeURIComponent(angleName)}.html`;
-  const siteRoot = siteRootPathnameFromPathname(pathname);
-  return siteRoot === "/" ? `/browse/${angleAlias}` : `${siteRoot}/browse/${angleAlias}`;
 }
 
 function absolutizeNavJsonUrls(shell: HTMLElement, beforeHref: string): void {
@@ -3198,14 +3368,6 @@ function normalizePairBrowseHrefForCurrentPath(shell: HTMLElement, pathname: str
   }
 }
 
-function normalizeDocumentationHomeHrefForCurrentPath(): void {
-  const home = document.querySelector('a[aria-label="Documentation home"]');
-  if (!(home instanceof HTMLAnchorElement)) return;
-  const siteRoot = siteRootPathnameFromPathname(globalThis.location.pathname);
-  const normalized = siteRoot === "/" ? "/" : `${siteRoot}/`;
-  home.setAttribute("href", normalized);
-}
-
 function activeCommentrayHashTokenFromViewport(): string | null {
   const docPane = document.getElementById("doc-pane");
   if (!(docPane instanceof HTMLElement)) return null;
@@ -3214,41 +3376,20 @@ function activeCommentrayHashTokenFromViewport(): string | null {
   const anchors = docScrollEl.querySelectorAll<HTMLElement>(".commentray-block-anchor");
   if (anchors.length === 0) return null;
   const mdLine0 = probeCommentrayLine0FromDoc(docScrollEl);
-  if (!Number.isFinite(mdLine0) || mdLine0 < 0) return null;
+  if (mdLine0 === null || !Number.isFinite(mdLine0) || mdLine0 < 0) return null;
   return `commentray-md-line-${String(mdLine0)}`;
 }
 
-function maybeBackfillAddressBarWithHumanePairLink(): void {
-  const shell = document.getElementById("shell");
-  if (!(shell instanceof HTMLElement)) return;
+/**
+ * Resolves hub-relative `data-nav-*` and pair-browse attributes against the current document URL so
+ * `fetch()` and toolbar targets work from deep `/browse/…/index.html` pages (static HTML stays portable).
+ */
+function resolveEmbeddedStaticNavUrlsForCurrentPage(shell: HTMLElement): void {
+  if ((shell.getAttribute("data-layout") ?? "dual") !== "dual") return;
   const pathname = globalThis.location.pathname;
-  normalizeDocumentationHomeHrefForCurrentPath();
-  if (!shellEligibleForHumaneBackfill(shell, pathname)) return;
   const beforeHref = globalThis.location.href;
   absolutizeNavJsonUrls(shell, beforeHref);
   normalizePairBrowseHrefForCurrentPath(shell, pathname);
-
-  /** Prefer the same `staticBrowseUrl` the static build put on `#shell` (slug or `…/index.html` shims). */
-  const canonicalBrowsePathname = ((): string | null => {
-    const raw = shell.getAttribute("data-commentray-pair-browse-href")?.trim() ?? "";
-    if (raw.length === 0) return null;
-    try {
-      const u = new URL(raw, globalThis.location.href);
-      if (u.origin !== globalThis.location.origin) return null;
-      if (!u.pathname.includes("/browse/")) return null;
-      return u.pathname;
-    } catch {
-      return null;
-    }
-  })();
-
-  const nextPath = canonicalBrowsePathname ?? nextHumaneBrowsePathForShell(shell, pathname);
-  if (nextPath === null) return;
-  globalThis.history.replaceState(
-    null,
-    "",
-    `${nextPath}${globalThis.location.search}${globalThis.location.hash}`,
-  );
 }
 
 function permalinkHashSuffixFromUi(): string {
@@ -3355,7 +3496,7 @@ function main(): void {
   }
 
   wireDualPaneCodeBrowser(shell, codePane);
-  maybeBackfillAddressBarWithHumanePairLink();
+  resolveEmbeddedStaticNavUrlsForCurrentPage(shell);
 }
 
 if (document.readyState === "loading") {

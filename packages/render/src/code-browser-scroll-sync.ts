@@ -4,6 +4,7 @@
  */
 export type { BlockScrollLink } from "@commentray/core/block-scroll-pickers";
 export {
+  pickBlockScrollLinkForCommentrayScroll,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
 } from "@commentray/core/block-scroll-pickers";

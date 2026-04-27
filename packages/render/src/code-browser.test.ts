@@ -430,11 +430,11 @@ describe("Code browser page — source markdown link resolution", () => {
       commentrayPathForSearch: ".commentray/source/README.md/main.md",
       commentrayOnGithubUrl:
         "https://github.com/acme/demo/blob/main/.commentray/source/README.md/main.md",
-      commentrayStaticBrowseUrl: "./browse/readme@main.html",
+      commentrayStaticBrowseUrl: "./browse/README.md/main/index.html",
     });
 
     expect(html).toContain('href="../../docs/user/install.md"');
-    expect(html).toContain('data-commentray-pair-browse-href="./browse/readme@main.html"');
+    expect(html).toContain('data-commentray-pair-browse-href="./browse/README.md/main/index.html"');
     expect(html).not.toContain(
       'data-commentray-pair-browse-href="https://github.com/acme/demo/blob/main/.commentray/source/README.md/main.md"',
     );

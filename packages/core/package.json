@@ -18,6 +18,10 @@
     "./block-scroll-pickers": {
       "types": "./dist/block-scroll-pickers.d.ts",
       "import": "./dist/block-scroll-pickers.js"
+    },
+    "./static-browse-path": {
+      "types": "./dist/commentray-static-browse-path.d.ts",
+      "import": "./dist/commentray-static-browse-path.js"
     }
   },
   "files": [

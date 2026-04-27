@@ -41,6 +41,12 @@ export {
   resolvePathUnderRepoRoot,
 } from "./paths.js";
 export { findMonorepoPackagesDir, monorepoLayoutStartDir } from "./monorepo-layout.js";
+export type {
+  CommentrayStaticBrowsePairPaths,
+  CommentrayStaticBrowsePathResolver,
+} from "./browse-contract.js";
+export { defaultCommentrayStaticBrowsePathResolver } from "./browse-path-default.js";
+export { staticBrowseIndexRelPathFromPair } from "./commentray-static-browse-path.js";
 export {
   commentrayPairSourceFileExistsOnDisk,
   discoverCommentrayPairsOnDisk,
@@ -110,6 +116,7 @@ export { runCommanderMain } from "./cli-bootstrap.js";
 export type { BlockScrollLink } from "./scroll-sync.js";
 export {
   buildBlockScrollLinks,
+  pickBlockScrollLinkForCommentrayScroll,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
 } from "./scroll-sync.js";

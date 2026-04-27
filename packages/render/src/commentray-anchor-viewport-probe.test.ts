@@ -19,4 +19,20 @@ describe("maxCommentrayAnchorLine0AtOrAboveViewportY", () => {
     ];
     expect(maxCommentrayAnchorLine0AtOrAboveViewportY(readings, 200)).toBe(20);
   });
+
+  it("returns null when the probe sits above every anchor (no block owns that viewport band)", () => {
+    const readings = [
+      { line0: 5, top: 300 },
+      { line0: 12, top: 400 },
+    ];
+    expect(maxCommentrayAnchorLine0AtOrAboveViewportY(readings, 200)).toBe(null);
+  });
+
+  it("returns null for an empty reading list", () => {
+    expect(maxCommentrayAnchorLine0AtOrAboveViewportY([], 100)).toBe(null);
+  });
+
+  it("returns 0 when line 0 is a real qualifying anchor", () => {
+    expect(maxCommentrayAnchorLine0AtOrAboveViewportY([{ line0: 0, top: 80 }], 120)).toBe(0);
+  });
 });

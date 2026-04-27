@@ -32,7 +32,7 @@ export type BuildCommentrayStaticOptions = {
   hljsTheme?: string;
   /** If set, toolbar shows an Octocat link to this repository (`http`/`https` only). Omitted when {@link siteHubUrl} is used for the same slot. */
   githubRepoUrl?: string;
-  /** Same-site link to the static hub (`./` on index, `../index.html` from `browse/`). */
+  /** Same-site link to the static hub (`./` on index; under `browse/…` a depth-correct `../../…/index.html`). */
   siteHubUrl?: string;
   /** Footer "Rendered with Commentray" link plus semver and build time (`http`/`https` only). */
   toolHomeUrl?: string;

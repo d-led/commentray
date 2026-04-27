@@ -83,11 +83,10 @@ export async function loadMultiAngleBrowsingIfEnabled(
     if (spec !== undefined) angles.push(spec);
   }
   if (angles.length < 2) return undefined;
-  const dup = angles.length;
   for (const a of angles) {
     a.staticBrowseUrl = browsePairStaticBrowseRelUrl(
       { sourcePath: ss.sourceFile, commentrayPath: a.commentrayPathRel },
-      dup,
+      cfg.storageDir,
     );
   }
   return { defaultAngleId: defaultAngleIdForOpen(cfg), angles };

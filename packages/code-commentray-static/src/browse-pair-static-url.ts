@@ -1,89 +1,45 @@
 import path from "node:path";
 
-import { browsePageSlugFromPair } from "@commentray/render";
+import {
+  type CommentrayStaticBrowsePairPaths,
+  staticBrowseIndexRelPathFromPair,
+} from "@commentray/core";
 
 /** Normalise repo-relative paths for browse alias and URL construction. */
 export function normPosixPath(s: string): string {
   return s.trim().replaceAll("\\", "/").replace(/^\.\//, "").replace(/^\/+/, "");
 }
 
-/** Dot-leading segments (`/.env`, `/.github/…`) break many static servers, which decode `%2E` to `.` in the path. */
-function sourcePathHasDotLeadingSegment(sourcePath: string): boolean {
-  return normPosixPath(sourcePath)
-    .split("/")
-    .filter(Boolean)
-    .some((seg) => seg.startsWith("."));
-}
-
-export function commentrayFileStem(commentrayPath: string): string {
-  const norm = normPosixPath(commentrayPath);
-  const last = norm.split("/").filter(Boolean).at(-1) ?? "commentray";
-  return last.replace(/\.md$/i, "");
-}
-
 /**
- * One path segment under `_site/browse/…`. `encodeURIComponent` does not escape `.`, so a
- * **leading** dot is spelled `%2E` plus encoding of the rest (same as the hub client’s humane
- * browse paths), so emitted dirs are not dot-hidden on static hosts.
+ * Relative `href` from `_site/browse/<alias>/index.html` to another file under `_site/browse/`.
+ * The `from` path must be the alias **directory** (`path.posix.dirname(join("browse", aliasRelPath))`),
+ * not `join("browse", aliasRelPath)` as a faux file — otherwise `../../target.html` resolves
+ * from `/browse/docs/manual.md` (no trailing slash) to `/target.html` and static hosts 404.
+ *
+ * @param targetRelPathFromBrowseDir — path under `browse/` (e.g. `src/x.ts/index.html` or
+ *   `README.md/main/index.html`), no leading `browse/`.
  */
-function browseAliasSegment(sourceSegment: string): string {
-  if (sourceSegment.startsWith(".")) {
-    return `%2E${encodeURIComponent(sourceSegment.slice(1))}`;
-  }
-  return encodeURIComponent(sourceSegment);
-}
-
-export function sourceBrowseAliasPath(sourcePath: string): string {
-  const sourceSegments = normPosixPath(sourcePath)
-    .split("/")
-    .filter(Boolean)
-    .map((seg) => browseAliasSegment(seg));
-  return sourceSegments.length > 0 ? sourceSegments.join("/") : "pair";
-}
-
-/**
- * Relative `href` from `_site/browse/<alias>/index.html` (or `…/<alias>.html` shim) to the
- * canonical `_site/browse/<slug>.html`. The `from` path must be the alias **directory**
- * (`path.posix.dirname(join("browse", aliasRelPath))`), not `join("browse", aliasRelPath)` as a
- * faux file — otherwise `../../slug.html` resolves from `/browse/docs/manual.md` (no trailing
- * slash) to `/slug.html` and static hosts 404.
- */
-export function canonicalHumaneBrowseRedirectHref(aliasRelPath: string, slug: string): string {
+export function canonicalHumaneBrowseRedirectHref(
+  aliasRelPath: string,
+  targetRelPathFromBrowseDir: string,
+): string {
   const rel = path.posix.relative(
     path.posix.dirname(path.posix.join("browse", aliasRelPath)),
-    path.posix.join("browse", `${slug}.html`),
+    path.posix.join("browse", targetRelPathFromBrowseDir),
   );
-  return rel.length > 0 ? rel : `./${slug}.html`;
-}
-
-export function humanBrowseAliasPathFromPair(
-  pair: { sourcePath: string; commentrayPath: string },
-  sourcePathDuplicateCount: number,
-): string {
-  const sourceAlias = sourceBrowseAliasPath(pair.sourcePath);
-  if (sourceAlias === "pair") {
-    return sourcePathDuplicateCount > 1
-      ? `pair@${encodeURIComponent(commentrayFileStem(pair.commentrayPath))}`
-      : "pair";
-  }
-  if (sourcePathDuplicateCount <= 1) return sourceAlias;
-  return `${sourceAlias}@${encodeURIComponent(commentrayFileStem(pair.commentrayPath))}`;
+  if (rel.length > 0) return rel;
+  return path.posix.basename(targetRelPathFromBrowseDir) === "index.html"
+    ? "./index.html"
+    : `./${path.posix.basename(targetRelPathFromBrowseDir)}`;
 }
 
 /**
- * Hub-relative URL for opening a pair in the static code browser (same targets as the redirect
- * shims under `_site/browse/…`). Prefer this in nav JSON over opaque hash filenames.
+ * Hub-relative URL for opening a pair in the static code browser: mirrors
+ * `{storageDir}/source/…` under `./browse/…/index.html` (see {@link staticBrowseIndexRelPathFromPair}).
  */
 export function browsePairStaticBrowseRelUrl(
-  pair: { sourcePath: string; commentrayPath: string },
-  sourcePathDuplicateCount: number,
+  pair: CommentrayStaticBrowsePairPaths,
+  storageDir: string,
 ): string {
-  if (sourcePathHasDotLeadingSegment(pair.sourcePath)) {
-    return `./browse/${browsePageSlugFromPair(pair)}.html`;
-  }
-  const aliasRelPath = humanBrowseAliasPathFromPair(pair, sourcePathDuplicateCount);
-  if (sourcePathDuplicateCount > 1) {
-    return `./browse/${aliasRelPath}.html`;
-  }
-  return `./browse/${aliasRelPath}/index.html`;
+  return `./browse/${staticBrowseIndexRelPathFromPair(pair, storageDir)}`;
 }

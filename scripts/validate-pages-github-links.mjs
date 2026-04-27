@@ -2,13 +2,14 @@
 /**
  * Post-`npm run pages:build` checks for `_site/`:
  * - Optional GitHub blob URLs match `https://github.com/<owner>/<repo>/blob/<branch>/…` (no doubled `/blob/`).
- * - `#shell` carries `data-commentray-pair-browse-href` (same-site `./browse/<slug>.html`, `./browse/…/index.html`, or GitHub blob) and resolves without `/browse/browse/` stacking.
+ * - `#shell` carries `data-commentray-pair-browse-href` (same-site `./browse/…/index.html`, optional legacy flat `./browse/…@….html`, or GitHub blob) and resolves without `/browse/browse/` stacking.
  * - `_site/serve.json` sets `renderSingle: true` so local `serve` serves lone `index.html` in humane dirs (not directory listings).
- * - Humane browse redirect shims (`_site/browse/…/index.html`, plus small flat `*.html` redirects) use `canonicalHumaneBrowseRedirectHref` so a no-trailing-slash URL never resolves to `/slug.html` off `/browse/`.
+ * - Every generated local `href` / `src` in each `.html` file under `_site/` (recursive) resolves to an existing static file.
+ * - No generated HTML is a client-side redirect shim (meta refresh + `window.location.replace`).
  *
  * Optional live check (network): `COMMENTRAY_VALIDATE_PAGES_LIVE=1` sends HEAD to the first GitHub blob URL found in the hub index.
  */
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -16,8 +17,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const GITHUB_BLOB_RE =
   /^https:\/\/github\.com\/(?<owner>[^/]+)\/(?<repo>[^/]+)\/blob\/(?<branch>[^/]+)\/(?<path>.+)$/;
 
-const BROWSE_FLAT_RE = /^\.\/browse\/[^/]+\.html$/;
-const BROWSE_INDEXED_RE = /^\.\/browse\/.+\/index\.html$/;
+const BROWSE_FLAT_RE = /^(?:\.\/|\/)browse\/[^/]+\.html$/;
+const BROWSE_INDEXED_RE = /^(?:\.\/|\/)browse\/.+\/index\.html$/;
 
 function isHubRelativeBrowseHref(href) {
   return BROWSE_FLAT_RE.test(href) || BROWSE_INDEXED_RE.test(href);
@@ -27,13 +28,6 @@ const repoRoot = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const siteDir = join(repoRoot, "_site");
 const indexPath = join(siteDir, "index.html");
 const pairNavPath = join(repoRoot, "packages", "render", "dist", "code-browser-pair-nav.js");
-const browsePairStaticPath = join(
-  repoRoot,
-  "packages",
-  "code-commentray-static",
-  "dist",
-  "browse-pair-static-url.js",
-);
 
 function fail(msg) {
   console.error(msg);
@@ -78,9 +72,7 @@ function assertDocPairHref(label, href) {
     return;
   }
   if (!isHubRelativeBrowseHref(href)) {
-    fail(
-      `${label}: expected ./browse/<slug>.html, ./browse/…/index.html, or GitHub blob, got: ${href}`,
-    );
+    fail(`${label}: expected ./browse/… (.html or …/index.html), or GitHub blob, got: ${href}`);
   }
 }
 
@@ -121,6 +113,63 @@ async function assertBrowseMatrixResolves(docHubHref, pairNav, origins, pathname
   }
 }
 
+function walkHtmlFiles(absDir) {
+  const out = [];
+  for (const ent of readdirSync(absDir, { withFileTypes: true })) {
+    const abs = join(absDir, ent.name);
+    if (ent.isDirectory()) {
+      out.push(...walkHtmlFiles(abs));
+      continue;
+    }
+    if (ent.isFile() && ent.name.endsWith(".html")) out.push(abs);
+  }
+  return out;
+}
+
+function localSitePathFromUrlPath(pathname) {
+  const clean = pathname.replace(/^\/+/, "");
+  const abs = join(siteDir, clean);
+  if (existsSync(abs) && statSync(abs).isFile()) return abs;
+  if (existsSync(abs) && statSync(abs).isDirectory()) {
+    const idx = join(abs, "index.html");
+    if (existsSync(idx) && statSync(idx).isFile()) return idx;
+  }
+  return null;
+}
+
+function localTargetPathFromRef(ref, fromHtmlAbsPath) {
+  const trimmed = ref.trim();
+  if (
+    trimmed === "" ||
+    trimmed.startsWith("#") ||
+    /^https?:\/\//i.test(trimmed) ||
+    trimmed.startsWith("mailto:") ||
+    trimmed.startsWith("tel:") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("javascript:")
+  ) {
+    return null;
+  }
+  const baseUrl = new URL(`file://${fromHtmlAbsPath}`);
+  const resolved = new URL(trimmed, baseUrl);
+  if (resolved.protocol !== "file:") return null;
+  return localSitePathFromUrlPath(resolved.pathname);
+}
+
+function assertStaticLocalRefsResolve(htmlAbsPath, html) {
+  const relHtml = relative(siteDir, htmlAbsPath).replaceAll("\\", "/");
+  const attrRe = /\b(?:href|src)="([^"]+)"/gi;
+  let m;
+  while ((m = attrRe.exec(html)) !== null) {
+    const ref = m[1] ?? "";
+    const target = localTargetPathFromRef(ref, htmlAbsPath);
+    if (target === null) continue;
+    if (!existsSync(target)) {
+      fail(`${relHtml}: local ref ${JSON.stringify(ref)} resolves to missing target`);
+    }
+  }
+}
+
 async function validateHubIndex(indexHtml) {
   assertNoBrowseStack(indexHtml, "hub index.html");
 
@@ -137,8 +186,8 @@ async function validateHubIndex(indexHtml) {
   assertDocPairHref("hub shell data-commentray-pair-browse-href", docHubHref);
 
   const origins = ["https://d-led.github.io", "http://127.0.0.1:14173"];
-  const flatSlug = /^\.\/browse\/([^/]+\.html)$/.exec(docHubHref)?.[1];
-  const indexedInner = /^\.\/browse\/(.+)\/index\.html$/.exec(docHubHref)?.[1];
+  const flatSlug = /^(?:\.\/|\/)browse\/([^/]+\.html)$/.exec(docHubHref)?.[1];
+  const indexedInner = /^(?:\.\/|\/)browse\/(.+)\/index\.html$/.exec(docHubHref)?.[1];
   const pathnames = flatSlug
     ? [`/browse/${flatSlug}`, `/commentray/browse/${flatSlug}`]
     : indexedInner
@@ -153,7 +202,6 @@ async function validateBrowsePage(name, html) {
   assertNoBrowseStack(html, `browse/${name}`);
   const doc = shellAttr(html, "data-commentray-pair-browse-href");
   if (!doc) {
-    if (isBrowseRedirectShimHtml(html)) return;
     fail(`browse/${name}: missing data-commentray-pair-browse-href on #shell`);
   }
 
@@ -163,8 +211,8 @@ async function validateBrowsePage(name, html) {
 
   if (!existsSync(pairNavPath) || !isHubRelativeBrowseHref(doc)) return;
   const { resolveStaticBrowseHref } = await import(pathToFileURL(pairNavPath).href);
-  const flatSlug = /^\.\/browse\/([^/]+\.html)$/.exec(doc)?.[1];
-  const indexedInner = /^\.\/browse\/(.+)\/index\.html$/.exec(doc)?.[1];
+  const flatSlug = /^(?:\.\/|\/)browse\/([^/]+\.html)$/.exec(doc)?.[1];
+  const indexedInner = /^(?:\.\/|\/)browse\/(.+)\/index\.html$/.exec(doc)?.[1];
   const pathnameProbe = flatSlug
     ? `/browse/${flatSlug}`
     : indexedInner
@@ -182,11 +230,15 @@ async function validateBrowseHtmlFiles() {
     console.log("No _site/browse/ — skipping browse HTML checks.");
     return;
   }
-  const files = readdirSync(browseDir).filter((f) => f.endsWith(".html"));
-  for (const name of files) {
-    const p = join(browseDir, name);
+  const files = walkHtmlFiles(browseDir);
+  for (const p of files) {
     const html = readFileSync(p, "utf8");
-    await validateBrowsePage(name, html);
+    if (isBrowseRedirectShimHtml(html)) {
+      fail(
+        `browse/${relative(browseDir, p).replaceAll("\\", "/")}: redirect shim HTML is forbidden`,
+      );
+    }
+    await validateBrowsePage(relative(browseDir, p).replaceAll("\\", "/"), html);
   }
 }
 
@@ -208,116 +260,28 @@ function validateServeJsonForLocalStaticHost() {
   }
 }
 
-/**
- * @param {(aliasRelPath: string, slug: string) => string} canonicalHumaneBrowseRedirectHref
- */
-function assertHumaneRedirectShimMatchesCanonical(
-  label,
-  aliasRelPath,
-  html,
-  canonicalHumaneBrowseRedirectHref,
-) {
-  if (!isBrowseRedirectShimHtml(html)) return;
-  const m = html.match(/content="0;url=([^"]+)"/i);
-  if (!m) fail(`${label}: humane redirect shim missing meta refresh url`);
-  const target = m[1].trim();
-  const tail = target.split("/").pop() ?? "";
-  const slug = tail.replace(/\.html$/i, "");
-  if (!slug) fail(`${label}: could not parse slug from redirect target ${JSON.stringify(target)}`);
-  const expected = canonicalHumaneBrowseRedirectHref(aliasRelPath, slug);
-  if (target !== expected) {
-    fail(
-      `${label}: redirect must match canonicalHumaneBrowseRedirectHref(${JSON.stringify(aliasRelPath)}, ${JSON.stringify(slug)}); expected ${JSON.stringify(expected)}, got ${JSON.stringify(target)}`,
-    );
-  }
-  const fakeOrigin = "http://127.0.0.1:14173";
-  const noSlashDoc = `${fakeOrigin}/browse/${aliasRelPath}`;
-  const resolvedPath = new URL(target, noSlashDoc).pathname;
-  if (!resolvedPath.startsWith("/browse/")) {
-    fail(
-      `${label}: resolving ${JSON.stringify(target)} against ${noSlashDoc} → ${resolvedPath} (must stay under /browse/; regressions often land at /${slug}.html)`,
-    );
-  }
-  const depth = resolvedPath.split("/").filter(Boolean).length;
-  if (depth < 2) {
-    fail(`${label}: resolved path too shallow: ${resolvedPath}`);
-  }
-}
-
-/**
- * @param {(aliasRelPath: string, slug: string) => string} canonicalHumaneBrowseRedirectHref
- */
-function validateHumaneBrowseRedirectShims(canonicalHumaneBrowseRedirectHref) {
-  const browseDir = join(siteDir, "browse");
-  if (!existsSync(browseDir)) return;
-
-  function walkForIndexHtml(absDir, relUnderBrowse) {
-    const out = [];
-    for (const ent of readdirSync(absDir, { withFileTypes: true })) {
-      if (!ent.isDirectory()) continue;
-      const childAbs = join(absDir, ent.name);
-      const nextRel = relUnderBrowse ? `${relUnderBrowse}/${ent.name}` : ent.name;
-      const idx = join(childAbs, "index.html");
-      if (existsSync(idx)) {
-        out.push({ indexPath: idx, aliasRelPath: nextRel });
-      }
-      out.push(...walkForIndexHtml(childAbs, nextRel));
+function validateAllStaticHtmlLinks() {
+  const htmlFiles = walkHtmlFiles(siteDir);
+  for (const htmlPath of htmlFiles) {
+    const html = readFileSync(htmlPath, "utf8");
+    if (isBrowseRedirectShimHtml(html)) {
+      fail(`${relative(siteDir, htmlPath).replaceAll("\\", "/")}: redirect shim HTML is forbidden`);
     }
-    return out;
+    assertStaticLocalRefsResolve(htmlPath, html);
   }
-
-  for (const { indexPath: idxPath, aliasRelPath } of walkForIndexHtml(browseDir, "")) {
-    const html = readFileSync(idxPath, "utf8");
-    const rel = relative(siteDir, idxPath).replaceAll("\\", "/");
-    assertHumaneRedirectShimMatchesCanonical(
-      rel,
-      aliasRelPath,
-      html,
-      canonicalHumaneBrowseRedirectHref,
-    );
-  }
-
-  for (const name of readdirSync(browseDir)) {
-    if (!name.endsWith(".html")) continue;
-    const abs = join(browseDir, name);
-    if (!statSync(abs).isFile()) continue;
-    const html = readFileSync(abs, "utf8");
-    if (!isBrowseRedirectShimHtml(html) || /id="shell"/i.test(html)) continue;
-    const aliasRelPath = name.slice(0, -".html".length);
-    assertHumaneRedirectShimMatchesCanonical(
-      `browse/${name}`,
-      aliasRelPath,
-      html,
-      canonicalHumaneBrowseRedirectHref,
-    );
-  }
-}
-
-async function loadCanonicalHumaneBrowseRedirectHref() {
-  if (!existsSync(browsePairStaticPath)) {
-    fail(
-      `Missing ${browsePairStaticPath} — run npm run build -w @commentray/code-commentray-static before pages:validate.`,
-    );
-  }
-  const mod = await import(pathToFileURL(browsePairStaticPath).href);
-  if (typeof mod.canonicalHumaneBrowseRedirectHref !== "function") {
-    fail(`${browsePairStaticPath}: missing export canonicalHumaneBrowseRedirectHref`);
-  }
-  return mod.canonicalHumaneBrowseRedirectHref;
 }
 
 async function main() {
   if (!existsSync(indexPath)) {
     fail(`Missing ${indexPath} — run npm run pages:build first.`);
   }
-  const canonicalHumaneBrowseRedirectHref = await loadCanonicalHumaneBrowseRedirectHref();
   validateServeJsonForLocalStaticHost();
   const indexHtml = readFileSync(indexPath, "utf8");
   await validateHubIndex(indexHtml);
   await validateBrowseHtmlFiles();
-  validateHumaneBrowseRedirectShims(canonicalHumaneBrowseRedirectHref);
+  validateAllStaticHtmlLinks();
   console.log(
-    "pages:validate — OK (GitHub blob shapes, no /browse/browse/ stacking, serve.json, humane redirects).",
+    "pages:validate — OK (GitHub blob shapes, no /browse/browse/ stacking, serve.json, static local links).",
   );
 }
 

@@ -52,14 +52,13 @@ export function pickCommentrayLineForSourceScroll(
 }
 
 /**
- * Choose a 0-based source line to reveal from the top of the commentray
- * viewport: the block whose marker is at or above that line wins; reveal the
- * first line of its viewport span (`lo` − 1).
+ * The block whose companion marker is at or above `topCommentrayLine0Based`
+ * (same rule as {@link pickSourceLine0ForCommentrayScroll}).
  */
-export function pickSourceLine0ForCommentrayScroll(
+export function pickBlockScrollLinkForCommentrayScroll(
   blocks: BlockScrollLink[],
   topCommentrayLine0Based: number,
-): number | null {
+): BlockScrollLink | null {
   if (blocks.length === 0) return null;
   const sorted = [...blocks].sort((a, b) => a.commentrayLine - b.commentrayLine);
   const head = sorted[0];
@@ -68,5 +67,18 @@ export function pickSourceLine0ForCommentrayScroll(
   for (const b of sorted) {
     if (b.commentrayLine <= topCommentrayLine0Based) best = b;
   }
-  return best.markerViewportHalfOpen1Based.lo - 1;
+  return best;
+}
+
+/**
+ * Choose a 0-based source line to reveal from the top of the commentray
+ * viewport: the block whose marker is at or above that line wins; reveal the
+ * first line of its viewport span (`lo` − 1).
+ */
+export function pickSourceLine0ForCommentrayScroll(
+  blocks: BlockScrollLink[],
+  topCommentrayLine0Based: number,
+): number | null {
+  const link = pickBlockScrollLinkForCommentrayScroll(blocks, topCommentrayLine0Based);
+  return link ? link.markerViewportHalfOpen1Based.lo - 1 : null;
 }
