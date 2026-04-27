@@ -3592,6 +3592,7 @@ function applySelectedMultiAngle(args: {
   searchInput.value = "";
   searchResults.innerHTML = "";
   searchResults.hidden = true;
+  assignLocationToCanonicalBrowsePermalinkIfNeeded(shell);
   requestBlockRayRedraw?.();
   globalThis.requestAnimationFrame(() => {
     requestBlockRayRedraw?.();
@@ -4124,6 +4125,20 @@ function resolveEmbeddedStaticNavUrlsForCurrentPage(shell: HTMLElement): void {
   normalizePairBrowseHrefForCurrentPath(shell, pathname);
 }
 
+/**
+ * Absolute base URL for the pair browse / permalink target from `#shell` `data-commentray-pair-browse-href`
+ * (hub-relative `./browse/…` resolved via {@link resolveStaticBrowseHref}; same contract as static build).
+ */
+function pairBrowsePermalinkBaseHrefFromShell(shell: HTMLElement): string {
+  const raw = shell.getAttribute("data-commentray-pair-browse-href") ?? "";
+  const t = raw.trim();
+  const canonical =
+    isHubRelativeStaticBrowseHref(t) && t.length > 0
+      ? resolveStaticBrowseHref(t, globalThis.location.pathname, globalThis.location.origin)
+      : safePermalinkHref(t);
+  return canonical ?? globalThis.location.href;
+}
+
 function permalinkHashSuffixFromUi(): string {
   const tokens: string[] = [];
   const pushUnique = (token: string): void => {
@@ -4144,20 +4159,28 @@ function permalinkHashSuffixFromUi(): string {
 }
 
 function sharePermalinkFromShell(shell: HTMLElement): string {
-  const raw = shell.getAttribute("data-commentray-pair-browse-href") ?? "";
-  const canonical =
-    isHubRelativeStaticBrowseHref(raw.trim()) && raw.trim().length > 0
-      ? resolveStaticBrowseHref(
-          raw.trim(),
-          globalThis.location.pathname,
-          globalThis.location.origin,
-        )
-      : safePermalinkHref(raw);
-  const base = canonical ?? globalThis.location.href;
-  const u = new URL(base, globalThis.location.href);
+  const u = new URL(pairBrowsePermalinkBaseHrefFromShell(shell), globalThis.location.href);
   const hash = permalinkHashSuffixFromUi();
   u.hash = hash.length > 0 ? hash.slice(1) : "";
   return u.toString();
+}
+
+/**
+ * Static multi-angle: each angle has its own `/browse/…/<angle>/index.html`. After `#angle-select`
+ * changes, load that canonical page without a `#angle-…` fragment (path is the permalink).
+ */
+function assignLocationToCanonicalBrowsePermalinkIfNeeded(shell: HTMLElement): void {
+  let target: URL;
+  try {
+    target = new URL(pairBrowsePermalinkBaseHrefFromShell(shell), globalThis.location.href);
+  } catch {
+    return;
+  }
+  if (target.origin !== globalThis.location.origin) return;
+  target.hash = "";
+  const here = new URL(globalThis.location.href);
+  if (here.pathname === target.pathname && here.search === target.search) return;
+  globalThis.location.assign(target.toString());
 }
 
 async function writeTextToClipboard(text: string): Promise<boolean> {
