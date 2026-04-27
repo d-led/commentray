@@ -2,6 +2,8 @@ import { shellA11y } from "../support/shell-a11y";
 
 const WIDE_MODE_INTRO_STORAGE_KEY = "commentray.codeCommentrayStatic.wideModeIntro.v1";
 const SOURCE_PANE_MODE_STORAGE_KEY = "commentray.codeCommentrayStatic.sourceMarkdownPaneMode";
+/** Milliseconds to wait for the debounced/rAF scroll-sync handler to settle. */
+const SCROLL_SYNC_SETTLE_MS = 120;
 
 function expectVisibleArrows(count: number): void {
   cy.get("#commentray-wide-intro-arrows .commentray-wide-intro-arrow")
@@ -42,7 +44,11 @@ function visitWithFreshWideIntroStorage(): void {
 /** Dual-only scroll tests; on stretch assert rendered-markdown only. */
 function whenHomeDualLayoutWide(dualOnly: () => void): void {
   cy.viewport(1280, 900);
-  cy.visit("/");
+  cy.visit("/", {
+    onBeforeLoad(win) {
+      win.localStorage.setItem(WIDE_MODE_INTRO_STORAGE_KEY, "1");
+    },
+  });
   cy.get(shellA11y.shell).then(($shell) => {
     if ($shell.attr("data-layout") !== "dual") {
       cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
@@ -93,7 +99,7 @@ describe("Markdown source rendering modes", () => {
         codePane.scrollTop = codePane.scrollTop + (lineRect.top - codeRect.top) - 4;
       });
 
-      cy.wait(120);
+      cy.wait(SCROLL_SYNC_SETTLE_MS);
 
       cy.get("#commentray-block-readme-user-guides").should("exist");
       cy.get(shellA11y.docPaneBody)
@@ -143,6 +149,7 @@ describe("Markdown source rendering modes", () => {
         const el = $body[0];
         el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
       });
+      cy.wait(SCROLL_SYNC_SETTLE_MS);
       cy.get("#code-pane").invoke("scrollTop").should("be.gt", 40);
 
       cy.get(shellA11y.angleSelect).select("architecture");
