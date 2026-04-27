@@ -1498,6 +1498,8 @@ ${CODE_BROWSER_INTRO_STYLES}
       .doc-pane-body {
         flex: 1 1 auto; min-height: 0; overflow: auto;
       }
+      /* scroll-behavior: smooth was removed: it interpolates many scroll events per gesture and
+       * exhausts the partner-echo guard in wireBidirectionalScroll, so doc↔code ping-pong returns. */
       /* Inline backtick code chips (GitHub-like): prose context only, never fenced pre/code blocks. */
       .pane--doc .doc-pane-body :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code,
       .shell--stretch-rows .stretch-preamble :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code,

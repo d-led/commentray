@@ -375,7 +375,7 @@ sanitizeSchema.attributes = {
     "dataCommentrayLine",
     "dataCommentrayPageBreak",
     "dataNextCommentrayLine",
-    "dataNextSourceStart",
+    "dataNextSourceViewportLine",
   ],
 };
 

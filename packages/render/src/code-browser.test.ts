@@ -639,7 +639,59 @@ describe("Code browser page — companion Markdown page-break rendering", () => 
     });
     expect(html).toContain('class="commentray-page-break"');
     expect(html).toContain('data-next-commentray-line="6"');
-    expect(html).toContain('data-next-source-start="20"');
+    expect(html).toContain('data-next-source-viewport-line="20"');
+  });
+
+  it("aligns the page-break next-block target with the marker viewport top line, not the inner source start", async () => {
+    const crPath = ".commentray/source/x.toml.md";
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [crPath]: {
+          sourcePath: "x.toml",
+          commentrayPath: crPath,
+          blocks: [
+            { id: "first", anchor: "marker:first" },
+            { id: "second", anchor: "marker:second" },
+          ],
+        },
+      },
+    };
+    const md = [
+      "<!-- commentray:block id=first -->",
+      "",
+      "lede",
+      "",
+      "<!-- commentray:page-break -->",
+      "",
+      "<!-- commentray:block id=second -->",
+      "",
+      "more",
+    ].join("\n");
+    const source = [
+      "# commentray:start id=first",
+      "[first]",
+      "# commentray:end id=first",
+      "",
+      "# commentray:start id=second",
+      "[second]",
+      "# commentray:end id=second",
+    ].join("\n");
+    const html = await renderCodeBrowserHtml({
+      code: source,
+      language: "toml",
+      filePath: "x.toml",
+      commentrayMarkdown: md,
+      codeBrowserLayout: "dual",
+      blockStretchRows: {
+        index,
+        sourceRelative: "x.toml",
+        commentrayPathRel: crPath,
+      },
+    });
+    expect(html).toContain('class="commentray-page-break"');
+    expect(html).toContain('data-next-source-viewport-line="4"');
+    expect(html).not.toContain('data-next-source-viewport-line="6"');
   });
 
   it("does not turn fenced commentray:page-break text into layout separators", async () => {

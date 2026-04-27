@@ -127,9 +127,17 @@ function appendSourceMdLineAnchorWhenAllowed(line: string, line0: number): strin
   return `${line}${sourceLineAnchorHtml(line0)}`;
 }
 
+/**
+ * `viewportSourceLine1Based` is `BlockScrollLink.markerViewportHalfOpen1Based.lo` — the source
+ * line that should appear at the top of the code viewport when the next block becomes active.
+ * For marker-backed blocks this is typically the line above the start marker, which is two lines
+ * earlier than {@link BlockScrollLink.sourceStart} (the first inner line of the block). Using it
+ * here keeps the page-break-pull target aligned with the block-from-md-probe target so the two
+ * mappers agree and monotonicity is preserved across page-break crossings.
+ */
 type PageBreakNextBlockMeta = {
   commentrayLine: number;
-  sourceStart?: number;
+  viewportSourceLine1Based?: number;
 };
 
 function pageBreakNextBlockMetaByLine(
@@ -143,9 +151,11 @@ function pageBreakNextBlockMetaByLine(
     const blockMatch = BLOCK_MARKER_HTML_LINE.exec(line);
     if (blockMatch?.[1]) {
       const id = blockMatch[1];
-      const sourceStart = byId?.get(id)?.sourceStart;
+      const viewportSourceLine1Based = byId?.get(id)?.markerViewportHalfOpen1Based.lo;
       nextMeta =
-        sourceStart !== undefined ? { commentrayLine: i, sourceStart } : { commentrayLine: i };
+        viewportSourceLine1Based !== undefined
+          ? { commentrayLine: i, viewportSourceLine1Based }
+          : { commentrayLine: i };
       continue;
     }
     if (!PAGE_BREAK_MARKER_HTML_LINE.test(line) || nextMeta === null) continue;
@@ -163,7 +173,9 @@ function pageBreakNextAttrs(next: PageBreakNextBlockMeta | undefined): string {
   if (next === undefined) return "";
   const nextCommentrayAttr = ` data-next-commentray-line="${String(next.commentrayLine)}"`;
   const nextSourceAttr =
-    next.sourceStart !== undefined ? ` data-next-source-start="${String(next.sourceStart)}"` : "";
+    next.viewportSourceLine1Based !== undefined
+      ? ` data-next-source-viewport-line="${String(next.viewportSourceLine1Based)}"`
+      : "";
   return `${nextCommentrayAttr}${nextSourceAttr}`;
 }
 

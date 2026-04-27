@@ -113,12 +113,20 @@ export type { SymbolResolutionStrategy } from "./language-intelligence.js";
 export { relocationHintMessages } from "./relocation-hints.js";
 export type { RelocationHintsInput } from "./relocation-hints.js";
 export { runCommanderMain } from "./cli-bootstrap.js";
-export type { BlockScrollLink } from "./scroll-sync.js";
+export type { BlockScrollLink, BlockScrollStickyState } from "./scroll-sync.js";
 export {
+  blockStrictlyContainingSourceViewportLine,
   buildBlockScrollLinks,
+  commentrayProbeInStrictInterMarkerGap,
+  DEFAULT_COMMENTRAY_VIEWPORT_HYSTERESIS_LINES,
+  DEFAULT_SOURCE_VIEWPORT_HYSTERESIS_LINES,
   pickBlockScrollLinkForCommentrayScroll,
+  pickBlockScrollLinkForCommentrayViewportWithHysteresis,
+  pickBlockScrollLinkForSourceViewportTop,
+  pickBlockScrollLinkForSourceViewportWithHysteresis,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
+  sourceTopLineStrictlyBeforeFirstIndexLine,
 } from "./scroll-sync.js";
 export {
   commentrayRegionInsertions,

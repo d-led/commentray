@@ -65,6 +65,46 @@ describe("Markdown source rendering modes", () => {
     cy.get("#code-pane").invoke("scrollTop").should("be.gt", 40);
   });
 
+  it("snaps the doc pane to the matching block when the rendered-markdown source pane scrolls into a region", () => {
+    cy.viewport(1280, 900);
+    cy.visit("/");
+    cy.get(shellA11y.shell)
+      .should("have.attr", "data-layout", "dual")
+      .and("have.attr", "data-source-pane-mode", "rendered-markdown");
+
+    /**
+     * Scroll the source pane so the `readme-user-guides` region sits at the viewport top.
+     * The commentary places that block far from the proportional offset of the source line
+     * (commentary has many more lines than `README.md`), so a proportional fallback would
+     * land the doc pane at a clearly different scrollTop than the block anchor.
+     */
+    cy.get("#code-md-line-22").then(($line) => {
+      const codePane = document.getElementById("code-pane");
+      if (codePane === null) throw new Error("expected code pane");
+      const codeRect = codePane.getBoundingClientRect();
+      const lineRect = ($line[0] as HTMLElement).getBoundingClientRect();
+      codePane.scrollTop = codePane.scrollTop + (lineRect.top - codeRect.top) - 4;
+    });
+
+    cy.wait(120);
+
+    cy.get("#commentray-block-readme-user-guides").should("exist");
+    cy.get(shellA11y.docPaneBody)
+      .invoke("scrollTop")
+      .then((scrollTop) => {
+        const anchor = document.getElementById("commentray-block-readme-user-guides");
+        if (anchor === null) throw new Error("expected commentray-block-readme-user-guides");
+        const docPaneBody = document.getElementById("doc-pane-body");
+        if (docPaneBody === null) throw new Error("expected doc pane body");
+        const anchorTopWithin =
+          anchor.getBoundingClientRect().top - docPaneBody.getBoundingClientRect().top;
+        expect(anchorTopWithin, "block anchor near doc viewport top").to.be.within(-12, 60);
+        expect(Number(scrollTop), "doc pane is region-snapped, not at proportional ratio").to.be.gt(
+          40,
+        );
+      });
+  });
+
   it("preserves source scroll sync after toggling source markdown mode and changing angle", () => {
     cy.viewport(1280, 900);
     cy.visit("/", {

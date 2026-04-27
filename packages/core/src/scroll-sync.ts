@@ -5,11 +5,19 @@ import type { CommentrayIndex } from "./model.js";
 import { normalizeRepoRelativePath } from "./paths.js";
 import { markerViewportHalfOpen1Based, sourceLineRangeForMarkerId } from "./source-markers.js";
 
-export type { BlockScrollLink } from "./block-scroll-pickers.js";
+export type { BlockScrollLink, BlockScrollStickyState } from "./block-scroll-pickers.js";
 export {
+  blockStrictlyContainingSourceViewportLine,
+  commentrayProbeInStrictInterMarkerGap,
+  DEFAULT_COMMENTRAY_VIEWPORT_HYSTERESIS_LINES,
+  DEFAULT_SOURCE_VIEWPORT_HYSTERESIS_LINES,
   pickBlockScrollLinkForCommentrayScroll,
+  pickBlockScrollLinkForCommentrayViewportWithHysteresis,
+  pickBlockScrollLinkForSourceViewportTop,
+  pickBlockScrollLinkForSourceViewportWithHysteresis,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
+  sourceTopLineStrictlyBeforeFirstIndexLine,
 } from "./block-scroll-pickers.js";
 
 const BLOCK_MARKER_RE = new RegExp(`<!-- commentray:block id=(${MARKER_ID_BODY}) -->`);

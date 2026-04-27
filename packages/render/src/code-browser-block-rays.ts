@@ -1,5 +1,5 @@
 import {
-  pickCommentrayLineForSourceScroll,
+  blockStrictlyContainingSourceViewportLine,
   type BlockScrollLink,
 } from "./code-browser-scroll-sync.js";
 
@@ -181,9 +181,7 @@ export function activeBlockIdForViewport(
   topSourceLine1Based: number,
 ): string | null {
   if (links.length === 0) return null;
-  const mdLine = pickCommentrayLineForSourceScroll(links, topSourceLine1Based);
-  if (mdLine === null) return null;
-  const b = links.find((x) => x.commentrayLine === mdLine);
+  const b = blockStrictlyContainingSourceViewportLine(links, topSourceLine1Based);
   return b?.id ?? null;
 }
 
@@ -303,4 +301,40 @@ export function maxRenderableCommentaryContentBottomViewport(
     maxBottom = Math.max(maxBottom, maxContentBottomByElementWalk(docScrollEl, cursor, null));
   }
   return maxBottom;
+}
+
+/**
+ * Lower Y bound (viewport) for the **doc** side of gutter splines between this block and the next
+ * indexed block, when dual-pane gutter “clip through page-break gaps” is enabled.
+ *
+ * Stops at the **first** `commentray-page-break` before `nextBlockEl` so interstitial companion
+ * prose (headings and copy after a page break but before the next `<!-- commentray:block … -->`)
+ * is not visually tied to the prior source region. If a single authored block intentionally spans
+ * a page break with more commentary after it, the band shows only the segment before that break
+ * until the next block anchor (authors can split blocks if they need a longer ray).
+ */
+export function commentaryGutterDocBandBottomViewport(
+  docScrollEl: HTMLElement,
+  docTop: HTMLElement,
+  nextBlockEl: HTMLElement,
+): number {
+  const nextTop = nextBlockEl.getBoundingClientRect().top - 3;
+  const docBandTop = docTop.getBoundingClientRect().top + 4;
+  const breaks = pageBreakHostsBetweenAnchors(docScrollEl, docTop, nextBlockEl);
+  const firstPb = breaks[0];
+  if (firstPb !== undefined) {
+    const segmentBottom = maxRenderableCommentaryContentBottomViewport(
+      docScrollEl,
+      docTop,
+      firstPb,
+    );
+    const pbTop = firstPb.getBoundingClientRect().top - 2;
+    return Math.min(nextTop, pbTop, Math.max(docBandTop, segmentBottom));
+  }
+  const contentBottom = maxRenderableCommentaryContentBottomViewport(
+    docScrollEl,
+    docTop,
+    nextBlockEl,
+  );
+  return Math.min(nextTop, Math.max(docBandTop, contentBottom));
 }

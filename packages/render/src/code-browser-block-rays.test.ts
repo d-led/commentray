@@ -126,8 +126,8 @@ describe("activeBlockIdForViewport", () => {
     expect(activeBlockIdForViewport(links, 22)).toBe("b2");
   });
 
-  it("returns the nearest preceding block in gaps", () => {
-    expect(activeBlockIdForViewport(links, 10)).toBe("b1");
+  it("returns null in true source gaps so gutter emphasis does not pretend a block owns the viewport", () => {
+    expect(activeBlockIdForViewport(links, 10)).toBe(null);
   });
 });
 

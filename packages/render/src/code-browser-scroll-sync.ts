@@ -2,11 +2,22 @@
  * Static browser scroll helpers: proportional mirror plus block pickers from
  * `@commentray/core/block-scroll-pickers` (small browser bundle entry).
  */
-export type { BlockScrollLink } from "@commentray/core/block-scroll-pickers";
+export type {
+  BlockScrollLink,
+  BlockScrollStickyState,
+} from "@commentray/core/block-scroll-pickers";
 export {
+  blockStrictlyContainingSourceViewportLine,
+  commentrayProbeInStrictInterMarkerGap,
+  DEFAULT_COMMENTRAY_VIEWPORT_HYSTERESIS_LINES,
+  DEFAULT_SOURCE_VIEWPORT_HYSTERESIS_LINES,
   pickBlockScrollLinkForCommentrayScroll,
+  pickBlockScrollLinkForCommentrayViewportWithHysteresis,
+  pickBlockScrollLinkForSourceViewportTop,
+  pickBlockScrollLinkForSourceViewportWithHysteresis,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
+  sourceTopLineStrictlyBeforeFirstIndexLine,
 } from "@commentray/core/block-scroll-pickers";
 
 /**

@@ -12,16 +12,18 @@ import {
   codeLineDomIndex0,
   dedupeBlockScrollLinksById,
   gutterRayBezierPaths,
+  commentaryGutterDocBandBottomViewport,
   maxRenderableCommentaryContentBottomViewport,
   nextBlockLinkInCommentrayOrder,
   sortBlockLinksBySource,
 } from "./code-browser-block-rays.js";
 import {
+  blockStrictlyContainingSourceViewportLine,
   type BlockScrollLink,
+  type BlockScrollStickyState,
   mirroredScrollTop,
   pickBlockScrollLinkForCommentrayScroll,
-  pickCommentrayLineForSourceScroll,
-  pickSourceLine0ForCommentrayScroll,
+  sourceTopLineStrictlyBeforeFirstIndexLine,
 } from "./code-browser-scroll-sync.js";
 import { maxCommentrayAnchorLine0AtOrAboveViewportY } from "./commentray-anchor-viewport-probe.js";
 import { decodeBase64Utf8 } from "./code-browser-encoding.js";
@@ -52,6 +54,7 @@ import {
   parseCommentrayColorThemeMode,
   type CommentrayColorThemeMode,
 } from "./code-browser-color-theme.js";
+import { shouldRevertPartnerScrollForMonotonicity } from "./code-browser-scroll-sync-monotonic.js";
 import { wireWideModeIntroTour } from "./code-browser-wide-intro-controller.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
@@ -139,9 +142,6 @@ function paneUsesInternalYScroll(el: HTMLElement): boolean {
   return oy === "auto" || oy === "scroll" || oy === "overlay";
 }
 
-/** Sub-pixel noise threshold for “which direction did the user scroll?”. */
-const SCROLL_SYNC_MONOTONIC_EPS = 1.5;
-
 function rootScrollingElement(): HTMLElement {
   const s = document.scrollingElement;
   if (s instanceof HTMLElement) return s;
@@ -165,28 +165,28 @@ function writePaneVerticalScrollForced(partnerPane: HTMLElement, target: number)
 }
 
 /**
- * If the driver pane moved down/up, the partner must not move the opposite way (static Pages UX:
- * no backward “snap” while scrolling one column).
+ * Enforces dual-pane scroll sync monotonicity (`docs/spec/dual-pane-scroll-sync.md`):
+ * partner never moves opposite the driver on a decisive scroll step.
  */
 function enforceScrollSyncMonotonic(args: {
   driverDelta: number;
   partnerBefore: number;
   partnerPane: HTMLElement;
+  /** Which driver→partner mapping produced the partner move (for debug only). */
+  axis?: "code→doc" | "doc→code";
 }): void {
-  const { driverDelta, partnerBefore, partnerPane } = args;
-  if (Math.abs(driverDelta) < SCROLL_SYNC_MONOTONIC_EPS) return;
+  const { driverDelta, partnerBefore, partnerPane, axis } = args;
   const partnerAfter = readPaneVerticalScroll(partnerPane);
-  if (
-    driverDelta > SCROLL_SYNC_MONOTONIC_EPS &&
-    partnerAfter < partnerBefore - SCROLL_SYNC_MONOTONIC_EPS
-  ) {
-    writePaneVerticalScrollForced(partnerPane, partnerBefore);
-    return;
-  }
-  if (
-    driverDelta < -SCROLL_SYNC_MONOTONIC_EPS &&
-    partnerAfter > partnerBefore + SCROLL_SYNC_MONOTONIC_EPS
-  ) {
+  if (shouldRevertPartnerScrollForMonotonicity({ driverDelta, partnerBefore, partnerAfter })) {
+    if (scrollSyncTraceFeatureFlag()) {
+      globalThis.console.warn("[commentray:scroll-sync] monotonic.revert", {
+        t: Math.round(performance.now()),
+        axis: axis ?? "?",
+        driverDelta,
+        partnerBefore,
+        partnerAfter,
+      });
+    }
     writePaneVerticalScrollForced(partnerPane, partnerBefore);
   }
 }
@@ -218,6 +218,44 @@ function applyRevealChildInPane(scrollport: HTMLElement, child: Element, leadCss
   const clamped = clamp(targetTop, 0, maxY);
   if (Math.abs(root.scrollTop - clamped) < 0.25) return;
   root.scrollTop = clamped;
+}
+
+/** True when the block anchor for `mdLine0` is already aligned like {@link applyRevealChildInPane} would. */
+function commentrayBlockAnchorAlignedWithLead(
+  docPane: HTMLElement,
+  mdLine0: number,
+  leadCssPx: number,
+): boolean {
+  const anchor = docPane.querySelector(`[data-commentray-line="${String(mdLine0)}"]`);
+  if (!(anchor instanceof HTMLElement)) return false;
+  const cr = anchor.getBoundingClientRect();
+  const sr = docPane.getBoundingClientRect();
+  const dist = cr.top - sr.top - docPane.clientTop;
+  return Math.abs(dist - leadCssPx) <= 4;
+}
+
+/**
+ * After the strict `[lo, hiExclusive)` span ends, keep treating the same block as active for a few
+ * more source lines so `line1` probe noise at the boundary does not flip code→doc between block
+ * snap and gap mirror every frame.
+ */
+const SOURCE_BLOCK_TRAILING_SLACK_LINES = 6;
+
+function blockForCodeToDocSync(
+  links: BlockScrollLink[],
+  line1: number,
+  sticky: BlockAwareStickyBundle,
+): BlockScrollLink | null {
+  const strict = blockStrictlyContainingSourceViewportLine(links, line1);
+  if (strict) return strict;
+  const id = sticky.sourceSticky.lockedId;
+  if (id === null) return null;
+  const b = links.find((x) => x.id === id);
+  if (!b) return null;
+  const { lo, hiExclusive } = b.markerViewportHalfOpen1Based;
+  const slack = SOURCE_BLOCK_TRAILING_SLACK_LINES;
+  if (line1 >= lo && line1 < hiExclusive + slack) return b;
+  return null;
 }
 
 /** Captured commentary→source scroll state for a narrow single-pane flip (see {@link DualPaneScrollSyncRunners}). */
@@ -262,6 +300,15 @@ function scrollSyncDebugHashOn(): boolean {
 }
 
 /**
+ * Auto-on for **dev hosts** (`commentray serve` / `localhost` / `127.0.0.1` / `0.0.0.0`).
+ * Production deploys (Pages, S3, etc.) stay opt-in through {@link SCROLL_SYNC_DEBUG_FLAG}.
+ */
+function scrollSyncDebugDevHostOn(): boolean {
+  const host = globalThis.location.hostname;
+  return host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1";
+}
+
+/**
  * Opt-in scroll-sync tracing: `console.info` lines prefixed with `[commentray:scroll-sync]`.
  * **Static hosting** — reads the URL and Web Storage in the browser only (no HTTP server logic,
  * headers, or preview tooling required for this flag to work on published Pages or any static file host).
@@ -270,9 +317,20 @@ function scrollSyncDebugHashOn(): boolean {
  * - Query: `?commentrayDebugScroll=1` (or `=true`, or present with an empty value)
  * - Hash: `#commentrayDebugScroll` or `#commentrayDebugScroll=1` (fragment is not sent to the server)
  * - DevTools, then reload: `sessionStorage.setItem("commentrayDebugScroll", "1")` or the same for `localStorage`
+ *
+ * Log lines (filter DevTools console on `[commentray:scroll-sync]`):
+ * - `code→doc.plan` / `doc→code.plan` — which branch built the flip plan (`reason` field)
+ * - `code→doc.apply` / `doc→code.apply` — partner `scrollTop` before vs after apply, `driverDelta`, `plan`
+ * - `wire.code.driver` / `wire.doc.driver` — RAF-coalesced driver flush (delta, pane `scrollTop`)
+ * - `wire.code.flush-skipped` / `wire.doc.flush-skipped` — flush skipped (`partner-echo` throttled ~5/s; `sync-in-progress` immediate)
+ * - `monotonic.revert` — `console.warn` when the partner move was opposite the driver and was rolled back
+ *
+ * Tracing consults a **cached feature flag** (mirrors URL/storage here, rechecked at most every 500ms
+ * and on `hashchange` / cross-tab `storage`) so hot scroll paths avoid reading storage every tick.
  */
 function scrollSyncDebugEnabled(): boolean {
   try {
+    if (scrollSyncDebugDevHostOn()) return true;
     if (scrollSyncDebugQueryOn()) return true;
     if (scrollSyncDebugHashOn()) return true;
     if (scrollSyncDebugStorageOn(globalThis.sessionStorage)) return true;
@@ -281,6 +339,68 @@ function scrollSyncDebugEnabled(): boolean {
   } catch {
     return false;
   }
+}
+
+/** Throttle for re-reading URL/storage into {@link scrollSyncTraceFeatureOn}. */
+const SCROLL_SYNC_TRACE_FLAG_RECHECK_MS = 500;
+
+/**
+ * Feature flag for scroll-sync tracing: mirrors {@link scrollSyncDebugEnabled} but cached so
+ * high-frequency scroll paths do not hit Web Storage on every event.
+ */
+let scrollSyncTraceFeatureOn = false;
+let scrollSyncTraceFeatureLastCheckMs = -Infinity;
+
+function invalidateScrollSyncTraceFeatureFlag(): void {
+  scrollSyncTraceFeatureLastCheckMs = -Infinity;
+}
+
+function scrollSyncTraceFeatureFlag(): boolean {
+  const now = performance.now();
+  if (now - scrollSyncTraceFeatureLastCheckMs < SCROLL_SYNC_TRACE_FLAG_RECHECK_MS) {
+    return scrollSyncTraceFeatureOn;
+  }
+  scrollSyncTraceFeatureLastCheckMs = now;
+  scrollSyncTraceFeatureOn = scrollSyncDebugEnabled();
+  return scrollSyncTraceFeatureOn;
+}
+
+if (typeof globalThis.addEventListener === "function") {
+  globalThis.addEventListener("hashchange", invalidateScrollSyncTraceFeatureFlag);
+  globalThis.addEventListener("storage", invalidateScrollSyncTraceFeatureFlag);
+}
+
+/**
+ * Boot announcement: **always** fires on dev hosts so a stale bundle is impossible to miss.
+ * On production hosts it still fires only when the opt-in flag is on. Uses `console.log`
+ * (visible at the default DevTools "Default" level filter) so a Verbose toggle is not required.
+ */
+function announceScrollSyncTraceOnBoot(): void {
+  const devHost = scrollSyncDebugDevHostOn();
+  if (!devHost && !scrollSyncTraceFeatureFlag()) return;
+  globalThis.console.log("[commentray:scroll-sync] boot", {
+    t: Math.round(performance.now()),
+    href: globalThis.location.href,
+    devHost,
+    traceOn: scrollSyncTraceFeatureFlag(),
+  });
+}
+
+/**
+ * Structured scroll-sync log line when {@link scrollSyncTraceFeatureFlag} is on. Tags you can filter on:
+ * - `code→doc.plan` — branch taken inside {@link buildCodeToDocFlipPlanBlockAware} (`reason` explains why)
+ * - `doc→code.plan` — branch inside {@link buildDocToCodeFlipPlanBlockAware}
+ * - `code→doc.apply` / `doc→code.apply` — partner `scrollTop` before/after apply for that driver step
+ * - `wire.code.flush-skipped` / `wire.doc.flush-skipped` — RAF driver flush skipped (echo gate or `syncing`)
+ * - `wire.code.driver` / `wire.doc.driver` — driver pane ran sync this frame (`delta`, `scrollTop`)
+ * - `monotonic.revert` — emitted with `console.warn` (see {@link enforceScrollSyncMonotonic})
+ */
+function scrollSyncTrace(tag: string, fields: Record<string, unknown>): void {
+  if (!scrollSyncTraceFeatureFlag()) return;
+  globalThis.console.log(`[commentray:scroll-sync] ${tag}`, {
+    t: Math.round(performance.now()),
+    ...fields,
+  });
 }
 
 function formatDocToCodePlanForLog(p: DocToCodeFlipPlan): string {
@@ -382,61 +502,235 @@ function applyCodeToDocFlipPlanImpl(
   applyWindowScrollRatio(clamp(nextTop / denom, 0, 1));
 }
 
+type BlockAwareStickyBundle = {
+  sourceSticky: BlockScrollStickyState;
+  commentraySticky: BlockScrollStickyState;
+  /** When the indexed block set changes (e.g. another angle), Schmitt locks must not carry over. */
+  linksKey: { current: string };
+};
+
+function resetBlockScrollStickyIfLinksChanged(
+  sticky: BlockAwareStickyBundle,
+  links: BlockScrollLink[],
+): void {
+  const key = links.map((l) => l.id).join("\0");
+  if (key !== sticky.linksKey.current) {
+    sticky.sourceSticky.lockedId = null;
+    sticky.commentraySticky.lockedId = null;
+    sticky.linksKey.current = key;
+  }
+}
+
 function buildDocToCodeFlipPlanBlockAware(
   docPane: HTMLElement,
   getLinks: () => BlockScrollLink[],
+  sticky: BlockAwareStickyBundle,
 ): DocToCodeFlipPlan {
   const winRatio = paneUsesInternalYScroll(docPane)
     ? clamp(docPane.scrollTop / Math.max(1, docPane.scrollHeight - docPane.clientHeight), 0, 1)
     : windowScrollRatio();
-  const pulledSrc0 = pulledSourceLine0FromPageBreak(docPane);
-  if (pulledSrc0 !== null) return { k: "block", src0: pulledSrc0, winRatio };
+  /**
+   * Block info is authoritative — `pulledSourceLine0FromPageBreak` is "active" for the entire span
+   * from a page-break element to its `nextAnchor`, which can cover whole blocks. If we let the
+   * page-break heuristic run first, it snaps code far forward (e.g. to the next segment's source
+   * line) while the doc viewport is still genuinely inside an earlier block; the later real-block
+   * resolution is then opposite the prior snap and `enforceScrollSyncMonotonic` reverts it, so
+   * code gets stuck hundreds of pixels ahead of the doc. Only fall back to `page-break-pull`
+   * when no indexed block matches the doc viewport (true inter-block / inter-segment gap).
+   */
   const links = getLinks();
+  resetBlockScrollStickyIfLinksChanged(sticky, links);
   const mdLine0 = probeCommentrayLine0FromDoc(docPane);
   if (mdLine0 !== null) {
-    const src0 = pickSourceLine0ForCommentrayScroll(links, mdLine0);
-    if (src0 !== null) return { k: "block", src0, winRatio };
+    const block = pickBlockScrollLinkForCommentrayScroll(links, mdLine0);
+    const src0 = block !== null ? block.markerViewportHalfOpen1Based.lo - 1 : null;
+    if (block !== null) {
+      sticky.commentraySticky.lockedId = block.id;
+    }
+    if (src0 !== null) {
+      const plan: DocToCodeFlipPlan = { k: "block", src0, winRatio };
+      scrollSyncTrace("doc→code.plan", {
+        reason: "block-from-md-probe",
+        plan: formatDocToCodePlanForLog(plan),
+        mdLine0,
+        blockId: block?.id ?? null,
+        markerSpan: block?.markerViewportHalfOpen1Based ?? null,
+      });
+      return plan;
+    }
+  }
+  const pulledSrc0 = pulledSourceLine0FromPageBreak(docPane);
+  if (pulledSrc0 !== null) {
+    const plan: DocToCodeFlipPlan = { k: "block", src0: pulledSrc0, winRatio };
+    scrollSyncTrace("doc→code.plan", {
+      reason: "page-break-pull",
+      plan: formatDocToCodePlanForLog(plan),
+      pulledSrc0,
+      mdLine0,
+    });
+    return plan;
   }
   /** Index-backed pair but no confident block anchor for this viewport — do not nudge the source. */
-  if (links.length > 0) return { k: "noop" };
+  if (links.length > 0) {
+    scrollSyncTrace("doc→code.plan", {
+      reason: "indexed-noop-no-src0",
+      mdLine0,
+      linkCount: links.length,
+    });
+    return { k: "noop" };
+  }
   if (paneUsesInternalYScroll(docPane)) {
-    return {
+    const plan: DocToCodeFlipPlan = {
       k: "mirrorI",
       docTop: docPane.scrollTop,
       docSH: docPane.scrollHeight,
       docCH: docPane.clientHeight,
     };
+    scrollSyncTrace("doc→code.plan", {
+      reason: "no-index-mirror-internal",
+      plan: formatDocToCodePlanForLog(plan),
+    });
+    return plan;
   }
-  return { k: "mirrorW", ratio: winRatio };
+  const plan: DocToCodeFlipPlan = { k: "mirrorW", ratio: winRatio };
+  scrollSyncTrace("doc→code.plan", { reason: "no-index-mirror-window", plan: formatDocToCodePlanForLog(plan) });
+  return plan;
 }
 
 function buildCodeToDocFlipPlanBlockAware(
   codePane: HTMLElement,
   docPane: HTMLElement,
   getLinks: () => BlockScrollLink[],
-  lineIdPrefix = "code-line-",
+  lineIdPrefix: string,
+  sticky: BlockAwareStickyBundle,
 ): CodeToDocFlipPlan {
   const winRatio = windowScrollRatio();
   const links = getLinks();
-  const line1 = probeCodeLine1FromViewport(codePane, lineIdPrefix);
-  const mdLine0 = pickCommentrayLineForSourceScroll(links, line1);
-  if (mdLine0 === null) {
-    if (links.length > 0) return { k: "noop" };
+  resetBlockScrollStickyIfLinksChanged(sticky, links);
+  if (links.length === 0) {
     if (paneUsesInternalYScroll(codePane)) {
-      return {
+      const plan: CodeToDocFlipPlan = {
         k: "mirrorI",
         codeTop: codePane.scrollTop,
         codeSH: codePane.scrollHeight,
         codeCH: codePane.clientHeight,
       };
+      scrollSyncTrace("code→doc.plan", {
+        reason: "no-block-links-mirror-internal",
+        lineIdPrefix,
+        plan: formatCodeToDocPlanForLog(plan),
+      });
+      return plan;
     }
-    return { k: "mirrorW", ratio: winRatio };
+    const plan: CodeToDocFlipPlan = { k: "mirrorW", ratio: winRatio };
+    scrollSyncTrace("code→doc.plan", {
+      reason: "no-block-links-mirror-window",
+      lineIdPrefix,
+      plan: formatCodeToDocPlanForLog(plan),
+    });
+    return plan;
   }
-  const docProbe = probeCommentrayLine0FromDoc(docPane);
-  if (docProbe !== null && docProbe === mdLine0) {
-    return { k: "noop" };
+
+  const line1 = probeCodeLine1FromViewport(codePane, lineIdPrefix);
+
+  if (sourceTopLineStrictlyBeforeFirstIndexLine(links, line1)) {
+    const sorted = [...links].sort(
+      (a, b) => a.markerViewportHalfOpen1Based.lo - b.markerViewportHalfOpen1Based.lo,
+    );
+    const first = sorted[0];
+    if (!first) {
+      scrollSyncTrace("code→doc.plan", { reason: "prelude-missing-first-link", line1, lineIdPrefix });
+      return { k: "noop" };
+    }
+    sticky.sourceSticky.lockedId = first.id;
+    const mdLine0 = first.commentrayLine;
+    if (commentrayBlockAnchorAlignedWithLead(docPane, mdLine0, 2)) {
+      scrollSyncTrace("code→doc.plan", {
+        reason: "prelude-anchor-already-aligned-noop",
+        line1,
+        blockId: first.id,
+        mdLine0,
+      });
+      return { k: "noop" };
+    }
+    const plan: CodeToDocFlipPlan = { k: "block", mdLine0, winRatio };
+    scrollSyncTrace("code→doc.plan", {
+      reason: "prelude-first-block",
+      line1,
+      blockId: first.id,
+      mdLine0,
+      plan: formatCodeToDocPlanForLog(plan),
+    });
+    return plan;
   }
-  return { k: "block", mdLine0, winRatio };
+
+  const strictContaining = blockStrictlyContainingSourceViewportLine(links, line1);
+  const active = blockForCodeToDocSync(links, line1, sticky);
+  if (active) {
+    sticky.sourceSticky.lockedId = active.id;
+    const mdLine0 = active.commentrayLine;
+    const pickMode =
+      strictContaining !== null && strictContaining.id === active.id ? "strict" : "trailing-slack";
+    if (commentrayBlockAnchorAlignedWithLead(docPane, mdLine0, 2)) {
+      scrollSyncTrace("code→doc.plan", {
+        reason: "active-block-anchor-aligned-noop",
+        line1,
+        pickMode,
+        blockId: active.id,
+        mdLine0,
+      });
+      return { k: "noop" };
+    }
+    const plan: CodeToDocFlipPlan = { k: "block", mdLine0, winRatio };
+    scrollSyncTrace("code→doc.plan", {
+      reason: "active-block-reveal",
+      line1,
+      pickMode,
+      blockId: active.id,
+      mdLine0,
+      markerSpan: active.markerViewportHalfOpen1Based,
+      plan: formatCodeToDocPlanForLog(plan),
+    });
+    return plan;
+  }
+
+  /** Source viewport sits in a true gap between indexed spans — mirror so the doc never snaps to an unrelated block head. */
+  const sid = sticky.sourceSticky.lockedId;
+  if (sid) {
+    const prev = links.find((x) => x.id === sid);
+    if (prev) {
+      const hi = prev.markerViewportHalfOpen1Based.hiExclusive;
+      if (line1 >= hi + SOURCE_BLOCK_TRAILING_SLACK_LINES) {
+        sticky.sourceSticky.lockedId = null;
+      }
+    } else {
+      sticky.sourceSticky.lockedId = null;
+    }
+  }
+  if (paneUsesInternalYScroll(codePane)) {
+    const plan: CodeToDocFlipPlan = {
+      k: "mirrorI",
+      codeTop: codePane.scrollTop,
+      codeSH: codePane.scrollHeight,
+      codeCH: codePane.clientHeight,
+    };
+    scrollSyncTrace("code→doc.plan", {
+      reason: "source-gap-mirror-internal",
+      line1,
+      lineIdPrefix,
+      stickyLockAfter: sticky.sourceSticky.lockedId,
+      plan: formatCodeToDocPlanForLog(plan),
+    });
+    return plan;
+  }
+  const plan: CodeToDocFlipPlan = { k: "mirrorW", ratio: winRatio };
+  scrollSyncTrace("code→doc.plan", {
+    reason: "source-gap-mirror-window",
+    line1,
+    lineIdPrefix,
+    plan: formatCodeToDocPlanForLog(plan),
+  });
+  return plan;
 }
 
 function buildDocToCodeFlipPlanProportional(docPane: HTMLElement): DocToCodeFlipPlan {
@@ -1322,13 +1616,13 @@ function pulledSourceLine0FromPageBreak(docPane: HTMLElement): number | null {
   if (!pageBreakPullEnabled()) return null;
   const topY = docProbeTopY(docPane);
   const breaks = Array.from(
-    docPane.querySelectorAll<HTMLElement>(".commentray-page-break[data-next-source-start]"),
+    docPane.querySelectorAll<HTMLElement>(".commentray-page-break[data-next-source-viewport-line]"),
   );
   for (const pageBreak of breaks) {
-    const nextSourceStartRaw = pageBreak.getAttribute("data-next-source-start");
-    if (!nextSourceStartRaw) continue;
-    const nextSourceStart = Number.parseInt(nextSourceStartRaw, 10);
-    if (!Number.isFinite(nextSourceStart) || nextSourceStart <= 0) continue;
+    const nextViewportLineRaw = pageBreak.getAttribute("data-next-source-viewport-line");
+    if (!nextViewportLineRaw) continue;
+    const nextViewportLine1Based = Number.parseInt(nextViewportLineRaw, 10);
+    if (!Number.isFinite(nextViewportLine1Based) || nextViewportLine1Based <= 0) continue;
 
     const breakTop = pageBreak.getBoundingClientRect().top;
     const nextLineRaw = pageBreak.getAttribute("data-next-commentray-line");
@@ -1346,35 +1640,37 @@ function pulledSourceLine0FromPageBreak(docPane: HTMLElement): number | null {
     const narrow = globalThis.matchMedia("(max-width: 767px)").matches;
     const pullThreshold = narrow ? 0.2 : 0.35;
     if (progress < pullThreshold) return null;
-    return nextSourceStart - 1;
+    return nextViewportLine1Based - 1;
   }
   return null;
 }
 
 type SyncPane = "none" | "code" | "doc";
 
-/**
- * Programmatic `scrollTop` on the partner pane can emit several `scroll` events, sometimes
- * after `syncing` is already cleared; the next handler would treat that as a user scroll and
- * apply the opposite block snap (doc↔code ping-pong). Arm a short budget on the partner before
- * each sync-driven update; release it after three rAFs so unused skips do not accumulate.
- */
-const PARTNER_SCROLL_EVENT_SKIP_BUDGET = 6;
+type PartnerScrollEchoGate = { until: number };
 
-function armIgnoreNextPaneScrollReaction(armed: { n: number }): void {
-  armed.n += PARTNER_SCROLL_EVENT_SKIP_BUDGET;
-  const release = PARTNER_SCROLL_EVENT_SKIP_BUDGET;
-  queueMicrotask(() => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          armed.n = Math.max(0, armed.n - release);
-        });
-      });
-    });
-  });
+/**
+ * After we move the **partner** pane from a driver sync, its `scroll` handler must not run the
+ * opposite mapper until things settle — one user wheel can produce dozens of programmatic scroll
+ * events (layout, smooth interpolation, nested scrollports). A **fixed event budget** was
+ * exhausted mid-gesture and caused doc↔code ping-pong. We extend a **deadline** instead; each driver
+ * sync pushes `until` forward so continuous scrolling stays stable.
+ */
+const PARTNER_SCROLL_ECHO_SUPPRESS_MS = 320;
+
+function armPartnerScrollEchoGate(gate: PartnerScrollEchoGate): void {
+  const next = performance.now() + PARTNER_SCROLL_ECHO_SUPPRESS_MS;
+  gate.until = Math.max(gate.until, next);
 }
 
+function partnerScrollEchoActive(gate: PartnerScrollEchoGate): boolean {
+  return performance.now() < gate.until;
+}
+
+/**
+ * Coalesces high-frequency `scroll` bursts into **one** partner sync per pane per animation
+ * frame so block-aware snaps do not chain immediate reverse syncs (“slot machine” feel).
+ */
 function wireBidirectionalScroll(
   codePane: HTMLElement,
   docPane: HTMLElement,
@@ -1382,27 +1678,96 @@ function wireBidirectionalScroll(
   syncFromDoc: (driverDelta: number) => void,
 ): void {
   let syncing: SyncPane = "none";
-  const ignoreCodeScrollFromPartnerSync = { n: 0 };
-  const ignoreDocScrollFromPartnerSync = { n: 0 };
+  /** Code pane: ignore scroll echoes while we are applying a doc→code partner update. */
+  const suppressCodeScrollEcho: PartnerScrollEchoGate = { until: 0 };
+  /** Doc pane: ignore scroll echoes while we are applying a code→doc partner update. */
+  const suppressDocScrollEcho: PartnerScrollEchoGate = { until: 0 };
   let lastSeenCodeTop = codePane.scrollTop;
   let lastSeenDocTop = docPane.scrollTop;
+  let pendingCodeDriverRaf = 0;
+  let pendingDocDriverRaf = 0;
+  /** Throttle `wire.*.flush-skipped` for `partner-echo` (otherwise one line per animation frame). */
+  const WIRE_ECHO_SKIP_TRACE_MIN_MS = 200;
+  let lastWireEchoSkipTraceCodeAt = -Infinity;
+  let lastWireEchoSkipTraceDocAt = -Infinity;
+
+  const flushCodeDriverScroll = (): void => {
+    pendingCodeDriverRaf = 0;
+    if (partnerScrollEchoActive(suppressCodeScrollEcho)) {
+      const t = performance.now();
+      if (scrollSyncTraceFeatureFlag() && t - lastWireEchoSkipTraceCodeAt >= WIRE_ECHO_SKIP_TRACE_MIN_MS) {
+        lastWireEchoSkipTraceCodeAt = t;
+        scrollSyncTrace("wire.code.flush-skipped", {
+          reason: "partner-echo",
+          echoUntilMs: Math.round(suppressCodeScrollEcho.until),
+          codeScrollTop: codePane.scrollTop,
+        });
+      }
+      lastSeenCodeTop = codePane.scrollTop;
+      return;
+    }
+    if (syncing !== "none") {
+      scrollSyncTrace("wire.code.flush-skipped", { reason: "sync-in-progress", syncing });
+      return;
+    }
+    const now = codePane.scrollTop;
+    const delta = now - lastSeenCodeTop;
+    lastSeenCodeTop = now;
+    syncing = "code";
+    armPartnerScrollEchoGate(suppressDocScrollEcho);
+    scrollSyncTrace("wire.code.driver", { delta, codeScrollTop: now });
+    syncFromCode(delta);
+    syncing = "none";
+  };
+
+  const flushDocDriverScroll = (): void => {
+    pendingDocDriverRaf = 0;
+    if (partnerScrollEchoActive(suppressDocScrollEcho)) {
+      const t = performance.now();
+      if (scrollSyncTraceFeatureFlag() && t - lastWireEchoSkipTraceDocAt >= WIRE_ECHO_SKIP_TRACE_MIN_MS) {
+        lastWireEchoSkipTraceDocAt = t;
+        scrollSyncTrace("wire.doc.flush-skipped", {
+          reason: "partner-echo",
+          echoUntilMs: Math.round(suppressDocScrollEcho.until),
+          docScrollTop: docPane.scrollTop,
+        });
+      }
+      lastSeenDocTop = docPane.scrollTop;
+      return;
+    }
+    if (syncing !== "none") {
+      scrollSyncTrace("wire.doc.flush-skipped", { reason: "sync-in-progress", syncing });
+      return;
+    }
+    const now = docPane.scrollTop;
+    const delta = now - lastSeenDocTop;
+    lastSeenDocTop = now;
+    syncing = "doc";
+    armPartnerScrollEchoGate(suppressCodeScrollEcho);
+    scrollSyncTrace("wire.doc.driver", { delta, docScrollTop: now });
+    syncFromDoc(delta);
+    syncing = "none";
+  };
 
   codePane.addEventListener(
     "scroll",
     () => {
-      const now = codePane.scrollTop;
-      const delta = now - lastSeenCodeTop;
-      lastSeenCodeTop = now;
-      if (ignoreCodeScrollFromPartnerSync.n > 0) {
-        ignoreCodeScrollFromPartnerSync.n--;
+      if (partnerScrollEchoActive(suppressCodeScrollEcho)) {
+        lastSeenCodeTop = codePane.scrollTop;
+        if (pendingCodeDriverRaf !== 0) {
+          cancelAnimationFrame(pendingCodeDriverRaf);
+          pendingCodeDriverRaf = 0;
+        }
         return;
       }
-      if (syncing === "doc") return;
-      if (syncing === "code") return;
-      syncing = "code";
-      armIgnoreNextPaneScrollReaction(ignoreDocScrollFromPartnerSync);
-      syncFromCode(delta);
-      syncing = "none";
+      if (syncing === "doc" || syncing === "code") {
+        lastSeenCodeTop = codePane.scrollTop;
+        return;
+      }
+      if (pendingCodeDriverRaf !== 0) {
+        cancelAnimationFrame(pendingCodeDriverRaf);
+      }
+      pendingCodeDriverRaf = requestAnimationFrame(flushCodeDriverScroll);
     },
     { passive: true },
   );
@@ -1410,19 +1775,22 @@ function wireBidirectionalScroll(
   docPane.addEventListener(
     "scroll",
     () => {
-      const now = docPane.scrollTop;
-      const delta = now - lastSeenDocTop;
-      lastSeenDocTop = now;
-      if (ignoreDocScrollFromPartnerSync.n > 0) {
-        ignoreDocScrollFromPartnerSync.n--;
+      if (partnerScrollEchoActive(suppressDocScrollEcho)) {
+        lastSeenDocTop = docPane.scrollTop;
+        if (pendingDocDriverRaf !== 0) {
+          cancelAnimationFrame(pendingDocDriverRaf);
+          pendingDocDriverRaf = 0;
+        }
         return;
       }
-      if (syncing === "code") return;
-      if (syncing === "doc") return;
-      syncing = "doc";
-      armIgnoreNextPaneScrollReaction(ignoreCodeScrollFromPartnerSync);
-      syncFromDoc(delta);
-      syncing = "none";
+      if (syncing === "code" || syncing === "doc") {
+        lastSeenDocTop = docPane.scrollTop;
+        return;
+      }
+      if (pendingDocDriverRaf !== 0) {
+        cancelAnimationFrame(pendingDocDriverRaf);
+      }
+      pendingDocDriverRaf = requestAnimationFrame(flushDocDriverScroll);
     },
     { passive: true },
   );
@@ -1450,63 +1818,61 @@ type BlockAwareScrollPaneBundle = {
   docPane: HTMLElement;
   getLinks: () => BlockScrollLink[];
   lineIdPrefix: () => string;
+  sticky: BlockAwareStickyBundle;
 };
 
 function blockAwareSyncFromCodeToDoc(
   bundle: BlockAwareScrollPaneBundle,
   driverDelta: number,
 ): void {
-  const { codePane, docPane, getLinks, lineIdPrefix } = bundle;
+  const { codePane, docPane, getLinks, lineIdPrefix, sticky } = bundle;
   const docBefore = readPaneVerticalScroll(docPane);
   const prefix = lineIdPrefix();
-  const p = buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks, prefix);
-  if (scrollSyncDebugEnabled()) {
-    const links = getLinks();
-    const line1 = probeCodeLine1FromViewport(codePane, prefix);
-    const docProbe = probeCommentrayLine0FromDoc(docPane);
-    const pickedMd = pickCommentrayLineForSourceScroll(links, line1);
-    globalThis.console.info("[commentray:scroll-sync] code→doc", {
-      plan: formatCodeToDocPlanForLog(p),
-      driverDelta,
-      line1,
-      docProbe,
-      pickedMd,
-      linkCount: links.length,
-      codeScrollTop: codePane.scrollTop,
-      docScrollTop: docPane.scrollTop,
-    });
-  }
+  const p = buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks, prefix, sticky);
   applyCodeToDocFlipPlanImpl(codePane, docPane, p);
-  enforceScrollSyncMonotonic({ driverDelta, partnerBefore: docBefore, partnerPane: docPane });
+  const docAfter = readPaneVerticalScroll(docPane);
+  scrollSyncTrace("code→doc.apply", {
+    driverDelta,
+    lineIdPrefix: prefix,
+    plan: formatCodeToDocPlanForLog(p),
+    docScrollTopBefore: docBefore,
+    docScrollTopAfter: docAfter,
+    docDelta: docAfter - docBefore,
+    codeScrollTop: codePane.scrollTop,
+  });
+  enforceScrollSyncMonotonic({
+    driverDelta,
+    partnerBefore: docBefore,
+    partnerPane: docPane,
+    axis: "code→doc",
+  });
 }
 
 function blockAwareSyncFromDocToCode(
   bundle: BlockAwareScrollPaneBundle,
   driverDelta: number,
 ): void {
-  const { codePane, docPane, getLinks, lineIdPrefix } = bundle;
+  const { codePane, docPane, getLinks, lineIdPrefix, sticky } = bundle;
   const codeBefore = readPaneVerticalScroll(codePane);
   const prefix = lineIdPrefix();
-  const p = buildDocToCodeFlipPlanBlockAware(docPane, getLinks);
-  if (scrollSyncDebugEnabled()) {
-    const links = getLinks();
-    const mdLine0 = probeCommentrayLine0FromDoc(docPane);
-    const line1 = probeCodeLine1FromViewport(codePane, prefix);
-    const link = mdLine0 !== null ? pickBlockScrollLinkForCommentrayScroll(links, mdLine0) : null;
-    globalThis.console.info("[commentray:scroll-sync] doc→code", {
-      plan: formatDocToCodePlanForLog(p),
-      driverDelta,
-      mdLine0,
-      line1,
-      blockId: link?.id ?? null,
-      markerSpan: link?.markerViewportHalfOpen1Based ?? null,
-      linkCount: links.length,
-      docScrollTop: docPane.scrollTop,
-      codeScrollTop: codePane.scrollTop,
-    });
-  }
+  const p = buildDocToCodeFlipPlanBlockAware(docPane, getLinks, sticky);
   applyDocToCodeFlipPlanImpl(codePane, docPane, p, prefix);
-  enforceScrollSyncMonotonic({ driverDelta, partnerBefore: codeBefore, partnerPane: codePane });
+  const codeAfter = readPaneVerticalScroll(codePane);
+  scrollSyncTrace("doc→code.apply", {
+    driverDelta,
+    lineIdPrefix: prefix,
+    plan: formatDocToCodePlanForLog(p),
+    codeScrollTopBefore: codeBefore,
+    codeScrollTopAfter: codeAfter,
+    codeDelta: codeAfter - codeBefore,
+    docScrollTop: docPane.scrollTop,
+  });
+  enforceScrollSyncMonotonic({
+    driverDelta,
+    partnerBefore: codeBefore,
+    partnerPane: codePane,
+    axis: "doc→code",
+  });
 }
 
 /** Index-backed scroll sync when `data-scroll-block-links-b64` is present; else see proportional fallback. */
@@ -1519,7 +1885,12 @@ function wireBlockAwareScrollSync(
 ): DualPaneScrollSyncRunners {
   let pendingDocToCode: DocToCodeFlipPlan | null = null;
   let pendingCodeToDoc: CodeToDocFlipPlan | null = null;
-  const bundle: BlockAwareScrollPaneBundle = { codePane, docPane, getLinks, lineIdPrefix };
+  const sticky: BlockAwareStickyBundle = {
+    sourceSticky: { lockedId: null },
+    commentraySticky: { lockedId: null },
+    linksKey: { current: "" },
+  };
+  const bundle: BlockAwareScrollPaneBundle = { codePane, docPane, getLinks, lineIdPrefix, sticky };
   const syncFromCodeToDocInner = (d: number): void => blockAwareSyncFromCodeToDoc(bundle, d);
   const syncFromDocToCodeInner = (d: number): void => blockAwareSyncFromDocToCode(bundle, d);
   const syncFromCodeToDoc = (): void => {
@@ -1533,7 +1904,7 @@ function wireBlockAwareScrollSync(
       pendingDocToCode = { k: "mirrorW", ratio: windowScrollRatio() };
       return;
     }
-    pendingDocToCode = buildDocToCodeFlipPlanBlockAware(docPane, getLinks);
+    pendingDocToCode = buildDocToCodeFlipPlanBlockAware(docPane, getLinks, sticky);
   };
   const finishMobileFlipToCode = (): void => {
     if (!pendingDocToCode) return;
@@ -1548,6 +1919,7 @@ function wireBlockAwareScrollSync(
       docPane,
       getLinks,
       lineIdPrefix(),
+      sticky,
     );
   };
   const finishMobileFlipToDoc = (): void => {
@@ -1579,30 +1951,40 @@ function wireProportionalScrollSync(
   const syncFromCodeToDocInner = (driverDelta: number): void => {
     const docBefore = readPaneVerticalScroll(docPane);
     const p = buildCodeToDocFlipPlanProportional(codePane);
-    if (scrollSyncDebugEnabled()) {
-      globalThis.console.info("[commentray:scroll-sync] code→doc (proportional)", {
-        plan: formatCodeToDocPlanForLog(p),
-        driverDelta,
-        codeScrollTop: codePane.scrollTop,
-        docScrollTop: docPane.scrollTop,
-      });
-    }
     applyCodeToDocFlipPlanImpl(codePane, docPane, p);
-    enforceScrollSyncMonotonic({ driverDelta, partnerBefore: docBefore, partnerPane: docPane });
+    scrollSyncTrace("code→doc.apply", {
+      mode: "proportional-shell",
+      driverDelta,
+      plan: formatCodeToDocPlanForLog(p),
+      docScrollTopBefore: docBefore,
+      docScrollTopAfter: readPaneVerticalScroll(docPane),
+      codeScrollTop: codePane.scrollTop,
+    });
+    enforceScrollSyncMonotonic({
+      driverDelta,
+      partnerBefore: docBefore,
+      partnerPane: docPane,
+      axis: "code→doc",
+    });
   };
   const syncFromDocToCodeInner = (driverDelta: number): void => {
     const codeBefore = readPaneVerticalScroll(codePane);
     const p = buildDocToCodeFlipPlanProportional(docPane);
-    if (scrollSyncDebugEnabled()) {
-      globalThis.console.info("[commentray:scroll-sync] doc→code (proportional)", {
-        plan: formatDocToCodePlanForLog(p),
-        driverDelta,
-        docScrollTop: docPane.scrollTop,
-        codeScrollTop: codePane.scrollTop,
-      });
-    }
     applyDocToCodeFlipPlanImpl(codePane, docPane, p);
-    enforceScrollSyncMonotonic({ driverDelta, partnerBefore: codeBefore, partnerPane: codePane });
+    scrollSyncTrace("doc→code.apply", {
+      mode: "proportional-shell",
+      driverDelta,
+      plan: formatDocToCodePlanForLog(p),
+      codeScrollTopBefore: codeBefore,
+      codeScrollTopAfter: readPaneVerticalScroll(codePane),
+      docScrollTop: docPane.scrollTop,
+    });
+    enforceScrollSyncMonotonic({
+      driverDelta,
+      partnerBefore: codeBefore,
+      partnerPane: codePane,
+      axis: "doc→code",
+    });
   };
   const syncFromCodeToDoc = (): void => {
     syncFromCodeToDocInner(0);
@@ -1665,9 +2047,7 @@ function commentaryBandEndYViewport(
     if (!nextEl) return centerYInViewport(docTop);
     const nextTop = nextEl.getBoundingClientRect().top - 3;
     if (!clipThroughPageBreakGaps) return nextTop;
-    const docBandTop = docTop.getBoundingClientRect().top + 4;
-    const contentBottom = maxRenderableCommentaryContentBottomViewport(docScrollEl, docTop, nextEl);
-    return Math.min(nextTop, Math.max(docBandTop, contentBottom));
+    return commentaryGutterDocBandBottomViewport(docScrollEl, docTop, nextEl);
   }
   const dr = docScrollEl.getBoundingClientRect();
   let bottom = dr.bottom - 4;
@@ -3504,6 +3884,7 @@ function wireSharePermalinkButton(): void {
 }
 
 function main(): void {
+  announceScrollSyncTraceOnBoot();
   wireSharePermalinkButton();
   wireColorThemeToolbar();
   wireDocumentedFilesTree();

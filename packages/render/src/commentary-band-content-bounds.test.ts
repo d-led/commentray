@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  commentaryGutterDocBandBottomViewport,
   maxRenderableCommentaryContentBottomViewport,
   pageBreakHostsBetweenAnchors,
 } from "./code-browser-block-rays.js";
@@ -145,5 +146,45 @@ describe("maxRenderableCommentaryContentBottomViewport", () => {
 
     expect(bottom).toBeGreaterThanOrEqual(p2Bottom - 4);
     expect(bottom).toBeLessThan(b2.getBoundingClientRect().top);
+  });
+});
+
+describe("commentaryGutterDocBandBottomViewport", () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it("stops the gutter doc band at the first page break before the next block (no false tie to interstitial prose)", () => {
+    const scroll = document.createElement("div");
+    scroll.style.position = "relative";
+
+    const b1 = document.createElement("div");
+    b1.id = "commentray-block-a";
+    const owned = pxBlock(document, 24, "Short block-owned copy");
+    const pb = document.createElement("div");
+    pb.className = "commentray-page-break";
+    pb.setAttribute("data-commentray-page-break", "true");
+    pb.style.minHeight = "200px";
+    pb.style.width = "80px";
+    const interstitial = pxBlock(document, 400, "Try scroll sync — not the same index block");
+    const b2 = document.createElement("div");
+    b2.id = "commentray-block-b";
+
+    scroll.append(b1, owned, pb, interstitial, b2);
+    document.body.append(scroll);
+
+    stubRect(b1, 0, 2, 8);
+    stubRect(owned, 4, 24);
+    stubRect(pb, 30, 200, 80);
+    stubRect(interstitial, 240, 400);
+    stubRect(b2, 2000, 2, 8);
+
+    const bottom = commentaryGutterDocBandBottomViewport(scroll, b1, b2);
+    const ownedBottom = owned.getBoundingClientRect().bottom;
+    const pbTop = pb.getBoundingClientRect().top;
+
+    expect(bottom).toBeLessThanOrEqual(pbTop + 4);
+    expect(bottom).toBeLessThan(interstitial.getBoundingClientRect().top);
+    expect(bottom).toBeGreaterThanOrEqual(ownedBottom - 2);
   });
 });

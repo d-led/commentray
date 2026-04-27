@@ -31,7 +31,7 @@ commentray migrate-angles    # flat .commentray/source/*.md → Angles folders +
 commentray angles add ID [--source PATH] [--title T] [--make-default]   # register angle + create companion under Angles layout
 commentray sync-moved-paths # rewrite index paths after Git renames (uses git diff)
 commentray convert-source-markers --file PATH --language LANG  # rewrite region comment style (optional --dry-run)
-commentray serve [--port 4173]     # watch inputs; rebuild _site; HTTP serve with browser livereload
+commentray serve [--port 4173]     # dev helper: watch inputs, rebuild _site, local HTTP + livereload (not how you host production—upload _site/ to Pages, S3, etc.)
 commentray render [--source SRC] [--markdown MD] [--out OUT.html] [--mermaid]
                             # missing flags fall back to .commentray.toml [static_site]
                             # (--out defaults to _site/index.html)

@@ -9,6 +9,7 @@ import { appendHtmlToOpaqueBrowseRequestUrl } from "@commentray/render";
 import chokidar from "chokidar";
 import handler from "serve-handler";
 
+import { injectServeDevBuildWatchIntoSite } from "./serve-dev-build-watch.js";
 import { startLivereloadServer } from "./serve-livereload.js";
 
 export type ServeCliOptions = {
@@ -38,6 +39,29 @@ function serveHandlerOptions(siteAbs: string): Parameters<typeof handler>[2] {
     // Same hub entry as GitHub Pages: GET `/` serves `_site/index.html` (not a directory index).
     rewrites: [{ source: "/", destination: "/index.html" }],
   };
+}
+
+function tryServeDevBuildIdRoute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  buildId: string,
+): boolean {
+  if (!buildId || req.method !== "GET") return false;
+  const raw = req.url;
+  if (typeof raw !== "string") return false;
+  let pathname = "";
+  try {
+    pathname = new URL(raw, "http://127.0.0.1").pathname;
+  } catch {
+    return false;
+  }
+  if (pathname !== "/__commentray/dev/build-id") return false;
+  res.writeHead(200, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(buildId);
+  return true;
 }
 
 function attachStaticSiteHandler(
@@ -78,6 +102,11 @@ function listenHttp(server: Server, port: number): Promise<void> {
   });
 }
 
+/**
+ * Serves the generated `_site/` tree over HTTP for **local development and CLI dogfooding** only.
+ * Production static sites use the same build output (`pages:build` / `buildGithubPagesStaticSite`)
+ * but are deployed by your host (for example GitHub Pages), not this Node `serve-handler` loop.
+ */
 export async function runServeStaticPages(
   repoRootAbs: string,
   opts: ServeCliOptions,
@@ -91,18 +120,23 @@ export async function runServeStaticPages(
   const siteRel = "_site";
   const siteAbs = path.join(repoRoot, siteRel);
   const livereload = await startLivereloadServer(opts.port + 1);
+  const serveDevBuildId = process.env.COMMENTRAY_SERVE_BUILD_ID?.trim() ?? "";
 
   async function rebuild(notifyBrowser = false): Promise<void> {
     process.stderr.write("[commentray serve] rebuilding…\n");
     await buildGithubPagesStaticSite({ repoRoot });
     await livereload?.injectIntoSite(siteAbs);
+    await injectServeDevBuildWatchIntoSite(siteAbs, serveDevBuildId);
     process.stderr.write("[commentray serve] rebuild finished\n");
     if (notifyBrowser) livereload?.notifyReload();
   }
 
   await rebuild();
 
-  const httpServer = createServer(attachStaticSiteHandler(siteAbs));
+  const httpServer = createServer((req, res) => {
+    if (tryServeDevBuildIdRoute(req, res, serveDevBuildId)) return;
+    attachStaticSiteHandler(siteAbs)(req, res);
+  });
   try {
     await listenHttp(httpServer, opts.port);
   } catch (err: unknown) {

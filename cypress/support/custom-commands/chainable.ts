@@ -49,6 +49,7 @@ declare global {
       CurrentPageShouldDisplayDualPaneCodeBrowserChrome(): Chainable<void>;
       DocumentationPairStripShouldMentionDualScrollSourceFile(): Chainable<void>;
       ResizeSplitterGutterShouldExposeConnectorPaths(): Chainable<void>;
+      AwaitDualPaneScrollSyncFlush(): Chainable<void>;
       ScrollCodePaneToMaximum(): Chainable<void>;
       ScrollDocPaneBodyToMaximum(): Chainable<void>;
       DocPaneBodyScrollTopShouldExceed(pixels: number): Chainable<void>;

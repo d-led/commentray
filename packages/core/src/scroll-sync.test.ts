@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { CURRENT_SCHEMA_VERSION } from "./model.js";
 import {
+  blockStrictlyContainingSourceViewportLine,
   buildBlockScrollLinks,
+  commentrayProbeInStrictInterMarkerGap,
   pickBlockScrollLinkForCommentrayScroll,
+  pickBlockScrollLinkForCommentrayViewportWithHysteresis,
+  pickBlockScrollLinkForSourceViewportTop,
+  pickBlockScrollLinkForSourceViewportWithHysteresis,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
+  sourceTopLineStrictlyBeforeFirstIndexLine,
 } from "./scroll-sync.js";
 
 const crPath = ".commentray/source/src/a.ts.md";
@@ -120,6 +126,79 @@ describe("Choosing a companion scroll position from a source viewport", () => {
 
   it("uses the first block when the viewport is above every range", () => {
     expect(pickCommentrayLineForSourceScroll(blocks, 1)).toBe(0);
+  });
+});
+
+describe("Strict source containment and markdown gap probes", () => {
+  const blocks = buildBlockScrollLinks(index, "src/a.ts", crPath, md);
+
+  it("detects when the source top sits strictly inside a block span", () => {
+    expect(blockStrictlyContainingSourceViewportLine(blocks, 3)?.id).toBe("b1");
+    expect(blockStrictlyContainingSourceViewportLine(blocks, 10)).toBeNull();
+    expect(blockStrictlyContainingSourceViewportLine(blocks, 22)?.id).toBe("b2");
+  });
+
+  it("detects prelude before the first block span", () => {
+    expect(sourceTopLineStrictlyBeforeFirstIndexLine(blocks, 0)).toBe(true);
+    expect(sourceTopLineStrictlyBeforeFirstIndexLine(blocks, 1)).toBe(false);
+  });
+
+  it("detects inter-marker companion gaps for doc-driven sync", () => {
+    expect(commentrayProbeInStrictInterMarkerGap(blocks, 0)).toBe(false);
+    expect(commentrayProbeInStrictInterMarkerGap(blocks, 3)).toBe(true);
+    expect(commentrayProbeInStrictInterMarkerGap(blocks, 5)).toBe(false);
+    expect(commentrayProbeInStrictInterMarkerGap(blocks, 99)).toBe(true);
+  });
+});
+
+describe("Schmitt sticky block picks (boundary hysteresis)", () => {
+  const blocks = buildBlockScrollLinks(index, "src/a.ts", crPath, md);
+
+  it("keeps the prior source block until the viewport has moved far enough into the next block", () => {
+    const state = { lockedId: null as string | null };
+    expect(pickBlockScrollLinkForSourceViewportWithHysteresis(blocks, 10, state, 2)?.id).toBe("b1");
+    expect(state.lockedId).toBe("b1");
+    expect(pickBlockScrollLinkForSourceViewportWithHysteresis(blocks, 20, state, 2)?.id).toBe("b1");
+    expect(pickBlockScrollLinkForSourceViewportWithHysteresis(blocks, 21, state, 2)?.id).toBe("b1");
+    expect(pickBlockScrollLinkForSourceViewportWithHysteresis(blocks, 22, state, 2)?.id).toBe("b2");
+    expect(state.lockedId).toBe("b2");
+  });
+
+  it("keeps the prior commentray block until the doc probe has moved far enough down the next block", () => {
+    const state = { lockedId: null as string | null };
+    expect(pickBlockScrollLinkForCommentrayViewportWithHysteresis(blocks, 0, state, 4)?.id).toBe(
+      "b1",
+    );
+    expect(pickBlockScrollLinkForCommentrayViewportWithHysteresis(blocks, 5, state, 4)?.id).toBe(
+      "b1",
+    );
+    expect(pickBlockScrollLinkForCommentrayViewportWithHysteresis(blocks, 8, state, 4)?.id).toBe(
+      "b1",
+    );
+    expect(pickBlockScrollLinkForCommentrayViewportWithHysteresis(blocks, 9, state, 4)?.id).toBe(
+      "b2",
+    );
+  });
+
+  it("releases the lock when the naive winner is not cleanly separated (overlap / odd geometry)", () => {
+    const state = { lockedId: "b1" as string | null };
+    const one = blocks[0];
+    const two = blocks[1];
+    if (!one || !two) throw new Error("fixture");
+    const weird: typeof blocks = [
+      { ...one, markerViewportHalfOpen1Based: { lo: 1, hiExclusive: 25 } },
+      { ...two, markerViewportHalfOpen1Based: { lo: 3, hiExclusive: 26 } },
+    ];
+    const topWhereNaiveIsB2 = 25;
+    expect(pickBlockScrollLinkForSourceViewportTop(weird, topWhereNaiveIsB2)?.id).toBe("b2");
+    const picked = pickBlockScrollLinkForSourceViewportWithHysteresis(
+      weird,
+      topWhereNaiveIsB2,
+      state,
+      2,
+    );
+    expect(picked?.id).toBe("b2");
+    expect(state.lockedId).toBe("b2");
   });
 });
 

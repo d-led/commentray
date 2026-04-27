@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 /**
  * Used by `scripts/serve.sh`: initial workspace builds, then `commentray serve`.
+ * Not a production deployment stack—only a dev loop around the same `_site/` output you upload elsewhere.
  * Watches `packages/{core,render,code-commentray-static,cli}/src` (and render's
  * esbuild entry script); on change, rebuilds affected packages and restarts
  * `commentray serve` so Node reloads workspace `dist` (ESM cache). No manual
  * `serve` restart: static `_site/` rebuilds run inside the same `commentray serve`
  * process (see packages/cli/src/serve.ts).
+ *
+ * Each restart sets a fresh `COMMENTRAY_SERVE_BUILD_ID` so open browser tabs
+ * detect the new process (livereload SSE alone cannot survive the restart).
  */
 import { spawn, spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import { once } from "node:events";
 import path from "node:path";
 import process from "node:process";
@@ -76,12 +81,19 @@ let restarting = false;
 
 const cliArgs = process.argv.slice(2);
 
+/** Rotated on every package rebuild + serve restart so tabs poll-reload (see serve.ts). */
+let packageWatchBuildId = crypto.randomBytes(8).toString("hex");
+
+function childEnv() {
+  return { ...process.env, COMMENTRAY_SERVE_BUILD_ID: packageWatchBuildId };
+}
+
 function startServe() {
   const cliJs = path.join(repoRoot, "packages", "cli", "dist", "cli.js");
   serveChild = spawn(process.execPath, [cliJs, "serve", ...cliArgs], {
     cwd: repoRoot,
     stdio: "inherit",
-    env: process.env,
+    env: childEnv(),
   });
   serveChild.on("exit", (code, signal) => {
     if (intentionalShutdown || restarting) return;
@@ -134,6 +146,7 @@ async function applyWork(work) {
     console.error("[serve] workspace rebuild failed; leaving commentray serve unchanged.");
     return;
   }
+  packageWatchBuildId = crypto.randomBytes(8).toString("hex");
   restarting = true;
   try {
     await stopServeAsync();
