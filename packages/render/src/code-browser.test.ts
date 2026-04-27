@@ -641,7 +641,9 @@ describe("Code browser page — companion Markdown page-break rendering", () => 
     expect(html).toContain('data-next-commentray-line="6"');
     expect(html).toContain('data-next-source-viewport-line="20"');
   });
+});
 
+describe("Code browser page — page-break next-block alignment and fenced-text guard", () => {
   it("aligns the page-break next-block target with the marker viewport top line, not the inner source start", async () => {
     const crPath = ".commentray/source/x.toml.md";
     const index = {

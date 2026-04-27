@@ -55,6 +55,10 @@ import {
   type CommentrayColorThemeMode,
 } from "./code-browser-color-theme.js";
 import { shouldRevertPartnerScrollForMonotonicity } from "./code-browser-scroll-sync-monotonic.js";
+import {
+  smoothRevealAlreadyInFlight,
+  type SmoothRevealInFlight,
+} from "./code-browser-smooth-reveal-dedup.js";
 import { wireWideModeIntroTour } from "./code-browser-wide-intro-controller.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
@@ -127,7 +131,14 @@ function scrollTopToAlignChildTop(
   return scrollEl.scrollTop + (cr.top - sr.top) - scrollEl.clientTop - leadCssPx;
 }
 
-/** Avoid feedback loops when sub-pixel math matches the current position (common with browser zoom). */
+/**
+ * Partner write for **proportional** mirror plans (`mirrorI` / `mirrorW`), which produce a fresh
+ * target on every driver scroll event. Must be **instant** — wrapping these in `behavior: "smooth"`
+ * makes the partner re-ease toward a moving target each frame, which the eye reads as up/down
+ * jitter while the user keeps scrolling. Block snaps (one-shot jumps) get the smooth glide via
+ * {@link applyRevealChildInPane}. Sub-pixel skip avoids feedback loops when zoom math matches the
+ * current position.
+ */
 function applyScrollTopClamped(scrollEl: HTMLElement, nextTop: number): void {
   const maxY = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
   const clamped = clamp(nextTop, 0, maxY);
@@ -191,6 +202,7 @@ function enforceScrollSyncMonotonic(args: {
   }
 }
 
+/** Window-root counterpart of {@link applyScrollTopClamped} for the narrow single-flow layout — same instant-vs-jitter rationale. */
 function applyWindowScrollRatio(ratio: number): void {
   const root = rootScrollingElement();
   const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
@@ -199,16 +211,29 @@ function applyWindowScrollRatio(ratio: number): void {
   root.scrollTop = next;
 }
 
+const smoothRevealInFlightByPane = new WeakMap<HTMLElement, SmoothRevealInFlight>();
+let smoothRevealInFlightWindow: SmoothRevealInFlight | null = null;
+
 /**
  * Reveal `child` near the top of the reading surface: the pane’s own scrollport when it scrolls
- * internally (desktop dual-pane), otherwise the document root (narrow flow layout).
+ * internally (desktop dual-pane), otherwise the document root (narrow flow layout). Block snaps are
+ * the only **jump**-shaped partner write, so this is the one place we glide with `behavior: "smooth"`
+ * — the user sees how far the other column moved instead of a discrete flash. Proportional mirror
+ * writes go through {@link applyScrollTopClamped} / {@link applyWindowScrollRatio} and stay instant
+ * to avoid retargeting jitter while the driver keeps scrolling. Same-target re-issues during an
+ * in-flight glide are dropped by {@link smoothRevealAlreadyInFlight} so the existing animation can
+ * finish without being cancelled and restarted every frame.
  */
 function applyRevealChildInPane(scrollport: HTMLElement, child: Element, leadCssPx: number): void {
   if (paneUsesInternalYScroll(scrollport)) {
-    applyScrollTopClamped(
-      scrollport,
-      Math.round(scrollTopToAlignChildTop(scrollport, child, leadCssPx)),
-    );
+    const target = Math.round(scrollTopToAlignChildTop(scrollport, child, leadCssPx));
+    const maxY = Math.max(0, scrollport.scrollHeight - scrollport.clientHeight);
+    const clamped = clamp(target, 0, maxY);
+    if (Math.abs(scrollport.scrollTop - clamped) < 0.25) return;
+    const last = smoothRevealInFlightByPane.get(scrollport) ?? null;
+    if (smoothRevealAlreadyInFlight(last, clamped, performance.now())) return;
+    smoothRevealInFlightByPane.set(scrollport, { target: clamped, issuedAt: performance.now() });
+    scrollport.scrollTo({ top: clamped, behavior: "smooth" });
     return;
   }
   const root = rootScrollingElement();
@@ -217,7 +242,9 @@ function applyRevealChildInPane(scrollport: HTMLElement, child: Element, leadCss
   const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
   const clamped = clamp(targetTop, 0, maxY);
   if (Math.abs(root.scrollTop - clamped) < 0.25) return;
-  root.scrollTop = clamped;
+  if (smoothRevealAlreadyInFlight(smoothRevealInFlightWindow, clamped, performance.now())) return;
+  smoothRevealInFlightWindow = { target: clamped, issuedAt: performance.now() };
+  globalThis.scrollTo({ top: clamped, behavior: "smooth" });
 }
 
 /** True when the block anchor for `mdLine0` is already aligned like {@link applyRevealChildInPane} would. */
@@ -600,6 +627,117 @@ function buildDocToCodeFlipPlanBlockAware(
   return plan;
 }
 
+/** Mirror plan for the current source pane geometry — internal scroller (`mirrorI`) or window flow (`mirrorW`). */
+function codeMirrorPlan(codePane: HTMLElement, winRatio: number): CodeToDocFlipPlan {
+  if (paneUsesInternalYScroll(codePane)) {
+    return {
+      k: "mirrorI",
+      codeTop: codePane.scrollTop,
+      codeSH: codePane.scrollHeight,
+      codeCH: codePane.clientHeight,
+    };
+  }
+  return { k: "mirrorW", ratio: winRatio };
+}
+
+/** Source viewport sits **above** every indexed span — pin partner to the very first block head. */
+function preludeBlockAwareCodeToDocPlan(
+  links: BlockScrollLink[],
+  docPane: HTMLElement,
+  sticky: BlockAwareStickyBundle,
+  line1: number,
+  lineIdPrefix: string,
+  winRatio: number,
+): CodeToDocFlipPlan {
+  const sorted = [...links].sort(
+    (a, b) => a.markerViewportHalfOpen1Based.lo - b.markerViewportHalfOpen1Based.lo,
+  );
+  const first = sorted[0];
+  if (!first) {
+    scrollSyncTrace("code→doc.plan", { reason: "prelude-missing-first-link", line1, lineIdPrefix });
+    return { k: "noop" };
+  }
+  sticky.sourceSticky.lockedId = first.id;
+  const mdLine0 = first.commentrayLine;
+  if (commentrayBlockAnchorAlignedWithLead(docPane, mdLine0, 2)) {
+    scrollSyncTrace("code→doc.plan", {
+      reason: "prelude-anchor-already-aligned-noop",
+      line1,
+      blockId: first.id,
+      mdLine0,
+    });
+    return { k: "noop" };
+  }
+  const plan: CodeToDocFlipPlan = { k: "block", mdLine0, winRatio };
+  scrollSyncTrace("code→doc.plan", {
+    reason: "prelude-first-block",
+    line1,
+    blockId: first.id,
+    mdLine0,
+    plan: formatCodeToDocPlanForLog(plan),
+  });
+  return plan;
+}
+
+/** Source viewport falls inside (or in trailing-slack of) an indexed block — reveal that block's anchor. */
+function activeBlockCodeToDocPlan(
+  active: BlockScrollLink,
+  strictContaining: BlockScrollLink | null,
+  docPane: HTMLElement,
+  sticky: BlockAwareStickyBundle,
+  line1: number,
+  winRatio: number,
+): CodeToDocFlipPlan {
+  sticky.sourceSticky.lockedId = active.id;
+  const mdLine0 = active.commentrayLine;
+  const pickMode =
+    strictContaining !== null && strictContaining.id === active.id ? "strict" : "trailing-slack";
+  if (commentrayBlockAnchorAlignedWithLead(docPane, mdLine0, 2)) {
+    scrollSyncTrace("code→doc.plan", {
+      reason: "active-block-anchor-aligned-noop",
+      line1,
+      pickMode,
+      blockId: active.id,
+      mdLine0,
+    });
+    return { k: "noop" };
+  }
+  const plan: CodeToDocFlipPlan = { k: "block", mdLine0, winRatio };
+  scrollSyncTrace("code→doc.plan", {
+    reason: "active-block-reveal",
+    line1,
+    pickMode,
+    blockId: active.id,
+    mdLine0,
+    markerSpan: active.markerViewportHalfOpen1Based,
+    plan: formatCodeToDocPlanForLog(plan),
+  });
+  return plan;
+}
+
+/**
+ * Releases the sticky source lock once the viewport is past the previous block plus its trailing
+ * slack — a true inter-block gap. Without this clear, the gap-mirror branch never reactivates after
+ * the slack expires.
+ */
+function clearStickySourceLockPastTrailingSlack(
+  sticky: BlockAwareStickyBundle,
+  links: BlockScrollLink[],
+  line1: number,
+): void {
+  const sid = sticky.sourceSticky.lockedId;
+  if (!sid) return;
+  const prev = links.find((x) => x.id === sid);
+  if (!prev) {
+    sticky.sourceSticky.lockedId = null;
+    return;
+  }
+  const hi = prev.markerViewportHalfOpen1Based.hiExclusive;
+  if (line1 >= hi + SOURCE_BLOCK_TRAILING_SLACK_LINES) {
+    sticky.sourceSticky.lockedId = null;
+  }
+}
+
 function buildCodeToDocFlipPlanBlockAware(
   codePane: HTMLElement,
   docPane: HTMLElement,
@@ -611,23 +749,10 @@ function buildCodeToDocFlipPlanBlockAware(
   const links = getLinks();
   resetBlockScrollStickyIfLinksChanged(sticky, links);
   if (links.length === 0) {
-    if (paneUsesInternalYScroll(codePane)) {
-      const plan: CodeToDocFlipPlan = {
-        k: "mirrorI",
-        codeTop: codePane.scrollTop,
-        codeSH: codePane.scrollHeight,
-        codeCH: codePane.clientHeight,
-      };
-      scrollSyncTrace("code→doc.plan", {
-        reason: "no-block-links-mirror-internal",
-        lineIdPrefix,
-        plan: formatCodeToDocPlanForLog(plan),
-      });
-      return plan;
-    }
-    const plan: CodeToDocFlipPlan = { k: "mirrorW", ratio: winRatio };
+    const plan = codeMirrorPlan(codePane, winRatio);
     scrollSyncTrace("code→doc.plan", {
-      reason: "no-block-links-mirror-window",
+      reason:
+        plan.k === "mirrorI" ? "no-block-links-mirror-internal" : "no-block-links-mirror-window",
       lineIdPrefix,
       plan: formatCodeToDocPlanForLog(plan),
     });
@@ -635,106 +760,24 @@ function buildCodeToDocFlipPlanBlockAware(
   }
 
   const line1 = probeCodeLine1FromViewport(codePane, lineIdPrefix);
-
   if (sourceTopLineStrictlyBeforeFirstIndexLine(links, line1)) {
-    const sorted = [...links].sort(
-      (a, b) => a.markerViewportHalfOpen1Based.lo - b.markerViewportHalfOpen1Based.lo,
-    );
-    const first = sorted[0];
-    if (!first) {
-      scrollSyncTrace("code→doc.plan", {
-        reason: "prelude-missing-first-link",
-        line1,
-        lineIdPrefix,
-      });
-      return { k: "noop" };
-    }
-    sticky.sourceSticky.lockedId = first.id;
-    const mdLine0 = first.commentrayLine;
-    if (commentrayBlockAnchorAlignedWithLead(docPane, mdLine0, 2)) {
-      scrollSyncTrace("code→doc.plan", {
-        reason: "prelude-anchor-already-aligned-noop",
-        line1,
-        blockId: first.id,
-        mdLine0,
-      });
-      return { k: "noop" };
-    }
-    const plan: CodeToDocFlipPlan = { k: "block", mdLine0, winRatio };
-    scrollSyncTrace("code→doc.plan", {
-      reason: "prelude-first-block",
-      line1,
-      blockId: first.id,
-      mdLine0,
-      plan: formatCodeToDocPlanForLog(plan),
-    });
-    return plan;
+    return preludeBlockAwareCodeToDocPlan(links, docPane, sticky, line1, lineIdPrefix, winRatio);
   }
 
   const strictContaining = blockStrictlyContainingSourceViewportLine(links, line1);
   const active = blockForCodeToDocSync(links, line1, sticky);
   if (active) {
-    sticky.sourceSticky.lockedId = active.id;
-    const mdLine0 = active.commentrayLine;
-    const pickMode =
-      strictContaining !== null && strictContaining.id === active.id ? "strict" : "trailing-slack";
-    if (commentrayBlockAnchorAlignedWithLead(docPane, mdLine0, 2)) {
-      scrollSyncTrace("code→doc.plan", {
-        reason: "active-block-anchor-aligned-noop",
-        line1,
-        pickMode,
-        blockId: active.id,
-        mdLine0,
-      });
-      return { k: "noop" };
-    }
-    const plan: CodeToDocFlipPlan = { k: "block", mdLine0, winRatio };
-    scrollSyncTrace("code→doc.plan", {
-      reason: "active-block-reveal",
-      line1,
-      pickMode,
-      blockId: active.id,
-      mdLine0,
-      markerSpan: active.markerViewportHalfOpen1Based,
-      plan: formatCodeToDocPlanForLog(plan),
-    });
-    return plan;
+    return activeBlockCodeToDocPlan(active, strictContaining, docPane, sticky, line1, winRatio);
   }
 
   /** Source viewport sits in a true gap between indexed spans — mirror so the doc never snaps to an unrelated block head. */
-  const sid = sticky.sourceSticky.lockedId;
-  if (sid) {
-    const prev = links.find((x) => x.id === sid);
-    if (prev) {
-      const hi = prev.markerViewportHalfOpen1Based.hiExclusive;
-      if (line1 >= hi + SOURCE_BLOCK_TRAILING_SLACK_LINES) {
-        sticky.sourceSticky.lockedId = null;
-      }
-    } else {
-      sticky.sourceSticky.lockedId = null;
-    }
-  }
-  if (paneUsesInternalYScroll(codePane)) {
-    const plan: CodeToDocFlipPlan = {
-      k: "mirrorI",
-      codeTop: codePane.scrollTop,
-      codeSH: codePane.scrollHeight,
-      codeCH: codePane.clientHeight,
-    };
-    scrollSyncTrace("code→doc.plan", {
-      reason: "source-gap-mirror-internal",
-      line1,
-      lineIdPrefix,
-      stickyLockAfter: sticky.sourceSticky.lockedId,
-      plan: formatCodeToDocPlanForLog(plan),
-    });
-    return plan;
-  }
-  const plan: CodeToDocFlipPlan = { k: "mirrorW", ratio: winRatio };
+  clearStickySourceLockPastTrailingSlack(sticky, links, line1);
+  const plan = codeMirrorPlan(codePane, winRatio);
   scrollSyncTrace("code→doc.plan", {
-    reason: "source-gap-mirror-window",
+    reason: plan.k === "mirrorI" ? "source-gap-mirror-internal" : "source-gap-mirror-window",
     line1,
     lineIdPrefix,
+    stickyLockAfter: sticky.sourceSticky.lockedId,
     plan: formatCodeToDocPlanForLog(plan),
   });
   return plan;
@@ -1674,6 +1717,112 @@ function partnerScrollEchoActive(gate: PartnerScrollEchoGate): boolean {
   return performance.now() < gate.until;
 }
 
+/** Throttle for the `wire.*.flush-skipped` `partner-echo` log line — without it we get one per animation frame. */
+const WIRE_ECHO_SKIP_TRACE_MIN_MS = 200;
+
+/** Mutable per-driver wiring state for one pane (code or doc). Symmetric across both directions. */
+type DriverWireState = {
+  lastSeenTop: number;
+  pendingRaf: number;
+  lastEchoSkipTraceAt: number;
+};
+
+/** Shared mutable lock used by both wire directions to serialise apply vs. driver flushes. */
+type SyncingRef = { current: SyncPane };
+
+function emitFlushSkippedPartnerEcho(
+  axis: "code" | "doc",
+  state: DriverWireState,
+  ownEchoGate: PartnerScrollEchoGate,
+  driverPane: HTMLElement,
+): void {
+  const t = performance.now();
+  if (
+    !scrollSyncTraceFeatureFlag() ||
+    t - state.lastEchoSkipTraceAt < WIRE_ECHO_SKIP_TRACE_MIN_MS
+  ) {
+    return;
+  }
+  state.lastEchoSkipTraceAt = t;
+  scrollSyncTrace(`wire.${axis}.flush-skipped`, {
+    reason: "partner-echo",
+    echoUntilMs: Math.round(ownEchoGate.until),
+    [`${axis}ScrollTop`]: driverPane.scrollTop,
+  });
+}
+
+type DriverWireArgs = {
+  axis: "code" | "doc";
+  driverPane: HTMLElement;
+  state: DriverWireState;
+  syncingRef: SyncingRef;
+  ownEchoGate: PartnerScrollEchoGate;
+  partnerEchoGate: PartnerScrollEchoGate;
+  syncFromDriver: (driverDelta: number) => void;
+};
+
+/** Builds the RAF flush closure that consumes one driver pane's coalesced scroll bursts. */
+function makeDriverFlush(args: DriverWireArgs): () => void {
+  const { axis, driverPane, state, syncingRef, ownEchoGate, partnerEchoGate, syncFromDriver } =
+    args;
+  return (): void => {
+    state.pendingRaf = 0;
+    if (partnerScrollEchoActive(ownEchoGate)) {
+      emitFlushSkippedPartnerEcho(axis, state, ownEchoGate, driverPane);
+      state.lastSeenTop = driverPane.scrollTop;
+      return;
+    }
+    if (syncingRef.current !== "none") {
+      scrollSyncTrace(`wire.${axis}.flush-skipped`, {
+        reason: "sync-in-progress",
+        syncing: syncingRef.current,
+      });
+      return;
+    }
+    const now = driverPane.scrollTop;
+    const delta = now - state.lastSeenTop;
+    state.lastSeenTop = now;
+    syncingRef.current = axis;
+    armPartnerScrollEchoGate(partnerEchoGate);
+    scrollSyncTrace(`wire.${axis}.driver`, { delta, [`${axis}ScrollTop`]: now });
+    syncFromDriver(delta);
+    syncingRef.current = "none";
+  };
+}
+
+/** Installs the `scroll` listener on one driver pane that schedules at most one flush per frame. */
+function attachDriverScrollListener(args: {
+  driverPane: HTMLElement;
+  state: DriverWireState;
+  syncingRef: SyncingRef;
+  ownEchoGate: PartnerScrollEchoGate;
+  flush: () => void;
+}): void {
+  const { driverPane, state, syncingRef, ownEchoGate, flush } = args;
+  driverPane.addEventListener(
+    "scroll",
+    () => {
+      if (partnerScrollEchoActive(ownEchoGate)) {
+        state.lastSeenTop = driverPane.scrollTop;
+        if (state.pendingRaf !== 0) {
+          cancelAnimationFrame(state.pendingRaf);
+          state.pendingRaf = 0;
+        }
+        return;
+      }
+      if (syncingRef.current !== "none") {
+        state.lastSeenTop = driverPane.scrollTop;
+        return;
+      }
+      if (state.pendingRaf !== 0) {
+        cancelAnimationFrame(state.pendingRaf);
+      }
+      state.pendingRaf = requestAnimationFrame(flush);
+    },
+    { passive: true },
+  );
+}
+
 /**
  * Coalesces high-frequency `scroll` bursts into **one** partner sync per pane per animation
  * frame so block-aware snaps do not chain immediate reverse syncs (“slot machine” feel).
@@ -1684,129 +1833,53 @@ function wireBidirectionalScroll(
   syncFromCode: (driverDelta: number) => void,
   syncFromDoc: (driverDelta: number) => void,
 ): void {
-  let syncing: SyncPane = "none";
+  const syncingRef: SyncingRef = { current: "none" };
   /** Code pane: ignore scroll echoes while we are applying a doc→code partner update. */
   const suppressCodeScrollEcho: PartnerScrollEchoGate = { until: 0 };
   /** Doc pane: ignore scroll echoes while we are applying a code→doc partner update. */
   const suppressDocScrollEcho: PartnerScrollEchoGate = { until: 0 };
-  let lastSeenCodeTop = codePane.scrollTop;
-  let lastSeenDocTop = docPane.scrollTop;
-  let pendingCodeDriverRaf = 0;
-  let pendingDocDriverRaf = 0;
-  /** Throttle `wire.*.flush-skipped` for `partner-echo` (otherwise one line per animation frame). */
-  const WIRE_ECHO_SKIP_TRACE_MIN_MS = 200;
-  let lastWireEchoSkipTraceCodeAt = -Infinity;
-  let lastWireEchoSkipTraceDocAt = -Infinity;
-
-  const flushCodeDriverScroll = (): void => {
-    pendingCodeDriverRaf = 0;
-    if (partnerScrollEchoActive(suppressCodeScrollEcho)) {
-      const t = performance.now();
-      if (
-        scrollSyncTraceFeatureFlag() &&
-        t - lastWireEchoSkipTraceCodeAt >= WIRE_ECHO_SKIP_TRACE_MIN_MS
-      ) {
-        lastWireEchoSkipTraceCodeAt = t;
-        scrollSyncTrace("wire.code.flush-skipped", {
-          reason: "partner-echo",
-          echoUntilMs: Math.round(suppressCodeScrollEcho.until),
-          codeScrollTop: codePane.scrollTop,
-        });
-      }
-      lastSeenCodeTop = codePane.scrollTop;
-      return;
-    }
-    if (syncing !== "none") {
-      scrollSyncTrace("wire.code.flush-skipped", { reason: "sync-in-progress", syncing });
-      return;
-    }
-    const now = codePane.scrollTop;
-    const delta = now - lastSeenCodeTop;
-    lastSeenCodeTop = now;
-    syncing = "code";
-    armPartnerScrollEchoGate(suppressDocScrollEcho);
-    scrollSyncTrace("wire.code.driver", { delta, codeScrollTop: now });
-    syncFromCode(delta);
-    syncing = "none";
+  const codeState: DriverWireState = {
+    lastSeenTop: codePane.scrollTop,
+    pendingRaf: 0,
+    lastEchoSkipTraceAt: -Infinity,
   };
-
-  const flushDocDriverScroll = (): void => {
-    pendingDocDriverRaf = 0;
-    if (partnerScrollEchoActive(suppressDocScrollEcho)) {
-      const t = performance.now();
-      if (
-        scrollSyncTraceFeatureFlag() &&
-        t - lastWireEchoSkipTraceDocAt >= WIRE_ECHO_SKIP_TRACE_MIN_MS
-      ) {
-        lastWireEchoSkipTraceDocAt = t;
-        scrollSyncTrace("wire.doc.flush-skipped", {
-          reason: "partner-echo",
-          echoUntilMs: Math.round(suppressDocScrollEcho.until),
-          docScrollTop: docPane.scrollTop,
-        });
-      }
-      lastSeenDocTop = docPane.scrollTop;
-      return;
-    }
-    if (syncing !== "none") {
-      scrollSyncTrace("wire.doc.flush-skipped", { reason: "sync-in-progress", syncing });
-      return;
-    }
-    const now = docPane.scrollTop;
-    const delta = now - lastSeenDocTop;
-    lastSeenDocTop = now;
-    syncing = "doc";
-    armPartnerScrollEchoGate(suppressCodeScrollEcho);
-    scrollSyncTrace("wire.doc.driver", { delta, docScrollTop: now });
-    syncFromDoc(delta);
-    syncing = "none";
+  const docState: DriverWireState = {
+    lastSeenTop: docPane.scrollTop,
+    pendingRaf: 0,
+    lastEchoSkipTraceAt: -Infinity,
   };
-
-  codePane.addEventListener(
-    "scroll",
-    () => {
-      if (partnerScrollEchoActive(suppressCodeScrollEcho)) {
-        lastSeenCodeTop = codePane.scrollTop;
-        if (pendingCodeDriverRaf !== 0) {
-          cancelAnimationFrame(pendingCodeDriverRaf);
-          pendingCodeDriverRaf = 0;
-        }
-        return;
-      }
-      if (syncing === "doc" || syncing === "code") {
-        lastSeenCodeTop = codePane.scrollTop;
-        return;
-      }
-      if (pendingCodeDriverRaf !== 0) {
-        cancelAnimationFrame(pendingCodeDriverRaf);
-      }
-      pendingCodeDriverRaf = requestAnimationFrame(flushCodeDriverScroll);
-    },
-    { passive: true },
-  );
-
-  docPane.addEventListener(
-    "scroll",
-    () => {
-      if (partnerScrollEchoActive(suppressDocScrollEcho)) {
-        lastSeenDocTop = docPane.scrollTop;
-        if (pendingDocDriverRaf !== 0) {
-          cancelAnimationFrame(pendingDocDriverRaf);
-          pendingDocDriverRaf = 0;
-        }
-        return;
-      }
-      if (syncing === "code" || syncing === "doc") {
-        lastSeenDocTop = docPane.scrollTop;
-        return;
-      }
-      if (pendingDocDriverRaf !== 0) {
-        cancelAnimationFrame(pendingDocDriverRaf);
-      }
-      pendingDocDriverRaf = requestAnimationFrame(flushDocDriverScroll);
-    },
-    { passive: true },
-  );
+  const flushCode = makeDriverFlush({
+    axis: "code",
+    driverPane: codePane,
+    state: codeState,
+    syncingRef,
+    ownEchoGate: suppressCodeScrollEcho,
+    partnerEchoGate: suppressDocScrollEcho,
+    syncFromDriver: syncFromCode,
+  });
+  const flushDoc = makeDriverFlush({
+    axis: "doc",
+    driverPane: docPane,
+    state: docState,
+    syncingRef,
+    ownEchoGate: suppressDocScrollEcho,
+    partnerEchoGate: suppressCodeScrollEcho,
+    syncFromDriver: syncFromDoc,
+  });
+  attachDriverScrollListener({
+    driverPane: codePane,
+    state: codeState,
+    syncingRef,
+    ownEchoGate: suppressCodeScrollEcho,
+    flush: flushCode,
+  });
+  attachDriverScrollListener({
+    driverPane: docPane,
+    state: docState,
+    syncingRef,
+    ownEchoGate: suppressDocScrollEcho,
+    flush: flushDoc,
+  });
 }
 
 /** One-shot runners used when the mobile single-pane flip reveals the partner pane. */

@@ -49,7 +49,7 @@ function tryServeDevBuildIdRoute(
   if (!buildId || req.method !== "GET") return false;
   const raw = req.url;
   if (typeof raw !== "string") return false;
-  let pathname = "";
+  let pathname: string;
   try {
     pathname = new URL(raw, "http://127.0.0.1").pathname;
   } catch {
