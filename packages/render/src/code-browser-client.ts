@@ -60,6 +60,13 @@ import {
   smoothRevealAlreadyInFlight,
   type SmoothRevealInFlight,
 } from "./code-browser-smooth-reveal-dedup.js";
+import { parseDualPaneScrollSyncStrategy } from "./code-browser-scroll-sync-strategy.js";
+import {
+  DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX,
+  READING_LEAD_ALIGN_TOLERANCE_CSS_PX,
+  READING_VIEWPORT_BOTTOM_EDGE_CSS_PX,
+  readingViewportTopInsetCssPx,
+} from "./reading-viewport-comfort.js";
 import { wireWideModeIntroTour } from "./code-browser-wide-intro-controller.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 
@@ -252,15 +259,19 @@ function applyRevealChildInPane(scrollport: HTMLElement, child: Element, leadCss
  * True when `child` is already placed like {@link applyRevealChildInPane} would (same few-pixel
  * tolerance as code→doc’s {@link commentrayBlockAnchorAlignedWithLead}).
  */
-function revealTargetAlreadyAtLead(scrollport: HTMLElement, child: Element, leadCssPx: number): boolean {
+function revealTargetAlreadyAtLead(
+  scrollport: HTMLElement,
+  child: Element,
+  leadCssPx: number,
+): boolean {
   if (paneUsesInternalYScroll(scrollport)) {
     const cr = child.getBoundingClientRect();
     const sr = scrollport.getBoundingClientRect();
     const dist = cr.top - sr.top - scrollport.clientTop;
-    return Math.abs(dist - leadCssPx) <= 4;
+    return Math.abs(dist - leadCssPx) <= READING_LEAD_ALIGN_TOLERANCE_CSS_PX;
   }
   const cr = child.getBoundingClientRect();
-  return Math.abs(cr.top - leadCssPx) <= 4;
+  return Math.abs(cr.top - leadCssPx) <= READING_LEAD_ALIGN_TOLERANCE_CSS_PX;
 }
 
 /** True when the block anchor for `mdLine0` is already aligned like {@link applyRevealChildInPane} would. */
@@ -305,7 +316,16 @@ function docToCodePlanIfCodeAnchorAlreadyAligned(
   traceReason: string,
   extraFields: Record<string, unknown>,
 ): DocToCodeFlipPlan | null {
-  if (!sourceCodeLineAnchorAlignedWithLead(codePane, lineIdPrefix, src0, 2)) return null;
+  if (
+    !sourceCodeLineAnchorAlignedWithLead(
+      codePane,
+      lineIdPrefix,
+      src0,
+      DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX,
+    )
+  ) {
+    return null;
+  }
   scrollSyncTrace("doc→code.plan", {
     reason: traceReason,
     ...extraFields,
@@ -519,7 +539,7 @@ function applyDocToCodeFlipPlanImpl(
   if (plan.k === "block") {
     const el = findCodeLineElementForBlockSnap(codePane, lineIdPrefix, plan.src0);
     if (el) {
-      applyRevealChildInPane(codePane, el, 2);
+      applyRevealChildInPane(codePane, el, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX);
     }
     return;
   }
@@ -561,7 +581,7 @@ function applyCodeToDocFlipPlanImpl(
   if (plan.k === "block") {
     const anchor = docPane.querySelector(`[data-commentray-line="${String(plan.mdLine0)}"]`);
     if (anchor instanceof HTMLElement) {
-      applyRevealChildInPane(docPane, anchor, 2);
+      applyRevealChildInPane(docPane, anchor, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX);
     }
     return;
   }
@@ -675,6 +695,7 @@ function buildDocToCodeFlipPlanBlockAware(
   getLinks: () => BlockScrollLink[],
   sticky: BlockAwareStickyBundle,
   lineIdPrefix: string,
+  allowProportionalMirror: boolean,
 ): DocToCodeFlipPlan {
   const winRatio = paneUsesInternalYScroll(docPane)
     ? clamp(docPane.scrollTop / Math.max(1, docPane.scrollHeight - docPane.clientHeight), 0, 1)
@@ -715,6 +736,10 @@ function buildDocToCodeFlipPlanBlockAware(
       mdLine0,
       linkCount: links.length,
     });
+    return { k: "noop" };
+  }
+  if (!allowProportionalMirror) {
+    scrollSyncTrace("doc→code.plan", { reason: "snap-only-no-index-noop", linkCount: 0 });
     return { k: "noop" };
   }
   if (paneUsesInternalYScroll(docPane)) {
@@ -770,7 +795,7 @@ function preludeBlockAwareCodeToDocPlan(
   }
   sticky.sourceSticky.lockedId = first.id;
   const mdLine0 = first.commentrayLine;
-  if (commentrayBlockAnchorAlignedWithLead(docPane, mdLine0, 2)) {
+  if (commentrayBlockAnchorAlignedWithLead(docPane, mdLine0, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX)) {
     scrollSyncTrace("code→doc.plan", {
       reason: "prelude-anchor-already-aligned-noop",
       line1,
@@ -803,7 +828,7 @@ function activeBlockCodeToDocPlan(
   const mdLine0 = active.commentrayLine;
   const pickMode =
     strictContaining !== null && strictContaining.id === active.id ? "strict" : "trailing-slack";
-  if (commentrayBlockAnchorAlignedWithLead(docPane, mdLine0, 2)) {
+  if (commentrayBlockAnchorAlignedWithLead(docPane, mdLine0, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX)) {
     scrollSyncTrace("code→doc.plan", {
       reason: "active-block-anchor-aligned-noop",
       line1,
@@ -855,11 +880,19 @@ function buildCodeToDocFlipPlanBlockAware(
   getLinks: () => BlockScrollLink[],
   lineIdPrefix: string,
   sticky: BlockAwareStickyBundle,
+  allowProportionalMirror: boolean,
 ): CodeToDocFlipPlan {
   const winRatio = windowScrollRatio();
   const links = getLinks();
   resetBlockScrollStickyIfLinksChanged(sticky, links);
   if (links.length === 0) {
+    if (!allowProportionalMirror) {
+      scrollSyncTrace("code→doc.plan", {
+        reason: "snap-only-no-block-links-noop",
+        lineIdPrefix,
+      });
+      return { k: "noop" };
+    }
     const plan = codeMirrorPlan(codePane, winRatio);
     scrollSyncTrace("code→doc.plan", {
       reason:
@@ -883,6 +916,15 @@ function buildCodeToDocFlipPlanBlockAware(
 
   /** Source viewport sits in a true gap between indexed spans — mirror so the doc never snaps to an unrelated block head. */
   clearStickySourceLockPastTrailingSlack(sticky, links, line1);
+  if (!allowProportionalMirror) {
+    scrollSyncTrace("code→doc.plan", {
+      reason: "snap-only-source-gap-noop",
+      line1,
+      lineIdPrefix,
+      stickyLockAfter: sticky.sourceSticky.lockedId,
+    });
+    return { k: "noop" };
+  }
   const plan = codeMirrorPlan(codePane, winRatio);
   scrollSyncTrace("code→doc.plan", {
     reason: plan.k === "mirrorI" ? "source-gap-mirror-internal" : "source-gap-mirror-window",
@@ -1164,7 +1206,9 @@ function scrollDocToMarkdownLine0(
 ): void {
   const el = docScrollEl.querySelector(`#commentray-md-line-${String(line0)}`);
   if (el instanceof HTMLElement) {
-    const top = Math.round(scrollTopToAlignChildTop(docScrollEl, el, 8));
+    const top = Math.round(
+      scrollTopToAlignChildTop(docScrollEl, el, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX),
+    );
     const maxY = Math.round(Math.max(0, docScrollEl.scrollHeight - docScrollEl.clientHeight));
     docScrollEl.scrollTo({ top: clamp(top, 0, maxY), behavior: "smooth" });
     return;
@@ -1635,14 +1679,17 @@ function parseScrollBlockLinksFromShell(b64: string): BlockScrollLink[] {
   }
 }
 
-function rootScrollNearDocumentEnd(edgePx = 56): boolean {
+function rootScrollNearDocumentEnd(edgePx = READING_VIEWPORT_BOTTOM_EDGE_CSS_PX): boolean {
   const root = rootScrollingElement();
   const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
   return maxY > 0 && root.scrollTop >= maxY - edgePx;
 }
 
 /** When the pane itself is the scrollport (dual desktop), mirror root “near end” behavior. */
-function paneScrollNearEnd(pane: HTMLElement, edgePx = 56): boolean {
+function paneScrollNearEnd(
+  pane: HTMLElement,
+  edgePx = READING_VIEWPORT_BOTTOM_EDGE_CSS_PX,
+): boolean {
   const maxY = Math.max(0, pane.scrollHeight - pane.clientHeight);
   return maxY > 0 && pane.scrollTop >= maxY - edgePx;
 }
@@ -1691,7 +1738,7 @@ function probeCodeLine1FromViewport(codePane: HTMLElement, lineIdPrefix = "code-
     const vh = globalThis.innerHeight;
     const clipT = Math.max(0, sr.top);
     const clipB = Math.min(vh, sr.bottom);
-    const y = clipT + Math.max(2, Math.min(40, (clipB - clipT) * 0.15));
+    const y = clipT + readingViewportTopInsetCssPx(clipB - clipT);
     for (const el of rows) {
       const r = el.getBoundingClientRect();
       if (r.bottom > y - 1e-3) {
@@ -1711,7 +1758,7 @@ function probeCodeLine1FromViewport(codePane: HTMLElement, lineIdPrefix = "code-
   }
 
   const sr = codePane.getBoundingClientRect();
-  const y = sr.top + codePane.clientTop + 2;
+  const y = sr.top + codePane.clientTop + readingViewportTopInsetCssPx(codePane.clientHeight);
   for (const el of rows) {
     const r = el.getBoundingClientRect();
     if (r.bottom > y - 1e-3) {
@@ -1736,7 +1783,7 @@ function probeCommentrayLine0FromDoc(docPane: HTMLElement): number | null {
     const vh = globalThis.innerHeight;
     const clipT = Math.max(0, dr.top);
     const clipB = Math.min(vh, dr.bottom);
-    const y = clipT + Math.max(2, Math.min(40, (clipB - clipT) * 0.15));
+    const y = clipT + readingViewportTopInsetCssPx(clipB - clipT);
     return bestCommentrayAnchorLine0AtOrAboveY(anchors, y);
   }
 
@@ -1746,8 +1793,8 @@ function probeCommentrayLine0FromDoc(docPane: HTMLElement): number | null {
   }
 
   const dr = docPane.getBoundingClientRect();
-  /** Same band as the root-scroll branch: a few px below the pane top so block anchors sit inside `top <= y` while their prose is what the reader sees first. */
-  const y = dr.top + docPane.clientTop + Math.max(2, Math.min(40, docPane.clientHeight * 0.15));
+  /** Same band as the root-scroll branch: inset below the pane top so anchors qualify while body text sits in the comfort zone. */
+  const y = dr.top + docPane.clientTop + readingViewportTopInsetCssPx(docPane.clientHeight);
   return bestCommentrayAnchorLine0AtOrAboveY(anchors, y);
 }
 
@@ -1763,10 +1810,10 @@ function docProbeTopY(docPane: HTMLElement): number {
     const vh = globalThis.innerHeight;
     const clipT = Math.max(0, dr.top);
     const clipB = Math.min(vh, dr.bottom);
-    return clipT + Math.max(2, Math.min(40, (clipB - clipT) * 0.15));
+    return clipT + readingViewportTopInsetCssPx(clipB - clipT);
   }
   const dr = docPane.getBoundingClientRect();
-  return dr.top + docPane.clientTop + 2;
+  return dr.top + docPane.clientTop + readingViewportTopInsetCssPx(docPane.clientHeight);
 }
 
 /**
@@ -2021,6 +2068,11 @@ type BlockAwareScrollPaneBundle = {
   getLinks: () => BlockScrollLink[];
   lineIdPrefix: () => string;
   sticky: BlockAwareStickyBundle;
+  /**
+   * When false (block-snap-only strategy), gap and no-index paths skip proportional mirror plans so
+   * the partner stays put until the next block snap.
+   */
+  allowProportionalMirror: boolean;
 };
 
 function blockAwareSyncFromCodeToDoc(
@@ -2030,7 +2082,14 @@ function blockAwareSyncFromCodeToDoc(
   const { codePane, docPane, getLinks, lineIdPrefix, sticky } = bundle;
   const docBefore = readPaneVerticalScroll(docPane);
   const prefix = lineIdPrefix();
-  const p = buildCodeToDocFlipPlanBlockAware(codePane, docPane, getLinks, prefix, sticky);
+  const p = buildCodeToDocFlipPlanBlockAware(
+    codePane,
+    docPane,
+    getLinks,
+    prefix,
+    sticky,
+    bundle.allowProportionalMirror,
+  );
   applyCodeToDocFlipPlanImpl(codePane, docPane, p);
   const docAfter = readPaneVerticalScroll(docPane);
   scrollSyncTrace("code→doc.apply", {
@@ -2057,7 +2116,14 @@ function blockAwareSyncFromDocToCode(
   const { codePane, docPane, getLinks, lineIdPrefix, sticky } = bundle;
   const codeBefore = readPaneVerticalScroll(codePane);
   const prefix = lineIdPrefix();
-  const p = buildDocToCodeFlipPlanBlockAware(docPane, codePane, getLinks, sticky, prefix);
+  const p = buildDocToCodeFlipPlanBlockAware(
+    docPane,
+    codePane,
+    getLinks,
+    sticky,
+    prefix,
+    bundle.allowProportionalMirror,
+  );
   applyDocToCodeFlipPlanImpl(codePane, docPane, p, prefix);
   const codeAfter = readPaneVerticalScroll(codePane);
   scrollSyncTrace("doc→code.apply", {
@@ -2084,7 +2150,9 @@ function wireBlockAwareScrollSync(
   getLinks: () => BlockScrollLink[],
   lineIdPrefix: () => string,
   shouldUseProportionalDocToCodeOnMobileFlip?: () => boolean,
+  options?: { allowProportionalMirror?: boolean },
 ): DualPaneScrollSyncRunners {
+  const allowProportionalMirror = options?.allowProportionalMirror !== false;
   let pendingDocToCode: DocToCodeFlipPlan | null = null;
   let pendingCodeToDoc: CodeToDocFlipPlan | null = null;
   const sticky: BlockAwareStickyBundle = {
@@ -2092,7 +2160,14 @@ function wireBlockAwareScrollSync(
     commentraySticky: { lockedId: null },
     linksKey: { current: "" },
   };
-  const bundle: BlockAwareScrollPaneBundle = { codePane, docPane, getLinks, lineIdPrefix, sticky };
+  const bundle: BlockAwareScrollPaneBundle = {
+    codePane,
+    docPane,
+    getLinks,
+    lineIdPrefix,
+    sticky,
+    allowProportionalMirror,
+  };
   const syncFromCodeToDocInner = (d: number): void => blockAwareSyncFromCodeToDoc(bundle, d);
   const syncFromDocToCodeInner = (d: number): void => blockAwareSyncFromDocToCode(bundle, d);
   const syncFromCodeToDoc = (): void => {
@@ -2102,7 +2177,7 @@ function wireBlockAwareScrollSync(
     blockAwareSyncFromDocToCode(bundle, 0);
   };
   const prepareMobileFlipToCode = (): void => {
-    if (shouldUseProportionalDocToCodeOnMobileFlip?.() === true) {
+    if (allowProportionalMirror && shouldUseProportionalDocToCodeOnMobileFlip?.() === true) {
       pendingDocToCode = { k: "mirrorW", ratio: windowScrollRatio() };
       return;
     }
@@ -2112,13 +2187,14 @@ function wireBlockAwareScrollSync(
       getLinks,
       sticky,
       lineIdPrefix(),
+      allowProportionalMirror,
     );
   };
   const finishMobileFlipToCode = (): void => {
     if (!pendingDocToCode) return;
     let p = pendingDocToCode;
     pendingDocToCode = null;
-    if (p.k === "noop" && p.skipProportionalFallbackOnFlip !== true) {
+    if (p.k === "noop" && p.skipProportionalFallbackOnFlip !== true && allowProportionalMirror) {
       p = buildDocToCodeFlipPlanProportional(docPane);
     }
     applyDocToCodeFlipPlanImpl(codePane, docPane, p, lineIdPrefix());
@@ -2130,13 +2206,16 @@ function wireBlockAwareScrollSync(
       getLinks,
       lineIdPrefix(),
       sticky,
+      allowProportionalMirror,
     );
   };
   const finishMobileFlipToDoc = (): void => {
     if (!pendingCodeToDoc) return;
     let p = pendingCodeToDoc;
     pendingCodeToDoc = null;
-    if (p.k === "noop") p = buildCodeToDocFlipPlanProportional(codePane);
+    if (p.k === "noop" && allowProportionalMirror) {
+      p = buildCodeToDocFlipPlanProportional(codePane);
+    }
     applyCodeToDocFlipPlanImpl(codePane, docPane, p);
   };
   wireBidirectionalScroll(codePane, docPane, syncFromCodeToDocInner, syncFromDocToCodeInner);
@@ -3177,7 +3256,7 @@ function wireSourceMarkdownPaneFlip(
     if (line0 !== null) {
       const row = codePane.querySelector(`#${nextPrefix}${String(line0)}`);
       if (row instanceof HTMLElement) {
-        applyRevealChildInPane(codePane, row, 2);
+        applyRevealChildInPane(codePane, row, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX);
       }
     }
     if (next === "rendered-markdown") {
@@ -3522,7 +3601,7 @@ function applySelectedMultiAngle(args: {
   });
 }
 
-function wireDualPaneMultiAngleAndScroll(args: {
+type WireDualPaneMultiAngleScrollArgs = {
   codePane: HTMLElement;
   docScrollEl: HTMLElement;
   docBody: HTMLElement | null;
@@ -3534,7 +3613,16 @@ function wireDualPaneMultiAngleAndScroll(args: {
   searchInput: HTMLInputElement;
   searchResults: HTMLElement;
   requestBlockRayRedraw?: () => void;
-}): DualPaneScrollSyncRunners {
+};
+
+/**
+ * Indexed / multi-angle wiring plus proportional fallback when there is no block map.
+ * `allowProportionalMirror: false` implements **block-snap-only** (partner holds in gaps / no index).
+ */
+function wireDualPaneScrollIndexedOrProportional(
+  args: WireDualPaneMultiAngleScrollArgs,
+  blockAwareOpts: { allowProportionalMirror: boolean },
+): DualPaneScrollSyncRunners {
   const {
     codePane,
     docScrollEl,
@@ -3555,6 +3643,7 @@ function wireDualPaneMultiAngleAndScroll(args: {
       () => scrollLinksRef.current,
       () => sourceLineIdPrefixForShell(shell),
       () => sourcePaneModeForShell(shell) === "rendered-markdown",
+      blockAwareOpts,
     );
     const angleSel = document.getElementById("angle-select") as HTMLSelectElement | null;
     if (angleSel && docBody) {
@@ -3583,9 +3672,34 @@ function wireDualPaneMultiAngleAndScroll(args: {
       () => scrollLinksRef.current,
       () => sourceLineIdPrefixForShell(shell),
       () => sourcePaneModeForShell(shell) === "rendered-markdown",
+      blockAwareOpts,
     );
   }
-  return wireProportionalScrollSync(codePane, docScrollEl);
+  if (blockAwareOpts.allowProportionalMirror) {
+    return wireProportionalScrollSync(codePane, docScrollEl);
+  }
+  return wireBlockAwareScrollSync(
+    codePane,
+    docScrollEl,
+    () => [],
+    () => sourceLineIdPrefixForShell(shell),
+    () => sourcePaneModeForShell(shell) === "rendered-markdown",
+    blockAwareOpts,
+  );
+}
+
+function wireDualPaneMultiAngleAndScroll(
+  args: WireDualPaneMultiAngleScrollArgs,
+): DualPaneScrollSyncRunners {
+  const strategy = parseDualPaneScrollSyncStrategy(
+    args.shell.getAttribute("data-scroll-sync-strategy"),
+  );
+  const blockAwareOpts =
+    strategy === "block-snap-only"
+      ? { allowProportionalMirror: false }
+      : { allowProportionalMirror: true };
+  // filler-blocks: reserved for height-matched buffers; until then same as block-aware-proportional.
+  return wireDualPaneScrollIndexedOrProportional(args, blockAwareOpts);
 }
 
 function wireDualPaneCommentrayLocationHash(

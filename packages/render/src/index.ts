@@ -3,6 +3,7 @@ export type {
   CodeBrowserMultiAngleBrowsing,
   CodeBrowserMultiAngleSpec,
   CodeBrowserPageOptions,
+  DualPaneScrollSyncStrategyId,
 } from "./code-browser.js";
 export { commentrayRenderVersion } from "./package-version.js";
 export type {

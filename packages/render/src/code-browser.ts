@@ -25,6 +25,10 @@ import {
   injectCommentrayDocAnchors,
   injectSourceMarkdownAnchors,
 } from "./inject-md-line-anchors.js";
+import {
+  DEFAULT_DUAL_PANE_SCROLL_SYNC_STRATEGY,
+  type DualPaneScrollSyncStrategyId,
+} from "./code-browser-scroll-sync-strategy.js";
 
 /** One angle tab for {@link CodeBrowserPageOptions.multiAngleBrowsing}. */
 export type CodeBrowserMultiAngleSpec = {
@@ -129,6 +133,12 @@ export type CodeBrowserPageOptions = {
    * **block-aware** scroll sync and separator lines in the commentray pane.
    */
   codeBrowserLayout?: "auto" | "dual";
+  /**
+   * Dual-pane scroll correlation (`#shell data-scroll-sync-strategy`). Strategies are mutually
+   * exclusive in the client; omit or set to the default for normal builds. `filler-blocks` is
+   * reserved until height-matched buffer layout exists (currently behaves like the default).
+   */
+  dualPaneScrollSyncStrategy?: DualPaneScrollSyncStrategyId;
   /**
    * `full` (default): in-page search indexes every source line and every commentray line.
    * `commentray-and-paths`: search only **toolbar path labels** plus commentray Markdown (no code-body line corpus).
@@ -2162,6 +2172,8 @@ type CodeBrowserPageParts = {
   sourceMarkdownToggleHtml: string;
   sourceMarkdownFlipScrollAffordanceHtml: string;
   sourcePaneModeAttr: string;
+  /** Optional ` data-scroll-sync-strategy="…"` fragment on `#shell` (empty when default / unset). */
+  scrollSyncStrategyShellAttr?: string;
 };
 
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
@@ -2234,7 +2246,7 @@ ${TOOLBAR_COLOR_THEME_HTML}
         <div class="search-results" id="search-results" hidden aria-live="polite"></div>
       </header>
       <main id="main-content" class="app__main" tabindex="-1">
-        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" ? ' data-dual-mobile-pane="doc"' : ""}${p.sourcePaneModeAttr} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairIdentityDataAttrs}${p.shellPairDocDataAttr}>
+        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" ? ' data-dual-mobile-pane="doc"' : ""}${p.sourcePaneModeAttr} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairIdentityDataAttrs}${p.shellPairDocDataAttr}${p.scrollSyncStrategyShellAttr ?? ""}>
 ${p.shellInner}
         </div>
       </main>
@@ -2711,6 +2723,11 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
   const pairIdentityDataAttrs = shellPairIdentityDataAttrs(shell, opts);
   const sourceMarkdownToggles = sourceMarkdownToggleControlsHtml(shell.sourceMarkdownToggleEnabled);
   const sourcePaneModeAttr = ` data-source-pane-mode="${shell.sourcePaneDefaultMode}"`;
+  const scrollSyncStrategyShellAttr =
+    opts.dualPaneScrollSyncStrategy !== undefined &&
+    opts.dualPaneScrollSyncStrategy !== DEFAULT_DUAL_PANE_SCROLL_SYNC_STRATEGY
+      ? ` data-scroll-sync-strategy="${escapeHtml(opts.dualPaneScrollSyncStrategy)}"`
+      : "";
 
   return buildCodeBrowserPageHtml({
     title,
@@ -2741,5 +2758,8 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     sourceMarkdownFlipScrollAffordanceHtml:
       sourceMarkdownToggles.sourceMarkdownFlipScrollAffordanceHtml,
     sourcePaneModeAttr,
+    scrollSyncStrategyShellAttr,
   });
 }
+
+export type { DualPaneScrollSyncStrategyId } from "./code-browser-scroll-sync-strategy.js";
