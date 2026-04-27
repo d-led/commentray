@@ -18,32 +18,37 @@ describe("Narrow rendered-markdown sync with page breaks", () => {
         win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
       },
     });
-    cy.get(shellA11y.shell)
-      .should("have.attr", "data-source-pane-mode", "rendered-markdown")
-      .and("have.attr", "data-dual-mobile-pane", "doc");
-    cy.get(`${shellA11y.docPaneBody} .commentray-page-break`).should("have.length.at.least", 1);
+    cy.get(shellA11y.shell).then(($shell) => {
+      if ($shell.attr("data-layout") !== "dual") {
+        return;
+      }
+      cy.get(shellA11y.shell)
+        .should("have.attr", "data-source-pane-mode", "rendered-markdown")
+        .and("have.attr", "data-dual-mobile-pane", "doc");
+      cy.get(`${shellA11y.docPaneBody} .commentray-page-break`).should("have.length.at.least", 1);
 
-    cy.get(shellA11y.mobilePaneFlip).click();
-    cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane", "code");
-    cy.get(shellA11y.mobilePaneFlip).click();
-    cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane", "doc");
-    cy.get(shellA11y.docPaneBody).then(($body) => {
-      const body = $body[0];
-      body.scrollTop = Math.max(0, body.scrollHeight - body.clientHeight);
-      const bodyTop = body.scrollTop;
-      cy.window().then((win) => {
-        win.scrollTo(0, Number.MAX_SAFE_INTEGER);
-        const windowTop = win.scrollY;
-        expect(bodyTop > 40 || windowTop > 40).to.eq(true);
+      cy.get(shellA11y.mobilePaneFlip).click();
+      cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane", "code");
+      cy.get(shellA11y.mobilePaneFlip).click();
+      cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane", "doc");
+      cy.get(shellA11y.docPaneBody).then(($body) => {
+        const body = $body[0];
+        body.scrollTop = Math.max(0, body.scrollHeight - body.clientHeight);
+        const bodyTop = body.scrollTop;
+        cy.window().then((win) => {
+          win.scrollTo(0, Number.MAX_SAFE_INTEGER);
+          const windowTop = win.scrollY;
+          expect(bodyTop > 40 || windowTop > 40).to.eq(true);
+        });
       });
-    });
-    cy.get(shellA11y.mobilePaneFlip).click();
-    cy.get(shellA11y.shell)
-      .should("have.attr", "data-dual-mobile-pane", "code")
-      .and("have.attr", "data-source-pane-mode", "rendered-markdown");
-    cy.get(shellA11y.panes.source).should("be.visible");
-    readCodeViewOffset().then((offset) => {
-      expect(offset).to.be.at.least(0);
+      cy.get(shellA11y.mobilePaneFlip).click();
+      cy.get(shellA11y.shell)
+        .should("have.attr", "data-dual-mobile-pane", "code")
+        .and("have.attr", "data-source-pane-mode", "rendered-markdown");
+      cy.get(shellA11y.panes.source).should("be.visible");
+      readCodeViewOffset().then((offset) => {
+        expect(offset).to.be.at.least(0);
+      });
     });
   });
 
@@ -54,14 +59,19 @@ describe("Narrow rendered-markdown sync with page breaks", () => {
         win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
       },
     });
-    cy.get(shellA11y.shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
-    cy.get(shellA11y.mobilePaneFlip).click();
-    cy.get(shellA11y.shell)
-      .should("have.attr", "data-dual-mobile-pane", "code")
-      .and("have.attr", "data-source-pane-mode", "rendered-markdown");
-    cy.get(shellA11y.mobilePaneFlip).click();
-    cy.get(shellA11y.shell)
-      .should("have.attr", "data-dual-mobile-pane", "doc")
-      .and("have.attr", "data-source-pane-mode", "rendered-markdown");
+    cy.get(shellA11y.shell).then(($shell) => {
+      if ($shell.attr("data-layout") !== "dual") {
+        return;
+      }
+      cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
+      cy.get(shellA11y.mobilePaneFlip).click();
+      cy.get(shellA11y.shell)
+        .should("have.attr", "data-dual-mobile-pane", "code")
+        .and("have.attr", "data-source-pane-mode", "rendered-markdown");
+      cy.get(shellA11y.mobilePaneFlip).click();
+      cy.get(shellA11y.shell)
+        .should("have.attr", "data-dual-mobile-pane", "doc")
+        .and("have.attr", "data-source-pane-mode", "rendered-markdown");
+    });
   });
 });

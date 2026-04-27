@@ -41,10 +41,18 @@ Cypress.Commands.add("ContentinfoLandmarkShouldExist", () => {
 });
 
 Cypress.Commands.add("DualPanesSplitterSearchRegionShouldBeVisible", () => {
-  cy.get(shellA11y.panes.source).should("be.visible");
-  cy.get(shellA11y.panes.commentray).should("be.visible");
-  cy.get(shellA11y.resizeSplitter).should("be.visible");
   cy.get(shellA11y.search.region).within(() => {
     cy.get('input[type="search"]').should("be.visible");
+  });
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") === "stretch") {
+      cy.get(`${shellA11y.shell} #code-pane`).should("be.visible");
+      cy.get(`${shellA11y.shell} .stretch-doc-inner`).first().should("be.visible");
+      cy.get(shellA11y.resizeSplitter).should("not.exist");
+    } else {
+      cy.get(shellA11y.panes.source).should("be.visible");
+      cy.get(shellA11y.panes.commentray).should("be.visible");
+      cy.get(shellA11y.resizeSplitter).should("be.visible");
+    }
   });
 });

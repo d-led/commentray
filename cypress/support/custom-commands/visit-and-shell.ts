@@ -20,8 +20,16 @@ Cypress.Commands.add("GoToE2eDualScrollFixturePage", () => {
 
 Cypress.Commands.add("CurrentPageShouldDisplayCodeBrowserShell", () => {
   cy.get(".shell").should("exist").and("have.attr", "data-layout");
-  cy.get(shellA11y.panes.source).should("be.visible");
-  cy.get(shellA11y.panes.commentray).should("be.visible");
+  cy.get(".shell").then(($shell) => {
+    const layout = $shell.attr("data-layout");
+    if (layout === "stretch") {
+      cy.get(`${shellA11y.shell} #code-pane`).should("be.visible");
+      cy.get(`${shellA11y.shell} .stretch-doc-inner`).first().should("be.visible");
+    } else {
+      cy.get(shellA11y.panes.source).should("be.visible");
+      cy.get(shellA11y.panes.commentray).should("be.visible");
+    }
+  });
   cy.get(shellA11y.search.region).within(() => {
     cy.get('input[type="search"]').should("be.visible");
   });

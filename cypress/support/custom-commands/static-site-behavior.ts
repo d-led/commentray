@@ -5,15 +5,37 @@ const BROWSE_LINK_REL_OR_ABS_RE =
   /^(?:\.\/browse\/(?:[^/]+\.html|.+\/index\.html)|https?:\/\/[^/]+\/browse\/(?:[^/]+\.html|.+\/index\.html))(?:\?.*)?$/;
 
 Cypress.Commands.add("CommentrayPaneReadmeLinksShouldUseGithubBlobUrls", () => {
-  cy.get(shellA11y.panes.commentray)
-    .invoke("html")
-    .should("match", /https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/[^/]+\/README\.md/)
-    .and("not.match", /href="\.\.\/README\.md"/);
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") === "stretch") {
+      cy.get(shellA11y.shell)
+        .invoke("html")
+        .should("match", /https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/[^/]+\/README\.md/)
+        .and("not.match", /href="\.\.\/README\.md"/);
+    } else {
+      cy.get(shellA11y.panes.commentray)
+        .invoke("html")
+        .should("match", /https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/[^/]+\/README\.md/)
+        .and("not.match", /href="\.\.\/README\.md"/);
+    }
+  });
 });
 
 Cypress.Commands.add("CommentrayPaneEmphasisShouldRenderAfterBlocks", () => {
-  cy.get(shellA11y.panes.commentray).find("em").should("have.length.at.least", 1);
-  cy.get(`${shellA11y.panes.commentray} em`).first().should("contain.text", "You have the main");
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") === "stretch") {
+      cy.get(`${shellA11y.shell} .stretch-doc-inner, ${shellA11y.shell} .stretch-preamble`)
+        .find("em")
+        .should("have.length.at.least", 1);
+      cy.get(`${shellA11y.shell} .stretch-doc-inner em, ${shellA11y.shell} .stretch-preamble em`)
+        .first()
+        .should("contain.text", "You have the main");
+    } else {
+      cy.get(shellA11y.panes.commentray).find("em").should("have.length.at.least", 1);
+      cy.get(`${shellA11y.panes.commentray} em`)
+        .first()
+        .should("contain.text", "You have the main");
+    }
+  });
 });
 
 Cypress.Commands.add("DocumentationHomeLinkShouldPointToRelativeIndex", () => {
@@ -140,7 +162,13 @@ Cypress.Commands.add("ChooseValueOfAngleSelect", (value) => {
 });
 
 Cypress.Commands.add("CommentrayPaneShouldContainText", (text) => {
-  cy.get(shellA11y.panes.commentray).should("contain", text);
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") === "stretch") {
+      cy.get(shellA11y.shell).should("contain", text);
+    } else {
+      cy.get(shellA11y.panes.commentray).should("contain", text);
+    }
+  });
 });
 
 Cypress.Commands.add("ShellPairBrowseLinkShouldMatchRelativeBrowseHtml", () => {
@@ -156,25 +184,58 @@ Cypress.Commands.add("ShellPairBrowseLinkShouldNotPointAtGithubHost", () => {
 });
 
 Cypress.Commands.add("DocPaneMermaidShouldShowDiagramOrMarkup", () => {
-  cy.get(`${shellA11y.docPaneBody} ${shellA11y.commentrayMermaid}`, {
-    timeout: MERMAID_E2E_TIMEOUT_MS,
-  })
-    .should("have.length.at.least", 1)
-    .each(($block) => {
-      cy.wrap($block).find("svg").should("have.length.at.least", 1);
-      cy.wrap($block).should("not.contain", MERMAID_SYNTAX_ERROR_SNIPPET);
-    });
-  cy.get(shellA11y.docPaneBody, { timeout: MERMAID_E2E_TIMEOUT_MS }).should(
-    "not.contain",
-    MERMAID_SYNTAX_ERROR_SNIPPET,
-  );
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") === "stretch") {
+      cy.get(
+        `${shellA11y.shell} .stretch-doc-inner ${shellA11y.commentrayMermaid}, ${shellA11y.shell} .stretch-preamble ${shellA11y.commentrayMermaid}`,
+        {
+          timeout: MERMAID_E2E_TIMEOUT_MS,
+        },
+      )
+        .should("have.length.at.least", 1)
+        .each(($block) => {
+          cy.wrap($block).find("svg").should("have.length.at.least", 1);
+          cy.wrap($block).should("not.contain", MERMAID_SYNTAX_ERROR_SNIPPET);
+        });
+      cy.get(shellA11y.shell, { timeout: MERMAID_E2E_TIMEOUT_MS }).should(
+        "not.contain",
+        MERMAID_SYNTAX_ERROR_SNIPPET,
+      );
+    } else {
+      cy.get(`${shellA11y.docPaneBody} ${shellA11y.commentrayMermaid}`, {
+        timeout: MERMAID_E2E_TIMEOUT_MS,
+      })
+        .should("have.length.at.least", 1)
+        .each(($block) => {
+          cy.wrap($block).find("svg").should("have.length.at.least", 1);
+          cy.wrap($block).should("not.contain", MERMAID_SYNTAX_ERROR_SNIPPET);
+        });
+      cy.get(shellA11y.docPaneBody, { timeout: MERMAID_E2E_TIMEOUT_MS }).should(
+        "not.contain",
+        MERMAID_SYNTAX_ERROR_SNIPPET,
+      );
+    }
+  });
 });
 
 /** Asserts diagram SVG is present — use after dual-mobile pane toggles when the stricter `DocPaneMermaidShouldShowDiagramOrMarkup` copy checks are not required. */
 Cypress.Commands.add("DocPaneMermaidSvgShouldExist", () => {
-  cy.get(`${shellA11y.docPaneBody} ${shellA11y.commentrayMermaid}`, {
-    timeout: MERMAID_E2E_TIMEOUT_MS,
-  })
-    .find("svg")
-    .should("have.length.at.least", 1);
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") === "stretch") {
+      cy.get(
+        `${shellA11y.shell} .stretch-doc-inner ${shellA11y.commentrayMermaid}, ${shellA11y.shell} .stretch-preamble ${shellA11y.commentrayMermaid}`,
+        {
+          timeout: MERMAID_E2E_TIMEOUT_MS,
+        },
+      )
+        .find("svg")
+        .should("have.length.at.least", 1);
+    } else {
+      cy.get(`${shellA11y.docPaneBody} ${shellA11y.commentrayMermaid}`, {
+        timeout: MERMAID_E2E_TIMEOUT_MS,
+      })
+        .find("svg")
+        .should("have.length.at.least", 1);
+    }
+  });
 });
