@@ -91,4 +91,17 @@ describe("browsePairStaticBrowseRelUrl", () => {
       ),
     ).toBe("./browse/.commentray.toml/main/index.html");
   });
+
+  it("uses ./browse/ (never host-root /browse/) for deep package paths so nav JSON and static shells stay portable", () => {
+    const url = browsePairStaticBrowseRelUrl(
+      {
+        sourcePath: "packages/cli/src/cli.ts",
+        commentrayPath: ".commentray/source/packages/cli/src/cli.ts/main.md",
+      },
+      storage,
+    );
+    expect(url).toBe("./browse/packages/cli/src/cli.ts/main/index.html");
+    expect(url.startsWith("./browse/")).toBe(true);
+    expect(url.startsWith("/browse/")).toBe(false);
+  });
 });

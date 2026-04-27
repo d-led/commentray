@@ -2,7 +2,8 @@
 /**
  * Post-`npm run pages:build` checks for `_site/`:
  * - Optional GitHub blob URLs match `https://github.com/<owner>/<repo>/blob/<branch>/…` (no doubled `/blob/`).
- * - `#shell` carries `data-commentray-pair-browse-href` (same-site `./browse/…/index.html`, optional legacy flat `./browse/…@….html`, or GitHub blob) and resolves without `/browse/browse/` stacking.
+ * - `#shell` carries `data-commentray-pair-browse-href` (same-site `./browse/…/index.html`, optional legacy flat `./browse/…@….html`, or GitHub blob). Host-root `/browse/…` is forbidden so static shells stay aligned with `commentray-nav-search.json` and work on GitHub Pages project URLs. Resolves without `/browse/browse/` stacking.
+ * - `commentray-nav-search.json` `documentedPairs[].staticBrowseUrl`, when present, uses the same `./browse/…` prefix.
  * - `_site/serve.json` sets `renderSingle: true` so local `serve` serves lone `index.html` in humane dirs (not directory listings).
  * - Every generated local `href` / `src` in each `.html` file under `_site/` (recursive) resolves to an existing static file.
  * - No generated HTML is a client-side redirect shim (meta refresh + `window.location.replace`).
@@ -73,6 +74,48 @@ function assertDocPairHref(label, href) {
   }
   if (!isHubRelativeBrowseHref(href)) {
     fail(`${label}: expected ./browse/… (.html or …/index.html), or GitHub blob, got: ${href}`);
+  }
+}
+
+/**
+ * Same-site static browse must use `./browse/…` (nav JSON shape). Host-root `/browse/…` breaks
+ * project-site hosting and diverges from `documentedPairs[].staticBrowseUrl`.
+ */
+function assertSameSiteStaticPairBrowseUsesNavJsonDotSlashPrefix(label, href) {
+  if (!href || href.startsWith("https://github.com/")) return;
+  if (!isHubRelativeBrowseHref(href)) return;
+  if (!href.startsWith("./browse/")) {
+    fail(
+      `${label}: same-site static pair browse must start with "./browse/" (same as commentray-nav-search.json staticBrowseUrl), not host-root "/browse/…". Got: ${href}`,
+    );
+  }
+}
+
+function validateNavSearchJsonStaticBrowseUrls() {
+  const p = join(siteDir, "commentray-nav-search.json");
+  if (!existsSync(p)) return;
+  let doc;
+  try {
+    doc = JSON.parse(readFileSync(p, "utf8"));
+  } catch (e) {
+    fail(`${p}: invalid JSON (${e instanceof Error ? e.message : String(e)})`);
+  }
+  const pairs = doc?.documentedPairs;
+  if (!Array.isArray(pairs)) return;
+  for (let i = 0; i < pairs.length; i++) {
+    const u = pairs[i]?.staticBrowseUrl;
+    if (typeof u !== "string") continue;
+    const t = u.trim();
+    if (t.length === 0) continue;
+    if (!isHubRelativeBrowseHref(t)) {
+      fail(
+        `commentray-nav-search.json documentedPairs[${String(i)}].staticBrowseUrl: expected hub-relative browse or omit, got: ${t}`,
+      );
+    }
+    assertSameSiteStaticPairBrowseUsesNavJsonDotSlashPrefix(
+      `commentray-nav-search.json documentedPairs[${String(i)}].staticBrowseUrl`,
+      t,
+    );
   }
 }
 
@@ -184,6 +227,10 @@ async function validateHubIndex(indexHtml) {
     fail('hub index.html: missing data-commentray-pair-browse-href on id="shell"');
   }
   assertDocPairHref("hub shell data-commentray-pair-browse-href", docHubHref);
+  assertSameSiteStaticPairBrowseUsesNavJsonDotSlashPrefix(
+    "hub shell data-commentray-pair-browse-href",
+    docHubHref,
+  );
 
   const origins = ["https://d-led.github.io", "http://127.0.0.1:14173"];
   const flatSlug = /^(?:\.\/|\/)browse\/([^/]+\.html)$/.exec(docHubHref)?.[1];
@@ -208,6 +255,10 @@ async function validateBrowsePage(name, html) {
   const src = firstGithubBlobHrefIn(html);
   if (src) assertGithubBlobUrl(`browse/${name} (first GitHub blob link)`, src);
   assertDocPairHref(`browse/${name} shell data-commentray-pair-browse-href`, doc);
+  assertSameSiteStaticPairBrowseUsesNavJsonDotSlashPrefix(
+    `browse/${name} shell data-commentray-pair-browse-href`,
+    doc,
+  );
 
   if (!existsSync(pairNavPath) || !isHubRelativeBrowseHref(doc)) return;
   const { resolveStaticBrowseHref } = await import(pathToFileURL(pairNavPath).href);
@@ -278,10 +329,11 @@ async function main() {
   validateServeJsonForLocalStaticHost();
   const indexHtml = readFileSync(indexPath, "utf8");
   await validateHubIndex(indexHtml);
+  validateNavSearchJsonStaticBrowseUrls();
   await validateBrowseHtmlFiles();
   validateAllStaticHtmlLinks();
   console.log(
-    "pages:validate — OK (GitHub blob shapes, no /browse/browse/ stacking, serve.json, static local links).",
+    "pages:validate — OK (GitHub blob shapes, ./browse/ nav+shell parity, no /browse/browse/ stacking, serve.json, static local links).",
   );
 }
 

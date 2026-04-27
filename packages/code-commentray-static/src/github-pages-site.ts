@@ -133,8 +133,7 @@ async function writeBrowsePageForPair(input: {
     browsePageDirUnderSite,
     "commentray-nav-search.json",
   );
-  const pairBrowsePathFromSiteRoot =
-    `/${path.posix.join("browse", canonicalBrowseRelPath)}`.replace(/\/+/g, "/");
+  const pairBrowseHubRelUrl = browsePairStaticBrowseRelUrl(p, input.cfg.storageDir);
   const outPath = path.join(input.browseDir, ...canonicalBrowseRelPath.split("/"));
   const sourceAbs = resolvePathUnderRepoRoot(input.repoRoot, p.sourcePath);
   const mdAbs = resolvePathUnderRepoRoot(input.repoRoot, p.commentrayPath);
@@ -183,8 +182,8 @@ async function writeBrowsePageForPair(input: {
     ...(dualStretchOpts ?? {}),
     ...(p.sourceOnGithub ? { sourceOnGithubUrl: p.sourceOnGithub } : {}),
     ...(p.commentrayOnGithub ? { commentrayOnGithubUrl: p.commentrayOnGithub } : {}),
-    /** Path-absolute from site root so the Doc target is correct on deep `/browse/…/index.html` pages. */
-    commentrayStaticBrowseUrl: pairBrowsePathFromSiteRoot,
+    /** Hub-relative `./browse/…` so pair nav matches `commentray-nav-search.json` and resolves on project pages. */
+    commentrayStaticBrowseUrl: pairBrowseHubRelUrl,
     documentedNavJsonUrl: navSearchJsonRelToPage,
     builtAt: input.builtAt,
     ...(input.documentedPairsEmbeddedB64

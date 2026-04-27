@@ -95,6 +95,32 @@ async function seedReadmeAnglesPagesFixture(repo: string, title: string): Promis
 const README_MAIN_ANGLE_MD = ".commentray/source/README.md/main.md";
 const EXTRA_TS_MAIN_MD = ".commentray/source/extra.ts/main.md";
 
+/** `#shell` opening tag only (matches validate-pages-github-links.mjs). */
+function dataCommentrayPairBrowseHrefFromShellTag(html: string): string | null {
+  const m = /<div\b[^>]*\bid="shell"(?=\s|>)[^>]*>/.exec(html);
+  if (!m) return null;
+  const am = /\bdata-commentray-pair-browse-href="([^"]*)"/.exec(m[0]);
+  return am?.[1] ?? null;
+}
+
+/** Every emitted browse page must carry the same pair URL the nav indexer exposes (no `/browse/…` drift). */
+async function expectBrowseShellPairHrefMatchesNavStaticBrowseUrlForEveryPair(
+  siteRoot: string,
+): Promise<void> {
+  const navPath = path.join(siteRoot, "commentray-nav-search.json");
+  const nav = JSON.parse(await readFile(navPath, "utf8")) as {
+    documentedPairs?: Array<{ staticBrowseUrl?: string }>;
+  };
+  for (const p of nav.documentedPairs ?? []) {
+    const u = p.staticBrowseUrl?.trim();
+    if (u === undefined || u.length === 0) continue;
+    const rel = u.replace(/^\.\//, "");
+    const pagePath = path.join(siteRoot, rel);
+    const html = await readFile(pagePath, "utf8");
+    expect(dataCommentrayPairBrowseHrefFromShellTag(html)).toBe(u);
+  }
+}
+
 /** README multi-angle hub + `extra.ts` indexed pair (shared by browse scroll-link tests). */
 async function seedAnglesHubWithIndexedExtraPair(input: {
   tmpPrefix: string;
@@ -182,7 +208,7 @@ async function runWritesSiteAndNavFromFlatCompanions(): Promise<string> {
   expect(html).toContain('href="./"');
   expect(browseHtml).toContain('href="../../../index.html"');
   expect(browseHtml).toContain('aria-label="Documentation home"');
-  expect(browseHtml).toMatch(/id="shell"[^>]*data-commentray-pair-browse-href="\/browse\/[^"]+"/);
+  expect(browseHtml).toMatch(/id="shell"[^>]*data-commentray-pair-browse-href="\.\/browse\/[^"]+"/);
   return r;
 }
 
@@ -233,7 +259,7 @@ async function runGithubToolbarUsesBlobUrlsForRealisticHost(): Promise<string> {
     path.join(r, "_site", "browse", "src", "x.ts", "index.html"),
     "utf8",
   );
-  expect(browseHtml).toMatch(/data-commentray-pair-browse-href="\/browse\/[^"]+"/);
+  expect(browseHtml).toMatch(/data-commentray-pair-browse-href="\.\/browse\/[^"]+"/);
   expect(browseHtml).not.toContain("/browse/browse/");
   expect(browseHtml).toMatch(/id="shell"/);
   return r;
@@ -443,6 +469,41 @@ describe("GitHub Pages static site output — nav pairs and toolbar", () => {
 
   it("writes GitHub blob toolbar URLs for d-led/commentray + main when configured", async () => {
     repo = await runGithubToolbarUsesBlobUrlsForRealisticHost();
+  });
+});
+
+describe("GitHub Pages static site — pair-browse shell matches nav JSON (regression)", () => {
+  let repo: string;
+
+  afterEach(async () => {
+    if (repo) await rm(repo, { recursive: true, force: true });
+  });
+
+  it("sets each browse #shell data-commentray-pair-browse-href to that pair's staticBrowseUrl", async () => {
+    const { repo: r } = await seedAnglesHubWithIndexedExtraPair({
+      tmpPrefix: "cr-pages-shell-nav-",
+      hubTitle: "Shell nav parity",
+      withDiskOnlyOrphan: true,
+    });
+    repo = r;
+    await buildGithubPagesStaticSite({ repoRoot: repo });
+    await expectBrowseShellPairHrefMatchesNavStaticBrowseUrlForEveryPair(path.join(repo, "_site"));
+  });
+
+  it("sets the hub #shell pair-browse href to the same staticBrowseUrl string as in commentray-nav-search.json", async () => {
+    repo = await mkdtemp(path.join(tmpdir(), "cr-pages-hub-shell-nav-"));
+    await writeMinimalPagesFixture(repo, {
+      title: "Hub shell",
+      githubUrl: "https://github.com/acme/demo",
+    });
+    await buildGithubPagesStaticSite({ repoRoot: repo });
+    const nav = JSON.parse(
+      await readFile(path.join(repo, "_site", "commentray-nav-search.json"), "utf8"),
+    ) as { documentedPairs?: Array<{ staticBrowseUrl?: string }> };
+    const expected = nav.documentedPairs?.[0]?.staticBrowseUrl;
+    expect(expected).toBe("./browse/src/x.ts/index.html");
+    const hubHtml = await readFile(path.join(repo, "_site", "index.html"), "utf8");
+    expect(dataCommentrayPairBrowseHrefFromShellTag(hubHtml)).toBe(expected);
   });
 });
 
