@@ -123,6 +123,40 @@ export const DEFAULT_SOURCE_VIEWPORT_HYSTERESIS_LINES = 2;
 /** Default: require this many **commentray markdown** lines into the naive winner before leaving the lock. */
 export const DEFAULT_COMMENTRAY_VIEWPORT_HYSTERESIS_LINES = 4;
 
+type StickyHysteresisLockResolution =
+  | { outcome: "clear" }
+  | { outcome: "return"; link: BlockScrollLink }
+  | { outcome: "hysteresis"; naive: BlockScrollLink; locked: BlockScrollLink };
+
+/**
+ * Shared prelude for Schmitt-style hysteresis after the caller’s naive pick: clear lock when there
+ * is no naive block; bootstrap or refresh `lockedId` on first hit / same block / stale lock;
+ * otherwise hand off naive + locked for span- or line-based separation math.
+ */
+function resolveStickyHysteresisLock(
+  naive: BlockScrollLink | null,
+  blocks: BlockScrollLink[],
+  state: BlockScrollStickyState,
+): StickyHysteresisLockResolution {
+  if (!naive) {
+    state.lockedId = null;
+    return { outcome: "clear" };
+  }
+  if (state.lockedId === null) {
+    state.lockedId = naive.id;
+    return { outcome: "return", link: naive };
+  }
+  if (state.lockedId === naive.id) {
+    return { outcome: "return", link: naive };
+  }
+  const locked = blocks.find((b) => b.id === state.lockedId);
+  if (!locked) {
+    state.lockedId = naive.id;
+    return { outcome: "return", link: naive };
+  }
+  return { outcome: "hysteresis", naive, locked };
+}
+
 /**
  * Schmitt-style block pick for **source→commentray** sync: keeps the active block until the
  * viewport top has moved clearly into another block’s territory, so probe noise at span edges
@@ -136,42 +170,30 @@ export function pickBlockScrollLinkForSourceViewportWithHysteresis(
 ): BlockScrollLink | null {
   const HYST = Math.max(1, Math.floor(hysteresisSourceLines));
   const naive = pickBlockScrollLinkForSourceViewportTop(blocks, topSourceLine1Based);
-  if (!naive) {
-    state.lockedId = null;
-    return null;
-  }
-  if (state.lockedId === null) {
-    state.lockedId = naive.id;
-    return naive;
-  }
-  if (state.lockedId === naive.id) {
-    return naive;
-  }
-  const locked = blocks.find((b) => b.id === state.lockedId);
-  if (!locked) {
-    state.lockedId = naive.id;
-    return naive;
-  }
+  const res = resolveStickyHysteresisLock(naive, blocks, state);
+  if (res.outcome === "clear") return null;
+  if (res.outcome === "return") return res.link;
+  const { naive: n, locked } = res;
   const loL = locked.markerViewportHalfOpen1Based.lo;
   const hiL = locked.markerViewportHalfOpen1Based.hiExclusive;
-  const loC = naive.markerViewportHalfOpen1Based.lo;
-  const hiC = naive.markerViewportHalfOpen1Based.hiExclusive;
+  const loC = n.markerViewportHalfOpen1Based.lo;
+  const hiC = n.markerViewportHalfOpen1Based.hiExclusive;
   const separatedBelow = loC >= hiL;
   const separatedAbove = hiC <= loL;
   if (!separatedBelow && !separatedAbove) {
-    state.lockedId = naive.id;
-    return naive;
+    state.lockedId = n.id;
+    return n;
   }
   if (separatedBelow) {
     if (topSourceLine1Based >= loC + HYST) {
-      state.lockedId = naive.id;
-      return naive;
+      state.lockedId = n.id;
+      return n;
     }
     return locked;
   }
   if (topSourceLine1Based <= loL - HYST) {
-    state.lockedId = naive.id;
-    return naive;
+    state.lockedId = n.id;
+    return n;
   }
   return locked;
 }
@@ -202,40 +224,28 @@ export function pickBlockScrollLinkForCommentrayViewportWithHysteresis(
 ): BlockScrollLink | null {
   const HYST = Math.max(1, Math.floor(hysteresisMdLines));
   const naive = pickBlockScrollLinkForCommentrayScroll(blocks, topCommentrayLine0Based);
-  if (!naive) {
-    state.lockedId = null;
-    return null;
-  }
-  if (state.lockedId === null) {
-    state.lockedId = naive.id;
-    return naive;
-  }
-  if (state.lockedId === naive.id) {
-    return naive;
-  }
-  const locked = blocks.find((b) => b.id === state.lockedId);
-  if (!locked) {
-    state.lockedId = naive.id;
-    return naive;
-  }
+  const res = resolveStickyHysteresisLock(naive, blocks, state);
+  if (res.outcome === "clear") return null;
+  if (res.outcome === "return") return res.link;
+  const { naive: n, locked } = res;
   const lL = locked.commentrayLine;
-  const lC = naive.commentrayLine;
+  const lC = n.commentrayLine;
   const separatedBelow = lC > lL;
   const separatedAbove = lC < lL;
   if (!separatedBelow && !separatedAbove) {
-    state.lockedId = naive.id;
-    return naive;
+    state.lockedId = n.id;
+    return n;
   }
   if (separatedBelow) {
     if (topCommentrayLine0Based >= lC + HYST) {
-      state.lockedId = naive.id;
-      return naive;
+      state.lockedId = n.id;
+      return n;
     }
     return locked;
   }
   if (topCommentrayLine0Based <= lL - HYST) {
-    state.lockedId = naive.id;
-    return naive;
+    state.lockedId = n.id;
+    return n;
   }
   return locked;
 }
