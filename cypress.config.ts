@@ -14,6 +14,9 @@ export default defineConfig({
     CI: `${process.env.CYPRESS_CI}` === "true",
   },
   e2e: {
+    /** Matches wide dual-pane specs: keeps `matchMedia('(max-width: 767px)')` false and toolbar chrome visible. */
+    viewportWidth: 1280,
+    viewportHeight: 900,
     baseUrl: `http://127.0.0.1:${commentrayE2ePort}`,
     supportFile: "cypress/support/e2e.ts",
     specPattern: "cypress/e2e/**/*.cy.ts",

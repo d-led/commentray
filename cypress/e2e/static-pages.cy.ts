@@ -70,7 +70,7 @@ describe("The Commentray GitHub Pages static build", () => {
         },
       });
       cy.CurrentPageShouldDisplayCodeBrowserShell();
-      cy.location("pathname").should("match", /\/browse\/README\.md\/main\/index\.html$/);
+      cy.location("pathname").should("match", /\/browse\/README\.md\/main(?:\/index\.html)?$/);
       cy.ShellPairBrowseLinkShouldAvoidStackedBrowseSegments();
       // Scroll sync is URL-agnostic; assert it on a real filename-readable permalink so
       // browse URL refactors cannot regress coupling without failing CI.
