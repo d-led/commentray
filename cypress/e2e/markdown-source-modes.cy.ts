@@ -39,6 +39,22 @@ function visitWithFreshWideIntroStorage(): void {
   });
 }
 
+/** Dual-only scroll tests; on stretch assert rendered-markdown only. */
+function whenHomeDualLayoutWide(dualOnly: () => void): void {
+  cy.viewport(1280, 900);
+  cy.visit("/");
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") !== "dual") {
+      cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
+      return;
+    }
+    cy.wrap($shell)
+      .should("have.attr", "data-layout", "dual")
+      .and("have.attr", "data-source-pane-mode", "rendered-markdown");
+    dualOnly();
+  });
+}
+
 describe("Markdown source rendering modes", () => {
   it("starts in rendered markdown even if prior storage asked for source", () => {
     cy.viewport(1280, 900);
@@ -51,16 +67,7 @@ describe("Markdown source rendering modes", () => {
   });
 
   it("keeps doc-to-source scroll sync when left pane shows rendered markdown (wide)", () => {
-    cy.viewport(1280, 900);
-    cy.visit("/");
-    cy.get(shellA11y.shell).then(($shell) => {
-      if ($shell.attr("data-layout") !== "dual") {
-        cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
-        return;
-      }
-      cy.wrap($shell)
-        .should("have.attr", "data-layout", "dual")
-        .and("have.attr", "data-source-pane-mode", "rendered-markdown");
+    whenHomeDualLayoutWide(() => {
       cy.get("#source-markdown-pane-flip").should("be.visible");
       cy.get(shellA11y.docPaneBody).then(($body) => {
         const el = $body[0];
@@ -71,17 +78,7 @@ describe("Markdown source rendering modes", () => {
   });
 
   it("snaps the doc pane to the matching block when the rendered-markdown source pane scrolls into a region", () => {
-    cy.viewport(1280, 900);
-    cy.visit("/");
-    cy.get(shellA11y.shell).then(($shell) => {
-      if ($shell.attr("data-layout") !== "dual") {
-        cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
-        return;
-      }
-      cy.wrap($shell)
-        .should("have.attr", "data-layout", "dual")
-        .and("have.attr", "data-source-pane-mode", "rendered-markdown");
-
+    whenHomeDualLayoutWide(() => {
       /**
        * Scroll the source pane so the `readme-user-guides` region sits at the viewport top.
        * The commentary places that block far from the proportional offset of the source line

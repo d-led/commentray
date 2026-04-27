@@ -1,27 +1,40 @@
 import { shellA11y } from "../support/shell-a11y";
 
-describe("Narrow rendered-markdown sync with page breaks", () => {
-  function readCodeViewOffset(): Cypress.Chainable<number> {
-    return cy.window().then((win) => {
-      const rootTop = Number(win.scrollY);
-      return cy
-        .get("#code-pane")
-        .invoke("scrollTop")
-        .then((paneTop) => Math.max(rootTop, Number(paneTop)));
-    });
-  }
+const WIDE_MODE_INTRO_STORAGE_KEY = "commentray.codeCommentrayStatic.wideModeIntro.v1";
 
+function visitNarrowHomeWithWideIntroDismissed(): void {
+  cy.viewport(390, 844);
+  cy.visit("/", {
+    onBeforeLoad(win) {
+      win.localStorage.setItem(WIDE_MODE_INTRO_STORAGE_KEY, "1");
+    },
+  });
+}
+
+/** Page-break + mobile flip tests apply only to the dual-pane shell. */
+function whenNarrowHomeDualLayout(dualOnly: () => void): void {
+  visitNarrowHomeWithWideIntroDismissed();
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") !== "dual") {
+      return;
+    }
+    dualOnly();
+  });
+}
+
+function readCodeViewOffset(): Cypress.Chainable<number> {
+  return cy.window().then((win) => {
+    const rootTop = Number(win.scrollY);
+    return cy
+      .get("#code-pane")
+      .invoke("scrollTop")
+      .then((paneTop) => Math.max(rootTop, Number(paneTop)));
+  });
+}
+
+describe("Narrow rendered-markdown sync with page breaks", () => {
   it("keeps narrow pane flips stable after deep doc scrolling across page-break gaps", () => {
-    cy.viewport(390, 844);
-    cy.visit("/", {
-      onBeforeLoad(win) {
-        win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
-      },
-    });
-    cy.get(shellA11y.shell).then(($shell) => {
-      if ($shell.attr("data-layout") !== "dual") {
-        return;
-      }
+    whenNarrowHomeDualLayout(() => {
       cy.get(shellA11y.shell)
         .should("have.attr", "data-source-pane-mode", "rendered-markdown")
         .and("have.attr", "data-dual-mobile-pane", "doc");
@@ -53,17 +66,8 @@ describe("Narrow rendered-markdown sync with page breaks", () => {
   });
 
   it("keeps source pane in rendered markdown mode after narrow pane flips", () => {
-    cy.viewport(390, 844);
-    cy.visit("/", {
-      onBeforeLoad(win) {
-        win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
-      },
-    });
-    cy.get(shellA11y.shell).then(($shell) => {
-      if ($shell.attr("data-layout") !== "dual") {
-        return;
-      }
-      cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
+    whenNarrowHomeDualLayout(() => {
+      cy.get(shellA11y.shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
       cy.get(shellA11y.mobilePaneFlip).click();
       cy.get(shellA11y.shell)
         .should("have.attr", "data-dual-mobile-pane", "code")
