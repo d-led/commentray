@@ -3,7 +3,6 @@
  * Build `_site/index.html` for GitHub Pages from `.commentray.toml` `[static_site]`.
  * Implementation: {@link import("@commentray/code-commentray-static/github-pages-site")}.
  */
-import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -24,9 +23,6 @@ try {
   });
   console.log(`Wrote ${outHtml}`);
   console.log(`Wrote ${navSearchPath}`);
-  const noJekyll = path.join(repoRoot, "_site", ".nojekyll");
-  await writeFile(noJekyll, "", "utf8");
-  console.log(`Wrote ${noJekyll}`);
   await writeE2eDualScrollFixture(repoRoot);
   await writeE2eMobileFlipEndFixture(repoRoot);
 } catch (err) {
