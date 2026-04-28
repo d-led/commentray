@@ -1,6 +1,6 @@
 import { shellA11y } from "../shell-a11y";
 
-/** Layout must expose real vertical overflow before scroll-sync E2E can drive panes (fonts, Mermaid). */
+/** Layout must expose real vertical overflow before scroll-sync assertions (fonts, Mermaid affect heights). */
 const PANE_MIN_OVERFLOW_PX = 80;
 
 /** Dual-pane sync coalesces driver `scroll` to the next animation frame(s); wait before asserting partner `scrollTop`. */
@@ -17,7 +17,20 @@ Cypress.Commands.add("AwaitDualPaneScrollSyncFlush", () => {
   );
 });
 
-Cypress.Commands.add("ApplyNarrowViewportForDualScrollFixture", () => {
+function scrollElementToMaximumTwice(el: HTMLElement) {
+  el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+  el.dispatchEvent(new Event("scroll", { bubbles: true }));
+  return new Cypress.Promise((resolve: () => void) => {
+    requestAnimationFrame(() => {
+      el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+      el.dispatchEvent(new Event("scroll", { bubbles: true }));
+      resolve();
+    });
+  });
+}
+
+/** Short viewport so the shipped README home exposes scrollable dual panes for scroll-sync tests. */
+Cypress.Commands.add("ApplyDualPaneScrollTestViewport", () => {
   cy.viewport(1280, 480);
 });
 
@@ -27,8 +40,8 @@ Cypress.Commands.add("CurrentPageShouldDisplayDualPaneCodeBrowserChrome", () => 
   cy.get(shellA11y.resizeSplitter).should("be.visible");
 });
 
-Cypress.Commands.add("DocumentationPairStripShouldMentionDualScrollSourceFile", () => {
-  cy.get(shellA11y.documentationPairLandmark).should("contain", "dual-scroll.ts");
+Cypress.Commands.add("DocumentationPairStripShouldMentionReadmeSourceFile", () => {
+  cy.get(shellA11y.documentationPairLandmark).should("contain", "README.md");
 });
 
 Cypress.Commands.add("ResizeSplitterGutterShouldExposeConnectorPaths", () => {
@@ -61,8 +74,7 @@ Cypress.Commands.add("ScrollCodePaneToMaximum", () => {
         expect(overflow, "code pane vertical overflow").to.be.greaterThan(PANE_MIN_OVERFLOW_PX);
       });
       cy.get("#code-pane").then(($pane) => {
-        const el = $pane[0];
-        el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+        return scrollElementToMaximumTwice($pane[0]);
       });
     }
   });
@@ -88,8 +100,7 @@ Cypress.Commands.add("ScrollDocPaneBodyToMaximum", () => {
         expect(overflow, "doc pane body vertical overflow").to.be.greaterThan(PANE_MIN_OVERFLOW_PX);
       });
       cy.get(shellA11y.docPaneBody).then(($body) => {
-        const el = $body[0];
-        el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+        return scrollElementToMaximumTwice($body[0]);
       });
     }
   });

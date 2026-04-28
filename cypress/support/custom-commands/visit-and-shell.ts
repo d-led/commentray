@@ -10,8 +10,10 @@ Cypress.Commands.add("GoToStaticSiteHome", () => {
   });
 });
 
-Cypress.Commands.add("GoToE2eDualScrollFixturePage", () => {
-  cy.visit("/__e2e__/dual-scroll-sync/", {
+/** Visit `/` at 1280×480 with wide intro dismissed so dual panes have enough vertical overflow for scroll-sync assertions. */
+Cypress.Commands.add("GoToStaticSiteHomeForDualPaneScrollTests", () => {
+  cy.viewport(1280, 480);
+  cy.visit("/", {
     onBeforeLoad(win) {
       win.localStorage.setItem(WIDE_MODE_INTRO_STORAGE_KEY, "1");
     },

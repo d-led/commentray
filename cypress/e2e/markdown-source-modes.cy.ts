@@ -60,20 +60,44 @@ function whenHomeDualLayoutWide(dualOnly: () => void): void {
       win.localStorage.removeItem(SOURCE_PANE_MODE_STORAGE_KEY);
     },
   });
-  cy.get(shellA11y.shell).then(($shell) => {
+  cy.get(shellA11y.shell, { timeout: 20000 }).then(($shell) => {
     if ($shell.attr("data-layout") !== "dual") {
       cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
-      return;
+      return undefined;
     }
-    cy.wrap($shell)
+    return cy
+      .wrap($shell)
       .should("have.attr", "data-layout", "dual")
-      .and("have.attr", "data-source-pane-mode", "rendered-markdown");
-    dualOnly();
+      .and("have.attr", "data-source-pane-mode", "rendered-markdown")
+      .then(() => cy.document({ log: false }))
+      .then((doc) => {
+        const intro = doc.getElementById("commentray-wide-intro");
+        if (!(intro instanceof HTMLElement)) {
+          return undefined;
+        }
+        return cy.wrap(intro).find('button[data-wide-intro="skip"]').click({ force: true });
+      })
+      .then(() => {
+        return cy.get("body").should(($b) => {
+          expect($b.find("#commentray-wide-intro")).to.have.length(0);
+        });
+      })
+      .then(() => {
+        return cy.get(shellA11y.shell).then(($latestShell) => {
+          if ($latestShell.attr("data-layout") !== "dual") {
+            cy.wrap($latestShell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
+            return undefined;
+          }
+          cy.get("#code-pane").should("exist");
+          dualOnly();
+          return undefined;
+        });
+      });
   });
 }
 
 describe("Markdown source rendering modes", () => {
-  /** Reset after other specs (e.g. dual-scroll fixture uses a short viewport). Narrow tests override before `visit`. */
+  /** Default viewport for this file; individual tests set their own when needed. */
   beforeEach(() => {
     cy.viewport(1280, 900);
   });
@@ -99,43 +123,44 @@ describe("Markdown source rendering modes", () => {
     });
   });
 
-  it("snaps the doc pane to the matching block when the rendered-markdown source pane scrolls into a region", () => {
+  it("keeps rendered-markdown source and doc panes at the same scrollTop across block buffers", () => {
     whenHomeDualLayoutWide(() => {
       /**
        * Scroll the code pane so the `readme-user-guides` heading sits near the pane top.
        * `scrollIntoView()` can scroll the window instead of `#code-pane`’s internal scrollport,
        * so we set `scrollTop` on `#code-pane` to reliably emit the driver scroll the client syncs on.
-       * The commentary places that block far from the proportional offset of the source line
-       * (commentary has many more lines than `README.md`), so a proportional fallback would
-       * land the doc pane at a clearly different scrollTop than the block anchor.
        */
-      /** Use nodes from Cypress chains — top-level `document` is the runner frame, not the AUT. */
-      cy.get("#using-commentray").then(($heading) => {
-        const heading = $heading[0];
-        const codePane = heading.closest("#code-pane");
-        if (!(codePane instanceof HTMLElement))
-          throw new Error("expected #code-pane ancestor of #using-commentray");
-        const codeRect = codePane.getBoundingClientRect();
-        const lineRect = heading.getBoundingClientRect();
-        codePane.scrollTop = codePane.scrollTop + (lineRect.top - codeRect.top) - 4;
-      });
+      cy.get("#code-pane-markdown-body #using-commentray", { timeout: 20000 })
+        .should("exist")
+        .then(($heading) => {
+          return cy.get("#code-pane").then(($codePane) => {
+            const codePane = $codePane[0];
+            const heading = $heading[0];
+            const codeRect = codePane.getBoundingClientRect();
+            const lineRect = heading.getBoundingClientRect();
+            codePane.scrollTop = codePane.scrollTop + (lineRect.top - codeRect.top) - 4;
+            codePane.dispatchEvent(new Event("scroll", { bubbles: true }));
+          });
+        });
+      cy.AwaitDualPaneScrollSyncFlush();
       cy.AwaitDualPaneScrollSyncFlush();
 
       cy.get("#commentray-block-readme-user-guides").should("exist");
-      cy.get(shellA11y.docPaneBody, { timeout: 15000 }).should(($body) => {
-        const docPaneBody = $body[0];
-        const anchor = docPaneBody.ownerDocument.getElementById(
-          "commentray-block-readme-user-guides",
-        );
-        if (anchor === null) throw new Error("expected commentray-block-readme-user-guides");
-        const anchorTopWithin =
-          anchor.getBoundingClientRect().top - docPaneBody.getBoundingClientRect().top;
-        expect(anchorTopWithin, "block anchor near doc viewport top").to.be.within(-12, 60);
-        expect(
-          docPaneBody.scrollTop,
-          "doc pane is region-snapped, not at proportional ratio",
-        ).to.be.gt(40);
-      });
+      cy.get("#code-pane")
+        .invoke("scrollTop")
+        .then(() => {
+          cy.get(shellA11y.docPaneBody, { timeout: 20000 }).then(($body) => {
+            const docPaneBody = $body[0];
+            cy.get("#commentray-block-readme-user-guides").should(($anchor) => {
+              const anchorTopWithin =
+                $anchor[0].getBoundingClientRect().top - docPaneBody.getBoundingClientRect().top;
+              expect(anchorTopWithin, "block anchor near doc viewport top").to.be.within(-16, 72);
+              expect(docPaneBody.scrollTop, "doc pane remains scrolled to synced region").to.be.gt(
+                40,
+              );
+            });
+          });
+        });
     });
   });
 

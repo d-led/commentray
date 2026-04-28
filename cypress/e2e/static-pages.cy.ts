@@ -63,7 +63,7 @@ describe("The Commentray GitHub Pages static build", () => {
     });
 
     it("serves humane source browse paths as real pages on static hosts", () => {
-      cy.ApplyNarrowViewportForDualScrollFixture();
+      cy.ApplyDualPaneScrollTestViewport();
       cy.visit("/browse/README.md/main/index.html", {
         onBeforeLoad(win) {
           win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");

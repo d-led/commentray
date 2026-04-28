@@ -5,10 +5,11 @@ const MOBILE_VIEWPORT_WIDTH = 390;
 const MOBILE_VIEWPORT_HEIGHT = 844;
 const WIDE_MODE_INTRO_STORAGE_KEY = "commentray.codeCommentrayStatic.wideModeIntro.v1";
 
-Cypress.Commands.add("PrepareE2eMobileFlipEndFixtureAtMobileViewport", () => {
+/** Visit `/` at the narrow mobile breakpoint with wide-mode intro dismissed; shell must be dual + mobile flip chrome. */
+Cypress.Commands.add("PrepareStaticSiteHomeForMobileFlipTailCheck", () => {
   cy.clearLocalStorage();
   cy.viewport(MOBILE_VIEWPORT_WIDTH, MOBILE_VIEWPORT_HEIGHT);
-  cy.visit("/__e2e__/mobile-flip-end/", {
+  cy.visit("/", {
     onBeforeLoad(win) {
       win.localStorage.setItem(WIDE_MODE_INTRO_STORAGE_KEY, "1");
     },

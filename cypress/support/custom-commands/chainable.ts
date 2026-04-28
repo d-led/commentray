@@ -4,7 +4,7 @@ declare global {
   namespace Cypress {
     interface Chainable {
       GoToStaticSiteHome(): Chainable<void>;
-      GoToE2eDualScrollFixturePage(): Chainable<void>;
+      GoToStaticSiteHomeForDualPaneScrollTests(): Chainable<void>;
 
       CurrentPageShouldDisplayCodeBrowserShell(): Chainable<void>;
       NavSearchArtifactGetRequestShouldReturnSchemaVersion(): Chainable<void>;
@@ -45,9 +45,9 @@ declare global {
       SearchResultsShouldBePoliteLiveRegion(): Chainable<void>;
       BlankTargetLinksShouldIncludeNoopenerInRel(): Chainable<void>;
 
-      ApplyNarrowViewportForDualScrollFixture(): Chainable<void>;
+      ApplyDualPaneScrollTestViewport(): Chainable<void>;
       CurrentPageShouldDisplayDualPaneCodeBrowserChrome(): Chainable<void>;
-      DocumentationPairStripShouldMentionDualScrollSourceFile(): Chainable<void>;
+      DocumentationPairStripShouldMentionReadmeSourceFile(): Chainable<void>;
       ResizeSplitterGutterShouldExposeConnectorPaths(): Chainable<void>;
       AwaitDualPaneScrollSyncFlush(): Chainable<void>;
       ScrollCodePaneToMaximum(): Chainable<void>;
@@ -112,7 +112,7 @@ declare global {
       MobileSinglePaneLayoutShouldShowSourceColumnOnly(): Chainable<void>;
       TapMobilePaneFlipControl(): Chainable<void>;
 
-      PrepareE2eMobileFlipEndFixtureAtMobileViewport(): Chainable<void>;
+      PrepareStaticSiteHomeForMobileFlipTailCheck(): Chainable<void>;
     }
   }
 }

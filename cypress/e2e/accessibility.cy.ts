@@ -45,10 +45,3 @@ describe("The shipped Commentray home page", () => {
     cy.DocPairGithubToolbarLinksShouldMarkSvgsDecorative();
   });
 });
-
-describe("The dual-scroll E2E fixture page", () => {
-  it("reuses the main landmark and skip link from the hub shell", () => {
-    cy.GoToE2eDualScrollFixturePage();
-    cy.CurrentPageShouldDisplayMainLandmarkAndSkipLink();
-  });
-});
