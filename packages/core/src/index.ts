@@ -110,6 +110,8 @@ export {
 } from "./validate-project.js";
 export { plannedSymbolResolutionStrategy } from "./language-intelligence.js";
 export type { SymbolResolutionStrategy } from "./language-intelligence.js";
+export type { HeightAdjustable, Identifiable, WithHeight } from "./height-adjustable.js";
+export { BufferingFlowSynchronizer } from "./buffering-flow-synchronizer.js";
 export { relocationHintMessages } from "./relocation-hints.js";
 export type { RelocationHintsInput } from "./relocation-hints.js";
 export { runCommanderMain } from "./cli-bootstrap.js";
