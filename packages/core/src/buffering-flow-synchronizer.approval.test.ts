@@ -7,7 +7,18 @@ import type { HeightAdjustable } from "./height-adjustable.js";
 import { BufferingFlowSynchronizer } from "./buffering-flow-synchronizer.js";
 
 const require = createRequire(import.meta.url);
-const approvals: typeof import("approvals") = require("approvals");
+
+type ApprovalsApi = {
+  configure(overrideOptions: { reporters?: string[] }): void;
+  verify(
+    dirName: string,
+    testName: string,
+    data: string,
+    optionsOverride?: { approvedFileExtensionWithDot?: string; reporters?: string[] },
+  ): void;
+};
+
+const approvals = require("approvals") as ApprovalsApi;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APPROVALS_DIR = path.join(__dirname, "buffering-flow-synchronizer.approvals");
 
@@ -181,7 +192,10 @@ function renderSynchronizedFlows(flows: {
 function assertSingleSpacerRowBetweenBlocks(renderedGrid: string): void {
   const lines = renderedGrid.split("\n");
   for (let i = 1; i < lines.length; i++) {
-    if (lines[i]!.trim() === "" && lines[i - 1]!.trim() === "") {
+    const current = lines[i];
+    const previous = lines[i - 1];
+    if (current === undefined || previous === undefined) continue;
+    if (current.trim() === "" && previous.trim() === "") {
       throw new Error(
         "Rendered grid must not use more than one spacer line between blocks (only XXXX, RnXX, BBBB rows are content).",
       );
@@ -193,7 +207,10 @@ function assertSingleSpacerRowBetweenBlocks(renderedGrid: string): void {
 function assertInputUsesSingleLineBlockBreaks(input: string): void {
   const lines = input.split("\n");
   for (let i = 1; i < lines.length; i++) {
-    if (lines[i]!.trim() === "" && lines[i - 1]!.trim() === "") {
+    const current = lines[i];
+    const previous = lines[i - 1];
+    if (current === undefined || previous === undefined) continue;
+    if (current.trim() === "" && previous.trim() === "") {
       throw new Error(
         "Fixture input must not contain consecutive blank lines; use exactly one blank line between blocks.",
       );
