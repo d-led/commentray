@@ -15,28 +15,81 @@ Cypress.Commands.add("PrepareStaticSiteHomeAtMobileViewport", () => {
   });
 });
 
-Cypress.Commands.add("MobileStaticSiteCodeBrowserChromeShouldBeReady", () => {
-  cy.get(shellA11y.shell).should("exist").and("have.attr", "data-layout", "dual");
-  cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane");
-  cy.get(shellA11y.mobilePaneFlip).should("be.visible");
-  cy.get(shellA11y.resizeSplitter).should("not.be.visible");
-  cy.get(shellA11y.search.region).within(() => {
-    cy.get('input[type="search"]').should("be.visible");
+Cypress.Commands.add("PrepareStaticSiteHomeAtMobileViewportWithSourcePaneActive", () => {
+  cy.clearLocalStorage();
+  cy.viewport(MOBILE_VIEWPORT_WIDTH, MOBILE_VIEWPORT_HEIGHT);
+  cy.visit("/", {
+    onBeforeLoad(win) {
+      win.localStorage.setItem(WIDE_MODE_INTRO_STORAGE_KEY, "1");
+      win.localStorage.setItem("commentray.codeCommentrayStatic.dualMobilePane", "code");
+    },
   });
-  cy.get(shellA11y.banner).should("be.visible");
-  cy.get(shellA11y.contentinfo).should("be.visible");
+});
+
+Cypress.Commands.add("MobileStaticSiteCodeBrowserChromeShouldBeReady", () => {
+  cy.get(shellA11y.shell).should("exist").and("have.attr", "data-layout");
+  cy.get(shellA11y.shell).then(($shell) => {
+    const layout = $shell.attr("data-layout");
+    expect(layout === "dual" || layout === "stretch").to.eq(true);
+    cy.wrap($shell).should("have.attr", "data-dual-mobile-pane");
+    cy.get(shellA11y.mobilePaneFlip).should("be.visible");
+    if (layout === "dual") {
+      cy.get(shellA11y.resizeSplitter).should("not.be.visible");
+    } else {
+      cy.get("#stretch-gutter").should("not.be.visible");
+    }
+    cy.get(shellA11y.search.region).within(() => {
+      cy.get('input[type="search"]').should("be.visible");
+    });
+    cy.get(shellA11y.banner).should("be.visible");
+    cy.get(shellA11y.contentinfo).should("be.visible");
+  });
 });
 
 Cypress.Commands.add("MobileSinglePaneLayoutShouldShowCommentaryColumnOnly", () => {
   cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane", "doc");
-  cy.get(shellA11y.panes.source).should("not.be.visible");
-  cy.get(shellA11y.panes.commentray).should("be.visible");
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") === "stretch") {
+      cy.get("#code-pane tbody tr.stretch-row--block td.stretch-code")
+        .first()
+        .should(($td) => {
+          const display = getComputedStyle($td[0]).display;
+          expect(display).to.eq("none");
+        });
+      cy.get("#code-pane tbody tr.stretch-row--block td.stretch-doc")
+        .first()
+        .should(($td) => {
+          const display = getComputedStyle($td[0]).display;
+          expect(display).to.not.eq("none");
+        });
+      return;
+    }
+    cy.get(shellA11y.panes.source).should("not.be.visible");
+    cy.get(shellA11y.panes.commentray).should("be.visible");
+  });
 });
 
 Cypress.Commands.add("MobileSinglePaneLayoutShouldShowSourceColumnOnly", () => {
   cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane", "code");
-  cy.get(shellA11y.panes.source).should("be.visible");
-  cy.get(shellA11y.panes.commentray).should("not.be.visible");
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") === "stretch") {
+      cy.get("#code-pane tbody tr.stretch-row--block td.stretch-code")
+        .first()
+        .should(($td) => {
+          const display = getComputedStyle($td[0]).display;
+          expect(display).to.not.eq("none");
+        });
+      cy.get("#code-pane tbody tr.stretch-row--block td.stretch-doc")
+        .first()
+        .should(($td) => {
+          const display = getComputedStyle($td[0]).display;
+          expect(display).to.eq("none");
+        });
+      return;
+    }
+    cy.get(shellA11y.panes.source).should("be.visible");
+    cy.get(shellA11y.panes.commentray).should("not.be.visible");
+  });
 });
 
 Cypress.Commands.add("TapMobilePaneFlipControl", () => {
@@ -48,4 +101,28 @@ Cypress.Commands.add("TapMobilePaneFlipControl", () => {
     }
     cy.get(shellA11y.mobilePaneFlip).click();
   });
+});
+
+Cypress.Commands.add("MobileViewportShouldHaveScrollableDocument", (minPixels = 80) => {
+  cy.window().then((win) => {
+    const root = win.document.scrollingElement ?? win.document.documentElement;
+    const maxScroll = Math.max(0, root.scrollHeight - root.clientHeight);
+    expect(maxScroll, "mobile document should be taller than viewport").to.be.gt(minPixels);
+  });
+});
+
+Cypress.Commands.add("ScrollMobileDocumentToFraction", (fraction: number) => {
+  cy.window().then((win) => {
+    const root = win.document.scrollingElement ?? win.document.documentElement;
+    const clamped = Math.min(1, Math.max(0, fraction));
+    const maxScroll = Math.max(0, root.scrollHeight - root.clientHeight);
+    root.scrollTop = Math.floor(maxScroll * clamped);
+    win.dispatchEvent(new Event("scroll"));
+    root.dispatchEvent(new Event("scroll"));
+  });
+  cy.AwaitDualPaneScrollSyncFlush();
+});
+
+Cypress.Commands.add("MobileDocumentScrollYShouldExceed", (pixels: number) => {
+  cy.window().its("scrollY").should("be.gt", pixels);
 });

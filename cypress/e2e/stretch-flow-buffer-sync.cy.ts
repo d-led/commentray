@@ -4,7 +4,7 @@ import { shellA11y } from "../support/shell-a11y";
 const STRETCH_FLOW_BUFFER_BROWSE = "/browse/e2e/stretch-flow-buffer.ts/index.html";
 
 describe("Stretch layout — flow-synchronizer buffer (static browse page)", () => {
-  it("exposes the shell flag and applies slack padding on the shorter code cell", () => {
+  it("exposes the shell flag and avoids terminal tail slack on the last gap row", () => {
     cy.visit(STRETCH_FLOW_BUFFER_BROWSE, {
       onBeforeLoad(win) {
         win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
@@ -16,17 +16,22 @@ describe("Stretch layout — flow-synchronizer buffer (static browse page)", () 
 
     cy.get("table#code-pane.block-stretch").should("exist");
     cy.get("#code-pane tbody tr.stretch-row--block").should("have.length.at.least", 1);
-    cy.get("table#code-pane.block-stretch td.stretch-code").should(($cells) => {
-      const win = $cells[0]?.ownerDocument.defaultView;
-      if (win === null) throw new Error("expected window");
-      const maxPb = Math.max(
-        ...[...$cells].map((td) => Number.parseFloat(win.getComputedStyle(td).paddingBottom)),
-      );
-      expect(
-        maxPb,
-        "flow-synchronizer adds bottom slack on a code cell (block row and/or trailing gap row)",
-      ).to.be.greaterThan(8);
-    });
+    cy.get("#code-pane tbody tr.stretch-row")
+      .last()
+      .within(() => {
+        cy.get("td.stretch-code").should(($td) => {
+          const win = $td[0]?.ownerDocument.defaultView;
+          if (win === null) throw new Error("expected window");
+          const pb = Number.parseFloat(win.getComputedStyle($td[0]).paddingBottom);
+          expect(pb, "last stretch-code row should not keep terminal tail slack").to.eq(0);
+        });
+        cy.get("td.stretch-doc").should(($td) => {
+          const win = $td[0]?.ownerDocument.defaultView;
+          if (win === null) throw new Error("expected window");
+          const pb = Number.parseFloat(win.getComputedStyle($td[0]).paddingBottom);
+          expect(pb, "last stretch-doc row should not keep terminal tail slack").to.eq(0);
+        });
+      });
 
     cy.get(`${shellA11y.shell} .stretch-doc-inner`)
       .first()

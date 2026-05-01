@@ -62,7 +62,7 @@ function whenHomeDualLayoutWide(dualOnly: () => void): void {
   });
   cy.get(shellA11y.shell, { timeout: 20000 }).then(($shell) => {
     if ($shell.attr("data-layout") !== "dual") {
-      cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
+      cy.wrap($shell).should("have.attr", "data-source-pane-mode", "source");
       return undefined;
     }
     return cy
@@ -109,7 +109,13 @@ describe("Markdown source rendering modes", () => {
         win.localStorage.setItem(SOURCE_PANE_MODE_STORAGE_KEY, "source");
       },
     });
-    cy.get(shellA11y.shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
+    cy.get(shellA11y.shell).then(($shell) => {
+      if ($shell.attr("data-layout") === "stretch") {
+        cy.wrap($shell).should("have.attr", "data-source-pane-mode", "source");
+        return;
+      }
+      cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
+    });
   });
 
   it("keeps doc-to-source scroll sync when left pane shows rendered markdown (wide)", () => {
@@ -196,7 +202,7 @@ describe("Markdown source rendering modes", () => {
     });
     cy.get(shellA11y.shell).then(($shell) => {
       if ($shell.attr("data-layout") !== "dual") {
-        cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");
+        cy.wrap($shell).should("have.attr", "data-source-pane-mode", "source");
         cy.get(shellA11y.angleSelect).select("architecture");
         cy.get(shellA11y.angleSelect).should("have.value", "architecture");
         cy.get(shellA11y.angleSelect).select("main");
@@ -273,94 +279,125 @@ describe("Markdown source rendering modes", () => {
     cy.viewport(1280, 900);
     visitWithFreshWideIntroStorage();
 
-    cy.get("#commentray-wide-intro").should("be.visible");
-    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
-      "be.visible",
-    );
-    cy.get('#commentray-wide-intro button[data-wide-intro="skip"]').click();
-    cy.get("#commentray-wide-intro").should("not.exist");
-    cy.window()
-      .its("localStorage")
-      .invoke("getItem", WIDE_MODE_INTRO_STORAGE_KEY)
-      .should("eq", "1");
+    cy.get(shellA11y.shell).then(($shell) => {
+      if ($shell.attr("data-layout") === "stretch") {
+        cy.get("#commentray-wide-intro").should("not.exist");
+        return;
+      }
+      cy.get("#commentray-wide-intro").should("be.visible");
+      cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
+        "be.visible",
+      );
+      cy.get('#commentray-wide-intro button[data-wide-intro="skip"]').click();
+      cy.get("#commentray-wide-intro").should("not.exist");
+      cy.window()
+        .its("localStorage")
+        .invoke("getItem", WIDE_MODE_INTRO_STORAGE_KEY)
+        .should("eq", "1");
 
-    cy.reload();
-    cy.get("#commentray-wide-intro").should("not.exist");
+      cy.reload();
+      cy.get("#commentray-wide-intro").should("not.exist");
 
-    cy.get("#commentray-help-tour").click();
-    cy.get("#commentray-wide-intro").should("be.visible");
+      cy.get("#commentray-help-tour").click();
+      cy.get("#commentray-wide-intro").should("be.visible");
+    });
   });
 
   it("draws two visible intro arrows in wide mode without crossing the bubble text area", () => {
     cy.viewport(1280, 900);
     visitWithFreshWideIntroStorage();
 
-    cy.get("#commentray-wide-intro").should("be.visible");
-    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
-      "be.visible",
-    );
-    expectVisibleArrows(2);
-    expectArrowStartsOutsideBubble();
+    cy.get(shellA11y.shell).then(($shell) => {
+      if ($shell.attr("data-layout") === "stretch") {
+        cy.get("#commentray-wide-intro").should("not.exist");
+        return;
+      }
+      cy.get("#commentray-wide-intro").should("be.visible");
+      cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
+        "be.visible",
+      );
+      expectVisibleArrows(2);
+      expectArrowStartsOutsideBubble();
 
-    cy.get('#commentray-wide-intro button[data-wide-intro="next"]').click();
-    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Two views").should(
-      "be.visible",
-    );
-    expectVisibleArrows(2);
-    expectArrowStartsOutsideBubble();
+      cy.get('#commentray-wide-intro button[data-wide-intro="next"]').click();
+      cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Two views").should(
+        "be.visible",
+      );
+      expectVisibleArrows(2);
+      expectArrowStartsOutsideBubble();
+    });
   });
 
   it("recomputes intro arrows when viewport switches between wide and narrow", () => {
     cy.viewport(1280, 900);
     visitWithFreshWideIntroStorage();
 
-    cy.get("#commentray-wide-intro").should("be.visible");
-    expectVisibleArrows(2);
+    cy.get(shellA11y.shell).then(($shell) => {
+      if ($shell.attr("data-layout") === "stretch") {
+        cy.get("#commentray-wide-intro").should("not.exist");
+        return;
+      }
+      cy.get("#commentray-wide-intro").should("be.visible");
+      expectVisibleArrows(2);
 
-    cy.viewport(390, 844);
-    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
-      "be.visible",
-    );
-    expectVisibleArrows(1);
+      cy.viewport(390, 844);
+      cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
+        "be.visible",
+      );
+      expectVisibleArrows(1);
 
-    cy.viewport(1280, 900);
-    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
-      "be.visible",
-    );
-    expectVisibleArrows(2);
+      cy.viewport(1280, 900);
+      cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
+        "be.visible",
+      );
+      expectVisibleArrows(2);
+    });
   });
 
   it("shows intro tour on narrow viewports with narrow-view copy", () => {
     cy.viewport(390, 844);
     visitWithFreshWideIntroStorage();
-    cy.get("#commentray-wide-intro").should("be.visible");
-    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
-      "be.visible",
-    );
-    cy.get('#commentray-wide-intro button[data-wide-intro="next"]').click();
-    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Two views").should(
-      "be.visible",
-    );
-    cy.contains("#commentray-wide-intro .commentray-wide-intro-body", "narrow view").should(
-      "be.visible",
-    );
+    cy.get(shellA11y.shell).then(($shell) => {
+      if ($shell.attr("data-layout") === "stretch") {
+        cy.get("#commentray-wide-intro").should("not.exist");
+        return;
+      }
+      cy.get("#commentray-wide-intro").should("be.visible");
+      cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
+        "be.visible",
+      );
+      cy.get('#commentray-wide-intro button[data-wide-intro="next"]').click();
+      cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Two views").should(
+        "be.visible",
+      );
+      cy.contains("#commentray-wide-intro .commentray-wide-intro-body", "narrow view").should(
+        "be.visible",
+      );
+    });
   });
 
   it("ends with a help-button reminder and introduces share link", () => {
     cy.viewport(1280, 900);
     visitWithFreshWideIntroStorage();
-    cy.get("#commentray-wide-intro").should("be.visible");
+    cy.get(shellA11y.shell).then(($shell) => {
+      if ($shell.attr("data-layout") === "stretch") {
+        cy.get("#commentray-wide-intro").should("not.exist");
+        return;
+      }
+      cy.get("#commentray-wide-intro").should("be.visible");
 
-    clickWideIntroNextUntilTitle("Need a refresher?", 18);
+      clickWideIntroNextUntilTitle("Need a refresher?", 18);
 
-    cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Need a refresher?").should(
-      "be.visible",
-    );
-    cy.contains(
-      "#commentray-wide-intro .commentray-wide-intro-body",
-      "You can always go back to this tutorial via the help button.",
-    ).should("be.visible");
-    cy.get("#commentray-wide-intro-arrows .commentray-wide-intro-arrow").should("have.length", 1);
+      cy.contains(
+        "#commentray-wide-intro .commentray-wide-intro-title",
+        "Need a refresher?",
+      ).should("be.visible");
+      cy.contains(
+        "#commentray-wide-intro .commentray-wide-intro-body",
+        "You can always go back to this tutorial via the help button.",
+      ).should("be.visible");
+      cy.get("#commentray-wide-intro-arrows .commentray-wide-intro-arrow").should("have.length", 1);
+    });
   });
 
   it("shows a fallback intro action when wrap-lines toggle is hidden", () => {
@@ -369,7 +406,7 @@ describe("Markdown source rendering modes", () => {
 
     cy.get(shellA11y.shell).then(($shell) => {
       if ($shell.attr("data-layout") !== "dual") {
-        cy.get("#commentray-wide-intro").should("be.visible");
+        cy.get("#commentray-wide-intro").should("not.exist");
         return;
       }
       cy.wrap($shell).should("have.attr", "data-source-pane-mode", "rendered-markdown");

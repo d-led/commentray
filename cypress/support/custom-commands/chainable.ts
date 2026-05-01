@@ -107,12 +107,20 @@ declare global {
       DocPaneMermaidSvgShouldExist(): Chainable<void>;
 
       PrepareStaticSiteHomeAtMobileViewport(): Chainable<void>;
+      PrepareStaticSiteHomeAtMobileViewportWithSourcePaneActive(): Chainable<void>;
       MobileStaticSiteCodeBrowserChromeShouldBeReady(): Chainable<void>;
       MobileSinglePaneLayoutShouldShowCommentaryColumnOnly(): Chainable<void>;
       MobileSinglePaneLayoutShouldShowSourceColumnOnly(): Chainable<void>;
+      MobileViewportShouldHaveScrollableDocument(minPixels?: number): Chainable<void>;
+      ScrollMobileDocumentToFraction(fraction: number): Chainable<void>;
+      MobileDocumentScrollYShouldExceed(pixels: number): Chainable<void>;
       TapMobilePaneFlipControl(): Chainable<void>;
 
       PrepareStaticSiteHomeForMobileFlipTailCheck(): Chainable<void>;
+      ScrollMobileDocumentToBottomAndFlush(): Chainable<void>;
+      SecondaryMobileFlipShouldBeVisibleAndPrimaryShouldBeOffscreen(): Chainable<void>;
+      MobilePaneShouldShowTailFixtureSourceText(): Chainable<void>;
+      MobilePaneShouldShowTailFlipMarkerText(): Chainable<void>;
     }
   }
 }

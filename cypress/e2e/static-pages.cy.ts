@@ -64,10 +64,24 @@ describe("The Commentray GitHub Pages static build", () => {
 
     it("serves humane source browse paths as real pages on static hosts", () => {
       cy.ApplyDualPaneScrollTestViewport();
-      cy.visit("/browse/README.md/main/index.html", {
-        onBeforeLoad(win) {
-          win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
-        },
+      cy.location("href").then((href) => {
+        cy.get(".shell")
+          .invoke("attr", "data-commentray-pair-browse-href")
+          .then((browseHref) => {
+            expect(browseHref)
+              .to.be.a("string")
+              .and.match(/^(?:\.\/browse\/.+|\/browse\/.+|https?:\/\/[^/]+\/browse\/.+)(?:\?.*)?$/);
+            if (typeof browseHref !== "string") {
+              throw new Error("Expected shell browse permalink href");
+            }
+            const browsePath = new URL(browseHref, href).pathname;
+            cy.wrap(browsePath).as("humaneBrowsePath");
+            cy.visit(browsePath, {
+              onBeforeLoad(win) {
+                win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
+              },
+            });
+          });
       });
       cy.CurrentPageShouldDisplayCodeBrowserShell();
       cy.location("pathname").should("match", /\/browse\/README\.md\/main(?:\/index\.html)?$/);
@@ -77,10 +91,12 @@ describe("The Commentray GitHub Pages static build", () => {
       cy.CodeAndDocPanesScrollTopShouldBeZero();
       cy.ScrollCodePaneToMaximum();
       cy.DocPaneBodyScrollTopShouldExceed(80);
-      cy.visit("/browse/README.md/main/index.html", {
-        onBeforeLoad(win) {
-          win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
-        },
+      cy.get("@humaneBrowsePath").then((browsePath) => {
+        cy.visit(String(browsePath), {
+          onBeforeLoad(win) {
+            win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
+          },
+        });
       });
       cy.CodeAndDocPanesScrollTopShouldBeZero();
       cy.ScrollDocPaneBodyToMaximum();

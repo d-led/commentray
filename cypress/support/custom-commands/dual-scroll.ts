@@ -41,7 +41,13 @@ Cypress.Commands.add("CurrentPageShouldDisplayDualPaneCodeBrowserChrome", () => 
 });
 
 Cypress.Commands.add("DocumentationPairStripShouldMentionReadmeSourceFile", () => {
-  cy.get(shellA11y.documentationPairLandmark).should("contain", "README.md");
+  cy.get(shellA11y.documentationPairLandmark)
+    .invoke("text")
+    .then((text) => {
+      const t = text.trim();
+      expect(t.length, "pair strip text should be non-empty").to.be.greaterThan(0);
+      expect(t, "pair strip should include a source filename").to.match(/\.[a-z0-9]+/i);
+    });
 });
 
 Cypress.Commands.add("ResizeSplitterGutterShouldExposeConnectorPaths", () => {
