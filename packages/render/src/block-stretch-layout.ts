@@ -8,6 +8,7 @@ import {
 
 import { escapeHtml } from "./html-utils.js";
 import { renderHighlightedCodeLineRows } from "./highlighted-code-lines.js";
+import { injectSourceMarkdownAnchors } from "./inject-md-line-anchors.js";
 import { type CommentrayOutputUrlOptions, renderMarkdownToHtml } from "./markdown-pipeline.js";
 
 const BLOCK_MARKER_LINE = new RegExp(
@@ -30,9 +31,39 @@ export type BlockStretchTableOptions = {
   sourceRelative: string;
   commentrayPathRel: string;
   commentrayOutputUrls?: CommentrayOutputUrlOptions;
+  sourceMarkdownOutputUrls?: CommentrayOutputUrlOptions;
   /** Omitted uses `DEFAULT_STRETCH_BUFFER_SYNC` from `@commentray/core` (`flow-synchronizer`). */
   stretchBufferSync?: StretchBufferSyncStrategy;
 };
+
+function sourceMarkdownEnabled(language: string): boolean {
+  const normalized = language.trim().toLowerCase();
+  return normalized === "md" || normalized === "markdown" || normalized === "mdx";
+}
+
+async function renderSourceMarkdownSlice(
+  lines: string[],
+  startLine0: number,
+  endLine0: number,
+  outputUrls: CommentrayOutputUrlOptions | undefined,
+): Promise<string> {
+  const markdown = lines.slice(startLine0, endLine0 + 1).join("\n");
+  const anchored = injectSourceMarkdownAnchors(markdown, startLine0);
+  const rendered = await renderMarkdownToHtml(anchored.trim().length > 0 ? anchored : " ", {
+    commentrayOutputUrls: outputUrls,
+  });
+  return `<div class="source-pane source-pane--rendered-md stretch-source-markdown-body" data-source-markdown-body="true">${rendered}</div>`;
+}
+
+function wrapStretchSourceCell(
+  codeHtml: string,
+  renderedMarkdownHtml: string | undefined,
+  mode: StretchBufferSyncStrategy,
+): string {
+  const rendered = renderedMarkdownHtml ?? "";
+  const inner = `<div class="source-pane source-pane--code">${codeHtml}</div>${rendered}`;
+  return mode === "flow-synchronizer" ? `<div class="stretch-cell-measure">${inner}</div>` : inner;
+}
 
 export function splitCommentrayMarkdownSegments(markdown: string): {
   preamble: string;
@@ -89,24 +120,26 @@ async function appendStretchGapRow(
   language: string,
   mode: StretchBufferSyncStrategy,
   gapSyncSeq: { n: number } | null,
+  renderedSourceMarkdownHtml: string | undefined,
 ): Promise<void> {
   const codeLineHtml = await renderHighlightedCodeLineRows(lines[lineIndex0] ?? "", language, {
     lineIndexOffset: lineIndex0,
     omitLineStackWrapper: true,
   });
+  const sourceCellInner = wrapStretchSourceCell(codeLineHtml, renderedSourceMarkdownHtml, mode);
   if (mode === "flow-synchronizer" && gapSyncSeq !== null) {
     const gapId = `__gap__${gapSyncSeq.n}`;
     gapSyncSeq.n += 1;
     rows.push(
       `<tr class="stretch-row stretch-row--gap" data-commentray-stretch-sync-id="${escapeHtml(gapId)}">` +
-        `<td class="stretch-code"><div class="stretch-cell-measure">${codeLineHtml}</div></td>` +
-        `<td class="stretch-doc stretch-doc--gap"><div class="stretch-cell-measure"><span class="stretch-gap-mark" aria-hidden="true">—</span></div></td></tr>`,
+        `<td class="stretch-code">${sourceCellInner}</td>` +
+        `<td class="stretch-doc stretch-doc--gap"><div class="stretch-cell-measure"></div></td></tr>`,
     );
     return;
   }
   rows.push(
-    `<tr class="stretch-row stretch-row--gap"><td class="stretch-code">${codeLineHtml}</td>` +
-      `<td class="stretch-doc stretch-doc--gap"><span class="stretch-gap-mark" aria-hidden="true">—</span></td></tr>`,
+    `<tr class="stretch-row stretch-row--gap"><td class="stretch-code">${sourceCellInner}</td>` +
+      `<td class="stretch-doc stretch-doc--gap"></td></tr>`,
   );
 }
 
@@ -138,6 +171,7 @@ export async function tryBuildBlockStretchTableHtml(
 
   const { preamble, segments } = splitCommentrayMarkdownSegments(opts.commentrayMarkdown);
   const mdOpts = { commentrayOutputUrls: opts.commentrayOutputUrls };
+  const sourceMarkdownSlicesEnabled = sourceMarkdownEnabled(opts.language);
   const renderedById = new Map<string, string>();
   for (const s of segments) {
     renderedById.set(
@@ -162,14 +196,46 @@ export async function tryBuildBlockStretchTableHtml(
     const b = lineToBlock.get(L);
 
     if (!b) {
-      await appendStretchGapRow(rows, lines, i, opts.language, mode, gapSyncSeq);
+      const renderedSourceMarkdownHtml = sourceMarkdownSlicesEnabled
+        ? await renderSourceMarkdownSlice(
+            lines,
+            i,
+            i,
+            opts.sourceMarkdownOutputUrls,
+          )
+        : undefined;
+      await appendStretchGapRow(
+        rows,
+        lines,
+        i,
+        opts.language,
+        mode,
+        gapSyncSeq,
+        renderedSourceMarkdownHtml,
+      );
       i += 1;
       continue;
     }
 
     /** `markerViewportHalfOpen1Based` can include lines before `sourceStart` (region prefix). */
     if (i < b.sourceStart - 1) {
-      await appendStretchGapRow(rows, lines, i, opts.language, mode, gapSyncSeq);
+      const renderedSourceMarkdownHtml = sourceMarkdownSlicesEnabled
+        ? await renderSourceMarkdownSlice(
+            lines,
+            i,
+            i,
+            opts.sourceMarkdownOutputUrls,
+          )
+        : undefined;
+      await appendStretchGapRow(
+        rows,
+        lines,
+        i,
+        opts.language,
+        mode,
+        gapSyncSeq,
+        renderedSourceMarkdownHtml,
+      );
       i += 1;
       continue;
     }
@@ -177,18 +243,22 @@ export async function tryBuildBlockStretchTableHtml(
     const start0 = b.sourceStart - 1;
     const end0 = b.sourceEnd - 1;
     const stackHtml = await renderCodeLineStack(lines, start0, end0, opts.language);
+    const renderedSourceMarkdownHtml = sourceMarkdownSlicesEnabled
+      ? await renderSourceMarkdownSlice(lines, start0, end0, opts.sourceMarkdownOutputUrls)
+      : undefined;
+    const sourceCellInner = wrapStretchSourceCell(stackHtml, renderedSourceMarkdownHtml, mode);
     const docInner =
       renderedById.get(b.id) ??
       `<p class="stretch-doc-missing"><em>No commentary segment for block <code>${escapeHtml(b.id)}</code>.</em></p>`;
     if (mode === "flow-synchronizer") {
       rows.push(
         `<tr class="stretch-row stretch-row--block" data-commentray-stretch-sync-id="${escapeHtml(b.id)}">` +
-          `<td class="stretch-code"><div class="stretch-cell-measure">${stackHtml}</div></td>` +
+          `<td class="stretch-code">${sourceCellInner}</td>` +
           `<td class="stretch-doc"><div class="stretch-cell-measure"><div class="stretch-doc-inner">${docInner}</div></div></td></tr>`,
       );
     } else {
       rows.push(
-        `<tr class="stretch-row stretch-row--block"><td class="stretch-code">${stackHtml}</td>` +
+        `<tr class="stretch-row stretch-row--block"><td class="stretch-code">${sourceCellInner}</td>` +
           `<td class="stretch-doc"><div class="stretch-doc-inner">${docInner}</div></td></tr>`,
       );
     }

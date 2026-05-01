@@ -32,6 +32,28 @@ function markerLineByIdFromMarkdown(markdown: string): Map<string, number> {
   return map;
 }
 
+function buildMarkerFallbackLinks(
+  markerLineById: Map<string, number>,
+  sourceText: string | undefined,
+): BlockScrollLink[] {
+  if (sourceText === undefined || markerLineById.size === 0) return [];
+  const links: BlockScrollLink[] = [];
+  for (const [id, commentrayLine] of markerLineById) {
+    const range = sourceLineRangeForMarkerId(sourceText, id);
+    const mv = markerViewportHalfOpen1Based(sourceText, id);
+    if (range === null || mv === null) continue;
+    links.push({
+      id,
+      commentrayLine,
+      sourceStart: range.start,
+      sourceEnd: range.end,
+      markerViewportHalfOpen1Based: mv,
+    });
+  }
+  links.sort((a, b) => a.sourceStart - b.sourceStart);
+  return links;
+}
+
 /**
  * Correlate index blocks with `<!-- commentray:block id=… -->` markers in
  * commentray. Supports legacy `lines:` anchors and `marker:` anchors (the
@@ -45,12 +67,14 @@ export function buildBlockScrollLinks(
   commentrayMarkdown: string,
   sourceText?: string,
 ): BlockScrollLink[] {
+  const markerLineById = markerLineByIdFromMarkdown(commentrayMarkdown);
   const entry = index?.byCommentrayPath[commentrayPath];
-  if (!entry || entry.sourcePath !== sourceRelative || entry.blocks.length === 0) return [];
+  if (!entry || entry.sourcePath !== sourceRelative || entry.blocks.length === 0) {
+    return buildMarkerFallbackLinks(markerLineById, sourceText);
+  }
   const entryCrNorm = normalizeRepoRelativePath(entry.commentrayPath.replaceAll("\\", "/"));
   const lookupCrNorm = normalizeRepoRelativePath(commentrayPath.replaceAll("\\", "/"));
-  if (entryCrNorm !== lookupCrNorm) return [];
-  const markerLineById = markerLineByIdFromMarkdown(commentrayMarkdown);
+  if (entryCrNorm !== lookupCrNorm) return buildMarkerFallbackLinks(markerLineById, sourceText);
   const links: BlockScrollLink[] = [];
   for (const block of entry.blocks) {
     const anchor = parseAnchor(block.anchor);

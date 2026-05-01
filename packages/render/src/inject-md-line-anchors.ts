@@ -257,7 +257,7 @@ export function injectCommentrayDocAnchors(markdown: string, links?: BlockScroll
  * Adds stable source-line anchors (`id="code-line-N"`) to Markdown so rendered-source mode can
  * preserve block-aware scroll sync and block ray geometry.
  */
-export function injectSourceMarkdownAnchors(markdown: string): string {
+export function injectSourceMarkdownAnchors(markdown: string, lineIndexOffset = 0): string {
   const lines = markdown.split("\n");
   const skipLineAnchor = gfmTableLineIndicesWithoutAnchors(lines);
   let fence: FenceState | null = null;
@@ -283,7 +283,7 @@ export function injectSourceMarkdownAnchors(markdown: string): string {
       out.push(line);
       continue;
     }
-    out.push(appendSourceMdLineAnchorWhenAllowed(line, i));
+    out.push(appendSourceMdLineAnchorWhenAllowed(line, lineIndexOffset + i));
   }
   return out.join("\n");
 }

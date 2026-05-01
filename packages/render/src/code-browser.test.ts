@@ -850,6 +850,64 @@ describe("Code browser page — multi-angle block stretch", () => {
     expect(payload.layoutMode).toBe("stretch");
     expect(payload.angles.every((a) => typeof a.stretchSwapInnerB64 === "string")).toBe(true);
   });
+
+  it("keeps stretch for markdown sources while preserving the source markdown toggle", async () => {
+    const mainPath = ".commentray/source/README.md/main.md";
+    const altPath = ".commentray/source/README.md/alt.md";
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [mainPath]: {
+          sourcePath: "README.md",
+          commentrayPath: mainPath,
+          blocks: [{ id: "b1", anchor: "lines:1-2" }],
+        },
+        [altPath]: {
+          sourcePath: "README.md",
+          commentrayPath: altPath,
+          blocks: [{ id: "b1", anchor: "lines:1-2" }],
+        },
+      },
+    };
+    const html = await renderCodeBrowserHtml({
+      filePath: "README.md",
+      code: "# Title\n\nBody\n",
+      language: "md",
+      commentrayMarkdown: "",
+      multiAngleBrowsing: {
+        defaultAngleId: "main",
+        angles: [
+          {
+            id: "main",
+            title: "Main",
+            markdown: "<!-- commentray:block id=b1 -->\n## Main\n",
+            commentrayPathRel: mainPath,
+            blockStretchRows: {
+              index,
+              sourceRelative: "README.md",
+              commentrayPathRel: mainPath,
+            },
+          },
+          {
+            id: "alt",
+            title: "Alt",
+            markdown: "<!-- commentray:block id=b1 -->\n## Alt\n",
+            commentrayPathRel: altPath,
+            blockStretchRows: {
+              index,
+              sourceRelative: "README.md",
+              commentrayPathRel: altPath,
+            },
+          },
+        ],
+      },
+    });
+    expect(html).toContain('data-layout="stretch"');
+    expect(html).toContain('id="source-markdown-pane-flip"');
+    expect(html).toContain('id="source-markdown-pane-flip-scroll"');
+    expect(html).toContain('data-source-pane-mode="source"');
+    expect(blockStretchTableHtml(html)).toContain('data-source-markdown-body="true"');
+  });
 });
 
 describe("Code browser page — multi-angle index isolation", () => {
@@ -996,11 +1054,12 @@ describe("Code browser page — scroll sync payload", () => {
     expect(html).toContain('data-layout="stretch"');
     expect(html).toContain("Sync");
     expect(stretchShellOpenTag(html)).toContain('data-stretch-buffer-sync="flow-synchronizer"');
+    expect(stretchShellOpenTag(html)).toContain('data-dual-mobile-pane="doc"');
     expect(blockStretchTableHtml(html)).toContain("stretch-cell-measure");
     expect(blockStretchTableHtml(html)).toContain('data-commentray-stretch-sync-id="b1"');
     expect(html).not.toContain('id="doc-pane"');
-    expect(html).not.toContain('id="mobile-pane-flip"');
-    expect(html).not.toContain('id="mobile-pane-flip-scroll"');
+    expect(html).toContain('id="mobile-pane-flip"');
+    expect(html).toContain('id="mobile-pane-flip-scroll"');
   });
 
   it("legacy stretch omits flow-synchronizer shell flag when stretchBufferSync is table", async () => {
@@ -1030,5 +1089,37 @@ describe("Code browser page — scroll sync payload", () => {
     expect(html).toContain('data-layout="stretch"');
     expect(stretchShellOpenTag(html)).not.toContain("data-stretch-buffer-sync");
     expect(blockStretchTableHtml(html)).not.toContain("stretch-cell-measure");
+  });
+
+  it("keeps markdown sources in stretch layout while preserving the markdown render toggle", async () => {
+    const crPath = ".commentray/source/README.md/main.md";
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [crPath]: {
+          sourcePath: "README.md",
+          commentrayPath: crPath,
+          blocks: [{ id: "b1", anchor: "lines:1-2" }],
+        },
+      },
+    };
+    const html = await renderCodeBrowserHtml({
+      code: "# Title\n\nHello\n",
+      language: "md",
+      filePath: "README.md",
+      commentrayMarkdown: "<!-- commentray:block id=b1 -->\n\n## Notes\n",
+      blockStretchRows: {
+        index,
+        sourceRelative: "README.md",
+        commentrayPathRel: crPath,
+      },
+    });
+    expect(html).toContain('data-layout="stretch"');
+    expect(html).toContain('id="mobile-pane-flip"');
+    expect(html).toContain('id="source-markdown-pane-flip"');
+    expect(html).toContain('id="source-markdown-pane-flip-scroll"');
+    expect(html).toContain('data-source-pane-mode="source"');
+    expect(blockStretchTableHtml(html)).toContain('data-source-markdown-body="true"');
+    expect(blockStretchTableHtml(html)).toContain('id="code-md-line-0"');
   });
 });

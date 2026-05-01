@@ -62,6 +62,65 @@ describe("Block scroll link derivation from index and markers", () => {
     expect(buildBlockScrollLinks(index, "src/a.ts", ".commentray/source/other.md", md)).toEqual([]);
   });
 
+  it("falls back to marker-derived links when an angle has matching markers but no index entry", () => {
+    const anglePath = ".commentray/source/README.md/architecture.md";
+    const angleMarkdown =
+      "<!-- commentray:block id=readme-lede -->\n\n" +
+      "<!-- commentray:block id=readme-why -->\n\n" +
+      "<!-- commentray:block id=readme-user-guides -->\n\n" +
+      "<!-- commentray:block id=readme-mobile-flip-check -->\n";
+    const sourceMarkdown = [
+      "<!-- #region commentray:readme-lede -->",
+      "lede",
+      "<!-- #endregion commentray:readme-lede -->",
+      "",
+      "<!-- #region commentray:readme-why -->",
+      "why",
+      "<!-- #endregion commentray:readme-why -->",
+      "",
+      "<!-- #region commentray:readme-user-guides -->",
+      "guides",
+      "<!-- #endregion commentray:readme-user-guides -->",
+      "",
+      "<!-- #region commentray:readme-mobile-flip-check -->",
+      "flip",
+      "<!-- #endregion commentray:readme-mobile-flip-check -->",
+    ].join("\n");
+
+    expect(
+      buildBlockScrollLinks(index, "README.md", anglePath, angleMarkdown, sourceMarkdown),
+    ).toEqual([
+      {
+        id: "readme-lede",
+        commentrayLine: 0,
+        sourceStart: 2,
+        sourceEnd: 2,
+        markerViewportHalfOpen1Based: { lo: 1, hiExclusive: 3 },
+      },
+      {
+        id: "readme-why",
+        commentrayLine: 2,
+        sourceStart: 6,
+        sourceEnd: 6,
+        markerViewportHalfOpen1Based: { lo: 4, hiExclusive: 7 },
+      },
+      {
+        id: "readme-user-guides",
+        commentrayLine: 4,
+        sourceStart: 10,
+        sourceEnd: 10,
+        markerViewportHalfOpen1Based: { lo: 8, hiExclusive: 11 },
+      },
+      {
+        id: "readme-mobile-flip-check",
+        commentrayLine: 6,
+        sourceStart: 14,
+        sourceEnd: 14,
+        markerViewportHalfOpen1Based: { lo: 12, hiExclusive: 15 },
+      },
+    ]);
+  });
+
   it("pairs markers in the markdown with line anchors from the index", () => {
     expect(buildBlockScrollLinks(index, "src/a.ts", crPath, md)).toEqual([
       {

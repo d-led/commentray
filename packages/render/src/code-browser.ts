@@ -412,7 +412,7 @@ function dualPanePanesInnerHtml(
 ): string {
   const sourceRenderedPaneHtml =
     typeof sourceMarkdownRenderedHtml === "string" && sourceMarkdownRenderedHtml.trim().length > 0
-      ? `          <div class="source-pane source-pane--rendered-md" id="code-pane-markdown-body">${sourceMarkdownRenderedHtml}</div>\n`
+      ? `          <div class="source-pane source-pane--rendered-md" id="code-pane-markdown-body" data-source-markdown-body="true">${sourceMarkdownRenderedHtml}</div>\n`
       : "";
   return (
     `        <section class="pane--code" id="code-pane" aria-label="Source code">` +
@@ -448,6 +448,7 @@ function sourceMarkdownToggleControlsHtml(enabled: boolean): {
 function isMarkdownLikeSource(opts: CodeBrowserPageOptions): boolean {
   const lang = opts.language.trim().toLowerCase();
   if (lang === "md" || lang === "markdown" || lang === "mdx") return true;
+  if (lang.length > 0) return false;
   const filePath = (opts.filePath ?? "").trim().toLowerCase();
   return filePath.endsWith(".md") || filePath.endsWith(".mdx") || filePath.endsWith(".markdown");
 }
@@ -2011,6 +2012,19 @@ ${CODE_BROWSER_INTRO_STYLES}
           flex: 1 1 auto;
           padding-left: var(--cr-pane-inline-pad);
         }
+        .shell.shell--stretch-rows[data-dual-mobile-pane="code"] .stretch-col-doc,
+        .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] .stretch-col-code,
+        .shell.shell--stretch-rows[data-dual-mobile-pane="code"] td.stretch-doc,
+        .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] td.stretch-code {
+          display: none;
+        }
+        .shell.shell--stretch-rows[data-dual-mobile-pane="code"] td.stretch-code,
+        .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] td.stretch-doc {
+          display: table-cell;
+          width: 100%;
+          padding-left: 0;
+          padding-right: 0;
+        }
       }
       .pane--doc { font-size: 15px; line-height: 1.45; }
       .pane--doc img { max-width: 100%; height: auto; }
@@ -2022,9 +2036,8 @@ ${CODE_BROWSER_INTRO_STYLES}
       .pane--doc .commentray-block-anchor {
         display: block;
         height: 0;
-        margin: 14px 0 0;
+        margin: 0;
         border: 0;
-        border-top: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
         pointer-events: none;
       }
       .shell--stretch-rows {
@@ -2037,7 +2050,6 @@ ${CODE_BROWSER_INTRO_STYLES}
       .shell--stretch-rows .stretch-preamble {
         padding: 8px 4px 16px;
         margin-bottom: 8px;
-        border-bottom: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
         font-size: 15px;
         line-height: 1.45;
         overflow-x: auto;
@@ -2057,7 +2069,6 @@ ${CODE_BROWSER_INTRO_STYLES}
       .block-stretch td.stretch-code {
         vertical-align: top;
         padding: 0 12px 0 0;
-        border-bottom: 1px solid color-mix(in oklab, CanvasText 8%, Canvas);
       }
       #shell[data-stretch-buffer-sync="flow-synchronizer"] .block-stretch td.stretch-code > .stretch-cell-measure,
       #shell[data-stretch-buffer-sync="flow-synchronizer"] .block-stretch td.stretch-doc > .stretch-cell-measure {
@@ -2078,7 +2089,6 @@ ${CODE_BROWSER_INTRO_STYLES}
       .block-stretch td.stretch-doc {
         vertical-align: top;
         padding: 0 0 0 12px;
-        border-bottom: 1px solid color-mix(in oklab, CanvasText 8%, Canvas);
       }
       .block-stretch td.stretch-doc .stretch-doc-inner {
         font-size: 15px;
@@ -2110,7 +2120,6 @@ ${CODE_BROWSER_INTRO_STYLES}
         font-size: 13px;
         vertical-align: top;
       }
-      .block-stretch .stretch-gap-mark { display: inline-block; padding-top: 2px; }
       .block-stretch .stretch-code-stack {
         display: flex;
         flex-direction: column;
@@ -2214,11 +2223,11 @@ type CodeBrowserPageParts = {
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
   const shellClass = p.layout === "stretch" ? "shell shell--stretch-rows" : "shell";
   const dualFlipControlHtml =
-    p.layout === "dual"
+    p.layout === "dual" || p.layout === "stretch"
       ? `<button type="button" id="mobile-pane-flip" class="toolbar-icon-btn toolbar-icon-btn--flip-only-narrow" aria-label="Switch between source code and commentary" title="Switch between source code and commentary">${TOOLBAR_ICON_FLIP_PANES_SVG}</button>`
       : "";
   const dualFlipScrollAffordanceHtml =
-    p.layout === "dual"
+    p.layout === "dual" || p.layout === "stretch"
       ? `<button type="button" id="mobile-pane-flip-scroll" class="toolbar-icon-btn toolbar-icon-btn--flip-scroll-narrow" hidden aria-label="Switch between source code and commentary" title="Switch between source code and commentary">${TOOLBAR_ICON_FLIP_PANES_SVG}</button>`
       : "";
   return `<!doctype html>
@@ -2281,7 +2290,7 @@ ${TOOLBAR_COLOR_THEME_HTML}
         <div class="search-results" id="search-results" hidden aria-live="polite"></div>
       </header>
       <main id="main-content" class="app__main" tabindex="-1">
-        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" ? ' data-dual-mobile-pane="doc"' : ""}${p.sourcePaneModeAttr} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairIdentityDataAttrs}${p.shellPairDocDataAttr}${p.scrollSyncStrategyShellAttr ?? ""}${p.stretchBufferSyncShellAttr ?? ""}>
+        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" || p.layout === "stretch" ? ' data-dual-mobile-pane="doc"' : ""}${p.sourcePaneModeAttr} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairIdentityDataAttrs}${p.shellPairDocDataAttr}${p.scrollSyncStrategyShellAttr ?? ""}${p.stretchBufferSyncShellAttr ?? ""}>
 ${p.shellInner}
         </div>
       </main>
@@ -2467,6 +2476,8 @@ async function buildMultiAngleBlockStretchShell(
   const defaultId = multi.angles.some((a) => a.id === multi.defaultAngleId)
     ? multi.defaultAngleId
     : (multi.angles[0]?.id ?? "main");
+  const sourceMarkdownEnabled = isMarkdownLikeSource(opts);
+  const sourceMarkdownUrls = sourceMarkdownEnabled ? sourcePaneOutputUrls(opts) : undefined;
 
   const perAngle: Array<{
     spec: CodeBrowserMultiAngleSpec;
@@ -2488,6 +2499,7 @@ async function buildMultiAngleBlockStretchShell(
       sourceRelative: rows.sourceRelative,
       commentrayPathRel: rows.commentrayPathRel,
       commentrayOutputUrls: opts.commentrayOutputUrls,
+      sourceMarkdownOutputUrls: sourceMarkdownUrls,
       stretchBufferSync: stretchBufferSyncFromOpts(opts),
     });
     if (stretched === null) return null;
@@ -2533,7 +2545,7 @@ async function buildMultiAngleBlockStretchShell(
     scrollBlockLinksB64: defaultScrollB64,
     angleSelectHtml: multiAngleToolbarAngleSelectHtml(multi, defaultId),
     multiAnglePayloadB64,
-    sourceMarkdownToggleEnabled: false,
+    sourceMarkdownToggleEnabled: sourceMarkdownEnabled,
     sourcePaneDefaultMode: "source",
     stretchBufferSync: stretchBufferSyncFromOpts(opts),
     multiShell: {
@@ -2681,6 +2693,8 @@ async function buildSingleAngleCodeBrowserShell(
 ): Promise<CodeBrowserShell> {
   let layout: "dual" | "stretch" = "dual";
   let shellInner = "";
+  const sourceMarkdownEnabled = isMarkdownLikeSource(opts);
+  const sourceMarkdownUrls = sourceMarkdownEnabled ? sourcePaneOutputUrls(opts) : undefined;
 
   if (opts.blockStretchRows && layoutPref !== "dual") {
     const stretched = await tryBuildBlockStretchTableHtml({
@@ -2691,6 +2705,7 @@ async function buildSingleAngleCodeBrowserShell(
       sourceRelative: opts.blockStretchRows.sourceRelative,
       commentrayPathRel: opts.blockStretchRows.commentrayPathRel,
       commentrayOutputUrls: opts.commentrayOutputUrls,
+      sourceMarkdownOutputUrls: sourceMarkdownUrls,
       stretchBufferSync: stretchBufferSyncFromOpts(opts),
     });
     if (stretched) {
@@ -2725,7 +2740,7 @@ async function buildSingleAngleCodeBrowserShell(
     scrollBlockLinksB64,
     angleSelectHtml: "",
     multiAnglePayloadB64: "",
-    sourceMarkdownToggleEnabled: false,
+    sourceMarkdownToggleEnabled: sourceMarkdownEnabled,
     sourcePaneDefaultMode: "source",
     stretchBufferSync: stretchBufferSyncFromOpts(opts),
   };

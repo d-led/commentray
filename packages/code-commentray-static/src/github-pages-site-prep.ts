@@ -44,10 +44,13 @@ async function multiAngleSpecForDefinition(
   let angleBlockStretch: CodeBrowserMultiAngleSpec["blockStretchRows"];
   if (projectIndex) {
     const entry = projectIndex.byCommentrayPath[rel];
-    if (entry && entry.blocks.length > 0 && entry.sourcePath === ss.sourceFile) {
+    if (
+      (entry && entry.blocks.length > 0 && entry.sourcePath === ss.sourceFile) ||
+      entry === undefined
+    ) {
       angleBlockStretch = {
         index: projectIndex,
-        sourceRelative: entry.sourcePath,
+        sourceRelative: ss.sourceFile,
         commentrayPathRel: rel,
       };
     }
