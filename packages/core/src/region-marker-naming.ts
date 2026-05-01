@@ -7,11 +7,7 @@ export type RegionMarkerNamingRange = {
   endLine: number;
 };
 
-/**
- * Everything needed to suggest a marker id without touching the filesystem.
- * Hosts (editors, CLI) may supply {@link RegionMarkerNamingInput.enclosingSymbolName}
- * from LSP or heuristics; when absent, language-aware fallbacks run in order.
- */
+/** Suggest marker id inputs; full pipeline: `region-marker-naming.ts` commentray. */
 export type RegionMarkerNamingInput = {
   languageId: string;
   sourceText: string;
@@ -22,24 +18,17 @@ export type RegionMarkerNamingInput = {
   rng?: () => number;
 };
 
-/**
- * Swappable policy for choosing `marker:<id>` / `commentray:<id>` ids when wrapping a selection.
- * Implementations should be pure (no I/O, no globals except injected `rng`).
- */
+/** Pure policy for `marker:<id>` / `commentray:<id>`; see commentray. */
 export interface RegionMarkerNamingStrategy {
   suggestMarkerId(input: RegionMarkerNamingInput): string;
 }
 
-/**
- * One step in a pipeline: return a **valid** marker id, or `null` to let the next step run.
- */
+/** Return a valid id or `null` to defer; see commentray. */
 export interface RegionMarkerNamingHintStrategy {
   trySuggestMarkerId(input: RegionMarkerNamingInput): string | null;
 }
 
-/**
- * Runs hint strategies in order, then {@link generateBlockId} when every hint declines.
- */
+/** Ordered hints then `generateBlockId`; see commentray. */
 export class CompositeRegionMarkerNamingStrategy implements RegionMarkerNamingStrategy {
   constructor(
     private readonly hints: readonly RegionMarkerNamingHintStrategy[],
@@ -62,9 +51,7 @@ export class CompositeRegionMarkerNamingStrategy implements RegionMarkerNamingSt
   }
 }
 
-/**
- * Escape hatch for hosts that already computed an id (e.g. custom rules, telemetry-driven names).
- */
+/** Host-supplied id function; see commentray. */
 export class CallbackRegionMarkerNamingStrategy implements RegionMarkerNamingStrategy {
   constructor(private readonly suggest: (input: RegionMarkerNamingInput) => string) {}
 
@@ -116,10 +103,7 @@ export class CodeStructureHintStrategy implements RegionMarkerNamingHintStrategy
 const TOML_LINE_ARRAY_TABLE = /^\s*\[\[([^\]]+)\]\]\s*(?:#.*)?$/;
 const TOML_LINE_TABLE = /^\s*\[([^\]]+)\]\s*(?:#.*)?$/;
 
-/**
- * Walks upward from `startLine1` and returns the innermost TOML table path
- * (`anchors`, `angles.definitions`, …) declared on a `[header]` / `[[array]]` line.
- */
+/** Innermost TOML `[header]` / `[[array]]` path above `startLine1`; see commentray. */
 export function tryTomlTablePathAboveSelection(
   sourceText: string,
   startLine1: number,
@@ -140,9 +124,7 @@ export function tryTomlTablePathAboveSelection(
 
 const MD_HEADING = /^\s{0,3}(#{1,6})\s+(.+?)\s*$/;
 
-/**
- * Nearest Markdown heading text at or above `startLine1` (ATX headings only).
- */
+/** Nearest ATX heading at or above line; see commentray. */
 export function tryMarkdownHeadingTitleAbove(
   sourceText: string,
   startLine1: number,
@@ -274,12 +256,9 @@ function patternsForLanguage(languageId: string): CodePattern[] | null {
   return null;
 }
 
-/**
- * Best-effort identifier near the selection: prefers declarations on selected lines,
- * then scans upward within {@link LOOKBACK_LINES} lines.
- */
 const PYTHON_CLASS_LINE = /^\s*class\s+(\w+)/;
 
+/** Declaration / class name near selection; see commentray. */
 export function tryCodeStructureNameHint(
   languageId: string,
   sourceText: string,

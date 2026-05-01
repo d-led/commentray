@@ -35,25 +35,16 @@ import {
   type DualPaneScrollSyncStrategyId,
 } from "./code-browser-scroll-sync-strategy.js";
 
-/** One angle tab for {@link CodeBrowserPageOptions.multiAngleBrowsing}. */
+/** One angle tab; field semantics: `code-browser.ts` commentray. */
 export type CodeBrowserMultiAngleSpec = {
   id: string;
   title?: string;
   markdown: string;
   commentrayPathRel: string;
   commentrayOnGithubUrl?: string;
-  /**
-   * When the static site emits per-pair browse pages, same-tab navigation for the Doc toolbar
-   * (preferred over {@link commentrayOnGithubUrl} on the hub). Paths mirror the companion layout
-   * under `./browse/…/index.html` (see `staticBrowseIndexRelPathFromPair` in `@commentray/core`).
-   */
+  /** Same-tab Doc toolbar target for static `./browse/…` pages (vs GitHub blob). */
   staticBrowseUrl?: string;
-  /**
-   * When set, `blockStretchRows.commentrayPathRel` must equal this angle’s {@link commentrayPathRel}
-   * and `blockStretchRows.sourceRelative` must equal the page primary {@link CodeBrowserPageOptions.filePath}
-   * (repo-relative, normalized the same way as the index). Otherwise scroll links are omitted so one
-   * angle never inherits another angle’s index slice.
-   */
+  /** Must match this angle’s paths + primary `filePath` or scroll links are dropped. */
   blockStretchRows?: {
     index: CommentrayIndex;
     sourceRelative: string;
