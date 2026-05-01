@@ -3424,7 +3424,7 @@ function wireStretchSplitter(shell: HTMLElement, codePane: HTMLElement): void {
   const gutter = document.getElementById("stretch-gutter");
   if (!(gutter instanceof HTMLElement)) return;
 
-  const stored = Number.parseFloat(readWebStorageItem(localStorage, STORAGE_SPLIT_PCT));
+  const stored = Number.parseFloat(readWebStorageItem(localStorage, STORAGE_SPLIT_PCT) ?? "");
   const initial = clamp(Number.isFinite(stored) ? stored : 50, 15, 85);
   shell.style.setProperty("--stretch-code-pct", `${String(initial)}%`);
 

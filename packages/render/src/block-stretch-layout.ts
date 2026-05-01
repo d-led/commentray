@@ -36,6 +36,16 @@ export type BlockStretchTableOptions = {
   stretchBufferSync?: StretchBufferSyncStrategy;
 };
 
+type StretchRenderContext = {
+  lines: string[];
+  language: string;
+  mode: StretchBufferSyncStrategy;
+  gapSyncSeq: { n: number } | null;
+  sourceMarkdownSlicesEnabled: boolean;
+  sourceMarkdownOutputUrls?: CommentrayOutputUrlOptions;
+  renderedById: Map<string, string>;
+};
+
 function sourceMarkdownEnabled(language: string): boolean {
   const normalized = language.trim().toLowerCase();
   return normalized === "md" || normalized === "markdown" || normalized === "mdx";
@@ -113,34 +123,122 @@ async function renderCodeLineStack(
   return `<div class="stretch-code-stack">${inner}</div>`;
 }
 
-async function appendStretchGapRow(
-  rows: string[],
-  lines: string[],
-  lineIndex0: number,
-  language: string,
-  mode: StretchBufferSyncStrategy,
-  gapSyncSeq: { n: number } | null,
-  renderedSourceMarkdownHtml: string | undefined,
-): Promise<void> {
-  const codeLineHtml = await renderHighlightedCodeLineRows(lines[lineIndex0] ?? "", language, {
-    lineIndexOffset: lineIndex0,
-    omitLineStackWrapper: true,
-  });
-  const sourceCellInner = wrapStretchSourceCell(codeLineHtml, renderedSourceMarkdownHtml, mode);
-  if (mode === "flow-synchronizer" && gapSyncSeq !== null) {
-    const gapId = `__gap__${gapSyncSeq.n}`;
-    gapSyncSeq.n += 1;
-    rows.push(
-      `<tr class="stretch-row stretch-row--gap" data-commentray-stretch-sync-id="${escapeHtml(gapId)}">` +
-        `<td class="stretch-code">${sourceCellInner}</td>` +
-        `<td class="stretch-doc stretch-doc--gap"><div class="stretch-cell-measure"></div></td></tr>`,
+async function renderCommentraySegmentBodies(
+  segments: { id: string; body: string }[],
+  outputUrls: CommentrayOutputUrlOptions | undefined,
+): Promise<Map<string, string>> {
+  const mdOpts = { commentrayOutputUrls: outputUrls };
+  const renderedById = new Map<string, string>();
+  for (const s of segments) {
+    renderedById.set(
+      s.id,
+      await renderMarkdownToHtml(s.body.trim().length > 0 ? s.body : " ", mdOpts),
     );
-    return;
   }
-  rows.push(
-    `<tr class="stretch-row stretch-row--gap"><td class="stretch-code">${sourceCellInner}</td>` +
-      `<td class="stretch-doc stretch-doc--gap"></td></tr>`,
+  return renderedById;
+}
+
+function buildLineToBlockLookup(links: BlockScrollLink[]): Map<number, BlockScrollLink> {
+  const lineToBlock = new Map<number, BlockScrollLink>();
+  for (const b of links) {
+    const { lo, hiExclusive } = b.markerViewportHalfOpen1Based;
+    for (let line1 = lo; line1 < hiExclusive; line1++) {
+      lineToBlock.set(line1, b);
+    }
+  }
+  return lineToBlock;
+}
+
+async function maybeRenderSourceMarkdownSlice(
+  ctx: StretchRenderContext,
+  startLine0: number,
+  endLine0: number,
+): Promise<string | undefined> {
+  if (!ctx.sourceMarkdownSlicesEnabled) return undefined;
+  return renderSourceMarkdownSlice(ctx.lines, startLine0, endLine0, ctx.sourceMarkdownOutputUrls);
+}
+
+function nextGapSyncId(gapSyncSeq: { n: number } | null): string | null {
+  if (gapSyncSeq === null) return null;
+  const gapId = `__gap__${gapSyncSeq.n}`;
+  gapSyncSeq.n += 1;
+  return gapId;
+}
+
+async function buildStretchGapRowHtml(
+  ctx: StretchRenderContext,
+  lineIndex0: number,
+): Promise<string> {
+  const codeLineHtml = await renderHighlightedCodeLineRows(
+    ctx.lines[lineIndex0] ?? "",
+    ctx.language,
+    {
+      lineIndexOffset: lineIndex0,
+      omitLineStackWrapper: true,
+    },
   );
+  const renderedSourceMarkdownHtml = await maybeRenderSourceMarkdownSlice(
+    ctx,
+    lineIndex0,
+    lineIndex0,
+  );
+  const sourceCellInner = wrapStretchSourceCell(codeLineHtml, renderedSourceMarkdownHtml, ctx.mode);
+  const gapId = ctx.mode === "flow-synchronizer" ? nextGapSyncId(ctx.gapSyncSeq) : null;
+  if (gapId !== null) {
+    return (
+      `<tr class="stretch-row stretch-row--gap" data-commentray-stretch-sync-id="${escapeHtml(gapId)}">` +
+      `<td class="stretch-code">${sourceCellInner}</td>` +
+      `<td class="stretch-doc stretch-doc--gap"><div class="stretch-cell-measure"></div></td></tr>`
+    );
+  }
+  return (
+    `<tr class="stretch-row stretch-row--gap"><td class="stretch-code">${sourceCellInner}</td>` +
+    `<td class="stretch-doc stretch-doc--gap"></td></tr>`
+  );
+}
+
+async function buildStretchBlockRowHtml(
+  ctx: StretchRenderContext,
+  block: BlockScrollLink,
+): Promise<string> {
+  const start0 = block.sourceStart - 1;
+  const end0 = block.sourceEnd - 1;
+  const stackHtml = await renderCodeLineStack(ctx.lines, start0, end0, ctx.language);
+  const renderedSourceMarkdownHtml = await maybeRenderSourceMarkdownSlice(ctx, start0, end0);
+  const sourceCellInner = wrapStretchSourceCell(stackHtml, renderedSourceMarkdownHtml, ctx.mode);
+  const docInner =
+    ctx.renderedById.get(block.id) ??
+    `<p class="stretch-doc-missing"><em>No commentary segment for block <code>${escapeHtml(block.id)}</code>.</em></p>`;
+  if (ctx.mode === "flow-synchronizer") {
+    return (
+      `<tr class="stretch-row stretch-row--block" data-commentray-stretch-sync-id="${escapeHtml(block.id)}">` +
+      `<td class="stretch-code">${sourceCellInner}</td>` +
+      `<td class="stretch-doc"><div class="stretch-cell-measure"><div class="stretch-doc-inner">${docInner}</div></div></td></tr>`
+    );
+  }
+  return (
+    `<tr class="stretch-row stretch-row--block"><td class="stretch-code">${sourceCellInner}</td>` +
+    `<td class="stretch-doc"><div class="stretch-doc-inner">${docInner}</div></td></tr>`
+  );
+}
+
+async function buildStretchRows(
+  ctx: StretchRenderContext,
+  lineToBlock: Map<number, BlockScrollLink>,
+): Promise<string[]> {
+  const rows: string[] = [];
+  let lineIndex0 = 0;
+  while (lineIndex0 < ctx.lines.length) {
+    const block = lineToBlock.get(lineIndex0 + 1);
+    if (block === undefined || lineIndex0 < block.sourceStart - 1) {
+      rows.push(await buildStretchGapRowHtml(ctx, lineIndex0));
+      lineIndex0 += 1;
+      continue;
+    }
+    rows.push(await buildStretchBlockRowHtml(ctx, block));
+    lineIndex0 = block.sourceEnd;
+  }
+  return rows;
 }
 
 /**
@@ -158,8 +256,6 @@ export async function tryBuildBlockStretchTableHtml(
   opts: BlockStretchTableOptions,
 ): Promise<{ preambleHtml: string; tableInnerHtml: string } | null> {
   const mode: StretchBufferSyncStrategy = opts.stretchBufferSync ?? DEFAULT_STRETCH_BUFFER_SYNC;
-  const gapSyncSeq = mode === "flow-synchronizer" ? { n: 0 } : null;
-
   const links = buildBlockScrollLinks(
     opts.index,
     opts.sourceRelative,
@@ -170,91 +266,20 @@ export async function tryBuildBlockStretchTableHtml(
   if (links.length === 0) return null;
 
   const { preamble, segments } = splitCommentrayMarkdownSegments(opts.commentrayMarkdown);
-  const mdOpts = { commentrayOutputUrls: opts.commentrayOutputUrls };
-  const sourceMarkdownSlicesEnabled = sourceMarkdownEnabled(opts.language);
-  const renderedById = new Map<string, string>();
-  for (const s of segments) {
-    renderedById.set(
-      s.id,
-      await renderMarkdownToHtml(s.body.trim().length > 0 ? s.body : " ", mdOpts),
-    );
-  }
-
   const lines = opts.code.split("\n");
   const lnMinCh = Math.max(2, String(Math.max(1, lines.length)).length);
-  const lineToBlock = new Map<number, BlockScrollLink>();
-  for (const b of links) {
-    const { lo, hiExclusive } = b.markerViewportHalfOpen1Based;
-    for (let L = lo; L < hiExclusive; L++) {
-      lineToBlock.set(L, b);
-    }
-  }
-
-  const rows: string[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const L = i + 1;
-    const b = lineToBlock.get(L);
-
-    if (!b) {
-      const renderedSourceMarkdownHtml = sourceMarkdownSlicesEnabled
-        ? await renderSourceMarkdownSlice(lines, i, i, opts.sourceMarkdownOutputUrls)
-        : undefined;
-      await appendStretchGapRow(
-        rows,
-        lines,
-        i,
-        opts.language,
-        mode,
-        gapSyncSeq,
-        renderedSourceMarkdownHtml,
-      );
-      i += 1;
-      continue;
-    }
-
-    /** `markerViewportHalfOpen1Based` can include lines before `sourceStart` (region prefix). */
-    if (i < b.sourceStart - 1) {
-      const renderedSourceMarkdownHtml = sourceMarkdownSlicesEnabled
-        ? await renderSourceMarkdownSlice(lines, i, i, opts.sourceMarkdownOutputUrls)
-        : undefined;
-      await appendStretchGapRow(
-        rows,
-        lines,
-        i,
-        opts.language,
-        mode,
-        gapSyncSeq,
-        renderedSourceMarkdownHtml,
-      );
-      i += 1;
-      continue;
-    }
-
-    const start0 = b.sourceStart - 1;
-    const end0 = b.sourceEnd - 1;
-    const stackHtml = await renderCodeLineStack(lines, start0, end0, opts.language);
-    const renderedSourceMarkdownHtml = sourceMarkdownSlicesEnabled
-      ? await renderSourceMarkdownSlice(lines, start0, end0, opts.sourceMarkdownOutputUrls)
-      : undefined;
-    const sourceCellInner = wrapStretchSourceCell(stackHtml, renderedSourceMarkdownHtml, mode);
-    const docInner =
-      renderedById.get(b.id) ??
-      `<p class="stretch-doc-missing"><em>No commentary segment for block <code>${escapeHtml(b.id)}</code>.</em></p>`;
-    if (mode === "flow-synchronizer") {
-      rows.push(
-        `<tr class="stretch-row stretch-row--block" data-commentray-stretch-sync-id="${escapeHtml(b.id)}">` +
-          `<td class="stretch-code">${sourceCellInner}</td>` +
-          `<td class="stretch-doc"><div class="stretch-cell-measure"><div class="stretch-doc-inner">${docInner}</div></div></td></tr>`,
-      );
-    } else {
-      rows.push(
-        `<tr class="stretch-row stretch-row--block"><td class="stretch-code">${sourceCellInner}</td>` +
-          `<td class="stretch-doc"><div class="stretch-doc-inner">${docInner}</div></td></tr>`,
-      );
-    }
-    i = end0 + 1;
-  }
+  const mdOpts = { commentrayOutputUrls: opts.commentrayOutputUrls };
+  const renderedById = await renderCommentraySegmentBodies(segments, opts.commentrayOutputUrls);
+  const ctx: StretchRenderContext = {
+    lines,
+    language: opts.language,
+    mode,
+    gapSyncSeq: mode === "flow-synchronizer" ? { n: 0 } : null,
+    sourceMarkdownSlicesEnabled: sourceMarkdownEnabled(opts.language),
+    sourceMarkdownOutputUrls: opts.sourceMarkdownOutputUrls,
+    renderedById,
+  };
+  const rows = await buildStretchRows(ctx, buildLineToBlockLookup(links));
 
   const preambleHtml =
     preamble.trim().length > 0

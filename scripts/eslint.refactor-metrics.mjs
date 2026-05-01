@@ -47,6 +47,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/node_modules/**",
       "**/coverage/**",
+      "**/.approval_tests_temp/**",
       "**/.vscode-test/**",
       "**/cypress/**",
       "cypress.config.ts",

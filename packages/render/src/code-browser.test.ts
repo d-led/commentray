@@ -36,6 +36,44 @@ function blockStretchTableHtml(html: string): string {
   return m?.[0] ?? "";
 }
 
+function readmeTwoAngleStretchIndex(mainPath: string, altPath: string) {
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    byCommentrayPath: {
+      [mainPath]: {
+        sourcePath: "README.md",
+        commentrayPath: mainPath,
+        blocks: [{ id: "b1", anchor: "lines:1-2" }],
+      },
+      [altPath]: {
+        sourcePath: "README.md",
+        commentrayPath: altPath,
+        blocks: [{ id: "b1", anchor: "lines:1-2" }],
+      },
+    },
+  };
+}
+
+function readmeStretchAngle(
+  index: ReturnType<typeof readmeTwoAngleStretchIndex>,
+  id: string,
+  title: string,
+  markdown: string,
+  commentrayPathRel: string,
+) {
+  return {
+    id,
+    title,
+    markdown,
+    commentrayPathRel,
+    blockStretchRows: {
+      index,
+      sourceRelative: "README.md",
+      commentrayPathRel,
+    },
+  };
+}
+
 function commentrayOutputUrlsForReadmeSourcePane(
   repoRoot: string,
   storageRoot: string,
@@ -789,21 +827,7 @@ describe("Code browser page — multi-angle block stretch", () => {
   it("should use stretch when every angle has a block table that builds", async () => {
     const mainPath = ".commentray/source/README.md/main.md";
     const altPath = ".commentray/source/README.md/alt.md";
-    const index = {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      byCommentrayPath: {
-        [mainPath]: {
-          sourcePath: "README.md",
-          commentrayPath: mainPath,
-          blocks: [{ id: "b1", anchor: "lines:1-2" }],
-        },
-        [altPath]: {
-          sourcePath: "README.md",
-          commentrayPath: altPath,
-          blocks: [{ id: "b1", anchor: "lines:1-2" }],
-        },
-      },
-    };
+    const index = readmeTwoAngleStretchIndex(mainPath, altPath);
     const html = await renderCodeBrowserHtml({
       filePath: "README.md",
       code: "a\nb",
@@ -812,28 +836,20 @@ describe("Code browser page — multi-angle block stretch", () => {
       multiAngleBrowsing: {
         defaultAngleId: "main",
         angles: [
-          {
-            id: "main",
-            title: "Main",
-            markdown: "<!-- commentray:block id=b1 -->\n## M\n",
-            commentrayPathRel: mainPath,
-            blockStretchRows: {
-              index,
-              sourceRelative: "README.md",
-              commentrayPathRel: mainPath,
-            },
-          },
-          {
-            id: "alt",
-            title: "Alt",
-            markdown: "<!-- commentray:block id=b1 -->\n## A\n",
-            commentrayPathRel: altPath,
-            blockStretchRows: {
-              index,
-              sourceRelative: "README.md",
-              commentrayPathRel: altPath,
-            },
-          },
+          readmeStretchAngle(
+            index,
+            "main",
+            "Main",
+            "<!-- commentray:block id=b1 -->\n## M\n",
+            mainPath,
+          ),
+          readmeStretchAngle(
+            index,
+            "alt",
+            "Alt",
+            "<!-- commentray:block id=b1 -->\n## A\n",
+            altPath,
+          ),
         ],
       },
     });
@@ -854,21 +870,7 @@ describe("Code browser page — multi-angle block stretch", () => {
   it("keeps stretch for markdown sources while preserving the source markdown toggle", async () => {
     const mainPath = ".commentray/source/README.md/main.md";
     const altPath = ".commentray/source/README.md/alt.md";
-    const index = {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      byCommentrayPath: {
-        [mainPath]: {
-          sourcePath: "README.md",
-          commentrayPath: mainPath,
-          blocks: [{ id: "b1", anchor: "lines:1-2" }],
-        },
-        [altPath]: {
-          sourcePath: "README.md",
-          commentrayPath: altPath,
-          blocks: [{ id: "b1", anchor: "lines:1-2" }],
-        },
-      },
-    };
+    const index = readmeTwoAngleStretchIndex(mainPath, altPath);
     const html = await renderCodeBrowserHtml({
       filePath: "README.md",
       code: "# Title\n\nBody\n",
@@ -877,28 +879,20 @@ describe("Code browser page — multi-angle block stretch", () => {
       multiAngleBrowsing: {
         defaultAngleId: "main",
         angles: [
-          {
-            id: "main",
-            title: "Main",
-            markdown: "<!-- commentray:block id=b1 -->\n## Main\n",
-            commentrayPathRel: mainPath,
-            blockStretchRows: {
-              index,
-              sourceRelative: "README.md",
-              commentrayPathRel: mainPath,
-            },
-          },
-          {
-            id: "alt",
-            title: "Alt",
-            markdown: "<!-- commentray:block id=b1 -->\n## Alt\n",
-            commentrayPathRel: altPath,
-            blockStretchRows: {
-              index,
-              sourceRelative: "README.md",
-              commentrayPathRel: altPath,
-            },
-          },
+          readmeStretchAngle(
+            index,
+            "main",
+            "Main",
+            "<!-- commentray:block id=b1 -->\n## Main\n",
+            mainPath,
+          ),
+          readmeStretchAngle(
+            index,
+            "alt",
+            "Alt",
+            "<!-- commentray:block id=b1 -->\n## Alt\n",
+            altPath,
+          ),
         ],
       },
     });
