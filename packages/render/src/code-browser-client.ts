@@ -3428,7 +3428,6 @@ function wireStretchMobilePaneFlip(
     // skipped on initial load, so they need a triggered pass once the cells become visible.
     if (next === "doc") {
       queueMicrotask(() => {
-        void runMermaidOnFreshDocNodes(shell);
         requestAnimationFrame(() => {
           void runMermaidOnFreshDocNodes(shell);
         });
