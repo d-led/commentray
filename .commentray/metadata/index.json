@@ -78,6 +78,16 @@
           "snippet": "commentray-snippet/v1\n # (Normative block text lives in companion Markdown — \"Pointers\" section.)"
         }
       ]
+    },
+    ".commentray/source/e2e/stretch-flow-buffer.ts.md": {
+      "sourcePath": "e2e/stretch-flow-buffer.ts",
+      "commentrayPath": ".commentray/source/e2e/stretch-flow-buffer.ts.md",
+      "blocks": [
+        {
+          "id": "b1",
+          "anchor": "lines:1-2"
+        }
+      ]
     }
   }
 }

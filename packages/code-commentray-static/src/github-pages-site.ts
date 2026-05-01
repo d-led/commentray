@@ -91,17 +91,17 @@ function siteHubUrlRelativeFromBrowsePageDir(browsePageDirUnderSite: string): st
   return `${segments.map(() => "..").join("/")}/index.html`;
 }
 
-function dualBlockStretchBrowseOpts(
+function browseBlockStretchRowsOpts(
   projectIndex: CommentrayIndex | null,
   p: { sourcePath: string; commentrayPath: string },
-): Pick<BuildCommentrayStaticOptions, "blockStretchRows" | "codeBrowserLayout"> | undefined {
+): Pick<BuildCommentrayStaticOptions, "blockStretchRows"> | undefined {
   const blockStretchRows = blockStretchRowsForDocumentedPair(
     projectIndex,
     p.sourcePath,
     p.commentrayPath,
   );
   if (!blockStretchRows) return undefined;
-  return { blockStretchRows, codeBrowserLayout: "dual" };
+  return { blockStretchRows };
 }
 
 async function writeBrowsePageForPair(input: {
@@ -162,7 +162,7 @@ async function writeBrowsePageForPair(input: {
     input.ghNavBase,
     p,
   );
-  const dualStretchOpts = dualBlockStretchBrowseOpts(input.projectIndex, p);
+  const browseBlockStretchOpts = browseBlockStretchRowsOpts(input.projectIndex, p);
   const commentrayPathForSearch = pickDefaultCommentrayRel(multiAngleBrowsing, p.commentrayPath);
   await buildCommentrayStatic({
     sourceFile: sourceAbs,
@@ -179,7 +179,7 @@ async function writeBrowsePageForPair(input: {
     staticSearchScope: "commentray-and-paths",
     commentrayPathForSearch,
     ...(multiAngleBrowsing ? { multiAngleBrowsing } : {}),
-    ...(dualStretchOpts ?? {}),
+    ...(browseBlockStretchOpts ?? {}),
     ...(p.sourceOnGithub ? { sourceOnGithubUrl: p.sourceOnGithub } : {}),
     ...(p.commentrayOnGithub ? { commentrayOnGithubUrl: p.commentrayOnGithub } : {}),
     /** Hub-relative `./browse/…` so pair nav matches `commentray-nav-search.json` and resolves on project pages. */
@@ -190,6 +190,7 @@ async function writeBrowsePageForPair(input: {
       ? { documentedPairsEmbeddedB64: input.documentedPairsEmbeddedB64 }
       : {}),
     ...(input.pagesBuildCommitSha ? { pagesBuildCommitSha: input.pagesBuildCommitSha } : {}),
+    stretchBufferSync: input.ss.stretchBufferSync,
   });
 }
 
@@ -350,6 +351,7 @@ function staticRenderOptions(input: {
       : {}),
     builtAt: input.builtAt,
     ...(input.pagesBuildCommitSha ? { pagesBuildCommitSha: input.pagesBuildCommitSha } : {}),
+    stretchBufferSync: input.ss.stretchBufferSync,
   };
 }
 

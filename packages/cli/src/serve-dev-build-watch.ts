@@ -25,8 +25,9 @@ function serveDevBuildWatchScript(buildId: string): string {
   setInterval(async () => {
     try {
       const r = await fetch("/__commentray/dev/build-id", { cache: "no-store" });
+      if (!r.ok) return;
       const cur = (await r.text()).trim();
-      if (cur.length > 0 && cur !== expect) {
+      if (cur.length > 0 && cur !== expect && !cur.startsWith("<")) {
         console.log("[commentray:dev-watch] reload", { from: expect, to: cur });
         location.reload();
       }

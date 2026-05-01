@@ -17,6 +17,7 @@ describe("serve dev build watch HTML injection", () => {
     expect(next).toContain("<script data-commentray-serve-watch>");
     expect(next).toContain('const expect = "abc123"');
     expect(next).toContain("/__commentray/dev/build-id");
+    expect(next).toContain("if (!r.ok) return");
     expect(next).toMatch(/<\/script>\n<\/body>$/);
   });
 

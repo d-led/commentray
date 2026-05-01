@@ -5,12 +5,16 @@ import {
   buildBlockScrollLinks,
   type BlockScrollLink,
   type CommentrayIndex,
+  DEFAULT_STRETCH_BUFFER_SYNC,
   findMonorepoPackagesDir,
   monorepoLayoutStartDir,
   normalizeRepoRelativePath,
 } from "@commentray/core";
 
-import { tryBuildBlockStretchTableHtml } from "./block-stretch-layout.js";
+import {
+  tryBuildBlockStretchTableHtml,
+  type StretchBufferSyncStrategy,
+} from "./block-stretch-layout.js";
 import { formatCommentrayBuiltAtLocal } from "./build-stamp.js";
 import { escapeHtml } from "./html-utils.js";
 import { commentrayColorThemeHeadBoot } from "./code-browser-color-theme.js";
@@ -133,6 +137,12 @@ export type CodeBrowserPageOptions = {
    * **block-aware** scroll sync and separator lines in the commentray pane.
    */
   codeBrowserLayout?: "auto" | "dual";
+  /**
+   * Stretch layout only. Omitted uses `DEFAULT_STRETCH_BUFFER_SYNC` from `@commentray/core`
+   * (`flow-synchronizer`: sync ids + measure wrappers + client `BufferingFlowSynchronizer`).
+   * `table`: legacy row height only, no shell flag / client padding pass.
+   */
+  stretchBufferSync?: StretchBufferSyncStrategy;
   /**
    * Dual-pane scroll correlation (`#shell data-scroll-sync-strategy`). Strategies are mutually
    * exclusive in the client; omit or set to the default for normal builds. `filler-blocks` is
@@ -2031,6 +2041,9 @@ ${CODE_BROWSER_INTRO_STYLES}
         font-size: 15px;
         line-height: 1.45;
         overflow-x: auto;
+        /* overflow-x other than visible makes overflow-y:visible compute to auto, which traps
+         * vertical wheel on this node instead of the shell scrollport when height is ever capped. */
+        overflow-y: hidden;
         max-width: 100%;
       }
       .shell--stretch-rows .stretch-preamble img { max-width: 100%; height: auto; }
@@ -2046,6 +2059,22 @@ ${CODE_BROWSER_INTRO_STYLES}
         padding: 0 12px 0 0;
         border-bottom: 1px solid color-mix(in oklab, CanvasText 8%, Canvas);
       }
+      #shell[data-stretch-buffer-sync="flow-synchronizer"] .block-stretch td.stretch-code > .stretch-cell-measure,
+      #shell[data-stretch-buffer-sync="flow-synchronizer"] .block-stretch td.stretch-doc > .stretch-cell-measure {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        height: max-content;
+        max-height: max-content;
+      }
+      #shell[data-stretch-buffer-sync="flow-synchronizer"] .block-stretch td.stretch-doc .stretch-doc-inner {
+        height: max-content;
+        max-height: max-content;
+      }
+      #shell[data-stretch-buffer-sync="flow-synchronizer"] .block-stretch .stretch-code-stack {
+        height: max-content;
+        max-height: max-content;
+      }
       .block-stretch td.stretch-doc {
         vertical-align: top;
         padding: 0 0 0 12px;
@@ -2056,10 +2085,13 @@ ${CODE_BROWSER_INTRO_STYLES}
         line-height: 1.45;
         min-width: 0;
         overflow-x: auto;
+        /* Keep vertical scrolling on the shell; see stretch-preamble rule above. */
+        overflow-y: hidden;
       }
       .block-stretch td.stretch-doc .stretch-doc-inner img { max-width: 100%; height: auto; }
       .block-stretch td.stretch-doc .stretch-doc-inner .commentray-mermaid {
         overflow-x: auto;
+        overflow-y: hidden;
         max-width: 100%;
       }
       .block-stretch.wrap td.stretch-doc .stretch-doc-inner {
@@ -2175,6 +2207,8 @@ type CodeBrowserPageParts = {
   sourcePaneModeAttr: string;
   /** Optional ` data-scroll-sync-strategy="…"` fragment on `#shell` (empty when default / unset). */
   scrollSyncStrategyShellAttr?: string;
+  /** Optional ` data-stretch-buffer-sync="flow-synchronizer"` on `#shell` when stretch uses the algo path. */
+  stretchBufferSyncShellAttr?: string;
 };
 
 function buildCodeBrowserPageHtml(p: CodeBrowserPageParts): string {
@@ -2247,7 +2281,7 @@ ${TOOLBAR_COLOR_THEME_HTML}
         <div class="search-results" id="search-results" hidden aria-live="polite"></div>
       </header>
       <main id="main-content" class="app__main" tabindex="-1">
-        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" ? ' data-dual-mobile-pane="doc"' : ""}${p.sourcePaneModeAttr} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairIdentityDataAttrs}${p.shellPairDocDataAttr}${p.scrollSyncStrategyShellAttr ?? ""}>
+        <div class="${shellClass}" id="shell" data-layout="${p.layout}"${p.layout === "dual" ? ' data-dual-mobile-pane="doc"' : ""}${p.sourcePaneModeAttr} data-raw-code-b64="${escapeHtml(p.rawCodeB64)}" data-raw-md-b64="${escapeHtml(p.rawMdB64)}" data-scroll-block-links-b64="${escapeHtml(p.scrollBlockLinksB64)}"${p.shellDocumentedPairsAttr}${p.shellSearchAttrs}${p.shellPairIdentityDataAttrs}${p.shellPairDocDataAttr}${p.scrollSyncStrategyShellAttr ?? ""}${p.stretchBufferSyncShellAttr ?? ""}>
 ${p.shellInner}
         </div>
       </main>
@@ -2270,6 +2304,8 @@ type CodeBrowserShell = {
   multiAnglePayloadB64: string;
   sourceMarkdownToggleEnabled: boolean;
   sourcePaneDefaultMode: "source" | "rendered-markdown";
+  /** Set when `layout` is `stretch`; drives `data-stretch-buffer-sync` on `#shell`. */
+  stretchBufferSync?: StretchBufferSyncStrategy;
   /** When multi-angle browsing is active, overrides shell `data-raw-md-b64` / search path / GitHub link. */
   multiShell?: {
     rawMdB64: string;
@@ -2304,6 +2340,10 @@ type MultiAngleDefaultSelection = {
 
 function firstNonEmpty(values: string[]): string | undefined {
   return values.find((v) => v.trim().length > 0);
+}
+
+function stretchBufferSyncFromOpts(opts: CodeBrowserPageOptions): StretchBufferSyncStrategy {
+  return opts.stretchBufferSync ?? DEFAULT_STRETCH_BUFFER_SYNC;
 }
 
 function angleBlockStretchRowsPathOk(
@@ -2448,6 +2488,7 @@ async function buildMultiAngleBlockStretchShell(
       sourceRelative: rows.sourceRelative,
       commentrayPathRel: rows.commentrayPathRel,
       commentrayOutputUrls: opts.commentrayOutputUrls,
+      stretchBufferSync: stretchBufferSyncFromOpts(opts),
     });
     if (stretched === null) return null;
     const { jsonRow, commentrayHtml, scrollB64 } = await multiAngleJsonRowAndDocHtml(opts, spec);
@@ -2494,6 +2535,7 @@ async function buildMultiAngleBlockStretchShell(
     multiAnglePayloadB64,
     sourceMarkdownToggleEnabled: false,
     sourcePaneDefaultMode: "source",
+    stretchBufferSync: stretchBufferSyncFromOpts(opts),
     multiShell: {
       rawMdB64: Buffer.from(defaultMarkdown, "utf8").toString("base64"),
       scrollBlockLinksB64: defaultScrollB64,
@@ -2639,7 +2681,6 @@ async function buildSingleAngleCodeBrowserShell(
 ): Promise<CodeBrowserShell> {
   let layout: "dual" | "stretch" = "dual";
   let shellInner = "";
-  const scrollBlockLinksB64 = "";
 
   if (opts.blockStretchRows && layoutPref !== "dual") {
     const stretched = await tryBuildBlockStretchTableHtml({
@@ -2650,6 +2691,7 @@ async function buildSingleAngleCodeBrowserShell(
       sourceRelative: opts.blockStretchRows.sourceRelative,
       commentrayPathRel: opts.blockStretchRows.commentrayPathRel,
       commentrayOutputUrls: opts.commentrayOutputUrls,
+      stretchBufferSync: stretchBufferSyncFromOpts(opts),
     });
     if (stretched) {
       layout = "stretch";
@@ -2661,6 +2703,22 @@ async function buildSingleAngleCodeBrowserShell(
     return buildDualPaneSingleAngleShell(opts);
   }
 
+  const rows = opts.blockStretchRows;
+  const links: BlockScrollLink[] =
+    rows !== undefined
+      ? buildBlockScrollLinks(
+          rows.index,
+          rows.sourceRelative,
+          rows.commentrayPathRel,
+          opts.commentrayMarkdown,
+          opts.code,
+        )
+      : [];
+  let scrollBlockLinksB64 = "";
+  if (links.length > 0) {
+    scrollBlockLinksB64 = Buffer.from(JSON.stringify(links), "utf8").toString("base64");
+  }
+
   return {
     layout,
     shellInner,
@@ -2669,6 +2727,7 @@ async function buildSingleAngleCodeBrowserShell(
     multiAnglePayloadB64: "",
     sourceMarkdownToggleEnabled: false,
     sourcePaneDefaultMode: "source",
+    stretchBufferSync: stretchBufferSyncFromOpts(opts),
   };
 }
 
@@ -2771,7 +2830,6 @@ function shellPairIdentityDataAttrs(shell: CodeBrowserShell, opts: CodeBrowserPa
 
 /** Canonical doc target for static validation: same-site `./browse/…` when present, else GitHub blob. */
 function shellPairDocDataAttr(shell: CodeBrowserShell, opts: CodeBrowserPageOptions): string {
-  if (shell.layout !== "dual") return "";
   const browseRaw = (
     shell.multiShell?.commentrayStaticBrowseUrl ??
     opts.commentrayStaticBrowseUrl ??
@@ -2855,6 +2913,10 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
     opts.dualPaneScrollSyncStrategy !== DEFAULT_DUAL_PANE_SCROLL_SYNC_STRATEGY
       ? ` data-scroll-sync-strategy="${escapeHtml(opts.dualPaneScrollSyncStrategy)}"`
       : "";
+  const stretchBufferSyncShellAttr =
+    shell.layout === "stretch" && shell.stretchBufferSync === "flow-synchronizer"
+      ? ` data-stretch-buffer-sync="flow-synchronizer"`
+      : "";
 
   return buildCodeBrowserPageHtml({
     title,
@@ -2886,7 +2948,9 @@ export async function renderCodeBrowserHtml(opts: CodeBrowserPageOptions): Promi
       sourceMarkdownToggles.sourceMarkdownFlipScrollAffordanceHtml,
     sourcePaneModeAttr,
     scrollSyncStrategyShellAttr,
+    stretchBufferSyncShellAttr,
   });
 }
 
 export type { DualPaneScrollSyncStrategyId } from "./code-browser-scroll-sync-strategy.js";
+export type { StretchBufferSyncStrategy } from "./block-stretch-layout.js";

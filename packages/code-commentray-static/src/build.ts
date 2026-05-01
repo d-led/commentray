@@ -10,6 +10,7 @@ import {
   type CodeBrowserMultiAngleBrowsing,
   type CommentrayOutputUrlOptions,
   type CommentrayStaticAssetCopy,
+  type StretchBufferSyncStrategy,
   commentrayRenderVersion,
   renderCodeBrowserHtml,
 } from "@commentray/render";
@@ -55,9 +56,9 @@ export type BuildCommentrayStaticOptions = {
   /** Repo-relative companion Markdown path (with `staticSearchScope: "commentray-and-paths"`). */
   commentrayPathForSearch?: string;
   /**
-   * Passed through to `renderCodeBrowserHtml` (default `"auto"`). Static browse uses `"dual"`
-   * when {@link blockStretchRows} is set so index-backed block sync uses side-by-side panes and
-   * the resize gutter can draw block rays (stretch layout shares one scroll and omits that payload).
+   * Passed through to `renderCodeBrowserHtml` (default `"auto"`). Per-pair static browse pages omit
+   * this so layout follows the same rules as other renders: stretch when a block-stretch table
+   * builds, dual otherwise.
    */
   codeBrowserLayout?: "auto" | "dual";
   /**
@@ -69,6 +70,8 @@ export type BuildCommentrayStaticOptions = {
     sourceRelative: string;
     commentrayPathRel: string;
   };
+  /** Stretch layout only; forwarded to `renderCodeBrowserHtml` (default `"table"`). */
+  stretchBufferSync?: StretchBufferSyncStrategy;
   /** GitHub blob URL for the primary `filePath` (static hub toolbar). */
   sourceOnGithubUrl?: string;
   /** GitHub blob URL for the companion commentray Markdown file. */
@@ -165,6 +168,7 @@ export async function buildCommentrayStatic(opts: BuildCommentrayStaticOptions):
     commentrayPathForSearch: opts.commentrayPathForSearch,
     ...(opts.codeBrowserLayout ? { codeBrowserLayout: opts.codeBrowserLayout } : {}),
     blockStretchRows: opts.blockStretchRows,
+    ...(opts.stretchBufferSync !== undefined ? { stretchBufferSync: opts.stretchBufferSync } : {}),
     sourceOnGithubUrl: opts.sourceOnGithubUrl,
     commentrayOnGithubUrl: opts.commentrayOnGithubUrl,
     commentrayStaticBrowseUrl: opts.commentrayStaticBrowseUrl,
