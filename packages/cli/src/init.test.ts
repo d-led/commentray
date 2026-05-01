@@ -43,6 +43,7 @@ describe("Full init in an empty or partial repository", () => {
 
   it("migrates an existing legacy index on disk", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "commentray-init-mig-"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       await mkdir(path.join(dir, ".commentray", "metadata"), { recursive: true });
       await mkdir(path.join(dir, ".commentray", "source"), { recursive: true });
@@ -68,6 +69,7 @@ describe("Full init in an empty or partial repository", () => {
       expect(round.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
       expect(round.byCommentrayPath).toBeDefined();
     } finally {
+      warn.mockRestore();
       await rm(dir, { recursive: true, force: true });
     }
   });
@@ -82,7 +84,10 @@ describe("Full init in an empty or partial repository", () => {
         "{not json\n",
         "utf8",
       );
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
       expect(await runInitFull(dir)).toBe(1);
+      expect(err).toHaveBeenCalled();
+      err.mockRestore();
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
