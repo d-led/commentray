@@ -3254,6 +3254,13 @@ function wireSourceMarkdownPaneFlip(
   syncSourceMarkdownFlipA11y();
   syncWrapLinesVisibilityForSourcePaneMode(shell);
   const runFlip = (): void => {
+    if (shell.getAttribute("data-layout") === "stretch" && isNarrowViewport()) {
+      const cur = normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane"));
+      const next = cur === "code" ? "doc" : "code";
+      shell.setAttribute("data-dual-mobile-pane", next);
+      writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, next);
+      return;
+    }
     const cur = sourcePaneModeForShell(shell);
     const currentPrefix = cur === "rendered-markdown" ? "code-md-line-" : "code-line-";
     const line0 = closestSourceLine0ForPaneTop(codePane, currentPrefix);
@@ -3343,8 +3350,10 @@ function wireDualMobilePaneFlip(
 
 function wireStretchMobilePaneFlip(
   shell: HTMLElement,
+  codePane: HTMLElement,
   flipBtn: HTMLButtonElement,
   flipScrollBtn: HTMLButtonElement | null,
+  onAfterFlip?: () => void,
 ): void {
   const mq = globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ);
   function readStoredPane(): "code" | "doc" {
@@ -3359,10 +3368,41 @@ function wireStretchMobilePaneFlip(
   }
   const runFlip = (): void => {
     if (!mq.matches) return;
-    const cur = normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane"));
-    const next = cur === "code" ? "doc" : "code";
-    shell.setAttribute("data-dual-mobile-pane", next);
-    writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, next);
+    const cur = sourcePaneModeForShell(shell);
+    const currentPrefix = cur === "rendered-markdown" ? "code-md-line-" : "code-line-";
+    const line0 = closestSourceLine0ForPaneTop(codePane, currentPrefix);
+    const next = cur === "rendered-markdown" ? "source" : "rendered-markdown";
+    const nextPrefix = next === "rendered-markdown" ? "code-md-line-" : "code-line-";
+    shell.setAttribute("data-source-pane-mode", next);
+    writeWebStorageItem(localStorage, STORAGE_SOURCE_MARKDOWN_PANE_MODE, next);
+    syncWrapLinesVisibilityForSourcePaneMode(shell);
+    if (line0 !== null) {
+      const row = codePane.querySelector(`#${nextPrefix}${String(line0)}`);
+      if (row instanceof HTMLElement) {
+        applyRevealChildInPane(codePane, row, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX);
+      }
+    }
+    if (next === "rendered-markdown") {
+      for (const sourceMdBody of codePane.querySelectorAll<HTMLElement>('[data-source-markdown-body="true"]')) {
+        void runMermaidOnFreshDocNodes(sourceMdBody);
+        rewriteHubRelativeBrowseAnchorsIn(sourceMdBody);
+      }
+    }
+    const sourceMdFlip = document.getElementById("source-markdown-pane-flip");
+    const sourceMdFlipScroll = document.getElementById("source-markdown-pane-flip-scroll");
+    const renderedActive = next === "rendered-markdown";
+    const nextModeLabel = renderedActive ? "markdown source" : "rendered markdown";
+    const ariaLabel = `Switch source pane to ${nextModeLabel}`;
+    const title = `Source pane: ${renderedActive ? "rendered markdown" : "markdown source"} (click to switch)`;
+    const apply = (btn: HTMLElement | null): void => {
+      if (!(btn instanceof HTMLButtonElement)) return;
+      btn.setAttribute("aria-pressed", renderedActive ? "true" : "false");
+      btn.setAttribute("aria-label", ariaLabel);
+      btn.title = title;
+    };
+    apply(sourceMdFlip);
+    apply(sourceMdFlipScroll);
+    onAfterFlip?.();
   };
   flipBtn.addEventListener("click", runFlip);
   if (flipScrollBtn) {
@@ -3380,6 +3420,43 @@ function stretchFlowSynchronizerEnabled(shell: HTMLElement): boolean {
   return shell.getAttribute("data-stretch-buffer-sync") === "flow-synchronizer";
 }
 
+function wireStretchSplitter(shell: HTMLElement, codePane: HTMLElement): void {
+  const gutter = document.getElementById("stretch-gutter");
+  if (!(gutter instanceof HTMLElement)) return;
+
+  const stored = Number.parseFloat(readWebStorageItem(localStorage, STORAGE_SPLIT_PCT));
+  const initial = clamp(Number.isFinite(stored) ? stored : 50, 15, 85);
+  shell.style.setProperty("--stretch-code-pct", `${String(initial)}%`);
+
+  let dragging = false;
+  const onMove = (ev: MouseEvent): void => {
+    if (!dragging) return;
+    const rect = codePane.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const x = ev.clientX - rect.left;
+    const pct = clamp((x / rect.width) * 100, 15, 85);
+    shell.style.setProperty("--stretch-code-pct", `${String(pct)}%`);
+    writeWebStorageItem(localStorage, STORAGE_SPLIT_PCT, String(pct));
+  };
+  const onUp = (): void => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    globalThis.removeEventListener("mousemove", onMove);
+    globalThis.removeEventListener("mouseup", onUp);
+  };
+
+  gutter.addEventListener("mousedown", (ev) => {
+    ev.preventDefault();
+    dragging = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    globalThis.addEventListener("mousemove", onMove);
+    globalThis.addEventListener("mouseup", onUp);
+  });
+}
+
 /** Wrap toggle always; `BufferingFlowSynchronizer` padding pass only when `#shell` has `data-stretch-buffer-sync="flow-synchronizer"`. */
 function wireStretchLayoutChrome(shell: HTMLElement, codePane: HTMLElement): void {
   if (codePane instanceof HTMLTableElement && stretchFlowSynchronizerEnabled(shell)) {
@@ -3395,6 +3472,7 @@ function wireStretchLayoutChrome(shell: HTMLElement, codePane: HTMLElement): voi
       globalThis.dispatchEvent(new Event("resize"));
     });
   }
+  wireStretchSplitter(shell, codePane);
 }
 
 type MultiAngleClientPayload = {
@@ -3449,6 +3527,19 @@ function applyMultiAngleStretchAngleToShell(
     wireSourceMarkdownControls(shell, nextCodePane, () => {
       globalThis.dispatchEvent(new Event("resize"));
     });
+    const flipBtn = document.getElementById("mobile-pane-flip");
+    const flipScrollBtn = document.getElementById("mobile-pane-flip-scroll");
+    if (flipBtn instanceof HTMLButtonElement) {
+      wireStretchMobilePaneFlip(
+        shell,
+        nextCodePane,
+        flipBtn,
+        flipScrollBtn instanceof HTMLButtonElement ? flipScrollBtn : null,
+        () => {
+          globalThis.dispatchEvent(new Event("resize"));
+        },
+      );
+    }
   }
   shell.setAttribute("data-scroll-block-links-b64", angle.scrollBlockLinksB64);
   shell.setAttribute("data-raw-md-b64", angle.rawMdB64);
@@ -4410,8 +4501,12 @@ function main(): void {
     if (flipBtn instanceof HTMLButtonElement) {
       wireStretchMobilePaneFlip(
         shell,
+        codePane,
         flipBtn,
         flipScrollBtn instanceof HTMLButtonElement ? flipScrollBtn : null,
+        () => {
+          globalThis.dispatchEvent(new Event("resize"));
+        },
       );
     }
     return;

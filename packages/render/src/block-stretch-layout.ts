@@ -181,6 +181,7 @@ export async function tryBuildBlockStretchTableHtml(
   }
 
   const lines = opts.code.split("\n");
+  const lnMinCh = Math.max(2, String(Math.max(1, lines.length)).length);
   const lineToBlock = new Map<number, BlockScrollLink>();
   for (const b of links) {
     const { lo, hiExclusive } = b.markerViewportHalfOpen1Based;
@@ -271,10 +272,16 @@ export async function tryBuildBlockStretchTableHtml(
       : "";
 
   const tableInnerHtml =
-    `<table class="block-stretch pane--code" id="code-pane" role="presentation">` +
+    `<div class="stretch-grid" id="stretch-grid">` +
+    `${preambleHtml}` +
+    `<table class="block-stretch pane--code" id="code-pane" role="presentation" style="--code-ln-min-ch:${String(
+      lnMinCh,
+    )}">` +
     `<colgroup><col class="stretch-col-code" /><col class="stretch-col-doc" /></colgroup>` +
     `<tbody>\n${rows.join("\n")}\n</tbody>` +
-    `</table>`;
+    `</table>` +
+    `<div class="stretch-gutter" id="stretch-gutter" role="separator" aria-orientation="vertical" aria-label="Resize columns"></div>` +
+    `</div>`;
 
-  return { preambleHtml, tableInnerHtml };
+  return { preambleHtml: "", tableInnerHtml };
 }

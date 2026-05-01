@@ -2025,6 +2025,9 @@ ${CODE_BROWSER_INTRO_STYLES}
           padding-left: 0;
           padding-right: 0;
         }
+        .shell.shell--stretch-rows[data-dual-mobile-pane] #stretch-gutter {
+          display: none;
+        }
       }
       .pane--doc { font-size: 15px; line-height: 1.45; }
       .pane--doc img { max-width: 100%; height: auto; }
@@ -2064,11 +2067,16 @@ ${CODE_BROWSER_INTRO_STYLES}
         border-collapse: collapse;
         table-layout: fixed;
       }
-      .stretch-col-code { width: 50%; }
-      .stretch-col-doc { width: 50%; }
+      .stretch-grid {
+        position: relative;
+        --stretch-code-pct: 50%;
+      }
+      .stretch-col-code { width: var(--stretch-code-pct, 50%); }
+      .stretch-col-doc { width: calc(100% - var(--stretch-code-pct, 50%)); }
       .block-stretch td.stretch-code {
         vertical-align: top;
         padding: 0 12px 0 0;
+        box-shadow: inset -1px 0 0 color-mix(in oklab, CanvasText 10%, Canvas);
       }
       #shell[data-stretch-buffer-sync="flow-synchronizer"] .block-stretch td.stretch-code > .stretch-cell-measure,
       #shell[data-stretch-buffer-sync="flow-synchronizer"] .block-stretch td.stretch-doc > .stretch-cell-measure {
@@ -2089,6 +2097,7 @@ ${CODE_BROWSER_INTRO_STYLES}
       .block-stretch td.stretch-doc {
         vertical-align: top;
         padding: 0 0 0 12px;
+        box-shadow: inset 1px 0 0 color-mix(in oklab, CanvasText 8%, Canvas);
       }
       .block-stretch td.stretch-doc .stretch-doc-inner {
         font-size: 15px;
@@ -2168,6 +2177,21 @@ ${CODE_BROWSER_INTRO_STYLES}
       .block-stretch:not(.wrap) .stretch-doc-inner pre,
       .block-stretch:not(.wrap) .stretch-doc-inner pre code {
         white-space: pre;
+      }
+      .stretch-gutter {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: var(--stretch-code-pct, 50%);
+        transform: translateX(-50%);
+        width: 12px;
+        cursor: col-resize;
+        touch-action: none;
+        border-left: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
+        border-right: 1px solid color-mix(in oklab, CanvasText 8%, Canvas);
+        background: color-mix(in oklab, CanvasText 4%, Canvas);
+        border-radius: 999px;
+        z-index: 6;
       }
 `;
 
