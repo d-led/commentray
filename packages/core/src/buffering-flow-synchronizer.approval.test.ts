@@ -1,17 +1,25 @@
 /**
- * Human approval grids for `BufferingFlowSynchronizer` must satisfy (and we assert after every case):
+ * **Approval harness** for `BufferingFlowSynchronizer`: reads `*.input.txt` fixtures, parses grids to
+ * `HeightAdjustable[]`, runs {@link BufferingFlowSynchronizer.synchronize}, prints ASCII via
+ * `printApprovalSynchronizedFlow`, then snapshots with Approvals plus explicit invariants below.
+ *
+ * Maintainer orientation: diagrams, fixture naming, and how grid notation maps to the model live in
+ * `.commentray/source/packages/core/src/buffering-flow-synchronizer.approval.test.ts/main.md`.
+ * Core math (abstract flows) is documented separately from approval vocabulary.
+ *
+ * After every case we assert:
  *
  * 1. **Equal column height after sync** — same total scroll lines left/right (`bufferAbove` + height +
  *    `bufferBelow` on every `HeightAdjustable`), so the zip grid has no dangling tail on one side.
- * 2. **Minimal buffering on one ASCII line** — never `BBBB` in **both** cells on the same row (split
- *    into stagger). Multiple consecutive `BBBB` **rows** in one column are allowed when slack depth
+ * 2. **Minimal buffering on one ASCII line** — never buffer fill in **both** cells on the same row (split
+ *    into stagger). Multiple consecutive buffer-fill **rows** in one column are allowed when slack depth
  *    requires it (`assertNoSymmetricBufferSlackRowOnAnyLine`).
- * 3. **No cross-column “sync” for unsynced blocks** — only ids matching `R{N}XX` participate in region
- *    height and start alignment; plain `XXXX` / `__ANON__*` never get paired-region semantics (that
- *    is enforced in `buffering-flow-synchronizer.ts` + `approval-flow-grid.ts`, not re-derived here).
+ * 3. **No cross-column “sync” for local blocks** — only sync-region ids (see `buffering-flow-synchronizer.ts`
+ *    and `approval-flow-grid.ts`) participate in region height and start alignment; generic body fill and
+ *    `__ANON__*` blocks stay local (not re-derived in this file).
  * 4. **One blank row for humans between blocks** — after each `HeightAdjustable` boundary (within a
  *    section), one full-width empty row in the grid so a reader can see block seams (not scroll slack).
- *    Never 0 such seams between items, and never two consecutive all-blank rows **between** content
+ *    Never zero such seams between items, and never two consecutive all-blank rows **between** content
  *    (`assertSingleSpacerRowBetweenBlocks` — trailing file padding after the last ink row is allowed).
  */
 import fs from "node:fs";

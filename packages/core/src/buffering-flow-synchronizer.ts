@@ -3,23 +3,30 @@ import type { HeightAdjustable } from "./height-adjustable.js";
 export type { HeightAdjustable } from "./height-adjustable.js";
 
 /**
- * Synthetic item appended (on **both** columns, paired) when total-height tail slack must not sit on
- * a synced `R{N}XX` block. The shorter side’s tail entry carries the `bufferBelow`; the other side’s
- * carries zero — same array length for consumers that zip by index (e.g. stretch rows).
+ * Sentinel `id` for a zero-height segment appended in **lockstep on both columns** when tail slack
+ * needed to equalize column totals must **not** be stored as `bufferBelow` on a sync-region item.
+ * The shorter column’s placeholder carries the slack in `bufferBelow`; the paired copy carries zero,
+ * keeping left and right arrays the same length for index-aligned consumers (for example stretch rows).
  */
 export const NON_SYNC_TAIL_SLACK_ITEM_ID = "__NON_SYNC_TAIL_SLACK__";
 
 /**
- * Pairs two vertical **flows** (e.g. code vs commentary columns). Items whose `id` matches `R{N}XX`
- * are **synced regions**; every other id stays **local** (no cross-column start alignment or shared
- * region height — unsynced `XXXX` blocks are never treated as paired regions). Pipeline (see
- * `.commentray.toml`, `commentray:start id=toml-buffering-flow-sync`): (1) `bufferBelow` on the shorter
- * side per shared id so region heights match; (2) align first content rows by **preferring** to lower
- * `bufferAbove` on the later-starting `R{N}XX`, then raising the other side if needed; (3) equalize
- * column totals with tail slack only on non-synced blocks or paired {@link NON_SYNC_TAIL_SLACK_ITEM_ID}
- * slots (`BBBB` in approval grids). Shifting `bufferBelow` between paired `R{N}XX` copies would break
- * per-column scroll totals and force stacked tail `BBBB` rows, so that step is not applied (see
- * `.commentray.toml` `toml-buffering-flow-sync`).
+ * Two parallel vertical **flows** of {@link HeightAdjustable}: each entry is one segment with
+ * intrinsic `height` and optional `bufferAbove` / `bufferBelow` slack in abstract row units.
+ *
+ * **Paired sync regions:** Items whose `id` passes {@link isSyncRegionId} and share the same id in
+ * both columns behave as one logical region: heights are equalized and first content rows are aligned.
+ * **Local segments:** All other ids are column-local — no cross-column pairing, shared region height,
+ * or coordinated start alignment.
+ *
+ * **Pipeline** (see `.commentray/source/packages/core/src/buffering-flow-synchronizer.ts/main.md`):
+ * (1) Per shared sync-region id, add `bufferBelow` on the shorter copy so both sides span the same
+ * region height; (2) align the row index of each region’s first content line, preferring to lower
+ * `bufferAbove` on the later-starting side before raising slack on the earlier side; (3) pad the
+ * shorter column’s tail so totals match, using `bufferBelow` on the last item when it is not a
+ * sync region, else paired {@link NON_SYNC_TAIL_SLACK_ITEM_ID} entries. **Non-step:** `bufferBelow`
+ * from (1) is never redistributed between the two copies of a paired region — that would change each
+ * column’s scroll total.
  */
 export interface SynchronizedHeightAdjustables {
   left: HeightAdjustable[];
@@ -51,6 +58,7 @@ function applySyncRegionBuffersToColumn(
   });
 }
 
+/** Whether `id` is treated as a sync-region identifier for cross-column pairing (same id on both sides). */
 function isSyncRegionId(id: string): boolean {
   return /^R\d+XX$/.test(id);
 }
@@ -119,10 +127,9 @@ function alignOnePairedRegionStart(
 }
 
 /**
- * Aligns paired `R{N}XX` starts at the **same** row index using **minimal** slack: prefer lowering
- * `bufferAbove` on the region that starts **later** (down to 0) before raising `bufferAbove` on the
- * side that starts earlier. That avoids extra symmetric `BBBB`/`BBBB` zip rows when the parse
- * already carried redundant `bufferAbove` on one side.
+ * For each sync-region id present in **both** columns, align the row index of the first intrinsic
+ * content line using **minimal** slack: prefer lowering `bufferAbove` on the side that starts
+ * **later** (down to zero) before increasing `bufferAbove` on the side that starts earlier.
  */
 function alignSyncRegionStarts(left: HeightAdjustable[], right: HeightAdjustable[]): void {
   const ids = new Set<string>();
@@ -157,9 +164,9 @@ function tailSlackPlaceholder(bufferBelow: number): HeightAdjustable {
 }
 
 /**
- * Column-equalizing slack at the **bottom** of the shorter column only, never as `bufferBelow` on a
- * synced `R{N}XX` item. Prefers extending the last non-synced item; otherwise appends paired tail
- * placeholders so `L` and `R` stay the same length.
+ * After region alignment, extend the **shorter** column so its total height matches the taller one.
+ * Prefers extra `bufferBelow` on the last item when that item is **not** a sync region; otherwise
+ * appends paired {@link NON_SYNC_TAIL_SLACK_ITEM_ID} rows so both columns stay the same length.
  */
 function padShorterColumnTail(L: HeightAdjustable[], R: HeightAdjustable[]): void {
   const tL = columnTotalHeight(L);
@@ -190,10 +197,7 @@ function padTailSlackOntoShorterColumn(
   longer.push(tailSlackPlaceholder(0));
 }
 
-/**
- * Mutates shallow copies: aligns `R{N}XX` region starts, equalizes per-id region heights, then
- * pads the shorter column’s tail so totals match.
- */
+/** Shallow-clone of one {@link HeightAdjustable}, copying continuation metadata when present. */
 function cloneHeightAdjustable(it: HeightAdjustable): HeightAdjustable {
   return {
     ...it,
@@ -203,6 +207,10 @@ function cloneHeightAdjustable(it: HeightAdjustable): HeightAdjustable {
   };
 }
 
+/**
+ * Clones both flows, then aligns sync-region starts and pads the shorter column’s tail. Region-height
+ * equalization is already applied on the inputs before this runs (see {@link BufferingFlowSynchronizer.synchronize}).
+ */
 function applyStackVerticalAlignment(
   left: HeightAdjustable[],
   right: HeightAdjustable[],

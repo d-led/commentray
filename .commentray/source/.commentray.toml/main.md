@@ -56,7 +56,7 @@ This file on disk is the **contract** the tools read first: storage root, SCM ba
 
 <!-- commentray:block id=toml-buffering-flow-sync -->
 
-Normative sketch lives in the real [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml) between `# commentray:start id=toml-buffering-flow-sync` and `# commentray:end id=toml-buffering-flow-sync`. Implementation: [`packages/core/src/buffering-flow-synchronizer.ts`](https://github.com/d-led/commentray/blob/main/packages/core/src/buffering-flow-synchronizer.ts) (equalize paired `R{N}XX` region heights via `bufferBelow`, align paired region starts by rebalancing `bufferAbove`, then pad only the shorter column tail while keeping equal total height).
+Normative sketch lives in the real [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml) between `# commentray:start id=toml-buffering-flow-sync` and `# commentray:end id=toml-buffering-flow-sync`. Implementation: [`packages/core/src/buffering-flow-synchronizer.ts`](https://github.com/d-led/commentray/blob/main/packages/core/src/buffering-flow-synchronizer.ts) — equalize paired **sync-region** heights via `bufferBelow`, align paired region starts by rebalancing `bufferAbove`, then pad the shorter column tail while keeping equal total height (full narrative: [buffering-flow-synchronizer commentray](../packages/core/src/buffering-flow-synchronizer.ts/main.md)).
 
 <!-- commentray:page-break -->
 

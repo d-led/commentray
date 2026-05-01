@@ -1,22 +1,64 @@
-# `buffering-flow-synchronizer.ts` - commentray
+# `buffering-flow-synchronizer.ts` — commentray
 
-Synchronizes two vertical flows by treating only `R{N}XX` as paired regions. Unsynced ids (`XXXX`, `__ANON__*`) stay local and are never region-matched across columns.
+<!-- #region commentray:bfs-purpose -->
 
-```mermaid
-flowchart TD
-  A[Input left/right HeightAdjustable flows] --> B[Collect max height per paired region id RnXX]
-  B --> C[Stage 1: add bufferBelow on shorter region copy]
-  C --> D[Stage 2: align region start rows via bufferAbove rebalance]
-  D --> E[Stage 3: equalize totals by tail slack on non-synced tail]
-  E --> F[Output: equal-total synchronized flows]
-```
+## Purpose (read this first)
 
-Why this shape: start alignment prefers lowering existing `bufferAbove` on the later-starting side before adding new top slack on the other side. This minimizes artificial empty rows while preserving scroll-total equality.
+`BufferingFlowSynchronizer` takes two ordered lists of **`HeightAdjustable`**: each entry is one vertical segment with intrinsic `height` and slack fields `bufferAbove` / `bufferBelow` (abstract **row units**, not pixels). It returns shallow copies whose slack fields are adjusted so that:
 
-Approval example A: `two-columns.zig-zag-alternating-sync-needs`.
-Alternating unsynced rows zig-zag between sides before `R2XX`/`R3XX`. Sync still aligns paired region starts and keeps the no-symmetric-`BBBB`-per-line invariant.
+1. **Paired sync regions** — items whose `id` is classified the same way on both sides (`isSyncRegionId` in the implementation) with matching `id` — end up with the same total span and aligned first content rows.
+2. **Local segments** — everything else stays column-local (no fake pairing across columns).
+3. **Column totals** — the sum of `bufferAbove + height + bufferBelow` down each column matches after the pass.
 
-Approval example B: `two-columns.second-column-missing-first-region`.
-The right column starts with `R1XX` while left starts unsynced. Sync shifts top slack where needed, then keeps later region/body rows in parity without pretending unsynced rows are paired.
+This file is intentionally **agnostic of ASCII grids**, golden filenames, and buffer “ink” symbols. Those belong to [`buffering-flow-synchronizer-approval-printer.ts`](https://github.com/d-led/commentary/blob/main/packages/core/src/buffering-flow-synchronizer-approval-printer.ts) and the approval harness. DOM wiring is in [`packages/render/src/block-stretch-buffer-sync.ts`](https://github.com/d-led/commentary/blob/main/packages/render/src/block-stretch-buffer-sync.ts) — see [its commentray](../../render/src/block-stretch-buffer-sync.ts/main.md).
 
-DOM application is documented in `.commentray/source/packages/render/src/block-stretch-buffer-sync.ts/main.md`.
+**Product note:** In this repository, parsed source regions use ids that match `^R\d+XX$`; tests and fixtures spell that out. The synchronizer’s **contract** is still “pairs of `HeightAdjustable` with the same sync-region classification,” not any particular string pattern in prose next to the algorithm.
+
+<!-- #endregion commentray:bfs-purpose -->
+
+---
+
+<!-- #region commentray:bfs-pipeline -->
+
+## Pipeline
+
+Linear pass over two `HeightAdjustable[]` flows (see source for exact helpers):
+
+- **Region height** — For each sync-region id that appears on both sides, take the larger intrinsic `height` and add bottom slack on the shorter copy so both columns span the same region.
+- **Start alignment** — For each such paired id, make the first content row the same index in both columns by moving slack in `bufferAbove` (minimal: trim the late starter first).
+- **Column totals** — If one column is still shorter overall, add tail slack on the last non–sync-region item when possible; otherwise append paired zero-height tail rows so lengths stay matched.
+- **Result** — Shallow copies with adjusted buffers; inputs are not mutated.
+
+<!-- #endregion commentray:bfs-pipeline -->
+
+---
+
+<!-- #region commentray:bfs-design -->
+
+## Design choices (why it looks like this)
+
+- **Start alignment** prefers **reducing** `bufferAbove` on the side whose first content line starts **later** (down to zero), then only then **increases** `bufferAbove` on the other side. That keeps extra top slack minimal when the parser already padded one column.
+- **Tail slack** never becomes `bufferBelow` on a sync-region item when that would misrepresent ownership; the implementation may append paired rows with id `NON_SYNC_TAIL_SLACK_ITEM_ID` so both columns stay the same length for index-based zip (e.g. stretch `<tr>` alignment).
+- **`bufferBelow` from stage 1 is not redistributed** between the two copies of a paired region: moving it would change per-column scroll totals.
+
+<!-- #endregion commentray:bfs-design -->
+
+---
+
+<!-- #region commentray:bfs-approval-grids -->
+
+## Where approval tests and grids fit
+
+Golden files under `packages/core/src/buffering-flow-synchronizer.approvals/` are **documentation and regression** for the combination: parse → synchronize → print. Scenario names (e.g. zig-zag vs missing first region) are described next to the harness in [buffering-flow-synchronizer.approval.test.ts commentray](../buffering-flow-synchronizer.approval.test.ts/main.md). Grid merge rules and token meanings are in [buffering-flow-synchronizer-approval-printer.ts commentray](../buffering-flow-synchronizer-approval-printer.ts/main.md).
+
+<!-- #endregion commentray:bfs-approval-grids -->
+
+---
+
+<!-- #region commentray:bfs-toml-sketch -->
+
+## Normative TOML sketch
+
+The repo’s [`.commentray.toml`](https://github.com/d-led/commentary/blob/main/.commentray.toml) contains a line-comment sketch between `# commentray:start id=toml-buffering-flow-sync` and `# commentray:end id=toml-buffering-flow-sync`. The [`.commentray.toml` commentray](../../../.commentray.toml/main.md) block with the same id points back here for implementation detail.
+
+<!-- #endregion commentray:bfs-toml-sketch -->
