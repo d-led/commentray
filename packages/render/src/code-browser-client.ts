@@ -3070,6 +3070,14 @@ function isNarrowViewport(): boolean {
   return globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ).matches;
 }
 
+function syncSinglePaneShellState(shell: HTMLElement, narrowSinglePane: boolean): void {
+  if (narrowSinglePane) {
+    shell.setAttribute("data-mobile-single-pane", "true");
+    return;
+  }
+  shell.removeAttribute("data-mobile-single-pane");
+}
+
 function wireWideModeIntroTrigger(shell: HTMLElement): void {
   const btn = document.getElementById("commentray-help-tour");
   if (!(btn instanceof HTMLButtonElement)) return;
@@ -3341,8 +3349,10 @@ function wireDualMobilePaneFlip(
   }
   function applyForViewport(): void {
     if (mq.matches) {
+      syncSinglePaneShellState(shell, true);
       shell.setAttribute("data-dual-mobile-pane", readStoredPane());
     } else {
+      syncSinglePaneShellState(shell, false);
       shell.removeAttribute("data-dual-mobile-pane");
     }
   }
@@ -3401,8 +3411,10 @@ function wireStretchMobilePaneFlip(
   }
   function applyForViewport(): void {
     if (mq.matches) {
+      syncSinglePaneShellState(shell, true);
       shell.setAttribute("data-dual-mobile-pane", readStoredPane());
     } else {
+      syncSinglePaneShellState(shell, false);
       shell.removeAttribute("data-dual-mobile-pane");
     }
   }

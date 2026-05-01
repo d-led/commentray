@@ -857,6 +857,9 @@ describe("Code browser page — multi-angle block stretch", () => {
     expect(stretchShellOpenTag(html)).toContain('data-stretch-buffer-sync="flow-synchronizer"');
     expect(blockStretchTableHtml(html)).toContain("stretch-cell-measure");
     expect(html).not.toContain('id="doc-pane"');
+    expect(html).toContain('class="shell__pair-context"');
+    expect(html).toContain('title="README.md"');
+    expect(html).toContain(`title="${mainPath}"`);
     const script = /<script[^>]*id="commentray-multi-angle-b64"[^>]*>([^<]*)<\/script>/i.exec(html);
     expect(script?.[1]).toBeDefined();
     const payload = JSON.parse(Buffer.from(script?.[1] ?? "", "base64").toString("utf8")) as {
@@ -865,6 +868,13 @@ describe("Code browser page — multi-angle block stretch", () => {
     };
     expect(payload.layoutMode).toBe("stretch");
     expect(payload.angles.every((a) => typeof a.stretchSwapInnerB64 === "string")).toBe(true);
+    expect(
+      payload.angles.every((a) =>
+        Buffer.from(a.stretchSwapInnerB64 ?? "", "base64")
+          .toString("utf8")
+          .includes('class="shell__pair-context"'),
+      ),
+    ).toBe(true);
   });
 
   it("keeps stretch for markdown sources while preserving the source markdown toggle", async () => {
@@ -1049,6 +1059,9 @@ describe("Code browser page — scroll sync payload", () => {
     expect(html).toContain("Sync");
     expect(stretchShellOpenTag(html)).toContain('data-stretch-buffer-sync="flow-synchronizer"');
     expect(stretchShellOpenTag(html)).toContain('data-dual-mobile-pane="doc"');
+    expect(html).toContain('class="shell__pair-context"');
+    expect(html).toContain('title="pkg/readme.md"');
+    expect(html).toContain(`title="${crPath}"`);
     expect(blockStretchTableHtml(html)).toContain("stretch-cell-measure");
     expect(blockStretchTableHtml(html)).toContain('data-commentray-stretch-sync-id="b1"');
     expect(html).not.toContain('id="doc-pane"');

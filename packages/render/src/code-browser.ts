@@ -491,9 +491,31 @@ function renderShellPairContextHtml(
   </div>`;
 }
 
-function wrapDualShellInner(pairContextHtml: string, panesHtml: string): string {
+function shellPairSourcePath(filePath: string | undefined, sourceRelative: string | undefined): string {
+  const filePathTrimmed = (filePath ?? "").trim();
+  if (filePathTrimmed.length > 0) return filePathTrimmed;
+  return (sourceRelative ?? "").trim();
+}
+
+function shellPairCommentrayPath(
+  commentrayPath: string | undefined,
+  fallbackCommentrayPath: string | undefined,
+): string {
+  const commentrayPathTrimmed = (commentrayPath ?? "").trim();
+  if (commentrayPathTrimmed.length > 0) return commentrayPathTrimmed;
+  return (fallbackCommentrayPath ?? "").trim();
+}
+
+function wrapShellInnerWithPairContext(pairContextHtml: string, mainHtml: string): string {
   const row = pairContextHtml.trim().length > 0 ? `        ${pairContextHtml.trim()}\n` : "";
-  return `${row}        <div class="shell__panes">\n${panesHtml}        </div>\n`;
+  return `${row}${mainHtml}`;
+}
+
+function wrapDualShellInner(pairContextHtml: string, panesHtml: string): string {
+  return wrapShellInnerWithPairContext(
+    pairContextHtml,
+    `        <div class="shell__panes">\n${panesHtml}        </div>\n`,
+  );
 }
 
 /** IIFE produced by `npm run build -w @commentray/render` (esbuild of `code-browser-client.ts`). */
@@ -1382,7 +1404,66 @@ ${CODE_BROWSER_INTRO_STYLES}
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .shell__pair-path--secondary { opacity: 0.88; }
+      .shell__pair-path--secondary {
+        opacity: 0.88;
+        text-align: right;
+      }
+      .shell--stretch-rows .shell__pair-context {
+        --shell-pair-gutter-w: 14px;
+        --shell-pair-gutter-half: calc(var(--shell-pair-gutter-w) / 2);
+        display: grid;
+        grid-template-columns:
+          minmax(0, calc(var(--stretch-code-pct, 50%) - var(--shell-pair-gutter-half)))
+          var(--shell-pair-gutter-w)
+          minmax(0, calc(100% - var(--stretch-code-pct, 50%) - var(--shell-pair-gutter-half)));
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .shell--stretch-rows .shell__pair-cell--src,
+      .shell--stretch-rows .shell__pair-cell--doc,
+      .shell--stretch-rows .shell__pair-gutter-spacer {
+        min-width: 0;
+      }
+      .shell--stretch-rows .shell__pair-cell--src {
+        grid-column: 1;
+        padding-left: var(--cr-pane-inline-pad);
+        padding-right: 0;
+      }
+      .shell--stretch-rows .shell__pair-gutter-spacer {
+        grid-column: 2;
+        width: var(--shell-pair-gutter-w);
+        min-width: var(--shell-pair-gutter-w);
+      }
+      .shell--stretch-rows .shell__pair-cell--doc {
+        grid-column: 3;
+        padding-left: var(--cr-pane-inline-pad);
+        padding-right: var(--cr-pane-inline-pad);
+      }
+      .shell[data-mobile-single-pane="true"] .shell__pair-context {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        padding: 4px 0 6px;
+      }
+      .shell[data-mobile-single-pane="true"] .shell__pair-cell--src,
+      .shell[data-mobile-single-pane="true"] .shell__pair-cell--doc {
+        width: 100%;
+        padding-right: var(--cr-pane-inline-pad);
+        box-sizing: border-box;
+      }
+      .shell[data-mobile-single-pane="true"][data-dual-mobile-pane="code"] .shell__pair-cell--doc,
+      .shell[data-mobile-single-pane="true"][data-dual-mobile-pane="code"] .shell__pair-gutter-spacer {
+        display: none;
+      }
+      .shell[data-mobile-single-pane="true"][data-dual-mobile-pane="doc"] .shell__pair-cell--src,
+      .shell[data-mobile-single-pane="true"][data-dual-mobile-pane="doc"] .shell__pair-gutter-spacer {
+        display: none;
+      }
+      .shell[data-mobile-single-pane="true"]:not([data-dual-mobile-pane]) .shell__pair-cell--src,
+      .shell[data-mobile-single-pane="true"]:not([data-dual-mobile-pane]) .shell__pair-gutter-spacer {
+        display: none;
+      }
       .pane--code {
         flex: 0 0 var(--split-pct, 46%);
         min-width: 120px; overflow: auto; padding: 12px var(--cr-pane-inline-pad);
@@ -2048,7 +2129,7 @@ ${CODE_BROWSER_INTRO_STYLES}
         min-height: 0;
         overflow: auto;
         display: block;
-        padding: 0 12px 20px;
+        padding: 0 0 20px;
       }
       .shell--stretch-rows .stretch-preamble {
         padding: 8px 4px 16px;
@@ -2293,13 +2374,13 @@ ${CODE_BROWSER_STYLES}
           ${p.toolbarSiteHubHtml}
           ${p.navRailDocumentedHtml}
           ${p.angleSelectHtml}
+          ${dualFlipControlHtml}
           <label class="toolbar-wrap-lines" title="Wrap long lines in the source pane; in commentary, wrap long words and fenced code when on (wide tables and diagrams scroll horizontally).">
             <input type="checkbox" id="wrap-lines" class="toolbar-wrap-lines__input" />
             <span class="toolbar-wrap-lines__box" aria-hidden="true"></span>
             <span class="toolbar-wrap-lines__face" aria-hidden="true">${TOOLBAR_ICON_WRAP_SVG}</span>
             <span class="toolbar-wrap-lines__caption">Wrap lines</span>
           </label>
-          ${dualFlipControlHtml}
           ${p.sourceMarkdownToggleHtml}
           ${p.toolbarDocHubHtml}
           ${p.relatedNavHtml}
@@ -2537,7 +2618,14 @@ async function buildMultiAngleBlockStretchShell(
     });
     if (stretched === null) return null;
     const { jsonRow, commentrayHtml, scrollB64 } = await multiAngleJsonRowAndDocHtml(opts, spec);
-    const stretchSwapInner = `        ${stretched.preambleHtml}\n        ${stretched.tableInnerHtml}\n`;
+    const stretchPairHtml = renderShellPairContextHtml(
+      shellPairSourcePath(opts.filePath, rows.sourceRelative),
+      jsonRow.commentrayPathForSearch,
+    );
+    const stretchSwapInner = wrapShellInnerWithPairContext(
+      stretchPairHtml,
+      `        ${stretched.preambleHtml}\n        ${stretched.tableInnerHtml}\n`,
+    );
     perAngle.push({
       spec,
       stretched,
@@ -2561,9 +2649,14 @@ async function buildMultiAngleBlockStretchShell(
   const defaultStretch = perAngle.find((p) => p.spec.id === defaultId) ?? perAngle[0];
   if (defaultStretch === undefined) return null;
 
-  const shellInner =
+  const shellInner = wrapShellInnerWithPairContext(
+    renderShellPairContextHtml(
+      shellPairSourcePath(opts.filePath, defaultStretch.spec.blockStretchRows?.sourceRelative),
+      defaultPathSearch,
+    ),
     `        ${defaultStretch.stretched.preambleHtml}\n` +
-    `        ${defaultStretch.stretched.tableInnerHtml}\n`;
+      `        ${defaultStretch.stretched.tableInnerHtml}\n`,
+  );
 
   const payloadObj = {
     layoutMode: "stretch" as const,
@@ -2640,7 +2733,10 @@ async function buildMultiAngleDualPaneShell(
 
   const angleSelectHtml = multiAngleToolbarAngleSelectHtml(multi, defaultId);
 
-  const pairHtml = renderShellPairContextHtml(opts.filePath, defaultPathSearch);
+  const pairHtml = renderShellPairContextHtml(
+    shellPairSourcePath(opts.filePath, opts.blockStretchRows?.sourceRelative),
+    defaultPathSearch,
+  );
   const shellInner = wrapDualShellInner(
     pairHtml,
     dualPanePanesInnerHtml(codeHtml, defaultPaneHtml, sourceMarkdownPaneHtml),
@@ -2702,8 +2798,8 @@ async function buildDualPaneSingleAngleShell(
       : Promise.resolve(""),
   ]);
   const pairHtml = renderShellPairContextHtml(
-    opts.filePath,
-    (opts.commentrayPathForSearch ?? "").trim(),
+    shellPairSourcePath(opts.filePath, opts.blockStretchRows?.sourceRelative),
+    shellPairCommentrayPath(opts.commentrayPathForSearch, opts.blockStretchRows?.commentrayPathRel),
   );
   const shellInner = wrapDualShellInner(
     pairHtml,
@@ -2743,7 +2839,16 @@ async function buildSingleAngleCodeBrowserShell(
     });
     if (stretched) {
       layout = "stretch";
-      shellInner = `        ${stretched.preambleHtml}\n` + `        ${stretched.tableInnerHtml}\n`;
+      shellInner = wrapShellInnerWithPairContext(
+        renderShellPairContextHtml(
+          shellPairSourcePath(opts.filePath, opts.blockStretchRows?.sourceRelative),
+          shellPairCommentrayPath(
+            opts.commentrayPathForSearch,
+            opts.blockStretchRows?.commentrayPathRel,
+          ),
+        ),
+        `        ${stretched.preambleHtml}\n` + `        ${stretched.tableInnerHtml}\n`,
+      );
     }
   }
 
