@@ -2153,7 +2153,6 @@ ${CODE_BROWSER_INTRO_STYLES}
       }
       .stretch-grid {
         position: relative;
-        --stretch-code-pct: 50%;
       }
       .stretch-col-code { width: var(--stretch-code-pct, 50%); }
       .stretch-col-doc { width: calc(100% - var(--stretch-code-pct, 50%)); }
