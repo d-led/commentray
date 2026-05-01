@@ -8,6 +8,7 @@ import {
   pickBlockScrollLinkForCommentrayViewportWithHysteresis,
   pickBlockScrollLinkForSourceViewportTop,
   pickBlockScrollLinkForSourceViewportWithHysteresis,
+  pickCommentrayLineForSourceDualPane,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
   sourceTopLineStrictlyBeforeFirstIndexLine,
@@ -175,6 +176,28 @@ describe("Block scroll link derivation from index and markers", () => {
         markerViewportHalfOpen1Based: { lo: 1, hiExclusive: 3 },
       },
     ]);
+  });
+});
+
+describe("Dual-pane source → companion (gap proportional, intra-block body)", () => {
+  const blocks = buildBlockScrollLinks(index, "src/a.ts", crPath, md);
+  const mdLineCount = md.split("\n").length;
+
+  it("uses gapFallback when the source top sits in a true gap between block spans", () => {
+    expect(pickCommentrayLineForSourceDualPane(blocks, 10, mdLineCount, () => 42)).toBe(42);
+  });
+
+  it("maps strictly inside a block onto companion body lines instead of snapping to the marker head", () => {
+    const line1 = pickCommentrayLineForSourceDualPane(blocks, 1, mdLineCount, () => -1);
+    const line3 = pickCommentrayLineForSourceDualPane(blocks, 3, mdLineCount, () => -1);
+    const line5 = pickCommentrayLineForSourceDualPane(blocks, 5, mdLineCount, () => -1);
+    expect(line1).toBe(1);
+    expect(line3).toBe(3);
+    expect(line5).toBe(4);
+  });
+
+  it("when there are no blocks, always uses gapFallback", () => {
+    expect(pickCommentrayLineForSourceDualPane([], 5, 20, () => 17)).toBe(17);
   });
 });
 

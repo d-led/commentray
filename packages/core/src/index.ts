@@ -48,6 +48,11 @@ export type {
 export { defaultCommentrayStaticBrowsePathResolver } from "./browse-path-default.js";
 export { staticBrowseIndexRelPathFromPair } from "./commentray-static-browse-path.js";
 export {
+  commentrayActiveEditorUiFlags,
+  commentrayStorageSourcePrefix,
+} from "./commentray-active-editor-ui-context.js";
+export type { CommentrayActiveEditorUiFlags } from "./commentray-active-editor-ui-context.js";
+export {
   commentrayPairSourceFileExistsOnDisk,
   discoverCommentrayPairsOnDisk,
   pairFromCommentraySourceRel,
@@ -157,6 +162,7 @@ export {
   pickBlockScrollLinkForCommentrayViewportWithHysteresis,
   pickBlockScrollLinkForSourceViewportTop,
   pickBlockScrollLinkForSourceViewportWithHysteresis,
+  pickCommentrayLineForSourceDualPane,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
   sourceTopLineStrictlyBeforeFirstIndexLine,

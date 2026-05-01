@@ -184,6 +184,59 @@ export function pickCommentrayLineForSourceScroll(
   return b ? b.commentrayLine : null;
 }
 
+/**
+ * Source viewport → companion markdown line for **dual-pane** hosts (VS Code, rendered preview):
+ * when the source probe sits **strictly inside** a block’s indexed viewport span, map linearly from
+ * `sourceStart`…`sourceEnd` onto markdown lines **after** that block’s `<!-- commentray:block` line
+ * up to (but not including) the next block marker (or end of file). Otherwise (prelude, gaps, after
+ * the last span) call `gapFallback()` — typically a proportional mirror, matching
+ * `docs/spec/dual-pane-scroll-sync.md` source-gap behaviour.
+ */
+export function pickCommentrayLineForSourceDualPane(
+  blocks: BlockScrollLink[],
+  topSourceLine1Based: number,
+  commentrayMdLineCount: number,
+  gapFallback: () => number,
+): number {
+  if (blocks.length === 0) {
+    return gapFallback();
+  }
+  const inside = blockStrictlyContainingSourceViewportLine(blocks, topSourceLine1Based);
+  if (inside === null) {
+    return gapFallback();
+  }
+  return commentrayBodyLineWithinBlockFromSourceTop(
+    blocks,
+    inside,
+    topSourceLine1Based,
+    commentrayMdLineCount,
+  );
+}
+
+function commentrayBodyLineWithinBlockFromSourceTop(
+  blocks: BlockScrollLink[],
+  block: BlockScrollLink,
+  topSourceLine1Based: number,
+  commentrayMdLineCount: number,
+): number {
+  const sorted = [...blocks].sort((a, b) => a.commentrayLine - b.commentrayLine);
+  const idx = sorted.findIndex((b) => b.id === block.id);
+  const next = idx >= 0 ? sorted[idx + 1] : undefined;
+  const mdCeilExclusive = next !== undefined ? next.commentrayLine : commentrayMdLineCount;
+  const mdBodyFirst = block.commentrayLine + 1;
+  const mdBodyLastInclusive = mdCeilExclusive - 1;
+  if (mdBodyLastInclusive < mdBodyFirst) {
+    return block.commentrayLine;
+  }
+  const srcLo = block.sourceStart;
+  const srcHi = block.sourceEnd;
+  const clamped = Math.min(Math.max(topSourceLine1Based, srcLo), srcHi);
+  const denom = Math.max(1, srcHi - srcLo);
+  const t = srcHi === srcLo ? 0 : (clamped - srcLo) / denom;
+  const mdLine = Math.round(mdBodyFirst + t * (mdBodyLastInclusive - mdBodyFirst));
+  return Math.min(mdBodyLastInclusive, Math.max(mdBodyFirst, mdLine));
+}
+
 /** Commentray→source hysteresis twin; see commentray. */
 export function pickBlockScrollLinkForCommentrayViewportWithHysteresis(
   blocks: BlockScrollLink[],

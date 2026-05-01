@@ -74,9 +74,17 @@ describe("Commentray Angles in VS Code (integration)", () => {
 
       const active = vscode.window.activeTextEditor;
       assert.ok(active, "Expected an active editor after opening corresponding source.");
-      assert.strictEqual(
-        active.document.uri.fsPath,
-        vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts").fsPath,
+      const sampleFs = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts").fsPath;
+      assert.strictEqual(active.document.uri.fsPath, sampleFs);
+      const hasSample = vscode.window.visibleTextEditors.some(
+        (e) => e.document.uri.fsPath === sampleFs,
+      );
+      const hasMain = vscode.window.visibleTextEditors.some(
+        (e) => e.document.uri.fsPath === mainUri.fsPath,
+      );
+      assert.ok(
+        hasSample && hasMain,
+        "Expected the primary source and main-angle companion visible together for scroll sync.",
       );
     });
   });
@@ -97,6 +105,23 @@ describe("Commentray Angles in VS Code (integration)", () => {
         text.includes('title = "Architecture"'),
         "Expected new angle title in .commentray.toml.",
       );
+    });
+  });
+
+  describe("Active editor UI flags with Angles dogfood", () => {
+    it("Given Angles layout paths, when core computes UI flags for main.md, then the companion is under the tree and resolvable", async () => {
+      const { commentrayActiveEditorUiFlags } =
+        await import("../../../../core/dist/commentray-active-editor-ui-context.js");
+      const root = dogfoodWorkspace.root().fsPath;
+      const flags = commentrayActiveEditorUiFlags({
+        normalizedRepoRelativePath: ".commentray/source/src/sample.ts/main.md",
+        storageDir: ".commentray",
+        repoRoot: root,
+      });
+      assert.deepStrictEqual(flags, {
+        underCompanionSourceTree: true,
+        isResolvableCompanionMarkdown: true,
+      });
     });
   });
 });

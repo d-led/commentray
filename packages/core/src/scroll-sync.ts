@@ -15,6 +15,7 @@ export {
   pickBlockScrollLinkForCommentrayViewportWithHysteresis,
   pickBlockScrollLinkForSourceViewportTop,
   pickBlockScrollLinkForSourceViewportWithHysteresis,
+  pickCommentrayLineForSourceDualPane,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
   sourceTopLineStrictlyBeforeFirstIndexLine,

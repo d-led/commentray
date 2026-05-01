@@ -6,8 +6,10 @@ import {
   appendBlockToCommentray,
   assertValidAngleId,
   buildBlockScrollLinks,
+  commentrayActiveEditorUiFlags,
   commentrayAnglesLayoutEnabled,
   commentrayAnglesSentinelPath,
+  commentrayStorageSourcePrefix,
   createBlockForRange,
   defaultMetadataIndexPath,
   defaultRegionMarkerNamingStrategy,
@@ -15,7 +17,7 @@ import {
   ensureAnglesSentinelFile,
   loadCommentrayConfig,
   normalizeRepoRelativePath,
-  pickCommentrayLineForSourceScroll,
+  pickCommentrayLineForSourceDualPane,
   pickSourceLine0ForCommentrayScroll,
   pairFromCommentraySourceRel,
   readIndex,
@@ -78,11 +80,6 @@ function applyScrollSyncSettingFromConfig(): void {
   }
 }
 
-function storageCommentraySourcePrefix(storageDir: string): string {
-  const sd = storageDir.replaceAll("\\", "/");
-  return `${sd}/source/`;
-}
-
 const CTX_ACTIVE_EDITOR_UNDER_COMPANION_SOURCE_TREE =
   "commentray.activeEditorUnderCompanionSourceTree";
 const CTX_ACTIVE_EDITOR_IS_RESOLVABLE_COMPANION_MD =
@@ -126,16 +123,12 @@ async function applyCommentrayActiveEditorUiContexts(uri: vscode.Uri | undefined
     }
     const normalized = normalizeRepoRelativePath(relative.replaceAll("\\", "/"));
     const cfg = await loadCommentrayConfig(folder.uri.fsPath);
-    const sourcePrefix = storageCommentraySourcePrefix(cfg.storageDir);
-    if (!normalized.startsWith(sourcePrefix)) {
-      await setBoth(false, false);
-      return;
-    }
-    const relFromSourceDir = normalized.slice(sourcePrefix.length);
-    const storageNorm = normalizeRepoRelativePath(cfg.storageDir.replaceAll("\\", "/"));
-    const anglesOn = commentrayAnglesLayoutEnabled(folder.uri.fsPath, cfg.storageDir);
-    const pair = pairFromCommentraySourceRel(storageNorm, relFromSourceDir, anglesOn);
-    await setBoth(true, Boolean(pair));
+    const flags = commentrayActiveEditorUiFlags({
+      normalizedRepoRelativePath: normalized,
+      storageDir: cfg.storageDir,
+      repoRoot: folder.uri.fsPath,
+    });
+    await setBoth(flags.underCompanionSourceTree, flags.isResolvableCompanionMarkdown);
   } catch {
     await setBoth(false, false);
   }
@@ -191,8 +184,12 @@ function scheduleRefreshActivePairBlocks(): void {
 
 function syncCommentrayForVisibleSourceRange(pair: ScrollPair, range: vscode.Range): void {
   const topSourceLine = range.start.line + 1;
-  const blockLine = pickCommentrayLineForSourceScroll(pair.blocks, topSourceLine);
-  const targetLine = blockLine ?? ratioCommentrayLineFromSourceScroll(pair, range);
+  const targetLine = pickCommentrayLineForSourceDualPane(
+    pair.blocks,
+    topSourceLine,
+    pair.commentray.document.lineCount,
+    () => ratioCommentrayLineFromSourceScroll(pair, range),
+  );
   const reveal = new vscode.Range(targetLine, 0, targetLine, 0);
   withIgnoredScrollPairEvents(() =>
     pair.commentray.revealRange(reveal, vscode.TextEditorRevealType.InCenterIfOutsideViewport),
@@ -298,7 +295,7 @@ async function resolvePairedPaths(
   }
   const repoRoot = folder.uri.fsPath;
   const cfg = await loadCommentrayConfig(repoRoot);
-  const sourcePrefix = storageCommentraySourcePrefix(cfg.storageDir);
+  const sourcePrefix = commentrayStorageSourcePrefix(cfg.storageDir);
   if (normalized.startsWith(sourcePrefix)) {
     await vscode.window.showWarningMessage(
       "Run this command from the primary source file — not from a file under .commentray/source/…",
@@ -331,19 +328,25 @@ function scrollSyncEnabled(): boolean {
   return v !== false;
 }
 
-async function openBesideAndSync(
-  sourceEditor: vscode.TextEditor,
+function pairedPathsFromDiskPair(
+  repoRoot: string,
+  diskPair: { sourcePath: string; commentrayPath: string },
+): PairedPaths {
+  const commentrayUri = vscode.Uri.file(path.join(repoRoot, ...diskPair.commentrayPath.split("/")));
+  return {
+    repoRoot,
+    sourceRelative: diskPair.sourcePath,
+    commentrayUri,
+    commentrayPathRel: diskPair.commentrayPath,
+    angleId: null,
+  };
+}
+
+async function bindPairScrollSync(
+  codeEditor: vscode.TextEditor,
+  commentrayEditor: vscode.TextEditor,
   paths: PairedPaths,
-): Promise<vscode.TextEditor> {
-  const ensured = await ensureCommentrayFile(paths.commentrayUri);
-  const commentrayDoc = await vscode.workspace.openTextDocument(ensured);
-  const commentrayEditor = await vscode.window.showTextDocument(commentrayDoc, {
-    viewColumn: vscode.ViewColumn.Beside,
-    preview: false,
-  });
-  const codeEditor =
-    vscode.window.visibleTextEditors.find((te) => te.document === sourceEditor.document) ??
-    sourceEditor;
+): Promise<void> {
   let index: CommentrayIndex | null = null;
   try {
     index = await readIndex(paths.repoRoot);
@@ -358,7 +361,7 @@ async function openBesideAndSync(
     index,
     paths.sourceRelative,
     paths.commentrayPathRel,
-    commentrayDoc.getText(),
+    commentrayEditor.document.getText(),
     codeEditor.document.getText(),
   );
   const pair: ScrollPair = {
@@ -372,6 +375,59 @@ async function openBesideAndSync(
   if (scrollSyncEnabled()) {
     bindScrollSync(pair);
   }
+}
+
+/**
+ * Prefer [source | companion]: if the companion is already past the first column, open the source in
+ * column one; otherwise open the source first and place the companion in the group to the right.
+ */
+async function revealSourceLeftOfCompanionAndReturnEditors(
+  companionEditor: vscode.TextEditor,
+  sourceDoc: vscode.TextDocument,
+): Promise<{ code: vscode.TextEditor; commentray: vscode.TextEditor }> {
+  const companionUri = companionEditor.document.uri;
+  const findCompanion = (): vscode.TextEditor =>
+    vscode.window.visibleTextEditors.find(
+      (te) => te.document.uri.toString() === companionUri.toString(),
+    ) ?? companionEditor;
+
+  const findSource = (doc: vscode.TextDocument): vscode.TextEditor | undefined =>
+    vscode.window.visibleTextEditors.find((te) => te.document === doc);
+
+  const cCol = companionEditor.viewColumn;
+  if (cCol !== undefined && cCol > vscode.ViewColumn.One) {
+    const codeEditor = await vscode.window.showTextDocument(sourceDoc, {
+      viewColumn: vscode.ViewColumn.One,
+      preview: false,
+    });
+    return { code: codeEditor, commentray: findCompanion() };
+  }
+
+  const codeEditor = await vscode.window.showTextDocument(sourceDoc, { preview: false });
+  const companionDoc = await vscode.workspace.openTextDocument(companionUri);
+  await vscode.window.showTextDocument(companionDoc, {
+    viewColumn: vscode.ViewColumn.Beside,
+    preview: false,
+    preserveFocus: true,
+  });
+  const code = findSource(sourceDoc) ?? codeEditor;
+  return { code, commentray: findCompanion() };
+}
+
+async function openBesideAndSync(
+  sourceEditor: vscode.TextEditor,
+  paths: PairedPaths,
+): Promise<vscode.TextEditor> {
+  const ensured = await ensureCommentrayFile(paths.commentrayUri);
+  const commentrayDoc = await vscode.workspace.openTextDocument(ensured);
+  const commentrayEditor = await vscode.window.showTextDocument(commentrayDoc, {
+    viewColumn: vscode.ViewColumn.Beside,
+    preview: false,
+  });
+  const codeEditor =
+    vscode.window.visibleTextEditors.find((te) => te.document === sourceEditor.document) ??
+    sourceEditor;
+  await bindPairScrollSync(codeEditor, commentrayEditor, paths);
   return commentrayEditor;
 }
 
@@ -771,7 +827,7 @@ async function openCommentrayPreviewCommand(): Promise<void> {
     const relative = vscode.workspace.asRelativePath(active.editor.document.uri, false);
     const normalized = normalizeRepoRelativePath(relative.replaceAll("\\", "/"));
     const cfg = await loadCommentrayConfig(active.folder.uri.fsPath);
-    const sourcePrefix = storageCommentraySourcePrefix(cfg.storageDir);
+    const sourcePrefix = commentrayStorageSourcePrefix(cfg.storageDir);
     if (normalized.startsWith(sourcePrefix) && active.editor.document.fileName.endsWith(".md")) {
       await vscode.commands.executeCommand("markdown.showPreview", active.editor.document.uri);
       return;
@@ -813,7 +869,7 @@ async function openCorrespondingSourceCommand(): Promise<void> {
 
   const repoRoot = active.folder.uri.fsPath;
   const cfg = await loadCommentrayConfig(repoRoot);
-  const sourcePrefix = storageCommentraySourcePrefix(cfg.storageDir);
+  const sourcePrefix = commentrayStorageSourcePrefix(cfg.storageDir);
 
   if (!normalized.startsWith(sourcePrefix) || !normalized.endsWith(".md")) {
     await vscode.window.showInformationMessage(
@@ -825,27 +881,29 @@ async function openCorrespondingSourceCommand(): Promise<void> {
   const relFromSourceDir = normalized.slice(sourcePrefix.length);
   const storageNorm = normalizeRepoRelativePath(cfg.storageDir.replaceAll("\\", "/"));
   const anglesOn = commentrayAnglesLayoutEnabled(repoRoot, cfg.storageDir);
-  const pair = pairFromCommentraySourceRel(storageNorm, relFromSourceDir, anglesOn);
-  if (!pair) {
+  const diskPair = pairFromCommentraySourceRel(storageNorm, relFromSourceDir, anglesOn);
+  if (!diskPair) {
     await vscode.window.showWarningMessage(
       "Could not map this companion path to a source file (unexpected path under …/source/).",
     );
     return;
   }
 
-  const sourceAbs = path.join(repoRoot, ...pair.sourcePath.split("/"));
+  const sourceAbs = path.join(repoRoot, ...diskPair.sourcePath.split("/"));
   const sourceUri = vscode.Uri.file(sourceAbs);
   try {
     await vscode.workspace.fs.stat(sourceUri);
   } catch {
     await vscode.window.showErrorMessage(
-      `Primary source file is missing on disk: ${pair.sourcePath}`,
+      `Primary source file is missing on disk: ${diskPair.sourcePath}`,
     );
     return;
   }
 
+  const paths = pairedPathsFromDiskPair(repoRoot, diskPair);
   const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
-  await vscode.window.showTextDocument(sourceDoc, { preview: false });
+  const { code, commentray } = await revealSourceLeftOfCompanionAndReturnEditors(editor, sourceDoc);
+  await bindPairScrollSync(code, commentray, paths);
 }
 
 async function openRenderedPreviewCore(

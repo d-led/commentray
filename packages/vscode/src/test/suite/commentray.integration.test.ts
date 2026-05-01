@@ -181,6 +181,36 @@ function registerAddBlockFromSelectionTests(dogfoodWorkspace: DogfoodWorkspaceAc
   });
 }
 
+function registerActiveEditorUiFlagsContractTests(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): void {
+  describe("Active editor UI flags (core contract for menus)", () => {
+    it("Given dogfood paths, when core computes UI flags, then the companion markdown is under the tree and resolvable and the primary file is not", async () => {
+      const { commentrayActiveEditorUiFlags } =
+        await import("../../../../core/dist/commentray-active-editor-ui-context.js");
+      const root = dogfoodWorkspace.root().fsPath;
+      const companion = commentrayActiveEditorUiFlags({
+        normalizedRepoRelativePath: pairedMarkdownPath,
+        storageDir: ".commentray",
+        repoRoot: root,
+      });
+      assert.deepStrictEqual(companion, {
+        underCompanionSourceTree: true,
+        isResolvableCompanionMarkdown: true,
+      });
+      const primary = commentrayActiveEditorUiFlags({
+        normalizedRepoRelativePath: "src/sample.ts",
+        storageDir: ".commentray",
+        repoRoot: root,
+      });
+      assert.deepStrictEqual(primary, {
+        underCompanionSourceTree: false,
+        isResolvableCompanionMarkdown: false,
+      });
+    });
+  });
+}
+
 function registerOpenCorrespondingSourceTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
   describe("Open corresponding source file from companion markdown", () => {
     it('Given the paired Commentray markdown is active, when the user runs "Commentray: Open corresponding source file", then the primary source editor becomes active for that pair.', async () => {
@@ -198,10 +228,22 @@ function registerOpenCorrespondingSourceTests(dogfoodWorkspace: DogfoodWorkspace
 
       const active = vscode.window.activeTextEditor;
       assert.ok(active, "Expected an active editor after opening corresponding source.");
+      const sampleFs = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts").fsPath;
       assert.strictEqual(
         active.document.uri.fsPath,
-        vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts").fsPath,
+        sampleFs,
         "Expected focus on the dogfood primary source file.",
+      );
+      const pairedFs = pairedUri.fsPath;
+      const hasSample = vscode.window.visibleTextEditors.some(
+        (e) => e.document.uri.fsPath === sampleFs,
+      );
+      const hasPaired = vscode.window.visibleTextEditors.some(
+        (e) => e.document.uri.fsPath === pairedFs,
+      );
+      assert.ok(
+        hasSample && hasPaired,
+        "Expected the primary source and companion markdown to stay visible together for scroll sync.",
       );
     });
   });
@@ -244,6 +286,7 @@ describe("Commentray in VS Code (integration)", () => {
   const dogfoodWorkspace = registerDogfoodWorkspaceLifecycle();
   registerExtensionSurfaceTests(dogfoodWorkspace);
   registerOpenPairedMarkdownTests(dogfoodWorkspace);
+  registerActiveEditorUiFlagsContractTests(dogfoodWorkspace);
   registerOpenCorrespondingSourceTests(dogfoodWorkspace);
   registerValidateWorkspaceTests(dogfoodWorkspace);
   registerAddBlockFromSelectionTests(dogfoodWorkspace);

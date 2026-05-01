@@ -3,7 +3,7 @@ import {
   type CommentrayIndex,
   buildBlockScrollLinks,
   defaultMetadataIndexPath,
-  pickCommentrayLineForSourceScroll,
+  pickCommentrayLineForSourceDualPane,
   pickSourceLine0ForCommentrayScroll,
   readIndex,
 } from "@commentray/core";
@@ -364,9 +364,12 @@ export class CommentrayRenderedPreviewPanel {
   private syncPreviewScrollFromSource(range: vscode.Range | undefined): void {
     if (this._disposed || !range || this.ignorePreviewToSource) return;
     const topSourceLine = range.start.line + 1;
-    const blockLine = pickCommentrayLineForSourceScroll(this.blocks, topSourceLine);
-    const mdLine =
-      blockLine ?? ratioCommentrayLineFromSourceScroll(this.codeDoc, this.mdDoc, range);
+    const mdLine = pickCommentrayLineForSourceDualPane(
+      this.blocks,
+      topSourceLine,
+      this.mdDoc.lineCount,
+      () => ratioCommentrayLineFromSourceScroll(this.codeDoc, this.mdDoc, range),
+    );
     this.panel.webview.postMessage({ type: "scrollToMdLine", line: mdLine });
   }
 
