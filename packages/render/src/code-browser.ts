@@ -2184,14 +2184,23 @@ ${CODE_BROWSER_INTRO_STYLES}
         bottom: 0;
         left: var(--stretch-code-pct, 50%);
         transform: translateX(-50%);
-        width: 12px;
+        width: 14px;
         cursor: col-resize;
         touch-action: none;
         border-left: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
-        border-right: 1px solid color-mix(in oklab, CanvasText 8%, Canvas);
-        background: color-mix(in oklab, CanvasText 4%, Canvas);
+        border-right: 1px solid color-mix(in oklab, CanvasText 10%, Canvas);
+        background: color-mix(in oklab, CanvasText 8%, Canvas);
         border-radius: 999px;
+        --commentray-ray-accent: #3b7dd8;
         z-index: 6;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) .stretch-gutter {
+          --commentray-ray-accent: #6eb0ff;
+        }
+      }
+      :root[data-commentray-theme="dark"] .stretch-gutter {
+        --commentray-ray-accent: #6eb0ff;
       }
 `;
 

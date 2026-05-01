@@ -3415,9 +3415,146 @@ function wireStretchMobilePaneFlip(
 
 /** Multi-angle stretch swaps `#shell` innerHTML; disconnect the previous table observer so listeners do not accumulate. */
 let stretchRowBufferSyncHandle: BlockStretchBufferSyncHandle | null = null;
+let stretchGutterConnectorHandle: { disconnect: () => void; request: () => void } | null = null;
 
 function stretchFlowSynchronizerEnabled(shell: HTMLElement): boolean {
   return shell.getAttribute("data-stretch-buffer-sync") === "flow-synchronizer";
+}
+
+function stretchBlockRows(table: HTMLElement): HTMLTableRowElement[] {
+  return Array.from(
+    table.querySelectorAll<HTMLTableRowElement>(
+      "tbody tr.stretch-row--block[data-commentray-stretch-sync-id]",
+    ),
+  ).filter((row) => (row.dataset.commentrayStretchSyncId?.trim() ?? "").length > 0);
+}
+
+function stretchRowPairRects(row: HTMLTableRowElement):
+  | { id: string; codeRect: DOMRect; docRect: DOMRect }
+  | null {
+  const id = row.dataset.commentrayStretchSyncId?.trim() ?? "";
+  if (id.length === 0) return null;
+  const codeTd = row.querySelector<HTMLTableCellElement>(":scope > td.stretch-code");
+  const docTd = row.querySelector<HTMLTableCellElement>(":scope > td.stretch-doc");
+  if (!(codeTd instanceof HTMLTableCellElement) || !(docTd instanceof HTMLTableCellElement)) return null;
+  return { id, codeRect: codeTd.getBoundingClientRect(), docRect: docTd.getBoundingClientRect() };
+}
+
+function activeStretchSyncId(shell: HTMLElement, rows: HTMLTableRowElement[]): string | null {
+  const shellRect = shell.getBoundingClientRect();
+  const probeY = shellRect.top + Math.min(Math.max(shellRect.height * 0.18, 24), 120);
+  for (const row of rows) {
+    const rect = row.getBoundingClientRect();
+    if (rect.top <= probeY && rect.bottom >= probeY) {
+      return row.dataset.commentrayStretchSyncId?.trim() ?? null;
+    }
+  }
+  return rows[0]?.dataset.commentrayStretchSyncId?.trim() ?? null;
+}
+
+function drawStretchGutterConnectorsIntoSvg(
+  svg: SVGSVGElement,
+  shell: HTMLElement,
+  table: HTMLElement,
+  gutter: HTMLElement,
+): void {
+  const rows = stretchBlockRows(table);
+  const gutterRect = gutter.getBoundingClientRect();
+  const w = gutterRect.width;
+  const h = gutterRect.height;
+  if (w <= 0 || h <= 0 || rows.length === 0) {
+    svg.replaceChildren();
+    return;
+  }
+
+  svg.setAttribute("viewBox", `0 0 ${String(w)} ${String(h)}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  const activeId = activeStretchSyncId(shell, rows);
+  const parts: string[] = [];
+
+  for (const row of rows) {
+    const pair = stretchRowPairRects(row);
+    if (pair === null) continue;
+    const codeTop = clampViewportYToGutterLocal(pair.codeRect.top + 1, gutterRect.top, h);
+    const docTop = clampViewportYToGutterLocal(pair.docRect.top + 1, gutterRect.top, h);
+    const codeBottom = clampViewportYToGutterLocal(pair.codeRect.bottom - 1, gutterRect.top, h);
+    const docBottom = clampViewportYToGutterLocal(pair.docRect.bottom - 1, gutterRect.top, h);
+    const strokeClass =
+      pair.id === activeId ? "gutter__rays-path gutter__rays-path--active" : "gutter__rays-path";
+    const trailClass = `${strokeClass} gutter__rays-path--trail`;
+    const topPaths = gutterRayBezierPaths(0, codeTop.y, w, docTop.y, {
+      tension: 0.38,
+      clipStart: codeTop.clipped,
+      clipEnd: docTop.clipped,
+    });
+    const bottomPaths = gutterRayBezierPaths(0, codeBottom.y, w, docBottom.y, {
+      tension: 0.38,
+      clipStart: codeBottom.clipped,
+      clipEnd: docBottom.clipped,
+    });
+    const topExtra = topPaths.dotted ? `<path class="${trailClass}" d="${topPaths.dotted}" />` : "";
+    const bottomExtra = bottomPaths.dotted
+      ? `<path class="${trailClass}" d="${bottomPaths.dotted}" />`
+      : "";
+    parts.push(
+      `<g class="gutter__rays-block" data-commentray-block="${escapeHtmlText(pair.id)}">` +
+        `<path class="${strokeClass}" d="${topPaths.solid}" />` +
+        topExtra +
+        `<path class="${strokeClass}" d="${bottomPaths.solid}" />` +
+        bottomExtra +
+        `</g>`,
+    );
+  }
+
+  svg.innerHTML = parts.join("");
+}
+
+function wireStretchGutterConnectors(
+  shell: HTMLElement,
+  table: HTMLElement,
+  gutter: HTMLElement,
+): { disconnect: () => void; request: () => void } {
+  gutter.querySelector(":scope > .gutter__rays")?.remove();
+  const svgNs = "http://www.w3.org/2000/svg";
+  const host = document.createElement("div");
+  host.className = "gutter__rays";
+  host.setAttribute("aria-hidden", "true");
+  const svg = document.createElementNS(svgNs, "svg");
+  host.appendChild(svg);
+  gutter.appendChild(host);
+
+  let raf = 0;
+  const scheduleDraw = (): void => {
+    if (raf !== 0) return;
+    raf = globalThis.requestAnimationFrame(() => {
+      raf = 0;
+      drawStretchGutterConnectorsIntoSvg(svg, shell, table, gutter);
+    });
+  };
+  const onScrollOrResize = (): void => scheduleDraw();
+  shell.addEventListener("scroll", onScrollOrResize, { passive: true });
+  globalThis.addEventListener("resize", onScrollOrResize);
+  const ro = new ResizeObserver(onScrollOrResize);
+  ro.observe(shell);
+  ro.observe(table);
+  ro.observe(gutter);
+
+  scheduleDraw();
+  globalThis.requestAnimationFrame(() => {
+    scheduleDraw();
+    globalThis.requestAnimationFrame(scheduleDraw);
+  });
+
+  return {
+    disconnect: () => {
+      if (raf !== 0) globalThis.cancelAnimationFrame(raf);
+      shell.removeEventListener("scroll", onScrollOrResize);
+      globalThis.removeEventListener("resize", onScrollOrResize);
+      ro.disconnect();
+      host.remove();
+    },
+    request: scheduleDraw,
+  };
 }
 
 function wireStretchSplitter(shell: HTMLElement, codePane: HTMLElement): void {
@@ -3437,6 +3574,7 @@ function wireStretchSplitter(shell: HTMLElement, codePane: HTMLElement): void {
     const pct = clamp((x / rect.width) * 100, 15, 85);
     shell.style.setProperty("--stretch-code-pct", `${String(pct)}%`);
     writeWebStorageItem(localStorage, STORAGE_SPLIT_PCT, String(pct));
+    stretchGutterConnectorHandle?.request();
   };
   const onUp = (): void => {
     if (!dragging) return;
@@ -3472,6 +3610,12 @@ function wireStretchLayoutChrome(shell: HTMLElement, codePane: HTMLElement): voi
       globalThis.dispatchEvent(new Event("resize"));
     });
   }
+  const gutter = document.getElementById("stretch-gutter");
+  stretchGutterConnectorHandle?.disconnect();
+  stretchGutterConnectorHandle =
+    codePane instanceof HTMLElement && gutter instanceof HTMLElement
+      ? wireStretchGutterConnectors(shell, codePane, gutter)
+      : null;
   wireStretchSplitter(shell, codePane);
 }
 
