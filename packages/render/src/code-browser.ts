@@ -491,7 +491,10 @@ function renderShellPairContextHtml(
   </div>`;
 }
 
-function shellPairSourcePath(filePath: string | undefined, sourceRelative: string | undefined): string {
+function shellPairSourcePath(
+  filePath: string | undefined,
+  sourceRelative: string | undefined,
+): string {
   const filePathTrimmed = (filePath ?? "").trim();
   if (filePathTrimmed.length > 0) return filePathTrimmed;
   return (sourceRelative ?? "").trim();

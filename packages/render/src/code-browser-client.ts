@@ -3450,14 +3450,15 @@ function stretchBlockRows(table: HTMLElement): HTMLTableRowElement[] {
   ).filter((row) => (row.dataset.commentrayStretchSyncId?.trim() ?? "").length > 0);
 }
 
-function stretchRowPairRects(row: HTMLTableRowElement):
-  | { id: string; codeRect: DOMRect; docRect: DOMRect }
-  | null {
+function stretchRowPairRects(
+  row: HTMLTableRowElement,
+): { id: string; codeRect: DOMRect; docRect: DOMRect } | null {
   const id = row.dataset.commentrayStretchSyncId?.trim() ?? "";
   if (id.length === 0) return null;
   const codeTd = row.querySelector<HTMLTableCellElement>(":scope > td.stretch-code");
   const docTd = row.querySelector<HTMLTableCellElement>(":scope > td.stretch-doc");
-  if (!(codeTd instanceof HTMLTableCellElement) || !(docTd instanceof HTMLTableCellElement)) return null;
+  if (!(codeTd instanceof HTMLTableCellElement) || !(docTd instanceof HTMLTableCellElement))
+    return null;
   return { id, codeRect: codeTd.getBoundingClientRect(), docRect: docTd.getBoundingClientRect() };
 }
 
@@ -3470,21 +3471,29 @@ function visibleElementRect(el: HTMLElement | null): DOMRect | null {
   return rect;
 }
 
-function stretchVisibleSourcePane(codeTd: HTMLTableCellElement, shell: HTMLElement): HTMLElement | null {
+function stretchVisibleSourcePane(
+  codeTd: HTMLTableCellElement,
+  shell: HTMLElement,
+): HTMLElement | null {
   const preferredSel =
     sourcePaneModeForShell(shell) === "rendered-markdown"
       ? ".source-pane--rendered-md"
       : ".source-pane--code";
   const preferred = codeTd.querySelector<HTMLElement>(preferredSel);
   if (visibleElementRect(preferred) !== null) return preferred;
-  const fallbacks = codeTd.querySelectorAll<HTMLElement>(".source-pane--code, .source-pane--rendered-md");
+  const fallbacks = codeTd.querySelectorAll<HTMLElement>(
+    ".source-pane--code, .source-pane--rendered-md",
+  );
   for (const el of fallbacks) {
     if (visibleElementRect(el) !== null) return el;
   }
   return null;
 }
 
-function stretchCodeContentBottomViewport(codeTd: HTMLTableCellElement, shell: HTMLElement): number {
+function stretchCodeContentBottomViewport(
+  codeTd: HTMLTableCellElement,
+  shell: HTMLElement,
+): number {
   const visiblePane = stretchVisibleSourcePane(codeTd, shell);
   const paneRect = visibleElementRect(visiblePane);
   if (paneRect !== null) return paneRect.bottom;
@@ -3535,7 +3544,8 @@ function drawStretchGutterConnectorsIntoSvg(
     if (pair === null) continue;
     const codeTd = row.querySelector<HTMLTableCellElement>(":scope > td.stretch-code");
     const docTd = row.querySelector<HTMLTableCellElement>(":scope > td.stretch-doc");
-    if (!(codeTd instanceof HTMLTableCellElement) || !(docTd instanceof HTMLTableCellElement)) continue;
+    if (!(codeTd instanceof HTMLTableCellElement) || !(docTd instanceof HTMLTableCellElement))
+      continue;
     const codeContentBottom = stretchCodeContentBottomViewport(codeTd, shell);
     const docContentBottom = stretchDocContentBottomViewport(docTd);
     const codeTop = clampViewportYToGutterLocal(pair.codeRect.top + 1, gutterRect.top, h);
