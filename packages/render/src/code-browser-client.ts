@@ -3230,9 +3230,7 @@ function wireSourceMarkdownPaneFlip(
   onAfterFlip?: () => void,
 ): void {
   function sourceMarkdownBodies(): HTMLElement[] {
-    return Array.from(
-      codePane.querySelectorAll<HTMLElement>('[data-source-markdown-body="true"]'),
-    );
+    return Array.from(codePane.querySelectorAll<HTMLElement>('[data-source-markdown-body="true"]'));
   }
 
   function syncSourceMarkdownFlipA11y(): void {
@@ -3383,7 +3381,9 @@ function wireStretchMobilePaneFlip(
       }
     }
     if (next === "rendered-markdown") {
-      for (const sourceMdBody of codePane.querySelectorAll<HTMLElement>('[data-source-markdown-body="true"]')) {
+      for (const sourceMdBody of codePane.querySelectorAll<HTMLElement>(
+        '[data-source-markdown-body="true"]',
+      )) {
         void runMermaidOnFreshDocNodes(sourceMdBody);
         rewriteHubRelativeBrowseAnchorsIn(sourceMdBody);
       }
@@ -3979,7 +3979,9 @@ function initializeSourceMarkdownPane(shell: HTMLElement): void {
   if (sourcePaneModeForShell(shell) !== "rendered-markdown") return;
   const codePane = document.getElementById("code-pane");
   if (!(codePane instanceof HTMLElement)) return;
-  for (const sourceMdBody of codePane.querySelectorAll<HTMLElement>('[data-source-markdown-body="true"]')) {
+  for (const sourceMdBody of codePane.querySelectorAll<HTMLElement>(
+    '[data-source-markdown-body="true"]',
+  )) {
     void runMermaidOnFreshDocNodes(sourceMdBody);
     rewriteHubRelativeBrowseAnchorsIn(sourceMdBody);
   }

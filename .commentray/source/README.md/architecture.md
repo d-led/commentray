@@ -9,6 +9,7 @@ This **angle** is a second voice on the same `README.md` source: high-level map 
 <!-- commentray:page-break -->
 
 <!-- commentray:block id=readme-why -->
+
 ```mermaid
 flowchart TB
   core["commentray/core"]

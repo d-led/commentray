@@ -198,12 +198,7 @@ export async function tryBuildBlockStretchTableHtml(
 
     if (!b) {
       const renderedSourceMarkdownHtml = sourceMarkdownSlicesEnabled
-        ? await renderSourceMarkdownSlice(
-            lines,
-            i,
-            i,
-            opts.sourceMarkdownOutputUrls,
-          )
+        ? await renderSourceMarkdownSlice(lines, i, i, opts.sourceMarkdownOutputUrls)
         : undefined;
       await appendStretchGapRow(
         rows,
@@ -221,12 +216,7 @@ export async function tryBuildBlockStretchTableHtml(
     /** `markerViewportHalfOpen1Based` can include lines before `sourceStart` (region prefix). */
     if (i < b.sourceStart - 1) {
       const renderedSourceMarkdownHtml = sourceMarkdownSlicesEnabled
-        ? await renderSourceMarkdownSlice(
-            lines,
-            i,
-            i,
-            opts.sourceMarkdownOutputUrls,
-          )
+        ? await renderSourceMarkdownSlice(lines, i, i, opts.sourceMarkdownOutputUrls)
         : undefined;
       await appendStretchGapRow(
         rows,

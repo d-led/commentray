@@ -67,7 +67,9 @@ describe("loadMultiAngleBrowsingIfEnabled", () => {
   afterEach(async () => {
     await Promise.all(
       tempDirs.splice(0).map(async (dir) => {
-        await import("node:fs/promises").then(({ rm }) => rm(dir, { recursive: true, force: true }));
+        await import("node:fs/promises").then(({ rm }) =>
+          rm(dir, { recursive: true, force: true }),
+        );
       }),
     );
   });
@@ -79,7 +81,11 @@ describe("loadMultiAngleBrowsingIfEnabled", () => {
     const angleDir = path.join(repoRoot, ".commentray/source/README.md");
     await mkdir(angleDir, { recursive: true });
     await writeFile(path.join(repoRoot, ".commentray/source/.default"), "", "utf8");
-    await writeFile(path.join(angleDir, "main.md"), "<!-- commentray:block id=readme-lede -->\n", "utf8");
+    await writeFile(
+      path.join(angleDir, "main.md"),
+      "<!-- commentray:block id=readme-lede -->\n",
+      "utf8",
+    );
     await writeFile(
       path.join(angleDir, "architecture.md"),
       "<!-- commentray:block id=readme-lede -->\n",
