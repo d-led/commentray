@@ -3440,6 +3440,43 @@ function stretchRowPairRects(row: HTMLTableRowElement):
   return { id, codeRect: codeTd.getBoundingClientRect(), docRect: docTd.getBoundingClientRect() };
 }
 
+function visibleElementRect(el: HTMLElement | null): DOMRect | null {
+  if (!(el instanceof HTMLElement)) return null;
+  const rect = el.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  const style = globalThis.getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden") return null;
+  return rect;
+}
+
+function stretchVisibleSourcePane(codeTd: HTMLTableCellElement, shell: HTMLElement): HTMLElement | null {
+  const preferredSel =
+    sourcePaneModeForShell(shell) === "rendered-markdown"
+      ? ".source-pane--rendered-md"
+      : ".source-pane--code";
+  const preferred = codeTd.querySelector<HTMLElement>(preferredSel);
+  if (visibleElementRect(preferred) !== null) return preferred;
+  const fallbacks = codeTd.querySelectorAll<HTMLElement>(".source-pane--code, .source-pane--rendered-md");
+  for (const el of fallbacks) {
+    if (visibleElementRect(el) !== null) return el;
+  }
+  return null;
+}
+
+function stretchCodeContentBottomViewport(codeTd: HTMLTableCellElement, shell: HTMLElement): number {
+  const visiblePane = stretchVisibleSourcePane(codeTd, shell);
+  const paneRect = visibleElementRect(visiblePane);
+  if (paneRect !== null) return paneRect.bottom;
+  return codeTd.getBoundingClientRect().bottom;
+}
+
+function stretchDocContentBottomViewport(docTd: HTMLTableCellElement): number {
+  const inner = docTd.querySelector<HTMLElement>(":scope .stretch-doc-inner");
+  const innerRect = visibleElementRect(inner);
+  if (innerRect !== null) return innerRect.bottom;
+  return docTd.getBoundingClientRect().bottom;
+}
+
 function activeStretchSyncId(shell: HTMLElement, rows: HTMLTableRowElement[]): string | null {
   const shellRect = shell.getBoundingClientRect();
   const probeY = shellRect.top + Math.min(Math.max(shellRect.height * 0.18, 24), 120);
@@ -3475,10 +3512,15 @@ function drawStretchGutterConnectorsIntoSvg(
   for (const row of rows) {
     const pair = stretchRowPairRects(row);
     if (pair === null) continue;
+    const codeTd = row.querySelector<HTMLTableCellElement>(":scope > td.stretch-code");
+    const docTd = row.querySelector<HTMLTableCellElement>(":scope > td.stretch-doc");
+    if (!(codeTd instanceof HTMLTableCellElement) || !(docTd instanceof HTMLTableCellElement)) continue;
+    const codeContentBottom = stretchCodeContentBottomViewport(codeTd, shell);
+    const docContentBottom = stretchDocContentBottomViewport(docTd);
     const codeTop = clampViewportYToGutterLocal(pair.codeRect.top + 1, gutterRect.top, h);
     const docTop = clampViewportYToGutterLocal(pair.docRect.top + 1, gutterRect.top, h);
-    const codeBottom = clampViewportYToGutterLocal(pair.codeRect.bottom - 1, gutterRect.top, h);
-    const docBottom = clampViewportYToGutterLocal(pair.docRect.bottom - 1, gutterRect.top, h);
+    const codeBottom = clampViewportYToGutterLocal(codeContentBottom - 1, gutterRect.top, h);
+    const docBottom = clampViewportYToGutterLocal(docContentBottom - 1, gutterRect.top, h);
     const strokeClass =
       pair.id === activeId ? "gutter__rays-path gutter__rays-path--active" : "gutter__rays-path";
     const trailClass = `${strokeClass} gutter__rays-path--trail`;
