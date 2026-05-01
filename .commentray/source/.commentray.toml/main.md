@@ -62,7 +62,7 @@ This file on disk is the **contract** the tools read first: storage root, SCM ba
 - Only ids matching **`R{N}XX`** pair across columns; everything else stays local (compact).
 
 1. **Region height** — For each shared `R` id, `max(height)`; set `bufferBelow` on the shorter region so both sides span the same region height.
-2. **Region start rows** — Re-measure “start row before first content line” for each paired `R`; if starts differ, prefer shrinking `bufferAbove` on the side that starts *later* (down to 0), then add `bufferAbove` on the earlier-start side only if still misaligned (minimal slack; avoids a full symmetric `BBBB` / `BBBB` zip row when the parse already over-padded one side).
+2. **Region start rows** — Re-measure “start row before first content line” for each paired `R`; if starts differ, prefer shrinking `bufferAbove` on the side that starts _later_ (down to 0), then add `bufferAbove` on the earlier-start side only if still misaligned (minimal slack; avoids a full symmetric `BBBB` / `BBBB` zip row when the parse already over-padded one side).
 3. **Column totals** — If one column is shorter, add tail slack only on non-`R` blocks (`bufferBelow` on the last item if it is not `R{N}XX`), else append paired `__NON_SYNC_TAIL_SLACK__` placeholders so left/right array lengths stay aligned for stretch-row zip.
 4. **Do not move `bufferBelow` between paired `R` copies** — That would change each column’s scroll total and force stacked tail `BBBB` rows when (3) re-pads. Closing buffer stays on the side that owns the shorter region’s `bufferBelow` from step (1).
 
