@@ -133,24 +133,20 @@ function stretchRowCells(row: HTMLTableRowElement): {
   return { codeTd, docTd };
 }
 
-/**
- * Applies `BufferingFlowSynchronizer` per stretch row (one shared sync id per `<tr>`). The shorter
- * cell gets `padding-bottom` so the row matches the taller side—same contract as `BBBB` in core
- * approval fixtures, recomputed when layout changes (Mermaid, wrap, viewport).
- */
-export function applyBlockStretchRowBuffers(table: HTMLTableElement): void {
-  const rows = stretchRowsWithSyncId(table);
-  if (rows.length === 0) return;
-
-  const left: HeightAdjustable[] = [];
-  const right: HeightAdjustable[] = [];
-
+function clearPaddingOnStretchRows(rows: HTMLTableRowElement[]): void {
   for (const row of rows) {
     const pair = stretchRowCells(row);
     if (pair === null) continue;
     clearStretchRowPadding(pair.codeTd, pair.docTd);
   }
+}
 
+function collectStretchRowHeights(rows: HTMLTableRowElement[]): {
+  left: HeightAdjustable[];
+  right: HeightAdjustable[];
+} | null {
+  const left: HeightAdjustable[] = [];
+  const right: HeightAdjustable[] = [];
   for (const row of rows) {
     const pair = stretchRowCells(row);
     if (pair === null) continue;
@@ -168,12 +164,15 @@ export function applyBlockStretchRowBuffers(table: HTMLTableElement): void {
       bufferBelow: 0,
     });
   }
+  if (left.length === 0) return null;
+  return { left, right };
+}
 
-  if (left.length === 0) return;
-
-  const sync = synchronizer.synchronize(left, right);
+function applySynchronizedPaddingToStretchRows(
+  rows: HTMLTableRowElement[],
+  sync: { left: HeightAdjustable[]; right: HeightAdjustable[] },
+): void {
   const rowCount = rows.length;
-
   for (let i = 0; i < rowCount; i++) {
     const row = rows[i];
     const pair = row === undefined ? null : stretchRowCells(row);
@@ -182,7 +181,13 @@ export function applyBlockStretchRowBuffers(table: HTMLTableElement): void {
     if (pair === null || l === undefined || r === undefined) continue;
     applyStretchSyncPadding(pair.codeTd, pair.docTd, l, r);
   }
+}
 
+function applyTailSlackPaddingToLastStretchRow(
+  rows: HTMLTableRowElement[],
+  sync: { left: HeightAdjustable[]; right: HeightAdjustable[] },
+): void {
+  const rowCount = rows.length;
   let tailLeftBelow = 0;
   let tailRightBelow = 0;
   for (let i = rowCount; i < sync.left.length; i++) {
@@ -191,20 +196,34 @@ export function applyBlockStretchRowBuffers(table: HTMLTableElement): void {
     if (l?.id === NON_SYNC_TAIL_SLACK_ITEM_ID) tailLeftBelow += l.bufferBelow;
     if (r?.id === NON_SYNC_TAIL_SLACK_ITEM_ID) tailRightBelow += r.bufferBelow;
   }
-  if (tailLeftBelow > 0 || tailRightBelow > 0) {
-    const lastRow = rows.at(-1);
-    const pair = lastRow === undefined ? null : stretchRowCells(lastRow);
-    const lLast = sync.left[rowCount - 1];
-    const rLast = sync.right[rowCount - 1];
-    if (pair !== null && lLast !== undefined && rLast !== undefined) {
-      if (tailLeftBelow > 0) {
-        pair.codeTd.style.paddingBottom = `${String(lLast.bufferBelow + tailLeftBelow)}px`;
-      }
-      if (tailRightBelow > 0) {
-        pair.docTd.style.paddingBottom = `${String(rLast.bufferBelow + tailRightBelow)}px`;
-      }
-    }
+  if (tailLeftBelow === 0 && tailRightBelow === 0) return;
+  const lastRow = rows.at(-1);
+  const pair = lastRow === undefined ? null : stretchRowCells(lastRow);
+  const lLast = sync.left[rowCount - 1];
+  const rLast = sync.right[rowCount - 1];
+  if (pair === null || lLast === undefined || rLast === undefined) return;
+  if (tailLeftBelow > 0) {
+    pair.codeTd.style.paddingBottom = `${String(lLast.bufferBelow + tailLeftBelow)}px`;
   }
+  if (tailRightBelow > 0) {
+    pair.docTd.style.paddingBottom = `${String(rLast.bufferBelow + tailRightBelow)}px`;
+  }
+}
+
+/**
+ * Applies `BufferingFlowSynchronizer` per stretch row (one shared sync id per `<tr>`). The shorter
+ * cell gets `padding-bottom` so the row matches the taller side—same contract as `BBBB` in core
+ * approval fixtures, recomputed when layout changes (Mermaid, wrap, viewport).
+ */
+export function applyBlockStretchRowBuffers(table: HTMLTableElement): void {
+  const rows = stretchRowsWithSyncId(table);
+  if (rows.length === 0) return;
+  clearPaddingOnStretchRows(rows);
+  const columns = collectStretchRowHeights(rows);
+  if (columns === null) return;
+  const sync = synchronizer.synchronize(columns.left, columns.right);
+  applySynchronizedPaddingToStretchRows(rows, sync);
+  applyTailSlackPaddingToLastStretchRow(rows, sync);
 }
 
 export function dispatchCommentrayMermaidDone(): void {

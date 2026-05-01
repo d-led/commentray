@@ -268,3 +268,4 @@ packages/vscode/dist/*.vsix
 
 # End of https://www.toptal.com/developers/gitignore/api/node,webstorm+all,visualstudiocode
 .commentray-dev/
+.approval_tests_temp/

@@ -62,10 +62,26 @@ export type CommentrayToml = {
      * (single-page Pages deploys cannot serve arbitrary paths next to `index.html`).
      */
     related_github_files?: { label?: string; path: string }[];
+    /**
+     * Stretch layout only: `"table"` or `"flow-synchronizer"` (client `BufferingFlowSynchronizer`
+     * padding on `#shell`). Omitted key uses {@link DEFAULT_STRETCH_BUFFER_SYNC}. Ignored when the
+     * page is dual panes.
+     */
+    stretch_buffer_sync?: string;
   };
 };
 
 export type ResolvedGithubNavLink = { label: string; href: string };
+
+/** Stretch-only; forwarded to `renderCodeBrowserHtml` when layout is stretch. */
+export type StaticSiteStretchBufferSync = "table" | "flow-synchronizer";
+
+/**
+ * Default for `[static_site].stretch_buffer_sync` and for `renderCodeBrowserHtml` when
+ * `stretchBufferSync` is omitted. Change this single export to change product default; tests
+ * should compare to this constant or pass an explicit strategy instead of hardcoding literals.
+ */
+export const DEFAULT_STRETCH_BUFFER_SYNC: StaticSiteStretchBufferSync = "flow-synchronizer";
 
 export type ResolvedStaticSite = {
   title: string;
@@ -80,6 +96,7 @@ export type ResolvedStaticSite = {
   commentrayMarkdownFile: string;
   /** Toolbar “Also on GitHub …” links for the static code browser. */
   relatedGithubNav: ResolvedGithubNavLink[];
+  stretchBufferSync: StaticSiteStretchBufferSync;
 };
 
 export type ResolvedAngleDefinition = { id: string; title: string };
@@ -109,6 +126,7 @@ const defaultStaticSite: ResolvedStaticSite = {
   defaultAngleId: null,
   commentrayMarkdownFile: "",
   relatedGithubNav: [],
+  stretchBufferSync: DEFAULT_STRETCH_BUFFER_SYNC,
 };
 
 const defaultAngles: ResolvedAngles = { defaultAngleId: null, definitions: [] };
@@ -273,7 +291,17 @@ function resolveStaticSite(parsed: CommentrayToml, storageDir: string): Resolved
       defaultAngleId,
     ),
     relatedGithubNav: mergeRelatedGithubNav(githubUrl, githubBlobBranch, ss?.related_github_files),
+    stretchBufferSync: resolvedStretchBufferSync(ss?.stretch_buffer_sync),
   };
+}
+
+function resolvedStretchBufferSync(raw: string | undefined): StaticSiteStretchBufferSync {
+  const t = raw?.trim();
+  if (t === undefined || t === "") return DEFAULT_STRETCH_BUFFER_SYNC;
+  if (t === "table" || t === "flow-synchronizer") return t;
+  throw new Error(
+    `.commentray.toml static_site.stretch_buffer_sync must be "table" or "flow-synchronizer" (got: ${String(raw)})`,
+  );
 }
 
 function assertValidSourceLinkPrefix(value: string | undefined): void {

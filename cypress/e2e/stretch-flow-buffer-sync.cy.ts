@@ -1,8 +1,7 @@
 import { shellA11y } from "../support/shell-a11y";
 
 /** Same path shape as `staticBrowseIndexRelPathFromPair` for this repo’s pair. */
-const STRETCH_FLOW_BUFFER_BROWSE =
-  "/browse/e2e/stretch-flow-buffer.ts/index.html";
+const STRETCH_FLOW_BUFFER_BROWSE = "/browse/e2e/stretch-flow-buffer.ts/index.html";
 
 describe("Stretch layout — flow-synchronizer buffer (static browse page)", () => {
   it("exposes the shell flag and applies slack padding on the shorter code cell", () => {

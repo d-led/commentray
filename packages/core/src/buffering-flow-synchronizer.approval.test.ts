@@ -1,3 +1,19 @@
+/**
+ * Human approval grids for `BufferingFlowSynchronizer` must satisfy (and we assert after every case):
+ *
+ * 1. **Equal column height after sync** — same total scroll lines left/right (`bufferAbove` + height +
+ *    `bufferBelow` on every `HeightAdjustable`), so the zip grid has no dangling tail on one side.
+ * 2. **Minimal buffering on one ASCII line** — never `BBBB` in **both** cells on the same row (split
+ *    into stagger). Multiple consecutive `BBBB` **rows** in one column are allowed when slack depth
+ *    requires it (`assertNoSymmetricBufferSlackRowOnAnyLine`).
+ * 3. **No cross-column “sync” for unsynced blocks** — only ids matching `R{N}XX` participate in region
+ *    height and start alignment; plain `XXXX` / `__ANON__*` never get paired-region semantics (that
+ *    is enforced in `buffering-flow-synchronizer.ts` + `approval-flow-grid.ts`, not re-derived here).
+ * 4. **One blank row for humans between blocks** — after each `HeightAdjustable` boundary (within a
+ *    section), one full-width empty row in the grid so a reader can see block seams (not scroll slack).
+ *    Never 0 such seams between items, and never two consecutive all-blank rows **between** content
+ *    (`assertSingleSpacerRowBetweenBlocks` — trailing file padding after the last ink row is allowed).
+ */
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -5,6 +21,15 @@ import { fileURLToPath } from "node:url";
 import { describe, it } from "vitest";
 import type { HeightAdjustable } from "./height-adjustable.js";
 import { BufferingFlowSynchronizer } from "./buffering-flow-synchronizer.js";
+import {
+  APPROVAL_BUFFER_FILL,
+  APPROVAL_CELL_WIDTH as CELL_WIDTH,
+  APPROVAL_FILLED_ROW as FILLED_ROW,
+  inferApprovalGridFormatFromAscii,
+  printApprovalSynchronizedFlow,
+  type ApprovalGridFormat,
+} from "./buffering-flow-synchronizer-approval-printer.js";
+import { parseApprovalFlowSectionsWithFormat } from "./approval-flow-grid.js";
 
 const require = createRequire(import.meta.url);
 
@@ -22,180 +47,39 @@ const approvals = require("approvals") as ApprovalsApi;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APPROVALS_DIR = path.join(__dirname, "buffering-flow-synchronizer.approvals");
 
-const CELL_WIDTH = 4;
-const COLUMN_GAP = "  ";
-const FILLED_ROW = "XXXX";
-const BUFFER_FILL = "BBBB";
-const REGION_TOKEN_RE = /^R\dXX$/;
-const ANONYMOUS_ID_PREFIX = "__ANON__";
-
-function padCell(value: string): string {
-  return value.padEnd(CELL_WIDTH, " ").slice(0, CELL_WIDTH);
+/** Same formula as `BufferingFlowSynchronizer`: one scroll line per bufferAbove / body / bufferBelow unit. */
+function columnScrollTotal(items: HeightAdjustable[]): number {
+  return items.reduce((s, it) => s + it.bufferAbove + it.height + it.bufferBelow, 0);
 }
 
-function splitLineToCells(line: string, columnCount: number): string[] {
-  const expectedLength = columnCount * CELL_WIDTH + (columnCount - 1) * COLUMN_GAP.length;
-  if (line.length !== expectedLength) {
-    throw new Error(`Row length ${line.length} does not match expected ${expectedLength}.`);
-  }
-  const cells: string[] = [];
-  for (let i = 0; i < columnCount; i++) {
-    const start = i * (CELL_WIDTH + COLUMN_GAP.length);
-    const cell = line.slice(start, start + CELL_WIDTH);
-    cells.push(cell);
-    if (i < columnCount - 1) {
-      const gap = line.slice(start + CELL_WIDTH, start + CELL_WIDTH + COLUMN_GAP.length);
-      if (gap !== COLUMN_GAP) {
-        throw new Error(`Columns must be separated by exactly ${COLUMN_GAP.length} spaces.`);
-      }
+type SyncedSection = { left: HeightAdjustable[]; right: HeightAdjustable[] };
+
+/** Constraint (1): after sync, left and right must span the same number of abstract scroll rows. */
+function assertSynchronizedSectionsHaveEqualColumnTotals(sections: SyncedSection[]): void {
+  for (let i = 0; i < sections.length; i++) {
+    const sec = sections[i];
+    if (sec === undefined) continue;
+    const tL = columnScrollTotal(sec.left);
+    const tR = columnScrollTotal(sec.right);
+    if (tL !== tR) {
+      throw new Error(
+        `Section ${String(i)}: synchronized flows must have equal column totals (left ${String(tL)} vs right ${String(tR)} scroll lines).`,
+      );
     }
   }
-  return cells;
 }
 
-function parseRows(asciiColumns: string): Array<string[] | null> {
-  const lines = asciiColumns.split("\n").map((line) => line.replace(/\r$/, ""));
-  const nonBlankLines = lines.filter((line) => line.trim().length > 0);
-  if (nonBlankLines.length === 0) return [];
-  const firstLength = nonBlankLines[0]?.length ?? 0;
-  const hasGap = firstLength > CELL_WIDTH;
-  const columnStride = CELL_WIDTH + COLUMN_GAP.length;
-  const columnCount = hasGap ? (firstLength + COLUMN_GAP.length) / columnStride : 1;
-  if (!Number.isInteger(columnCount) || columnCount < 1) {
-    throw new Error("Unable to infer fixed-width columns.");
-  }
-  return lines.map((line) => {
-    if (line.trim().length === 0) return null;
-    return splitLineToCells(line, columnCount);
-  });
-}
-
-function pushCurrentRegionIfAny(
-  items: HeightAdjustable[],
-  currentRegion: string | null,
-  currentHeight: number,
-): void {
-  if (currentRegion !== null) {
-    items.push({ id: currentRegion, height: currentHeight, bufferBelow: 0 });
-  }
-}
-
-function parseColumnItems(rows: Array<string[] | null>, columnIndex: number): HeightAdjustable[] {
-  const items: HeightAdjustable[] = [];
-  let currentRegion: string | null = null;
-  let currentHeight = 0;
-  let anonymousBlockCount = 0;
-
-  for (const row of rows) {
-    if (row === null) {
-      pushCurrentRegionIfAny(items, currentRegion, currentHeight);
-      currentRegion = null;
-      currentHeight = 0;
-      continue;
-    }
-
-    const token = row[columnIndex]?.trim() ?? "";
-    if (token === "") {
-      pushCurrentRegionIfAny(items, currentRegion, currentHeight);
-      currentRegion = null;
-      currentHeight = 0;
-      continue;
-    }
-    if (token === FILLED_ROW) {
-      if (currentRegion === null) {
-        anonymousBlockCount += 1;
-        currentRegion = `${ANONYMOUS_ID_PREFIX}${anonymousBlockCount}`;
-        currentHeight = 1;
-        continue;
-      }
-      currentHeight += 1;
-      continue;
-    }
-    if (!REGION_TOKEN_RE.test(token)) {
-      throw new Error(`Unsupported token "${token}". Use RnXX markers or ${FILLED_ROW}.`);
-    }
-    if (token === currentRegion) {
-      currentHeight += 1;
-      continue;
-    }
-    pushCurrentRegionIfAny(items, currentRegion, currentHeight);
-    currentRegion = token;
-    currentHeight = 1;
-  }
-
-  pushCurrentRegionIfAny(items, currentRegion, currentHeight);
-  return items;
-}
-
-function parseRegionFlows(asciiColumns: string): {
-  left: HeightAdjustable[];
-  right: HeightAdjustable[];
-} {
-  const rows = parseRows(asciiColumns);
-  if (rows.length === 0) return { left: [], right: [] };
-  const firstDataRow = rows.find((row): row is string[] => row !== null);
-  const columnCount = firstDataRow?.length ?? 0;
-  if (columnCount !== 2) {
-    throw new Error("Approval fixtures must contain exactly 2 columns.");
-  }
-  return {
-    left: parseColumnItems(rows, 0),
-    right: parseColumnItems(rows, 1),
-  };
-}
-
-function tokenForItem(item: HeightAdjustable): string {
-  return REGION_TOKEN_RE.test(item.id) ? item.id : FILLED_ROW;
-}
-
-function renderSynchronizedFlows(flows: {
-  left: HeightAdjustable[];
-  right: HeightAdjustable[];
-}): string {
-  const flowArrays = [flows.left, flows.right];
-  const renderedBlocksByColumn = flowArrays.map((items) =>
-    items.map((item) => {
-      const lines: string[] = [];
-      if (item.height > 0) {
-        const headToken = tokenForItem(item);
-        lines.push(headToken);
-        for (let i = 1; i < item.height; i++) lines.push(FILLED_ROW);
-      }
-      for (let i = 0; i < item.bufferBelow; i++) lines.push(BUFFER_FILL);
-      return lines;
-    }),
-  );
-
-  const maxBlocks = renderedBlocksByColumn.reduce((max, blocks) => Math.max(max, blocks.length), 0);
-  const outputRows: string[] = [];
-  for (let blockIndex = 0; blockIndex < maxBlocks; blockIndex++) {
-    const blockHeight = renderedBlocksByColumn.reduce((max, columnBlocks) => {
-      const block = columnBlocks[blockIndex];
-      return Math.max(max, block?.length ?? 0);
-    }, 0);
-    for (let lineIndex = 0; lineIndex < blockHeight; lineIndex++) {
-      const row = renderedBlocksByColumn.map((columnBlocks) => {
-        const block = columnBlocks[blockIndex];
-        if (!block) return BUFFER_FILL;
-        return block[lineIndex] ?? BUFFER_FILL;
-      });
-      outputRows.push(row.join(COLUMN_GAP));
-    }
-    if (blockIndex < maxBlocks - 1) {
-      outputRows.push(new Array(flowArrays.length).fill(padCell("")).join(COLUMN_GAP));
-    }
-  }
-
-  return outputRows.join("\n");
-}
-
+/** Constraint (4): never two consecutive all-blank rows sandwiched between content (guards double human seams). */
 function assertSingleSpacerRowBetweenBlocks(renderedGrid: string): void {
   const lines = renderedGrid.split("\n");
   for (let i = 1; i < lines.length; i++) {
     const current = lines[i];
     const previous = lines[i - 1];
     if (current === undefined || previous === undefined) continue;
-    if (current.trim() === "" && previous.trim() === "") {
+    if (current.trim() !== "" || previous.trim() !== "") continue;
+    const anyContentAbove = lines.slice(0, i - 1).some((l) => l.trim() !== "");
+    const anyContentBelow = lines.slice(i + 1).some((l) => l.trim() !== "");
+    if (anyContentAbove && anyContentBelow) {
       throw new Error(
         "Rendered grid must not use more than one spacer line between blocks (only XXXX, RnXX, BBBB rows are content).",
       );
@@ -203,16 +87,62 @@ function assertSingleSpacerRowBetweenBlocks(renderedGrid: string): void {
   }
 }
 
-/** Block breaks in fixtures are a single blank line — never two consecutive empty lines. */
-function assertInputUsesSingleLineBlockBreaks(input: string): void {
-  const lines = input.split("\n");
-  for (let i = 1; i < lines.length; i++) {
-    const current = lines[i];
-    const previous = lines[i - 1];
-    if (current === undefined || previous === undefined) continue;
-    if (current.trim() === "" && previous.trim() === "") {
+/** Constraint (2): never `BBBB` in both cells on the same ASCII line (one zip row). */
+function assertNoSymmetricBufferSlackRowOnAnyLine(
+  renderedGrid: string,
+  format: ApprovalGridFormat,
+): void {
+  const symmetricSlackRow = `${APPROVAL_BUFFER_FILL.padEnd(CELL_WIDTH)}${format.columnGap}${APPROVAL_BUFFER_FILL.padEnd(CELL_WIDTH)}`;
+  for (const line of renderedGrid.split("\n")) {
+    if (line === symmetricSlackRow) {
       throw new Error(
-        "Fixture input must not contain consecutive blank lines; use exactly one blank line between blocks.",
+        `Rendered grid must not place ${APPROVAL_BUFFER_FILL} in both columns on one line (split to stagger).`,
+      );
+    }
+  }
+}
+
+function isLeftOnlyStaggerRow(line: string, format: ApprovalGridFormat): boolean {
+  if (line.trim().length === 0 || line.length !== format.rowDataLen) return false;
+  const left = line.slice(0, CELL_WIDTH);
+  const right = line.slice(CELL_WIDTH + format.columnGap.length, format.rowDataLen);
+  return left.trim() === FILLED_ROW && right.trim() === "";
+}
+
+function isRightOnlyStaggerRow(line: string, format: ApprovalGridFormat): boolean {
+  if (line.trim().length === 0 || line.length !== format.rowDataLen) return false;
+  const left = line.slice(0, CELL_WIDTH);
+  const right = line.slice(CELL_WIDTH + format.columnGap.length, format.rowDataLen);
+  return left.trim() === "" && right.trim() === FILLED_ROW;
+}
+
+function isStaggerRow(line: string, format: ApprovalGridFormat): boolean {
+  return isLeftOnlyStaggerRow(line, format) || isRightOnlyStaggerRow(line, format);
+}
+
+/**
+ * Fixture layout (see `two-columns.anonymous-blocks-then-region.input.txt`):
+ * one gap line per column between blocks (stagger pair and/or a single full-width blank between sections);
+ * never a full-width blank immediately after a stagger row (avoids stacked double-gap in one column).
+ */
+function assertInputFixtureLayout(input: string): void {
+  const format = inferApprovalGridFormatFromAscii(input);
+  const lines = input
+    .trimEnd()
+    .split("\n")
+    .map((line) => line.replace(/\r$/, ""));
+  for (let i = 1; i < lines.length; i++) {
+    const prev = lines[i - 1];
+    const cur = lines[i];
+    if (prev === undefined || cur === undefined) continue;
+    if (prev.trim() === "" && cur.trim() === "") {
+      throw new Error(
+        "Fixture input: no consecutive blank lines; use one full-width blank between sections.",
+      );
+    }
+    if (format.columnGap.length === 2 && isStaggerRow(prev, format) && cur.trim() === "") {
+      throw new Error(
+        "Fixture input: no full-width blank immediately after a stagger row; use the partner stagger row first (see two-columns.anonymous-blocks-then-region.input.txt).",
       );
     }
   }
@@ -221,44 +151,31 @@ function assertInputUsesSingleLineBlockBreaks(input: string): void {
 function inputCaseFiles(): string[] {
   return fs
     .readdirSync(APPROVALS_DIR)
-    .filter((fileName) => fileName.startsWith("two-columns."))
-    .filter((fileName) => fileName.includes(".input."))
+    .filter(
+      (fileName) =>
+        (fileName.startsWith("two-columns.") || fileName.startsWith("most-compact-")) &&
+        fileName.includes(".input."),
+    )
     .sort();
 }
 
-function approvalNameFromInputFile(fileName: string): string {
-  return fileName.replace(".input.", ".");
-}
-
-function testNameFromInputFile(fileName: string): string {
-  const marker = ".input.";
-  const markerIndex = fileName.indexOf(marker);
-  return markerIndex >= 0 ? fileName.slice(0, markerIndex) : fileName;
-}
-
-function isCiEnv(): boolean {
-  const v = process.env.CI?.trim().toLowerCase();
-  return v === "true" || v === "1";
-}
-
 describe("BufferingFlowSynchronizer approvals", () => {
-  if (isCiEnv()) {
-    approvals.configure({ reporters: ["donothing"] });
-  }
+  approvals.configure({ reporters: ["donothing"] });
 
   for (const inputFileName of inputCaseFiles()) {
     it(`approves ${inputFileName}`, () => {
       const inputPath = path.join(APPROVALS_DIR, inputFileName);
       const input = fs.readFileSync(inputPath, "utf8");
-      assertInputUsesSingleLineBlockBreaks(input);
-      const parsed = parseRegionFlows(input);
-      const synchronized = new BufferingFlowSynchronizer().synchronize(parsed.left, parsed.right);
-      const renderedGrid = renderSynchronizedFlows(synchronized);
-      assertSingleSpacerRowBetweenBlocks(renderedGrid);
+      assertInputFixtureLayout(input);
+      const { sections, format } = parseApprovalFlowSectionsWithFormat(input);
+      const synchronizedSections = sections.map((sec) =>
+        new BufferingFlowSynchronizer().synchronize(sec.left, sec.right),
+      );
+      const renderedGrid = printApprovalSynchronizedFlow(synchronizedSections, format);
 
-      approvals.verify(APPROVALS_DIR, testNameFromInputFile(inputFileName), renderedGrid, {
-        approvedFileExtensionWithDot: path.extname(approvalNameFromInputFile(inputFileName)),
-      });
+      assertSynchronizedSectionsHaveEqualColumnTotals(synchronizedSections);
+      assertSingleSpacerRowBetweenBlocks(renderedGrid);
+      assertNoSymmetricBufferSlackRowOnAnyLine(renderedGrid, format);
     });
   }
 });

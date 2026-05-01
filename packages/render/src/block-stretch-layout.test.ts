@@ -19,7 +19,24 @@ function tinyIndex() {
 }
 
 describe("Block-aligned stretch table HTML", () => {
-  it("emits one blame-style row per block (no rowspan) so code and doc share row height", async () => {
+  it("table strategy omits flow-synchronizer wrappers (legacy)", async () => {
+    const md = "<!-- commentray:block id=b1 -->\n\n## Hi\n\nBody.\n";
+    const out = await tryBuildBlockStretchTableHtml({
+      code: "gap\na\nb",
+      language: "txt",
+      commentrayMarkdown: md,
+      index: tinyIndex(),
+      sourceRelative: "pkg/x.txt",
+      commentrayPathRel: crPath,
+      stretchBufferSync: "table",
+    });
+    expect(out).not.toBeNull();
+    if (out === null) throw new Error("expected table");
+    expect(out.tableInnerHtml).not.toContain("stretch-cell-measure");
+    expect(out.tableInnerHtml).not.toContain("data-commentray-stretch-sync-id");
+  });
+
+  it("default flow-synchronizer: one blame-style row per block (no rowspan), sync ids + measure wrappers", async () => {
     const md = "<!-- commentray:block id=b1 -->\n\n## Hi\n\nBody.\n";
     const out = await tryBuildBlockStretchTableHtml({
       code: "gap\na\nb",
@@ -38,6 +55,9 @@ describe("Block-aligned stretch table HTML", () => {
     expect((out.tableInnerHtml.match(/<tr /g) ?? []).length).toBe(2);
     expect((out.tableInnerHtml.match(/stretch-row--gap/g) ?? []).length).toBe(1);
     expect((out.tableInnerHtml.match(/stretch-row--block/g) ?? []).length).toBe(1);
+    expect(out.tableInnerHtml).toContain('data-commentray-stretch-sync-id="b1"');
+    expect(out.tableInnerHtml).toContain('data-commentray-stretch-sync-id="__gap__0"');
+    expect((out.tableInnerHtml.match(/stretch-cell-measure/g) ?? []).length).toBe(4);
   });
 
   it("emits gap rows for marker viewport lines before the inner source range", async () => {

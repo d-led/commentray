@@ -16,6 +16,7 @@
     "lib": ["ES2022"]
   },
   "include": [
+    "e2e/**/*.ts",
     "eslint.config.mjs",
     "vitest.config.ts",
     "vitest.*.config.ts",

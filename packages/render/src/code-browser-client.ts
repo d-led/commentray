@@ -65,6 +65,11 @@ import {
 } from "./reading-viewport-comfort.js";
 import { wireWideModeIntroTour } from "./code-browser-wide-intro-controller.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
+import {
+  dispatchCommentrayMermaidDone,
+  wireBlockStretchBufferSync,
+  type BlockStretchBufferSyncHandle,
+} from "./block-stretch-buffer-sync.js";
 
 /**
  * Hub pages emit `./browse/…` relative to the site root. From `/…/browse/current.html` the browser
@@ -86,9 +91,9 @@ type CommentrayMermaidGlobal = {
   run: (opts: { nodes?: HTMLElement[]; querySelector?: string }) => Promise<unknown>;
 };
 
-function runMermaidOnFreshDocNodes(docBody: HTMLElement): void {
+function runMermaidOnFreshDocNodes(docBody: HTMLElement): Promise<void> {
   if (typeof globalThis.location !== "undefined" && globalThis.location.protocol === "file:")
-    return;
+    return Promise.resolve();
   /** Only fenced diagram sources; Mermaid leaves other `.mermaid` nodes in the tree after render. */
   const allPres = Array.from(docBody.querySelectorAll("pre.mermaid")) as HTMLElement[];
   /** Do not re-run on wrappers that already have SVG (avoids corrupting output after dual-mobile pane flip). */
@@ -96,13 +101,18 @@ function runMermaidOnFreshDocNodes(docBody: HTMLElement): void {
     const wrap = pre.closest(".commentray-mermaid");
     return wrap === null || wrap.querySelector("svg") === null;
   });
-  if (nodes.length === 0) return;
+  if (nodes.length === 0) return Promise.resolve();
   const m = (globalThis as unknown as { commentrayMermaid?: CommentrayMermaidGlobal })
     .commentrayMermaid;
-  if (!m) return;
-  void m.run({ nodes }).catch((err: unknown) => {
-    console.error("Commentray: mermaid.run failed", err);
-  });
+  if (!m) return Promise.resolve();
+  return m
+    .run({ nodes })
+    .then(() => {
+      dispatchCommentrayMermaidDone();
+    })
+    .catch((err: unknown) => {
+      console.error("Commentray: mermaid.run failed", err);
+    });
 }
 
 type HitKind = "code" | "md" | "path";
@@ -713,16 +723,25 @@ function buildDocToCodeFlipPlanBlockAware(
     mdLine0,
   );
   if (fromPb !== null) return fromPb;
-  /** Index-backed pair but no confident block anchor for this viewport — do not nudge the source. */
+  /**
+   * Index-backed pair but no confident block anchor for this viewport (e.g. missing
+   * `.commentray-block-anchor` nodes, or probe could not map the doc band to a link).
+   * With {@link allowProportionalMirror}, mirror like the no-index path so static dual
+   * browse still scrolls both panes together; block-snap-only keeps the historical noop.
+   */
   if (links.length > 0) {
     scrollSyncTrace("doc→code.plan", {
-      reason: "indexed-noop-no-src0",
+      reason: allowProportionalMirror
+        ? "indexed-fallback-mirror-no-confident-block"
+        : "indexed-noop-no-src0",
       mdLine0,
       linkCount: links.length,
+      allowProportionalMirror,
     });
-    return { k: "noop" };
-  }
-  if (!allowProportionalMirror) {
+    if (!allowProportionalMirror) {
+      return { k: "noop" };
+    }
+  } else if (!allowProportionalMirror) {
     scrollSyncTrace("doc→code.plan", { reason: "snap-only-no-index-noop", linkCount: 0 });
     return { k: "noop" };
   }
@@ -3112,7 +3131,7 @@ function scheduleMermaidWhenDualDocPaneVisible(shell: HTMLElement, mq: MediaQuer
     if (normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane")) !== "doc") return;
     const docBody = document.getElementById("doc-pane-body");
     if (!(docBody instanceof HTMLElement)) return;
-    runMermaidOnFreshDocNodes(docBody);
+    void runMermaidOnFreshDocNodes(docBody);
   };
   queueMicrotask(() => {
     kick();
@@ -3247,7 +3266,7 @@ function wireSourceMarkdownPaneFlip(
     if (next === "rendered-markdown") {
       const sourceMdBody = document.getElementById("code-pane-markdown-body");
       if (sourceMdBody instanceof HTMLElement) {
-        runMermaidOnFreshDocNodes(sourceMdBody);
+        void runMermaidOnFreshDocNodes(sourceMdBody);
         rewriteHubRelativeBrowseAnchorsIn(sourceMdBody);
       }
     }
@@ -3317,7 +3336,22 @@ function wireDualMobilePaneFlip(
   applyForViewport();
 }
 
-function wireStretchLayoutChrome(codePane: HTMLElement): void {
+/** Multi-angle stretch swaps `#shell` innerHTML; disconnect the previous table observer so listeners do not accumulate. */
+let stretchRowBufferSyncHandle: BlockStretchBufferSyncHandle | null = null;
+
+function stretchFlowSynchronizerEnabled(shell: HTMLElement): boolean {
+  return shell.getAttribute("data-stretch-buffer-sync") === "flow-synchronizer";
+}
+
+/** Wrap toggle always; `BufferingFlowSynchronizer` padding pass only when `#shell` has `data-stretch-buffer-sync="flow-synchronizer"`. */
+function wireStretchLayoutChrome(shell: HTMLElement, codePane: HTMLElement): void {
+  if (codePane instanceof HTMLTableElement && stretchFlowSynchronizerEnabled(shell)) {
+    stretchRowBufferSyncHandle?.disconnect();
+    stretchRowBufferSyncHandle = wireBlockStretchBufferSync(codePane);
+  } else {
+    stretchRowBufferSyncHandle?.disconnect();
+    stretchRowBufferSyncHandle = null;
+  }
   const wrapCb = document.getElementById("wrap-lines") as HTMLInputElement | null;
   if (wrapCb) {
     wireWrapToggle(STORAGE_WRAP_LINES, codePane, wrapCb, () => {
@@ -3374,7 +3408,7 @@ function applyMultiAngleStretchAngleToShell(
   shell.innerHTML = decodeBase64Utf8(innerB64);
   const nextCodePane = document.getElementById("code-pane");
   if (nextCodePane instanceof HTMLElement) {
-    wireStretchLayoutChrome(nextCodePane);
+    wireStretchLayoutChrome(shell, nextCodePane);
   }
   shell.setAttribute("data-scroll-block-links-b64", angle.scrollBlockLinksB64);
   shell.setAttribute("data-raw-md-b64", angle.rawMdB64);
@@ -3404,7 +3438,7 @@ function applyMultiAngleStretchAngleToShell(
   }
   applyDocumentedTreeCurrentPairHighlight();
   assignLocationToCanonicalBrowsePermalinkIfNeeded(shell);
-  runMermaidOnFreshDocNodes(shell);
+  void runMermaidOnFreshDocNodes(shell);
   rewriteHubRelativeBrowseAnchorsIn(shell);
   rootScrollingElement().scrollTop = 0;
 }
@@ -3422,29 +3456,39 @@ function wireMultiAngleStretchAngleSelect(
   });
 }
 
-type DualPaneDomBundle = {
+type DualPaneCoreDom = {
   docBody: HTMLElement | null;
   docScrollEl: HTMLElement;
   gutter: HTMLElement;
   wrapCb: HTMLInputElement;
+};
+
+type DualPaneSearchDom = {
   searchInput: HTMLInputElement;
   searchClear: HTMLElement;
   searchResults: HTMLElement;
 };
 
-function readDualPaneDomBundle(): DualPaneDomBundle | null {
+function readDualPaneCoreDom(): DualPaneCoreDom | null {
   const docPane = document.getElementById("doc-pane");
   const gutter = document.getElementById("gutter");
   const wrapCb = document.getElementById("wrap-lines") as HTMLInputElement | null;
-  const searchInput = document.getElementById("search-q") as HTMLInputElement | null;
-  const searchClear = document.getElementById("search-clear");
-  const searchResults = document.getElementById("search-results");
-  if (!docPane || !gutter || !wrapCb || !searchInput || !searchClear || !searchResults) {
+  if (!docPane || !gutter || !wrapCb) {
     return null;
   }
   const docBody = document.getElementById("doc-pane-body");
   const docScrollEl = docBody instanceof HTMLElement ? docBody : docPane;
-  return { docBody, docScrollEl, gutter, wrapCb, searchInput, searchClear, searchResults };
+  return { docBody, docScrollEl, gutter, wrapCb };
+}
+
+function readDualPaneSearchDom(): DualPaneSearchDom | null {
+  const searchInput = document.getElementById("search-q") as HTMLInputElement | null;
+  const searchClear = document.getElementById("search-clear");
+  const searchResults = document.getElementById("search-results");
+  if (!searchInput || !searchClear || !searchResults) {
+    return null;
+  }
+  return { searchInput, searchClear, searchResults };
 }
 
 function hubSearcherRowsForDualPane(args: {
@@ -3592,8 +3636,8 @@ function applySelectedMultiAngle(args: {
   rebuildSearcher: () => void;
   scrollLinksRef: { current: BlockScrollLink[] };
   shell: HTMLElement;
-  searchInput: HTMLInputElement;
-  searchResults: HTMLElement;
+  searchInput?: HTMLInputElement;
+  searchResults?: HTMLElement;
   requestBlockRayRedraw?: () => void;
 }): void {
   const {
@@ -3608,7 +3652,7 @@ function applySelectedMultiAngle(args: {
     requestBlockRayRedraw,
   } = args;
   docBody.innerHTML = decodeBase64Utf8(angle.docInnerHtmlB64);
-  runMermaidOnFreshDocNodes(docBody);
+  void runMermaidOnFreshDocNodes(docBody);
   rewriteHubRelativeBrowseAnchorsIn(docBody);
   mutable.rawMd = decodeBase64Utf8(angle.rawMdB64);
   mutable.mdLines = mutable.rawMd.split("\n");
@@ -3641,9 +3685,11 @@ function applySelectedMultiAngle(args: {
     if (ghu) shell.setAttribute("data-commentray-pair-browse-href", ghu);
     else shell.removeAttribute("data-commentray-pair-browse-href");
   }
-  searchInput.value = "";
-  searchResults.innerHTML = "";
-  searchResults.hidden = true;
+  if (searchInput && searchResults) {
+    searchInput.value = "";
+    searchResults.innerHTML = "";
+    searchResults.hidden = true;
+  }
   assignLocationToCanonicalBrowsePermalinkIfNeeded(shell);
   requestBlockRayRedraw?.();
   globalThis.requestAnimationFrame(() => {
@@ -3663,8 +3709,8 @@ type WireDualPaneMultiAngleScrollArgs = {
   multiPayload: MultiAngleClientPayload | null;
   mutable: MutableSearchFields;
   rebuildSearcher: () => void;
-  searchInput: HTMLInputElement;
-  searchResults: HTMLElement;
+  searchInput?: HTMLInputElement;
+  searchResults?: HTMLElement;
   requestBlockRayRedraw?: () => void;
 };
 
@@ -3802,7 +3848,7 @@ function initializeSourceMarkdownPane(shell: HTMLElement): void {
   if (sourcePaneModeForShell(shell) !== "rendered-markdown") return;
   const sourceMdBody = document.getElementById("code-pane-markdown-body");
   if (!(sourceMdBody instanceof HTMLElement)) return;
-  runMermaidOnFreshDocNodes(sourceMdBody);
+  void runMermaidOnFreshDocNodes(sourceMdBody);
   rewriteHubRelativeBrowseAnchorsIn(sourceMdBody);
 }
 
@@ -3889,34 +3935,39 @@ function buildDualPaneSearcherBundle(
 }
 
 function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): void {
-  const dom = readDualPaneDomBundle();
-  if (!dom) return;
-
-  const { docBody, docScrollEl, gutter, wrapCb, searchInput, searchClear, searchResults } = dom;
+  const coreDom = readDualPaneCoreDom();
+  if (!coreDom) {
+    return;
+  }
+  const { docBody, docScrollEl, gutter, wrapCb } = coreDom;
+  const searchDom = readDualPaneSearchDom();
 
   const bundle = buildDualPaneSearcherBundle(shell, codePane);
 
   rewriteHubRelativeBrowseAnchorsIn(document);
 
-  wireSearchUi({
-    scope: bundle.scope,
-    filePathLabel: bundle.filePathLabel,
-    mutable: bundle.mutable,
-    rawCode: bundle.rawCode,
-    searchInput,
-    searchClear,
-    searchResults,
-    docScrollEl,
-  });
+  if (searchDom) {
+    const { searchInput, searchClear, searchResults } = searchDom;
+    wireSearchUi({
+      scope: bundle.scope,
+      filePathLabel: bundle.filePathLabel,
+      mutable: bundle.mutable,
+      rawCode: bundle.rawCode,
+      searchInput,
+      searchClear,
+      searchResults,
+      docScrollEl,
+    });
 
-  wireDualPaneNavSearchFetch(
-    shell,
-    bundle.pathInit.documentedPairs,
-    bundle.indexState,
-    bundle.mutable,
-    bundle.rebuildSearcher,
-    searchInput,
-  );
+    wireDualPaneNavSearchFetch(
+      shell,
+      bundle.pathInit.documentedPairs,
+      bundle.indexState,
+      bundle.mutable,
+      bundle.rebuildSearcher,
+      searchInput,
+    );
+  }
 
   const pct0 = parseFloat(readWebStorageItem(localStorage, STORAGE_SPLIT_PCT) || "46");
   const pct = clamp(Number.isFinite(pct0) ? pct0 : 46, 15, 85);
@@ -3965,8 +4016,8 @@ function wireDualPaneCodeBrowser(shell: HTMLElement, codePane: HTMLElement): voi
     multiPayload,
     mutable: bundle.mutable,
     rebuildSearcher: bundle.rebuildSearcher,
-    searchInput,
-    searchResults,
+    searchInput: searchDom?.searchInput,
+    searchResults: searchDom?.searchResults,
     requestBlockRayRedraw,
   });
 
@@ -4298,7 +4349,7 @@ function main(): void {
 
   const layout = shell.getAttribute("data-layout") || "dual";
   if (layout === "stretch") {
-    wireStretchLayoutChrome(codePane);
+    wireStretchLayoutChrome(shell, codePane);
     const multiScript = document.getElementById("commentray-multi-angle-b64");
     const multiPayload = parseMultiAnglePayload(multiScript);
     if (multiPayload?.layoutMode === "stretch") {

@@ -69,8 +69,13 @@ export type {
   ResolvedCommentrayConfig,
   ResolvedGithubNavLink,
   ResolvedStaticSite,
+  StaticSiteStretchBufferSync,
 } from "./config.js";
-export { loadCommentrayConfig, mergeCommentrayConfig } from "./config.js";
+export {
+  DEFAULT_STRETCH_BUFFER_SYNC,
+  loadCommentrayConfig,
+  mergeCommentrayConfig,
+} from "./config.js";
 export { githubRepoBlobFileUrl, parseGithubRepoWebUrl } from "./github-url.js";
 export { assertValidIndex, emptyIndex } from "./metadata.js";
 export { describeIndexSchemaRemediation } from "./index-schema-messages.js";
@@ -110,8 +115,34 @@ export {
 } from "./validate-project.js";
 export { plannedSymbolResolutionStrategy } from "./language-intelligence.js";
 export type { SymbolResolutionStrategy } from "./language-intelligence.js";
-export type { HeightAdjustable, Identifiable, WithHeight } from "./height-adjustable.js";
-export { BufferingFlowSynchronizer } from "./buffering-flow-synchronizer.js";
+export type {
+  HeightAdjustable,
+  Identifiable,
+  SyncRegionContinuationKind,
+  WithHeight,
+} from "./height-adjustable.js";
+export {
+  BufferingFlowSynchronizer,
+  NON_SYNC_TAIL_SLACK_ITEM_ID,
+} from "./buffering-flow-synchronizer.js";
+export {
+  APPROVAL_GRID_STANDARD,
+  APPROVAL_HUMAN_BREAK_ROW,
+  approvalHumanBreakFullRow,
+  inferApprovalGridFormatFromAscii,
+  printApprovalFlowSection,
+  printApprovalSynchronizedFlow,
+} from "./buffering-flow-synchronizer-approval-printer.js";
+export type {
+  ApprovalFlowSection,
+  ApprovalGridFormat,
+} from "./buffering-flow-synchronizer-approval-printer.js";
+export {
+  parseApprovalFlowSections,
+  parseApprovalFlowSectionsWithFormat,
+  parseApprovalRows,
+  splitApprovalLineToCells,
+} from "./approval-flow-grid.js";
 export { relocationHintMessages } from "./relocation-hints.js";
 export type { RelocationHintsInput } from "./relocation-hints.js";
 export { runCommanderMain } from "./cli-bootstrap.js";

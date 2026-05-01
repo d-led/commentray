@@ -22,6 +22,10 @@
     "./static-browse-path": {
       "types": "./dist/commentray-static-browse-path.d.ts",
       "import": "./dist/commentray-static-browse-path.js"
+    },
+    "./buffering-flow-synchronizer": {
+      "types": "./dist/buffering-flow-synchronizer.d.ts",
+      "import": "./dist/buffering-flow-synchronizer.js"
     }
   },
   "files": [

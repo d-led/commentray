@@ -16,7 +16,10 @@ export function mermaidRuntimeScriptHtml(include: boolean | undefined): string {
     `const skipInitial=globalThis.matchMedia("(max-width:767px)").matches&&shell&&shell.getAttribute("data-layout")==="dual"&&shell.getAttribute("data-dual-mobile-pane")==="code";`,
     `if(!skipInitial){`,
     // Only `pre.mermaid` diagram sources; rendered SVG output can still match a broad `.mermaid` selector.
-    `void mermaid.run({ querySelector: "#doc-pane-body pre.mermaid, .stretch-doc-inner pre.mermaid" }).catch((err)=>{`,
+    // Event name must match `MERMAID_DONE_EVENT` in `block-stretch-buffer-sync.ts` (stretch row buffer pass).
+    `void mermaid.run({ querySelector: "#doc-pane-body pre.mermaid, .stretch-doc-inner pre.mermaid" }).then(()=>{`,
+    `try{globalThis.dispatchEvent(new CustomEvent("commentray-mermaid-done"));}catch(_){}`,
+    `}).catch((err)=>{`,
     `console.error("Commentray: mermaid.run failed", err);`,
     `});`,
     `}`,

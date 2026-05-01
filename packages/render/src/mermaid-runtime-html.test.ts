@@ -16,6 +16,7 @@ describe("Optional Mermaid runtime script injection", () => {
     expect(html).toContain("mermaid.initialize");
     expect(html).toContain("globalThis.commentrayMermaid=mermaid");
     expect(html).toContain("skipInitial");
+    expect(html).toContain("commentray-mermaid-done");
     expect(html).not.toContain('<script type="module">');
   });
 });

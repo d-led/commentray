@@ -24,6 +24,18 @@ function bannerRegionHtml(html: string): string {
   return m?.[0] ?? "";
 }
 
+/** Opening `#shell` tag only (avoid matching the client bundle source, which mentions the same data attribute). */
+function stretchShellOpenTag(html: string): string {
+  const m = html.match(/<div class="shell shell--stretch-rows" id="shell"[^>]*>/);
+  return m?.[0] ?? "";
+}
+
+/** The stretch `<table>` only (the bundle references class names in source strings). */
+function blockStretchTableHtml(html: string): string {
+  const m = /<table class="block-stretch[^"]*"[^>]*>[\s\S]*?<\/table>/.exec(html);
+  return m?.[0] ?? "";
+}
+
 function commentrayOutputUrlsForReadmeSourcePane(
   repoRoot: string,
   storageRoot: string,
@@ -826,6 +838,8 @@ describe("Code browser page — multi-angle block stretch", () => {
       },
     });
     expect(html).toContain('data-layout="stretch"');
+    expect(stretchShellOpenTag(html)).toContain('data-stretch-buffer-sync="flow-synchronizer"');
+    expect(blockStretchTableHtml(html)).toContain("stretch-cell-measure");
     expect(html).not.toContain('id="doc-pane"');
     const script = /<script[^>]*id="commentray-multi-angle-b64"[^>]*>([^<]*)<\/script>/i.exec(html);
     expect(script?.[1]).toBeDefined();
@@ -895,7 +909,7 @@ describe("Code browser page — multi-angle index isolation", () => {
   });
 });
 
-describe("Code browser page — block markers and scroll sync payload", () => {
+describe("Code browser page — block markers", () => {
   it("should insert block separator anchors after each commentray:block marker", async () => {
     const html = await renderCodeBrowserHtml({
       code: "x",
@@ -906,48 +920,54 @@ describe("Code browser page — block markers and scroll sync payload", () => {
     expect(html).toContain("Title");
     expect(html).toContain('id="commentray-block-myblock"');
   });
+});
 
+async function expectDualPaneBlockScrollLinksPayload(): Promise<void> {
+  const crPath = ".commentray/source/pkg/x.txt.md";
+  const index = {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    byCommentrayPath: {
+      [crPath]: {
+        sourcePath: "pkg/x.txt",
+        commentrayPath: crPath,
+        blocks: [{ id: "b1", anchor: "lines:1-2" }],
+      },
+    },
+  };
+  const md = "<!-- commentray:block id=b1 -->\n\n## Hi\n";
+  const html = await renderCodeBrowserHtml({
+    code: "a\nb",
+    language: "txt",
+    commentrayMarkdown: md,
+    codeBrowserLayout: "dual",
+    blockStretchRows: {
+      index,
+      sourceRelative: "pkg/x.txt",
+      commentrayPathRel: crPath,
+    },
+  });
+  expect(html).toContain('data-commentray-line="0"');
+  expect(html).toContain('data-source-start="1"');
+  const m = /data-scroll-block-links-b64="([^"]*)"/.exec(html);
+  expect(m).not.toBeNull();
+  if (m === null || m[1] === undefined) {
+    throw new Error("expected data-scroll-block-links-b64 attribute with a value");
+  }
+  const links = JSON.parse(Buffer.from(m[1], "base64").toString("utf8")) as unknown[];
+  expect(links).toEqual([
+    {
+      id: "b1",
+      commentrayLine: 0,
+      sourceStart: 1,
+      sourceEnd: 2,
+      markerViewportHalfOpen1Based: { lo: 1, hiExclusive: 3 },
+    },
+  ]);
+}
+
+describe("Code browser page — scroll sync payload", () => {
   it("should embed base64 block scroll links on #shell when dual panes align with the index", async () => {
-    const crPath = ".commentray/source/pkg/x.txt.md";
-    const index = {
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      byCommentrayPath: {
-        [crPath]: {
-          sourcePath: "pkg/x.txt",
-          commentrayPath: crPath,
-          blocks: [{ id: "b1", anchor: "lines:1-2" }],
-        },
-      },
-    };
-    const md = "<!-- commentray:block id=b1 -->\n\n## Hi\n";
-    const html = await renderCodeBrowserHtml({
-      code: "a\nb",
-      language: "txt",
-      commentrayMarkdown: md,
-      codeBrowserLayout: "dual",
-      blockStretchRows: {
-        index,
-        sourceRelative: "pkg/x.txt",
-        commentrayPathRel: crPath,
-      },
-    });
-    expect(html).toContain('data-commentray-line="0"');
-    expect(html).toContain('data-source-start="1"');
-    const m = /data-scroll-block-links-b64="([^"]*)"/.exec(html);
-    expect(m).not.toBeNull();
-    if (m === null || m[1] === undefined) {
-      throw new Error("expected data-scroll-block-links-b64 attribute with a value");
-    }
-    const links = JSON.parse(Buffer.from(m[1], "base64").toString("utf8")) as unknown[];
-    expect(links).toEqual([
-      {
-        id: "b1",
-        commentrayLine: 0,
-        sourceStart: 1,
-        sourceEnd: 2,
-        markerViewportHalfOpen1Based: { lo: 1, hiExclusive: 3 },
-      },
-    ]);
+    await expectDualPaneBlockScrollLinksPayload();
   });
 
   it("should choose stretch layout with one shared scroll when the block table can be built", async () => {
@@ -975,8 +995,40 @@ describe("Code browser page — block markers and scroll sync payload", () => {
     });
     expect(html).toContain('data-layout="stretch"');
     expect(html).toContain("Sync");
+    expect(stretchShellOpenTag(html)).toContain('data-stretch-buffer-sync="flow-synchronizer"');
+    expect(blockStretchTableHtml(html)).toContain("stretch-cell-measure");
+    expect(blockStretchTableHtml(html)).toContain('data-commentray-stretch-sync-id="b1"');
     expect(html).not.toContain('id="doc-pane"');
     expect(html).not.toContain('id="mobile-pane-flip"');
     expect(html).not.toContain('id="mobile-pane-flip-scroll"');
+  });
+
+  it("legacy stretch omits flow-synchronizer shell flag when stretchBufferSync is table", async () => {
+    const crPath = ".commentray/source/pkg/readme.md.md";
+    const index = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      byCommentrayPath: {
+        [crPath]: {
+          sourcePath: "pkg/readme.md",
+          commentrayPath: crPath,
+          blocks: [{ id: "b1", anchor: "lines:1-2" }],
+        },
+      },
+    };
+    const md = "<!-- commentray:block id=b1 -->\n\n## Sync\n";
+    const html = await renderCodeBrowserHtml({
+      code: "one\ntwo",
+      language: "txt",
+      commentrayMarkdown: md,
+      blockStretchRows: {
+        index,
+        sourceRelative: "pkg/readme.md",
+        commentrayPathRel: crPath,
+      },
+      stretchBufferSync: "table",
+    });
+    expect(html).toContain('data-layout="stretch"');
+    expect(stretchShellOpenTag(html)).not.toContain("data-stretch-buffer-sync");
+    expect(blockStretchTableHtml(html)).not.toContain("stretch-cell-measure");
   });
 });

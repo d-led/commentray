@@ -1,9 +1,13 @@
 import { parse as parseToml } from "@iarna/toml";
 import { describe, expect, it } from "vitest";
 
-import { type CommentrayToml, mergeCommentrayConfig } from "./config.js";
+import {
+  type CommentrayToml,
+  DEFAULT_STRETCH_BUFFER_SYNC,
+  mergeCommentrayConfig,
+} from "./config.js";
 
-describe("Merging Commentray TOML configuration", () => {
+describe("Merging Commentray TOML configuration — basics", () => {
   it("applies defaults for empty input", () => {
     const cfg = mergeCommentrayConfig(null);
     expect(cfg.storageDir).toBe(".commentray");
@@ -12,6 +16,7 @@ describe("Merging Commentray TOML configuration", () => {
     expect(cfg.render.relativeGithubBlobLinks).toBe(false);
     expect(cfg.angles.defaultAngleId).toBeNull();
     expect(cfg.angles.definitions).toEqual([]);
+    expect(cfg.staticSite.stretchBufferSync).toBe(DEFAULT_STRETCH_BUFFER_SYNC);
   });
 
   it("merges render.relative_github_blob_links from TOML", () => {
@@ -24,7 +29,9 @@ describe("Merging Commentray TOML configuration", () => {
   it("rejects unsupported scm providers", () => {
     expect(() => mergeCommentrayConfig({ scm: { provider: "p4" } })).toThrow(/Unsupported/);
   });
+});
 
+describe("Merging Commentray TOML configuration — static site", () => {
   it("merges static_site from TOML", () => {
     const cfg = mergeCommentrayConfig({
       static_site: {
@@ -47,6 +54,27 @@ describe("Merging Commentray TOML configuration", () => {
     );
     expect(cfg.staticSite.githubBlobBranch).toBe("main");
     expect(cfg.staticSite.relatedGithubNav).toEqual([]);
+    expect(cfg.staticSite.stretchBufferSync).toBe(DEFAULT_STRETCH_BUFFER_SYNC);
+  });
+
+  it("merges static_site.stretch_buffer_sync table when set explicitly", () => {
+    const cfg = mergeCommentrayConfig({
+      static_site: { stretch_buffer_sync: "table" },
+    });
+    expect(cfg.staticSite.stretchBufferSync).toBe("table");
+  });
+
+  it("merges static_site.stretch_buffer_sync flow-synchronizer when set explicitly", () => {
+    const cfg = mergeCommentrayConfig({
+      static_site: { stretch_buffer_sync: "flow-synchronizer" },
+    });
+    expect(cfg.staticSite.stretchBufferSync).toBe("flow-synchronizer");
+  });
+
+  it("rejects invalid static_site.stretch_buffer_sync", () => {
+    expect(() => mergeCommentrayConfig({ static_site: { stretch_buffer_sync: "nope" } })).toThrow(
+      /stretch_buffer_sync/,
+    );
   });
 
   it("keeps backward compatibility for source_file + commentray_markdown", () => {
