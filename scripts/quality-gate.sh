@@ -120,6 +120,7 @@ run_step "format:check" npm run format:check
 run_step "actionlint" bash scripts/actionlint.sh
 run_step "lint" npm run lint
 run_step "dupes" npm run dupes
+run_step "security:codeql-guards" npm run security:codeql-guards
 run_step "typecheck" npm run typecheck
 run_step "commentray validate" bash -c "npm run build -w commentray && npm run commentray -- validate"
 run_step "test (unit)" env COMMENTRAY_TEST_MODE=unit npm run test

@@ -189,6 +189,7 @@ function localTargetPathFromRef(ref, fromHtmlAbsPath) {
     trimmed.startsWith("mailto:") ||
     trimmed.startsWith("tel:") ||
     trimmed.startsWith("data:") ||
+    trimmed.startsWith("vbscript:") ||
     trimmed.startsWith("javascript:")
   ) {
     return null;
