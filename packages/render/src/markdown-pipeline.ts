@@ -155,7 +155,7 @@ function isResolvedPathInsideRoot(resolvedAbs: string, rootAbs: string): boolean
 function normalizeSourceLinkPrefix(raw: string): string | null {
   const t = raw.trim();
   if (t.length === 0) return null;
-  if (t.startsWith("/")) return t.replace(/\/+$/, "");
+  if (t.startsWith("/")) return trimTrailingSlashes(t);
   let u: URL;
   try {
     u = new URL(t);
@@ -164,7 +164,15 @@ function normalizeSourceLinkPrefix(raw: string): string | null {
   }
   const proto = u.protocol.toLowerCase();
   if (proto !== "http:" && proto !== "https:") return null;
-  return t.replace(/\/+$/, "");
+  return trimTrailingSlashes(t);
+}
+
+function trimTrailingSlashes(input: string): string {
+  let end = input.length;
+  while (end > 0 && input.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return input.slice(0, end);
 }
 
 function prefixedSourceHref(prefix: string, repoRoot: string, resolvedAbs: string): string | null {

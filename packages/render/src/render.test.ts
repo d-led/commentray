@@ -339,4 +339,26 @@ describe("Markdown to HTML — source link prefix fallback", () => {
     expect(html).toContain('href="https://github.com/acme/demo/blob/main/docs/user/install.md"');
     expect(html).not.toContain('href="../../docs/user/install.md"');
   });
+
+  it("normalizes source_link_prefix with trailing slashes", async () => {
+    const { repoRoot, storageRoot, outHtml } = await mkTempRepoWithBrowsePairHtmlLayout(
+      "cr-source-prefix-trailing-",
+    );
+
+    const html = await renderMarkdownToHtml("[Install](docs/user/install.md)", {
+      commentrayOutputUrls: {
+        repoRootAbs: repoRoot,
+        htmlOutputFileAbs: outHtml,
+        markdownUrlBaseDirAbs: repoRoot,
+        commentrayStorageRootAbs: storageRoot,
+        staticSiteOutDirAbs: path.join(repoRoot, "_site"),
+        sourceLinkPrefix: "https://github.com/acme/demo/blob/main////",
+      },
+    });
+
+    expect(html).toContain('href="https://github.com/acme/demo/blob/main/docs/user/install.md"');
+    expect(html).not.toContain(
+      'href="https://github.com/acme/demo/blob/main////docs/user/install.md"',
+    );
+  });
 });
