@@ -263,7 +263,6 @@ export async function tryBuildBlockStretchTableHtml(
     opts.commentrayMarkdown,
     opts.code,
   );
-  if (links.length === 0) return null;
 
   const { preamble, segments } = splitCommentrayMarkdownSegments(opts.commentrayMarkdown);
   const lines = opts.code.split("\n");

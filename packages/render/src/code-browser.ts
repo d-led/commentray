@@ -5,6 +5,7 @@ import {
   buildBlockScrollLinks,
   type BlockScrollLink,
   type CommentrayIndex,
+  CURRENT_SCHEMA_VERSION,
   DEFAULT_STRETCH_BUFFER_SYNC,
   findMonorepoPackagesDir,
   monorepoLayoutStartDir,
@@ -2814,7 +2815,7 @@ async function buildDualPaneSingleAngleShell(
     angleSelectHtml: "",
     multiAnglePayloadB64: "",
     sourceMarkdownToggleEnabled: sourceMarkdownEnabled,
-    sourcePaneDefaultMode: sourceMarkdownEnabled ? "rendered-markdown" : "source",
+    sourcePaneDefaultMode: "source",
   };
 }
 
@@ -2827,14 +2828,44 @@ async function buildSingleAngleCodeBrowserShell(
   const sourceMarkdownEnabled = isMarkdownLikeSource(opts);
   const sourceMarkdownUrls = sourceMarkdownEnabled ? sourcePaneOutputUrls(opts) : undefined;
 
-  if (opts.blockStretchRows && layoutPref !== "dual") {
+  if (layoutPref !== "dual") {
+    const fallbackSourceRelative =
+      (opts.filePath ?? "").trim().length > 0 ? (opts.filePath ?? "").trim() : "source";
+    const fallbackCommentrayPathRel =
+      (opts.commentrayPathForSearch ?? "").trim().length > 0
+        ? (opts.commentrayPathForSearch ?? "").trim()
+        : "commentray.md";
+    const fallbackSourceLineCount = Math.max(1, opts.code.split("\n").length);
+    const fallbackBlockId = "commentray-full";
+    const fallbackStretchMarkdown =
+      opts.blockStretchRows === undefined
+        ? `<!-- commentray:block id=${fallbackBlockId} -->\n${opts.commentrayMarkdown}`
+        : opts.commentrayMarkdown;
+    const stretchRows =
+      opts.blockStretchRows ??
+      ({
+        index: {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          byCommentrayPath: {
+            [fallbackCommentrayPathRel]: {
+              sourcePath: fallbackSourceRelative,
+              commentrayPath: fallbackCommentrayPathRel,
+              blocks: [
+                { id: fallbackBlockId, anchor: `lines:1-${String(fallbackSourceLineCount)}` },
+              ],
+            },
+          },
+        } satisfies CommentrayIndex,
+        sourceRelative: fallbackSourceRelative,
+        commentrayPathRel: fallbackCommentrayPathRel,
+      } as const);
     const stretched = await tryBuildBlockStretchTableHtml({
       code: opts.code,
       language: opts.language,
-      commentrayMarkdown: opts.commentrayMarkdown,
-      index: opts.blockStretchRows.index,
-      sourceRelative: opts.blockStretchRows.sourceRelative,
-      commentrayPathRel: opts.blockStretchRows.commentrayPathRel,
+      commentrayMarkdown: fallbackStretchMarkdown,
+      index: stretchRows.index,
+      sourceRelative: stretchRows.sourceRelative,
+      commentrayPathRel: stretchRows.commentrayPathRel,
       commentrayOutputUrls: opts.commentrayOutputUrls,
       sourceMarkdownOutputUrls: sourceMarkdownUrls,
       stretchBufferSync: stretchBufferSyncFromOpts(opts),
@@ -2843,11 +2874,8 @@ async function buildSingleAngleCodeBrowserShell(
       layout = "stretch";
       shellInner = wrapShellInnerWithPairContext(
         renderShellPairContextHtml(
-          shellPairSourcePath(opts.filePath, opts.blockStretchRows?.sourceRelative),
-          shellPairCommentrayPath(
-            opts.commentrayPathForSearch,
-            opts.blockStretchRows?.commentrayPathRel,
-          ),
+          shellPairSourcePath(opts.filePath, stretchRows.sourceRelative),
+          shellPairCommentrayPath(opts.commentrayPathForSearch, stretchRows.commentrayPathRel),
         ),
         `        ${stretched.preambleHtml}\n` + `        ${stretched.tableInnerHtml}\n`,
       );
@@ -2972,8 +3000,7 @@ function currentPairCommentrayPathRel(
   ).trim();
 }
 
-/**
- * Repo-relative source + companion Markdown paths for matching the current page to nav pairs
+/** Repo-relative source + companion Markdown paths for matching the current page to nav pairs
  * (see `code-browser-client.ts` documented-files tree).
  */
 function shellPairIdentityDataAttrs(shell: CodeBrowserShell, opts: CodeBrowserPageOptions): string {
