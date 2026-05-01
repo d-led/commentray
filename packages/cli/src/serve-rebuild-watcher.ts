@@ -53,7 +53,9 @@ export async function startServeRebuildWatcher(
     try {
       await rebuild(true);
     } catch (e: unknown) {
-      process.stderr.write(`[commentray serve] rebuild failed: ${formatWatcherRebuildFailure(e)}\n`);
+      process.stderr.write(
+        `[commentray serve] rebuild failed: ${formatWatcherRebuildFailure(e)}\n`,
+      );
     } finally {
       rebuildInFlight = false;
       if (pendingWhileRebuild) {
