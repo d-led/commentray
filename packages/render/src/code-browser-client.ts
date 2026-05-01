@@ -3188,6 +3188,10 @@ function wireSourceMarkdownPaneFlipAffordance(
     scrollFlip.classList.add("is-visible");
   };
   const tick = (): void => {
+    if (primaryFlip.hidden || primaryFlip.getClientRects().length === 0) {
+      hideScroll();
+      return;
+    }
     const r = primaryFlip.getBoundingClientRect();
     const vh = globalThis.innerHeight;
     const margin = 10;
@@ -3198,6 +3202,27 @@ function wireSourceMarkdownPaneFlipAffordance(
   globalThis.addEventListener("scroll", tick, { passive: true, signal });
   globalThis.addEventListener("resize", tick, { passive: true, signal });
   globalThis.requestAnimationFrame(tick);
+}
+
+function syncSourceMarkdownToggleVisibility(
+  shell: HTMLElement,
+  primaryFlip: HTMLButtonElement,
+  scrollFlip: HTMLButtonElement | null,
+): void {
+  const hidden =
+    isNarrowViewport() &&
+    normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane")) !== "code";
+  primaryFlip.hidden = hidden;
+  if (hidden) {
+    primaryFlip.setAttribute("aria-hidden", "true");
+    primaryFlip.style.setProperty("display", "none", "important");
+  } else {
+    primaryFlip.removeAttribute("aria-hidden");
+    primaryFlip.style.removeProperty("display");
+  }
+  if (!(scrollFlip instanceof HTMLButtonElement)) return;
+  scrollFlip.hidden = true;
+  scrollFlip.classList.remove("is-visible");
 }
 
 function closestSourceLine0ForPaneTop(codePane: HTMLElement, idPrefix: string): number | null {
@@ -3237,8 +3262,9 @@ function wireSourceMarkdownPaneFlip(
     const mode = sourcePaneModeForShell(shell);
     const renderedActive = mode === "rendered-markdown";
     const nextModeLabel = renderedActive ? "markdown source" : "rendered markdown";
+    const currentModeLabel = renderedActive ? "rendered markdown" : "markdown source";
     const ariaLabel = `Switch source pane to ${nextModeLabel}`;
-    const title = `Source pane: ${renderedActive ? "rendered markdown" : "markdown source"} (click to switch)`;
+    const title = `Switch source pane to ${nextModeLabel} (currently ${currentModeLabel})`;
     const apply = (btn: HTMLButtonElement | null): void => {
       if (!(btn instanceof HTMLButtonElement)) return;
       btn.setAttribute("aria-pressed", renderedActive ? "true" : "false");
@@ -3251,14 +3277,20 @@ function wireSourceMarkdownPaneFlip(
 
   syncSourceMarkdownFlipA11y();
   syncWrapLinesVisibilityForSourcePaneMode(shell);
+  syncSourceMarkdownToggleVisibility(shell, flipBtn, flipScrollBtn);
+  const onViewportChange = (): void => {
+    syncSourceMarkdownToggleVisibility(shell, flipBtn, flipScrollBtn);
+  };
+  globalThis.addEventListener("resize", onViewportChange, { passive: true, signal });
+  const mobileMq = globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ);
+  mobileMq.addEventListener("change", onViewportChange, { signal });
+  const observer = new MutationObserver(onViewportChange);
+  observer.observe(shell, {
+    attributes: true,
+    attributeFilter: ["data-dual-mobile-pane", "data-source-pane-mode"],
+  });
+  signal.addEventListener("abort", () => observer.disconnect(), { once: true });
   const runFlip = (): void => {
-    if (shell.getAttribute("data-layout") === "stretch" && isNarrowViewport()) {
-      const cur = normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane"));
-      const next = cur === "code" ? "doc" : "code";
-      shell.setAttribute("data-dual-mobile-pane", next);
-      writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, next);
-      return;
-    }
     const cur = sourcePaneModeForShell(shell);
     const currentPrefix = cur === "rendered-markdown" ? "code-md-line-" : "code-line-";
     const line0 = closestSourceLine0ForPaneTop(codePane, currentPrefix);
@@ -3266,12 +3298,20 @@ function wireSourceMarkdownPaneFlip(
     const nextPrefix = next === "rendered-markdown" ? "code-md-line-" : "code-line-";
     shell.setAttribute("data-source-pane-mode", next);
     writeWebStorageItem(localStorage, STORAGE_SOURCE_MARKDOWN_PANE_MODE, next);
+    if (isNarrowViewport()) {
+      const curPane = normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane"));
+      if (curPane === "doc") {
+        shell.setAttribute("data-dual-mobile-pane", "code");
+        writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, "code");
+      }
+    }
     syncSourceMarkdownFlipA11y();
     syncWrapLinesVisibilityForSourcePaneMode(shell);
-    if (line0 !== null) {
+    const shouldWriteRevealScroll = !isNarrowViewport() || paneUsesInternalYScroll(codePane);
+    if (line0 !== null && shouldWriteRevealScroll) {
       const row = codePane.querySelector(`#${nextPrefix}${String(line0)}`);
       if (row instanceof HTMLElement) {
-        applyRevealChildInPane(codePane, row, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX);
+        applyRevealChildInPane(codePane, row, 0);
       }
     }
     if (next === "rendered-markdown") {
@@ -3353,6 +3393,8 @@ function wireStretchMobilePaneFlip(
   flipScrollBtn: HTMLButtonElement | null,
   onAfterFlip?: () => void,
 ): void {
+  void codePane;
+  void onAfterFlip;
   const mq = globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ);
   function readStoredPane(): "code" | "doc" {
     return normalizedDualMobilePane(readWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE));
@@ -3366,43 +3408,10 @@ function wireStretchMobilePaneFlip(
   }
   const runFlip = (): void => {
     if (!mq.matches) return;
-    const cur = sourcePaneModeForShell(shell);
-    const currentPrefix = cur === "rendered-markdown" ? "code-md-line-" : "code-line-";
-    const line0 = closestSourceLine0ForPaneTop(codePane, currentPrefix);
-    const next = cur === "rendered-markdown" ? "source" : "rendered-markdown";
-    const nextPrefix = next === "rendered-markdown" ? "code-md-line-" : "code-line-";
-    shell.setAttribute("data-source-pane-mode", next);
-    writeWebStorageItem(localStorage, STORAGE_SOURCE_MARKDOWN_PANE_MODE, next);
-    syncWrapLinesVisibilityForSourcePaneMode(shell);
-    if (line0 !== null) {
-      const row = codePane.querySelector(`#${nextPrefix}${String(line0)}`);
-      if (row instanceof HTMLElement) {
-        applyRevealChildInPane(codePane, row, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX);
-      }
-    }
-    if (next === "rendered-markdown") {
-      for (const sourceMdBody of codePane.querySelectorAll<HTMLElement>(
-        '[data-source-markdown-body="true"]',
-      )) {
-        void runMermaidOnFreshDocNodes(sourceMdBody);
-        rewriteHubRelativeBrowseAnchorsIn(sourceMdBody);
-      }
-    }
-    const sourceMdFlip = document.getElementById("source-markdown-pane-flip");
-    const sourceMdFlipScroll = document.getElementById("source-markdown-pane-flip-scroll");
-    const renderedActive = next === "rendered-markdown";
-    const nextModeLabel = renderedActive ? "markdown source" : "rendered markdown";
-    const ariaLabel = `Switch source pane to ${nextModeLabel}`;
-    const title = `Source pane: ${renderedActive ? "rendered markdown" : "markdown source"} (click to switch)`;
-    const apply = (btn: HTMLElement | null): void => {
-      if (!(btn instanceof HTMLButtonElement)) return;
-      btn.setAttribute("aria-pressed", renderedActive ? "true" : "false");
-      btn.setAttribute("aria-label", ariaLabel);
-      btn.title = title;
-    };
-    apply(sourceMdFlip);
-    apply(sourceMdFlipScroll);
-    onAfterFlip?.();
+    const cur = normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane"));
+    const next = cur === "code" ? "doc" : "code";
+    shell.setAttribute("data-dual-mobile-pane", next);
+    writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, next);
   };
   flipBtn.addEventListener("click", runFlip);
   if (flipScrollBtn) {
