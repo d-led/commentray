@@ -3784,13 +3784,56 @@ function applyMultiAngleStretchAngleToShell(
 function wireMultiAngleStretchAngleSelect(
   shell: HTMLElement,
   payload: MultiAngleClientPayload,
+  onAngleApplied?: (angle: MultiAngleClientPayload["angles"][number]) => void,
 ): void {
   if (payload.layoutMode !== "stretch") return;
   const angleSel = document.getElementById("angle-select") as HTMLSelectElement | null;
   if (!angleSel) return;
   angleSel.addEventListener("change", () => {
     const a = payload.angles.find((x) => x.id === angleSel.value);
-    if (a) applyMultiAngleStretchAngleToShell(shell, a);
+    if (!a) return;
+    applyMultiAngleStretchAngleToShell(shell, a);
+    onAngleApplied?.(a);
+  });
+}
+
+function wireStretchSearchUi(shell: HTMLElement, codePane: HTMLElement): void {
+  const searchDom = readDualPaneSearchDom();
+  if (!searchDom) return;
+
+  const bundle = buildDualPaneSearcherBundle(shell, codePane);
+  const { searchInput, searchClear, searchResults } = searchDom;
+  wireSearchUi({
+    scope: bundle.scope,
+    filePathLabel: bundle.filePathLabel,
+    mutable: bundle.mutable,
+    rawCode: bundle.rawCode,
+    searchInput,
+    searchClear,
+    searchResults,
+    docScrollEl: shell,
+  });
+
+  wireDualPaneNavSearchFetch(
+    shell,
+    bundle.pathInit.documentedPairs,
+    bundle.indexState,
+    bundle.mutable,
+    bundle.rebuildSearcher,
+    searchInput,
+  );
+
+  const multiScript = document.getElementById("commentray-multi-angle-b64");
+  const multiPayload = parseMultiAnglePayload(multiScript);
+  if (multiPayload?.layoutMode !== "stretch") return;
+  wireMultiAngleStretchAngleSelect(shell, multiPayload, (angle) => {
+    bundle.mutable.rawMd = decodeBase64Utf8(angle.rawMdB64);
+    bundle.mutable.mdLines = bundle.mutable.rawMd.split("\n");
+    bundle.mutable.commentrayPathLabel = angle.commentrayPathForSearch;
+    bundle.rebuildSearcher();
+    searchInput.value = "";
+    searchResults.innerHTML = "";
+    searchResults.hidden = true;
   });
 }
 
@@ -4697,11 +4740,7 @@ function main(): void {
   const layout = shell.getAttribute("data-layout") || "dual";
   if (layout === "stretch") {
     wireStretchLayoutChrome(shell, codePane);
-    const multiScript = document.getElementById("commentray-multi-angle-b64");
-    const multiPayload = parseMultiAnglePayload(multiScript);
-    if (multiPayload?.layoutMode === "stretch") {
-      wireMultiAngleStretchAngleSelect(shell, multiPayload);
-    }
+    wireStretchSearchUi(shell, codePane);
     wireSourceMarkdownControls(shell, codePane, () => {
       globalThis.dispatchEvent(new Event("resize"));
     });
