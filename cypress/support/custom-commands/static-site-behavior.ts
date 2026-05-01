@@ -193,9 +193,13 @@ Cypress.Commands.add("DocPaneMermaidShouldShowDiagramOrMarkup", () => {
         expect(mermaidBlocks.length, "stretch mermaid block count").to.be.at.least(1);
         const svgCount = mermaidBlocks.find("svg").length;
         expect(svgCount, "stretch rendered mermaid svg count").to.be.at.least(1);
-        expect($scope.text(), "stretch mermaid syntax error output").not.to.contain(
-          MERMAID_SYNTAX_ERROR_SNIPPET,
-        );
+        mermaidBlocks.toArray().forEach((node, index) => {
+          const text = Cypress.$(node).text();
+          expect(
+            text,
+            `stretch mermaid syntax error output (block ${String(index + 1)})`,
+          ).not.to.contain(MERMAID_SYNTAX_ERROR_SNIPPET);
+        });
       });
     } else {
       cy.get(shellA11y.docPaneBody, { timeout: MERMAID_E2E_TIMEOUT_MS }).should(($scope) => {
@@ -203,9 +207,13 @@ Cypress.Commands.add("DocPaneMermaidShouldShowDiagramOrMarkup", () => {
         expect(mermaidBlocks.length, "dual mermaid block count").to.be.at.least(1);
         const svgCount = mermaidBlocks.find("svg").length;
         expect(svgCount, "dual rendered mermaid svg count").to.be.at.least(1);
-        expect($scope.text(), "dual mermaid syntax error output").not.to.contain(
-          MERMAID_SYNTAX_ERROR_SNIPPET,
-        );
+        mermaidBlocks.toArray().forEach((node, index) => {
+          const text = Cypress.$(node).text();
+          expect(
+            text,
+            `dual mermaid syntax error output (block ${String(index + 1)})`,
+          ).not.to.contain(MERMAID_SYNTAX_ERROR_SNIPPET);
+        });
       });
     }
   });
