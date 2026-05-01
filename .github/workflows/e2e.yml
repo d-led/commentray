@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       # Pin to lockfile Cypress (see ci.yml e2e-static job).
-      image: cypress/included:15.14.0
+      image: cypress/included:15.14.2
       options: --ipc=host
     steps:
       - uses: actions/checkout@v6
