@@ -1,18 +1,9 @@
 import { assertValidMarkerId, MARKER_ID_BODY } from "./marker-ids.js";
 
 /**
- * Source delimiters for block anchors:
- *
- * 1. **Region convention** — where editors commonly fold `//#region` /
- *    `//#endregion`, `#region` / `#endregion`, `#pragma region`, etc. (aligned
- *    with [Region Marker](https://marketplace.visualstudio.com/items?itemName=txava.region-marker)),
- *    Commentray uses the region **name** `commentray:<id>`.
- *
- * 2. **Generic comments** — for languages without a shared region idiom, we
- *    use ordinary line or block comments and our own `commentray:start id=<id>` /
- *    `commentray:end id=<id>` tokens (still parsed by {@link parseCommentrayRegionBoundary}).
- *
- * Legacy pairs that only use (2) remain valid everywhere.
+ * Source delimiters for block anchors (region `commentray:<id>` vs generic
+ * `commentray:start` / `end`). Full taxonomy and viewport geometry: companion
+ * `.commentray/source/.../source-markers.ts/main.md`.
  */
 
 const COMMENTRAY_TAG = (id: string) => `commentray:${id.trim().toLowerCase()}`;
@@ -272,12 +263,7 @@ export function sourceLineRangeForMarkerId(
   return { start, end };
 }
 
-/**
- * 1-based half-open `[lo, hiExclusive)` for viewport / scroll sync: includes one physical line
- * above the start delimiter and the delimiter line itself, runs through the last inner line, and
- * **excludes** the end delimiter line. The blank between a block’s end marker and the next block’s
- * start marker therefore belongs to the next block (same as the line above the next start).
- */
+/** Half-open viewport span for scroll sync; see source-markers commentray. */
 export function markerViewportHalfOpen1Based(
   sourceText: string,
   markerId: string,

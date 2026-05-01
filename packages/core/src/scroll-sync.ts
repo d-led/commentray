@@ -54,12 +54,7 @@ function buildMarkerFallbackLinks(
   return links;
 }
 
-/**
- * Correlate index blocks with `<!-- commentray:block id=… -->` markers in
- * commentray. Supports legacy `lines:` anchors and `marker:` anchors (the
- * latter needs `sourceText` to resolve marker comments in the primary file).
- * Sorted by `sourceStart`.
- */
+/** Join index + companion markers into `BlockScrollLink[]`; see scroll-sync commentray. */
 export function buildBlockScrollLinks(
   index: CommentrayIndex | null | undefined,
   sourceRelative: string,

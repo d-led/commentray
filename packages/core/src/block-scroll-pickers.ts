@@ -6,24 +6,11 @@ export type BlockScrollLink = {
   /** 1-based inclusive inner lines between paired region markers (unchanged semantics). */
   sourceStart: number;
   sourceEnd: number;
-  /**
-   * 1-based half-open viewport span for “which block owns this source line?”. Marker-backed
-   * blocks use `markerViewportHalfOpen1Based()` in source-markers; `lines:` anchors use
-   * `[range.start, range.end + 1)`.
-   */
+  /** 1-based half-open span; see block-scroll-pickers commentray. */
   markerViewportHalfOpen1Based: { lo: number; hiExclusive: number };
 };
 
-/**
- * Which index block “owns” the source viewport top line (1-based), without hysteresis.
- * Same geometry as {@link pickCommentrayLineForSourceScroll}.
- */
-/**
- * The index block whose source viewport span **strictly contains** `topSourceLine1Based`
- * (`[lo, hiExclusive)`). When spans overlap, the earliest block by `lo` wins. Returns `null` in
- * true inter-block **gaps** (including above the first `lo` only when that line is still below
- * `lo` — callers combine with {@link sourceTopLineStrictlyBeforeFirstIndexLine} for “prelude”).
- */
+/** Strict `[lo, hi)` contain; `null` in gaps. See commentray for geometry. */
 export function blockStrictlyContainingSourceViewportLine(
   blocks: BlockScrollLink[],
   topSourceLine1Based: number,
@@ -39,7 +26,7 @@ export function blockStrictlyContainingSourceViewportLine(
   return null;
 }
 
-/** True when the viewport top sits **strictly above** every block’s `[lo, hiExclusive)` span. */
+/** Prelude above every span; see commentray. */
 export function sourceTopLineStrictlyBeforeFirstIndexLine(
   blocks: BlockScrollLink[],
   topSourceLine1Based: number,
@@ -52,10 +39,7 @@ export function sourceTopLineStrictlyBeforeFirstIndexLine(
   return topSourceLine1Based < minLo;
 }
 
-/**
- * True when the doc viewport probe sits strictly **between** two block marker lines in companion
- * order (interstitial prose / blanks), not on a marker line and not before the first marker.
- */
+/** True when probe sits strictly between two `commentray:block` lines (interstitial prose). */
 export function commentrayProbeInStrictInterMarkerGap(
   blocks: BlockScrollLink[],
   topCommentrayLine0Based: number,
@@ -82,6 +66,7 @@ export function commentrayProbeInStrictInterMarkerGap(
   return false;
 }
 
+/** Naive source viewport pick (inside span / gap / prelude); see commentray. */
 export function pickBlockScrollLinkForSourceViewportTop(
   blocks: BlockScrollLink[],
   topSourceLine1Based: number,
@@ -128,11 +113,7 @@ type StickyHysteresisLockResolution =
   | { outcome: "return"; link: BlockScrollLink }
   | { outcome: "hysteresis"; naive: BlockScrollLink; locked: BlockScrollLink };
 
-/**
- * Shared prelude for Schmitt-style hysteresis after the caller’s naive pick: clear lock when there
- * is no naive block; bootstrap or refresh `lockedId` on first hit / same block / stale lock;
- * otherwise hand off naive + locked for span- or line-based separation math.
- */
+/** Hysteresis lock resolution; diagram in commentray. */
 function resolveStickyHysteresisLock(
   naive: BlockScrollLink | null,
   blocks: BlockScrollLink[],
@@ -157,11 +138,7 @@ function resolveStickyHysteresisLock(
   return { outcome: "hysteresis", naive, locked };
 }
 
-/**
- * Schmitt-style block pick for **source→commentray** sync: keeps the active block until the
- * viewport top has moved clearly into another block’s territory, so probe noise at span edges
- * does not flip the partner between unrelated regions.
- */
+/** Source→commentray hysteresis; see commentray. */
 export function pickBlockScrollLinkForSourceViewportWithHysteresis(
   blocks: BlockScrollLink[],
   topSourceLine1Based: number,
@@ -198,13 +175,7 @@ export function pickBlockScrollLinkForSourceViewportWithHysteresis(
   return locked;
 }
 
-/**
- * Choose which commentray line (0-based) to reveal so the commentary matches
- * the top of the source viewport. Uses each link’s `markerViewportHalfOpen1Based`:
- * if the top line falls in `[lo, hiExclusive)`, that block wins; in gaps, the block with the
- * greatest `lo` still at or above the top line; if the viewport is above every `lo`, the first
- * block by `lo`.
- */
+/** Maps source viewport top → commentray line (naive pick); see commentray. */
 export function pickCommentrayLineForSourceScroll(
   blocks: BlockScrollLink[],
   topSourceLine1Based: number,
@@ -213,9 +184,7 @@ export function pickCommentrayLineForSourceScroll(
   return b ? b.commentrayLine : null;
 }
 
-/**
- * Schmitt twin for **commentray→source**: same idea in markdown line (0-based) space.
- */
+/** Commentray→source hysteresis twin; see commentray. */
 export function pickBlockScrollLinkForCommentrayViewportWithHysteresis(
   blocks: BlockScrollLink[],
   topCommentrayLine0Based: number,
@@ -250,10 +219,7 @@ export function pickBlockScrollLinkForCommentrayViewportWithHysteresis(
   return locked;
 }
 
-/**
- * The block whose companion marker is at or above `topCommentrayLine0Based`
- * (same rule as {@link pickSourceLine0ForCommentrayScroll}).
- */
+/** Naive pick: last block whose marker line ≤ viewport top (0-based MD lines). */
 export function pickBlockScrollLinkForCommentrayScroll(
   blocks: BlockScrollLink[],
   topCommentrayLine0Based: number,
@@ -269,11 +235,7 @@ export function pickBlockScrollLinkForCommentrayScroll(
   return best;
 }
 
-/**
- * Choose a 0-based source line to reveal from the top of the commentray
- * viewport: the block whose marker is at or above that line wins; reveal the
- * first line of its viewport span (`lo` − 1).
- */
+/** Commentray viewport top → 0-based source line (`lo - 1` of winning block). */
 export function pickSourceLine0ForCommentrayScroll(
   blocks: BlockScrollLink[],
   topCommentrayLine0Based: number,
