@@ -39,6 +39,17 @@ function visitWithFreshWideIntroStorage(): void {
   });
 }
 
+function whenWideIntroVisible(callback: () => void): void {
+  cy.get(shellA11y.shell).then(($shell) => {
+    if ($shell.attr("data-layout") === "stretch") {
+      cy.get("#commentray-wide-intro").should("not.exist");
+      return;
+    }
+    cy.get("#commentray-wide-intro").should("be.visible");
+    callback();
+  });
+}
+
 /** Advance the wide intro with Next until the title contains `fragment` (tolerates auto-skipped steps). */
 function clickWideIntroNextUntilTitle(fragment: string, maxNextClicks: number): void {
   if (maxNextClicks < 0) {
@@ -279,12 +290,7 @@ describe("Markdown source rendering modes", () => {
     cy.viewport(1280, 900);
     visitWithFreshWideIntroStorage();
 
-    cy.get(shellA11y.shell).then(($shell) => {
-      if ($shell.attr("data-layout") === "stretch") {
-        cy.get("#commentray-wide-intro").should("not.exist");
-        return;
-      }
-      cy.get("#commentray-wide-intro").should("be.visible");
+    whenWideIntroVisible(() => {
       cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
         "be.visible",
       );
@@ -307,12 +313,7 @@ describe("Markdown source rendering modes", () => {
     cy.viewport(1280, 900);
     visitWithFreshWideIntroStorage();
 
-    cy.get(shellA11y.shell).then(($shell) => {
-      if ($shell.attr("data-layout") === "stretch") {
-        cy.get("#commentray-wide-intro").should("not.exist");
-        return;
-      }
-      cy.get("#commentray-wide-intro").should("be.visible");
+    whenWideIntroVisible(() => {
       cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
         "be.visible",
       );
@@ -332,12 +333,7 @@ describe("Markdown source rendering modes", () => {
     cy.viewport(1280, 900);
     visitWithFreshWideIntroStorage();
 
-    cy.get(shellA11y.shell).then(($shell) => {
-      if ($shell.attr("data-layout") === "stretch") {
-        cy.get("#commentray-wide-intro").should("not.exist");
-        return;
-      }
-      cy.get("#commentray-wide-intro").should("be.visible");
+    whenWideIntroVisible(() => {
       expectVisibleArrows(2);
 
       cy.viewport(390, 844);
@@ -357,12 +353,7 @@ describe("Markdown source rendering modes", () => {
   it("shows intro tour on narrow viewports with narrow-view copy", () => {
     cy.viewport(390, 844);
     visitWithFreshWideIntroStorage();
-    cy.get(shellA11y.shell).then(($shell) => {
-      if ($shell.attr("data-layout") === "stretch") {
-        cy.get("#commentray-wide-intro").should("not.exist");
-        return;
-      }
-      cy.get("#commentray-wide-intro").should("be.visible");
+    whenWideIntroVisible(() => {
       cy.contains("#commentray-wide-intro .commentray-wide-intro-title", "Welcome").should(
         "be.visible",
       );
@@ -379,13 +370,7 @@ describe("Markdown source rendering modes", () => {
   it("ends with a help-button reminder and introduces share link", () => {
     cy.viewport(1280, 900);
     visitWithFreshWideIntroStorage();
-    cy.get(shellA11y.shell).then(($shell) => {
-      if ($shell.attr("data-layout") === "stretch") {
-        cy.get("#commentray-wide-intro").should("not.exist");
-        return;
-      }
-      cy.get("#commentray-wide-intro").should("be.visible");
-
+    whenWideIntroVisible(() => {
       clickWideIntroNextUntilTitle("Need a refresher?", 18);
 
       cy.contains(
