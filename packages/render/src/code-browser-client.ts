@@ -3424,6 +3424,16 @@ function wireStretchMobilePaneFlip(
     const next = cur === "code" ? "doc" : "code";
     shell.setAttribute("data-dual-mobile-pane", next);
     writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, next);
+    // When revealing the doc pane, (re)run Mermaid — diagrams inside display:none cells are
+    // skipped on initial load, so they need a triggered pass once the cells become visible.
+    if (next === "doc") {
+      queueMicrotask(() => {
+        void runMermaidOnFreshDocNodes(shell);
+        requestAnimationFrame(() => {
+          void runMermaidOnFreshDocNodes(shell);
+        });
+      });
+    }
   };
   flipBtn.addEventListener("click", runFlip);
   if (flipScrollBtn) {
