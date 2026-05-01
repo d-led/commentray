@@ -9,9 +9,17 @@ const SCRIPT_MARKER = "commentray-livereload";
 export function livereloadScript(port: number): string {
   return `<script data-${SCRIPT_MARKER}>
 (() => {
+  try {
+    const u0 = new URL(window.location.href);
+    if (u0.searchParams.has("_commentray_bust")) {
+      u0.searchParams.delete("_commentray_bust");
+      const q = u0.searchParams.toString();
+      history.replaceState(null, "", u0.pathname + (q ? "?" + q : "") + u0.hash);
+    }
+  } catch (_) {}
   const host = window.location.hostname || "127.0.0.1";
   const events = new EventSource("http://" + host + ":${port}${EVENT_PATH}");
-  events.addEventListener("reload", () => window.location.reload());
+  events.addEventListener("reload", () => location.reload());
 })();
 </script>`;
 }

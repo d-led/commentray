@@ -20,6 +20,14 @@ export function injectServeDevBuildWatch(html: string, buildId: string): string 
 function serveDevBuildWatchScript(buildId: string): string {
   return `<script data-${SCRIPT_MARKER}>
 (() => {
+  try {
+    const u0 = new URL(window.location.href);
+    if (u0.searchParams.has("_commentray_bust")) {
+      u0.searchParams.delete("_commentray_bust");
+      const q = u0.searchParams.toString();
+      history.replaceState(null, "", u0.pathname + (q ? "?" + q : "") + u0.hash);
+    }
+  } catch (_) {}
   const expect = "${buildId}";
   console.log("[commentray:dev-watch] poll-init", { buildId: expect });
   setInterval(async () => {

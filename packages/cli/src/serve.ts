@@ -10,6 +10,7 @@ import chokidar from "chokidar";
 import handler from "serve-handler";
 
 import { injectServeDevBuildWatchIntoSite } from "./serve-dev-build-watch.js";
+import { createServeRepoWatchIgnored } from "./serve-repo-watch-ignore.js";
 import { startLivereloadServer } from "./serve-livereload.js";
 
 export type ServeCliOptions = {
@@ -38,6 +39,14 @@ function serveHandlerOptions(siteAbs: string): Parameters<typeof handler>[2] {
     renderSingle,
     // Same hub entry as GitHub Pages: GET `/` serves `_site/index.html` (not a directory index).
     rewrites: [{ source: "/", destination: "/index.html" }],
+    // Local preview only: avoid disk-cache + 304 loops (especially with dev build-id polling after
+    // `serve-with-package-watch` restarts the process while the bar URL stays `http://localhost:4173/`).
+    headers: [
+      {
+        source: "**/*.html",
+        headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
+      },
+    ],
   };
 }
 
@@ -151,37 +160,55 @@ export async function runServeStaticPages(
   );
 
   const cfg = await loadCommentrayConfig(repoRoot);
-  const ss = cfg.staticSite;
-  const storageNorm = normalizeRepoRelativePath(cfg.storageDir.replaceAll("\\", "/"));
-  const storageAbs = path.join(repoRoot, ...storageNorm.split("/"));
-  const storageGlob = `${posixPath(storageAbs)}/**`;
-
-  const watchPaths: string[] = [
-    path.join(repoRoot, ".commentray.toml"),
-    posixPath(path.join(repoRoot, ss.sourceFile)),
-    storageGlob,
-    path.join(repoRoot, ".commentray", "metadata", "index.json"),
-  ];
-  if (ss.commentrayMarkdownFile) {
-    watchPaths.push(posixPath(path.join(repoRoot, ss.commentrayMarkdownFile)));
-  }
+  const storageDirRepoRelative = normalizeRepoRelativePath(cfg.storageDir.replaceAll("\\", "/"));
+  const ignored = createServeRepoWatchIgnored(repoRoot, { storageDirRepoRelative });
 
   let debounce: ReturnType<typeof setTimeout> | undefined;
-  const queueRebuild = (): void => {
+  let rebuildInFlight = false;
+  let pendingWhileRebuild = false;
+
+  const scheduleDebouncedRebuild = (): void => {
     if (debounce !== undefined) clearTimeout(debounce);
     debounce = setTimeout(() => {
       debounce = undefined;
-      void rebuild(true).catch((e: unknown) => {
-        process.stderr.write(
-          `[commentray serve] rebuild failed: ${e instanceof Error ? e.message : String(e)}\n`,
-        );
-      });
+      void runRebuildOnce();
     }, 300);
   };
 
-  const watcher = chokidar.watch(watchPaths, {
+  async function runRebuildOnce(): Promise<void> {
+    if (rebuildInFlight) {
+      pendingWhileRebuild = true;
+      return;
+    }
+    rebuildInFlight = true;
+    try {
+      await rebuild(true);
+    } catch (e: unknown) {
+      process.stderr.write(
+        `[commentray serve] rebuild failed: ${e instanceof Error ? e.message : String(e)}\n`,
+      );
+    } finally {
+      rebuildInFlight = false;
+      if (pendingWhileRebuild) {
+        pendingWhileRebuild = false;
+        scheduleDebouncedRebuild();
+      }
+    }
+  }
+
+  const queueRebuild = (): void => {
+    if (rebuildInFlight) {
+      pendingWhileRebuild = true;
+      return;
+    }
+    scheduleDebouncedRebuild();
+  };
+
+  const watcher = chokidar.watch(posixPath(repoRoot), {
     ignoreInitial: true,
-    ignored: ["**/node_modules/**", "**/_site/**"],
+    ignored,
+    /** Avoid paired unlink/add noise from atomic saves on some editors (chokidar default). */
+    atomic: false,
     awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 100 },
   });
   watcher.on("all", () => {
@@ -207,6 +234,7 @@ export async function runServeStaticPages(
     if (exiting) return;
     exiting = true;
     void (async () => {
+      if (debounce !== undefined) clearTimeout(debounce);
       void watcher.close();
       await livereload?.close();
       await stopHttpServerAsync();

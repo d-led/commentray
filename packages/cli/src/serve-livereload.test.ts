@@ -13,6 +13,7 @@ describe("serve livereload HTML injection", () => {
 
     expect(withReload).toContain("<script data-commentray-livereload>");
     expect(withReload).toContain('new EventSource("http://" + host + ":4174');
+    expect(withReload).toContain("location.reload()");
     expect(withReload).toMatch(/<\/script>\n<\/body>$/);
   });
 
