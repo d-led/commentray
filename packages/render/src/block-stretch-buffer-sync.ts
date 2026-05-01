@@ -1,6 +1,5 @@
 import {
   BufferingFlowSynchronizer,
-  NON_SYNC_TAIL_SLACK_ITEM_ID,
   type HeightAdjustable,
 } from "@commentray/core/buffering-flow-synchronizer";
 
@@ -183,31 +182,14 @@ function applySynchronizedPaddingToStretchRows(
   }
 }
 
-function applyTailSlackPaddingToLastStretchRow(
-  rows: HTMLTableRowElement[],
-  sync: { left: HeightAdjustable[]; right: HeightAdjustable[] },
-): void {
-  const rowCount = rows.length;
-  let tailLeftBelow = 0;
-  let tailRightBelow = 0;
-  for (let i = rowCount; i < sync.left.length; i++) {
-    const l = sync.left[i];
-    const r = sync.right[i];
-    if (l?.id === NON_SYNC_TAIL_SLACK_ITEM_ID) tailLeftBelow += l.bufferBelow;
-    if (r?.id === NON_SYNC_TAIL_SLACK_ITEM_ID) tailRightBelow += r.bufferBelow;
-  }
-  if (tailLeftBelow === 0 && tailRightBelow === 0) return;
+function clearTerminalBottomSlack(rows: HTMLTableRowElement[]): void {
   const lastRow = rows.at(-1);
+  if (lastRow === undefined || !lastRow.classList.contains("stretch-row--gap")) return;
   const pair = lastRow === undefined ? null : stretchRowCells(lastRow);
-  const lLast = sync.left[rowCount - 1];
-  const rLast = sync.right[rowCount - 1];
-  if (pair === null || lLast === undefined || rLast === undefined) return;
-  if (tailLeftBelow > 0) {
-    pair.codeTd.style.paddingBottom = `${String(lLast.bufferBelow + tailLeftBelow)}px`;
-  }
-  if (tailRightBelow > 0) {
-    pair.docTd.style.paddingBottom = `${String(rLast.bufferBelow + tailRightBelow)}px`;
-  }
+  if (pair === null) return;
+  // In shared-table stretch mode, terminal tail slack only creates dead blank space at the end.
+  pair.codeTd.style.paddingBottom = "";
+  pair.docTd.style.paddingBottom = "";
 }
 
 /**
@@ -223,7 +205,7 @@ export function applyBlockStretchRowBuffers(table: HTMLTableElement): void {
   if (columns === null) return;
   const sync = synchronizer.synchronize(columns.left, columns.right);
   applySynchronizedPaddingToStretchRows(rows, sync);
-  applyTailSlackPaddingToLastStretchRow(rows, sync);
+  clearTerminalBottomSlack(rows);
 }
 
 export function dispatchCommentrayMermaidDone(): void {

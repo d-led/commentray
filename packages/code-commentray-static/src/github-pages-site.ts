@@ -324,6 +324,7 @@ function staticRenderOptions(input: {
     outHtml: input.outHtml,
     title: input.ss.title,
     filePath: input.ss.sourceFile,
+    codeBrowserLayout: "auto",
     includeMermaidRuntime: input.cfg.render.mermaid,
     hljsTheme: input.cfg.render.syntaxTheme,
     siteHubUrl: "./",

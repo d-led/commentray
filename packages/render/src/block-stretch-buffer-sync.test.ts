@@ -52,4 +52,53 @@ describe("applyBlockStretchRowBuffers", () => {
     expect(codeTd.style.paddingBottom).toBe("24px");
     expect(docTd.style.paddingBottom).toBe("");
   });
+
+  it("does not leave terminal bottom slack on the last stretch row", () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>
+        <table class="block-stretch"><tbody>
+        <tr class="stretch-row stretch-row--block" data-commentray-stretch-sync-id="r1">
+          <td class="stretch-code"><div class="stretch-cell-measure"><div class="stretch-code-stack"></div></div></td>
+          <td class="stretch-doc"><div class="stretch-cell-measure"><div class="stretch-doc-inner"></div></div></td>
+        </tr>
+        <tr class="stretch-row stretch-row--gap" data-commentray-stretch-sync-id="__gap__0">
+          <td class="stretch-code"><div class="stretch-cell-measure"><div class="stretch-code-stack"></div></div></td>
+          <td class="stretch-doc"><div class="stretch-cell-measure"><div class="stretch-doc-inner"></div></div></td>
+        </tr>
+      </tbody></table></body></html>`,
+      { pretendToBeVisual: true },
+    );
+    const { document } = dom.window;
+    const table = document.querySelector("table");
+    if (!(table instanceof dom.window.HTMLTableElement)) throw new Error("table");
+
+    const codeStacks = table.querySelectorAll(".stretch-code-stack");
+    const docInners = table.querySelectorAll(".stretch-doc-inner");
+    const topCode = codeStacks[0];
+    const tailCode = codeStacks[1];
+    const topDoc = docInners[0];
+    const tailDoc = docInners[1];
+    if (!(topCode instanceof dom.window.HTMLElement)) throw new Error("top code stack");
+    if (!(tailCode instanceof dom.window.HTMLElement)) throw new Error("tail code stack");
+    if (!(topDoc instanceof dom.window.HTMLElement)) throw new Error("top doc inner");
+    if (!(tailDoc instanceof dom.window.HTMLElement)) throw new Error("tail doc inner");
+
+    topCode.getBoundingClientRect = () => fakeDomRect(120);
+    topDoc.getBoundingClientRect = () => fakeDomRect(40);
+    tailCode.getBoundingClientRect = () => fakeDomRect(20);
+    tailDoc.getBoundingClientRect = () => fakeDomRect(20);
+
+    applyBlockStretchRowBuffers(table);
+
+    const rows = table.querySelectorAll("tr.stretch-row");
+    const lastRow = rows[rows.length - 1];
+    if (!(lastRow instanceof dom.window.HTMLTableRowElement)) throw new Error("last row");
+    const lastCode = lastRow.querySelector("td.stretch-code");
+    const lastDoc = lastRow.querySelector("td.stretch-doc");
+    if (!(lastCode instanceof dom.window.HTMLTableCellElement)) throw new Error("last code td");
+    if (!(lastDoc instanceof dom.window.HTMLTableCellElement)) throw new Error("last doc td");
+
+    expect(lastCode.style.paddingBottom).toBe("");
+    expect(lastDoc.style.paddingBottom).toBe("");
+  });
 });
