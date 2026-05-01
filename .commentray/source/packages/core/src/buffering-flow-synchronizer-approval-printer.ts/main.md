@@ -1,4 +1,4 @@
-# `buffering-flow-synchronizer-approval-printer.ts` — commentray.
+# `buffering-flow-synchronizer-approval-printer.ts` — commentray
 
 <!-- #region commentray:bfap-role -->
 
@@ -21,11 +21,11 @@ Responsibilities here:
 
 ## Token vocabulary (approval-only)
 
-| Token / pattern | Meaning in fixtures |
-|-----------------|---------------------|
-| `XXXX` | Generic “body” ink in a cell (anonymous or continuation body). |
-| `BBBB` | One row of buffer slack from `bufferAbove` / `bufferBelow` stacking. |
-| `R{N}XX` | Sync-region header id (must match `APPROVAL_REGION_TOKEN_RE` for header styling). |
+| Token / pattern | Meaning in fixtures                                                               |
+| --------------- | --------------------------------------------------------------------------------- |
+| `XXXX`          | Generic “body” ink in a cell (anonymous or continuation body).                    |
+| `BBBB`          | One row of buffer slack from `bufferAbove` / `bufferBelow` stacking.              |
+| `R{N}XX`        | Sync-region header id (must match `APPROVAL_REGION_TOKEN_RE` for header styling). |
 
 **Invariant:** never place buffer fill in **both** cells on the **same** ASCII line — that would duplicate slack on one zip row. The printer splits such pairs into stagger. Tall columns may still show **many** consecutive buffer rows in **one** cell.
 
