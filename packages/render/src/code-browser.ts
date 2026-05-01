@@ -884,7 +884,7 @@ const CODE_BROWSER_STYLES = `
         flex-wrap: wrap;
         align-items: center;
         justify-content: flex-end;
-        gap: 10px 14px;
+        gap: 6px;
         margin-left: auto;
         min-width: 0;
       }
