@@ -59,6 +59,6 @@ Golden files under `packages/core/src/buffering-flow-synchronizer.approvals/` ar
 
 ## Normative TOML sketch
 
-The repo’s [`.commentray.toml`](https://github.com/d-led/commentary/blob/main/.commentray.toml) contains a line-comment sketch between `# commentray:start id=toml-buffering-flow-sync` and `# commentray:end id=toml-buffering-flow-sync`. The [`.commentray.toml` commentray](../../../.commentray.toml/main.md) block with the same id points back here for implementation detail.
+The normative sketch for id **`toml-buffering-flow-sync`** lives in the [`.commentray.toml` commentray](../../../.commentray.toml/main.md) (Markdown block paired with placeholder comments in [`.commentray.toml`](https://github.com/d-led/commentary/blob/main/.commentray.toml)). That block points here for implementation detail.
 
 <!-- #endregion commentray:bfs-toml-sketch -->
