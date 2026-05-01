@@ -186,34 +186,27 @@ Cypress.Commands.add("ShellPairBrowseLinkShouldNotPointAtGithubHost", () => {
 Cypress.Commands.add("DocPaneMermaidShouldShowDiagramOrMarkup", () => {
   cy.get(shellA11y.shell).then(($shell) => {
     if ($shell.attr("data-layout") === "stretch") {
-      cy.get(
-        `${shellA11y.shell} .stretch-doc-inner ${shellA11y.commentrayMermaid}, ${shellA11y.shell} .stretch-preamble ${shellA11y.commentrayMermaid}`,
-        {
-          timeout: MERMAID_E2E_TIMEOUT_MS,
-        },
-      )
-        .should("have.length.at.least", 1)
-        .each(($block) => {
-          cy.wrap($block).find("svg").should("have.length.at.least", 1);
-          cy.wrap($block).should("not.contain", MERMAID_SYNTAX_ERROR_SNIPPET);
-        });
-      cy.get(shellA11y.shell, { timeout: MERMAID_E2E_TIMEOUT_MS }).should(
-        "not.contain",
-        MERMAID_SYNTAX_ERROR_SNIPPET,
-      );
+      cy.get(shellA11y.shell, { timeout: MERMAID_E2E_TIMEOUT_MS }).should(($scope) => {
+        const mermaidBlocks = $scope.find(
+          `.stretch-doc-inner ${shellA11y.commentrayMermaid}, .stretch-preamble ${shellA11y.commentrayMermaid}`,
+        );
+        expect(mermaidBlocks.length, "stretch mermaid block count").to.be.at.least(1);
+        const svgCount = mermaidBlocks.find("svg").length;
+        expect(svgCount, "stretch rendered mermaid svg count").to.be.at.least(1);
+        expect($scope.text(), "stretch mermaid syntax error output").not.to.contain(
+          MERMAID_SYNTAX_ERROR_SNIPPET,
+        );
+      });
     } else {
-      cy.get(`${shellA11y.docPaneBody} ${shellA11y.commentrayMermaid}`, {
-        timeout: MERMAID_E2E_TIMEOUT_MS,
-      })
-        .should("have.length.at.least", 1)
-        .each(($block) => {
-          cy.wrap($block).find("svg").should("have.length.at.least", 1);
-          cy.wrap($block).should("not.contain", MERMAID_SYNTAX_ERROR_SNIPPET);
-        });
-      cy.get(shellA11y.docPaneBody, { timeout: MERMAID_E2E_TIMEOUT_MS }).should(
-        "not.contain",
-        MERMAID_SYNTAX_ERROR_SNIPPET,
-      );
+      cy.get(shellA11y.docPaneBody, { timeout: MERMAID_E2E_TIMEOUT_MS }).should(($scope) => {
+        const mermaidBlocks = $scope.find(shellA11y.commentrayMermaid);
+        expect(mermaidBlocks.length, "dual mermaid block count").to.be.at.least(1);
+        const svgCount = mermaidBlocks.find("svg").length;
+        expect(svgCount, "dual rendered mermaid svg count").to.be.at.least(1);
+        expect($scope.text(), "dual mermaid syntax error output").not.to.contain(
+          MERMAID_SYNTAX_ERROR_SNIPPET,
+        );
+      });
     }
   });
 });
