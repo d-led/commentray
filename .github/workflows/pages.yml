@@ -23,7 +23,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -50,24 +50,6 @@ jobs:
         run: node scripts/validate-pages-github-links.mjs
         env:
           COMMENTRAY_VALIDATE_PAGES_LIVE: "1"
-
-      - name: Remove stale github-pages artifacts from earlier attempts
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          ids=$(gh api --paginate "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts" \
-            --jq '.artifacts[] | select(.name == "github-pages" and .expired == false) | .id')
-          if [ -z "$ids" ]; then
-            echo "No stale github-pages artifacts."
-            exit 0
-          fi
-          for id in $ids; do
-            echo "Deleting stale github-pages artifact $id"
-            gh api -X DELETE "repos/$GH_REPO/actions/artifacts/$id"
-          done
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
