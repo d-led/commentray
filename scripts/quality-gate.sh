@@ -36,6 +36,10 @@ cd "$REPO_ROOT"
 : "${FORCE_COLOR:=1}"
 export FORCE_COLOR
 
+# Keep local quality-gate behavior deterministic when launched from a VS Code
+# JavaScript Debug Terminal (auto-attach signal for child Node processes).
+unset VSCODE_INSPECTOR_OPTIONS
+
 quality_gate_require_external_tools() {
   local failed=0
   local al_version="${ACTIONLINT_VERSION:-1.7.12}"

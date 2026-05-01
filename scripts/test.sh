@@ -8,6 +8,9 @@ cd "$REPO_ROOT"
 : "${FORCE_COLOR:=1}"
 export FORCE_COLOR
 
+# Avoid VS Code auto-attach side effects in child Node processes.
+unset VSCODE_INSPECTOR_OPTIONS
+
 mode="${COMMENTRAY_TEST_MODE:-unit}"
 case "$mode" in
   # Unit Vitest suite includes `packages/architecture/architecture.test.ts`
