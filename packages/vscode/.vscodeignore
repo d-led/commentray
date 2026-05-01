@@ -1,8 +1,16 @@
 .vscode/**
+.vscode-test/**
 src/**
 dist/test/**
+fixtures/**
+test-results/**
 **/*.tsbuildinfo
 tsconfig*.json
 esbuild.extension.mjs
 *.vsix
+*.tgz
 dist/*.vsix
+dist/**/*.d.ts
+dist/**/*.d.ts.map
+dist/**/*.js.map
+.vscode-test.mjs
