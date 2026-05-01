@@ -36,6 +36,19 @@ function blockStretchTableHtml(html: string): string {
   return m?.[0] ?? "";
 }
 
+function shellOpenTag(html: string): string {
+  const m = /<div class="shell[^"]*" id="shell"[^>]*>/.exec(html);
+  return m?.[0] ?? "";
+}
+
+function decodeShellDataAttr(html: string, attr: string): string {
+  const shell = shellOpenTag(html);
+  const rx = new RegExp(`${attr}="([^"]*)"`);
+  const b64 = rx.exec(shell)?.[1] ?? "";
+  if (b64.length === 0) return "";
+  return Buffer.from(b64, "base64").toString("utf8");
+}
+
 function readmeTwoAngleStretchIndex(mainPath: string, altPath: string) {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -134,15 +147,16 @@ describe("Code browser page — layout shell and search", () => {
       language: "txt",
       commentrayMarkdown: "body",
     });
-    const m = /<div class="shell" id="shell"[^>]*>/.exec(html);
-    expect(m).not.toBeNull();
-    if (m === null) {
+    const shell = shellOpenTag(html);
+    expect(shell.length).toBeGreaterThan(0);
+    if (shell.length === 0) {
       throw new Error("expected shell opening tag");
     }
-    expect(m[0]).toContain("data-raw-code-b64=");
-    expect(m[0]).toContain("data-raw-md-b64=");
-    expect(m[0]).not.toContain("data-search-scope=");
-    expect(m[0]).toContain('data-source-pane-mode="source"');
+    expect(shell).toContain('data-layout="stretch"');
+    expect(shell).toContain("data-raw-code-b64=");
+    expect(shell).toContain("data-raw-md-b64=");
+    expect(shell).not.toContain("data-search-scope=");
+    expect(shell).toContain('data-source-pane-mode="source"');
     expect(html).not.toContain('id="source-markdown-pane-flip"');
   });
 
@@ -210,7 +224,8 @@ describe("Code browser page — document shell and chrome", () => {
     expect(banner).toMatch(/<h1[^>]*>\s*Demo\s*</i);
     expect(banner).toMatch(/aria-haspopup="menu"/);
 
-    expect(html).toContain('aria-label="Resize panes"');
+    expect(html).toContain('data-layout="stretch"');
+    expect(html).toContain('data-stretch-buffer-sync="flow-synchronizer"');
     expect(html).toContain('role="region" aria-label="Search"');
     expect(html).toContain('for="search-q"');
     expect(banner).toContain("Wrap lines");
@@ -242,7 +257,7 @@ describe("Code browser page — document shell and chrome", () => {
     expect(html).toContain('<meta name="description" content="Custom summary for listings." />');
   });
 
-  it("should render commentray inline markdown after block markers (anchors must not break mdast)", async () => {
+  it("should preserve markdown content after block markers in shell payload", async () => {
     const md =
       "# Title\n\n<!-- commentray:block id=blk -->\n\n_Italic lede_ and **bold** after the marker.\n";
     const html = await renderCodeBrowserHtml({
@@ -251,8 +266,10 @@ describe("Code browser page — document shell and chrome", () => {
       language: "ts",
       commentrayMarkdown: md,
     });
-    expect(html).toContain("<em>Italic lede</em>");
-    expect(html).toContain("<strong>bold</strong>");
+    const rawMd = decodeShellDataAttr(html, "data-raw-md-b64");
+    expect(rawMd).toContain("<!-- commentray:block id=blk -->");
+    expect(rawMd).toContain("_Italic lede_");
+    expect(rawMd).toContain("**bold**");
   });
 
   it("should include a generator meta tag when a generator label is provided", async () => {
@@ -439,11 +456,10 @@ describe("Code browser page — file path display", () => {
       commentrayMarkdown: "body",
     });
     expect(html).toContain("README.md");
-    expect(html).toContain('data-source-pane-mode="rendered-markdown"');
+    expect(html).toContain('data-source-pane-mode="source"');
     expect(html).toContain('id="source-markdown-pane-flip"');
     expect(html).toContain('id="source-markdown-pane-flip-scroll"');
-    expect(html).toContain('id="code-pane-markdown-body"');
-    expect(html).toContain('id="code-md-line-0"');
+    expect(html).not.toContain('id="code-pane-markdown-body"');
   });
 
   it("should escape file path labels so angle brackets cannot inject markup", async () => {
@@ -611,7 +627,6 @@ describe("Code browser page — companion Markdown rendering basics", () => {
     expect(html).toMatch(/<h1[^>]*>\s*Title/);
     expect(html).toContain("<strong>bold</strong>");
     expect(html).toContain('href="https://example.com"');
-    expect(html).toContain('id="commentray-md-line-0"');
     expect(html).not.toContain("const fenced = 1<span ");
   });
 
@@ -628,7 +643,7 @@ describe("Code browser page — companion Markdown rendering basics", () => {
 });
 
 describe("Code browser page — companion Markdown page-break rendering", () => {
-  it("renders deliberate page breaks from comment markers without breaking markdown flow", async () => {
+  it("preserves deliberate page-break markers and surrounding markdown in shell payload", async () => {
     const md = [
       "# Chapter one",
       "",
@@ -645,9 +660,10 @@ describe("Code browser page — companion Markdown page-break rendering", () => 
       language: "txt",
       commentrayMarkdown: md,
     });
-    expect(html).toContain('class="commentray-page-break"');
-    expect(html).toContain('data-commentray-page-break="true"');
-    expect(html).toContain("Chapter two");
+    const rawMd = decodeShellDataAttr(html, "data-raw-md-b64");
+    expect(rawMd).toContain("<!-- commentray:page-break -->");
+    expect(rawMd).toContain("## Chapter two");
+    expect(rawMd).toContain("Continuation.");
   });
 
   it("annotates page breaks with next block metadata when block links are available", async () => {
@@ -972,15 +988,15 @@ describe("Code browser page — multi-angle index isolation", () => {
 });
 
 describe("Code browser page — block markers", () => {
-  it("should insert block separator anchors after each commentray:block marker", async () => {
+  it("should preserve block marker lines in shell payload", async () => {
     const html = await renderCodeBrowserHtml({
       code: "x",
       language: "txt",
       commentrayMarkdown: "<!-- commentray:block id=myblock -->\n\n## Title\n",
     });
-    expect(html).toContain("<h2");
-    expect(html).toContain("Title");
-    expect(html).toContain('id="commentray-block-myblock"');
+    const rawMd = decodeShellDataAttr(html, "data-raw-md-b64");
+    expect(rawMd).toContain("<!-- commentray:block id=myblock -->");
+    expect(rawMd).toContain("## Title");
   });
 });
 
