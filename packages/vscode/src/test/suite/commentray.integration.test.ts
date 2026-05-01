@@ -34,6 +34,7 @@ function registerExtensionSurfaceTests(dogfoodWorkspace: DogfoodWorkspaceAccesso
       assert.ok(cmds.includes("commentray.addAngleDefinition"));
       assert.ok(cmds.includes("commentray.openRenderedPreview"));
       assert.ok(cmds.includes("commentray.openRenderedPreviewChooseAngle"));
+      assert.ok(cmds.includes("commentray.openCorrespondingSource"));
     });
   });
 }
@@ -180,6 +181,32 @@ function registerAddBlockFromSelectionTests(dogfoodWorkspace: DogfoodWorkspaceAc
   });
 }
 
+function registerOpenCorrespondingSourceTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
+  describe("Open corresponding source file from companion markdown", () => {
+    it('Given the paired Commentray markdown is active, when the user runs "Commentray: Open corresponding source file", then the primary source editor becomes active for that pair.', async () => {
+      await openFixtureSourceFile(dogfoodWorkspace.root());
+      await vscode.commands.executeCommand("commentray.openSideBySide");
+
+      const pairedUri = vscode.Uri.joinPath(
+        dogfoodWorkspace.root(),
+        ...pairedMarkdownPath.split("/"),
+      );
+      const pairedDoc = await vscode.workspace.openTextDocument(pairedUri);
+      await vscode.window.showTextDocument(pairedDoc);
+
+      await vscode.commands.executeCommand("commentray.openCorrespondingSource");
+
+      const active = vscode.window.activeTextEditor;
+      assert.ok(active, "Expected an active editor after opening corresponding source.");
+      assert.strictEqual(
+        active.document.uri.fsPath,
+        vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts").fsPath,
+        "Expected focus on the dogfood primary source file.",
+      );
+    });
+  });
+}
+
 function registerMarkdownPreviewTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
   describe("Open Markdown preview for paired file", () => {
     it('Given the paired Markdown file is active, when the user runs "Commentray: Open Markdown preview for paired file", then the command runs without rejecting.', async () => {
@@ -217,6 +244,7 @@ describe("Commentray in VS Code (integration)", () => {
   const dogfoodWorkspace = registerDogfoodWorkspaceLifecycle();
   registerExtensionSurfaceTests(dogfoodWorkspace);
   registerOpenPairedMarkdownTests(dogfoodWorkspace);
+  registerOpenCorrespondingSourceTests(dogfoodWorkspace);
   registerValidateWorkspaceTests(dogfoodWorkspace);
   registerAddBlockFromSelectionTests(dogfoodWorkspace);
   registerMarkdownPreviewTests(dogfoodWorkspace);

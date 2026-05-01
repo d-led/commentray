@@ -30,7 +30,8 @@
     "onCommand:commentray.openCommentrayPreview",
     "onCommand:commentray.openRenderedPreview",
     "onCommand:commentray.openRenderedPreviewChooseAngle",
-    "onCommand:commentray.validateWorkspace"
+    "onCommand:commentray.validateWorkspace",
+    "onCommand:commentray.openCorrespondingSource"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -48,12 +49,14 @@
       {
         "command": "commentray.openSideBySide",
         "title": "Open paired markdown beside editor",
-        "category": "Commentray"
+        "category": "Commentray",
+        "enablement": "!commentray.activeEditorUnderCompanionSourceTree"
       },
       {
         "command": "commentray.openCommentrayAngle",
         "title": "Open paired markdown (choose angle)",
-        "category": "Commentray"
+        "category": "Commentray",
+        "enablement": "!commentray.activeEditorUnderCompanionSourceTree"
       },
       {
         "command": "commentray.addAngleDefinition",
@@ -63,27 +66,37 @@
       {
         "command": "commentray.startBlockFromSelection",
         "title": "Add commentary block from selection",
-        "category": "Commentray"
+        "category": "Commentray",
+        "enablement": "!commentray.activeEditorUnderCompanionSourceTree && !editorReadonly"
       },
       {
         "command": "commentray.openCommentrayPreview",
         "title": "Open Markdown preview for paired file",
-        "category": "Commentray"
+        "category": "Commentray",
+        "enablement": "!commentray.activeEditorUnderCompanionSourceTree || editorLangId == markdown"
       },
       {
         "command": "commentray.openRenderedPreview",
         "title": "Open rendered Commentray preview (default angle)",
-        "category": "Commentray"
+        "category": "Commentray",
+        "enablement": "!commentray.activeEditorUnderCompanionSourceTree"
       },
       {
         "command": "commentray.openRenderedPreviewChooseAngle",
         "title": "Open rendered Commentray preview (choose angle)…",
-        "category": "Commentray"
+        "category": "Commentray",
+        "enablement": "!commentray.activeEditorUnderCompanionSourceTree"
       },
       {
         "command": "commentray.validateWorkspace",
         "title": "Validate workspace",
         "category": "Commentray"
+      },
+      {
+        "command": "commentray.openCorrespondingSource",
+        "title": "Open corresponding source file",
+        "category": "Commentray",
+        "enablement": "commentray.activeEditorIsResolvableCompanionMarkdown"
       }
     ],
     "keybindings": [
@@ -91,13 +104,13 @@
         "command": "commentray.openSideBySide",
         "key": "ctrl+alt+o",
         "mac": "cmd+alt+o",
-        "when": "editorTextFocus"
+        "when": "editorTextFocus && !commentray.activeEditorUnderCompanionSourceTree"
       },
       {
         "command": "commentray.startBlockFromSelection",
         "key": "ctrl+alt+k",
         "mac": "cmd+alt+k",
-        "when": "editorTextFocus && !editorReadonly"
+        "when": "editorTextFocus && !editorReadonly && !commentray.activeEditorUnderCompanionSourceTree"
       }
     ],
     "menus": {
@@ -105,22 +118,22 @@
         {
           "command": "commentray.openSideBySide",
           "group": "commentray@1",
-          "when": "editorTextFocus"
+          "when": "editorTextFocus && !commentray.activeEditorUnderCompanionSourceTree"
         },
         {
           "command": "commentray.openCommentrayAngle",
           "group": "commentray@1b",
-          "when": "editorTextFocus"
+          "when": "editorTextFocus && !commentray.activeEditorUnderCompanionSourceTree"
         },
         {
           "command": "commentray.openRenderedPreview",
           "group": "commentray@1d",
-          "when": "editorTextFocus"
+          "when": "editorTextFocus && !commentray.activeEditorUnderCompanionSourceTree"
         },
         {
           "command": "commentray.openRenderedPreviewChooseAngle",
           "group": "commentray@1e",
-          "when": "editorTextFocus"
+          "when": "editorTextFocus && !commentray.activeEditorUnderCompanionSourceTree"
         },
         {
           "command": "commentray.addAngleDefinition",
@@ -130,7 +143,12 @@
         {
           "command": "commentray.startBlockFromSelection",
           "group": "commentray@2",
-          "when": "editorTextFocus && !editorReadonly"
+          "when": "editorTextFocus && !editorReadonly && !commentray.activeEditorUnderCompanionSourceTree"
+        },
+        {
+          "command": "commentray.openCorrespondingSource",
+          "group": "commentray@1f",
+          "when": "editorTextFocus && commentray.activeEditorIsResolvableCompanionMarkdown"
         }
       ],
       "explorer/context": [

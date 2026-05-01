@@ -17,6 +17,7 @@ import {
   normalizeRepoRelativePath,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
+  pairFromCommentraySourceRel,
   readIndex,
   resolveCommentrayMarkdownPath,
   upsertAngleDefinitionInCommentrayToml,
@@ -80,6 +81,64 @@ function applyScrollSyncSettingFromConfig(): void {
 function storageCommentraySourcePrefix(storageDir: string): string {
   const sd = storageDir.replaceAll("\\", "/");
   return `${sd}/source/`;
+}
+
+const CTX_ACTIVE_EDITOR_UNDER_COMPANION_SOURCE_TREE =
+  "commentray.activeEditorUnderCompanionSourceTree";
+const CTX_ACTIVE_EDITOR_IS_RESOLVABLE_COMPANION_MD =
+  "commentray.activeEditorIsResolvableCompanionMarkdown";
+
+/**
+ * Drives `when` / `enablement` clauses so editor-only commands match companion vs primary files.
+ */
+async function applyCommentrayActiveEditorUiContexts(uri: vscode.Uri | undefined): Promise<void> {
+  const setBoth = async (
+    underCompanionTree: boolean,
+    resolvableCompanionMd: boolean,
+  ): Promise<void> => {
+    await vscode.commands.executeCommand(
+      "setContext",
+      CTX_ACTIVE_EDITOR_UNDER_COMPANION_SOURCE_TREE,
+      underCompanionTree,
+    );
+    await vscode.commands.executeCommand(
+      "setContext",
+      CTX_ACTIVE_EDITOR_IS_RESOLVABLE_COMPANION_MD,
+      resolvableCompanionMd,
+    );
+  };
+
+  if (!uri || uri.scheme !== "file") {
+    await setBoth(false, false);
+    return;
+  }
+  const folder = vscode.workspace.getWorkspaceFolder(uri);
+  if (!folder) {
+    await setBoth(false, false);
+    return;
+  }
+
+  try {
+    const relative = vscode.workspace.asRelativePath(uri, false);
+    if (path.isAbsolute(relative)) {
+      await setBoth(false, false);
+      return;
+    }
+    const normalized = normalizeRepoRelativePath(relative.replaceAll("\\", "/"));
+    const cfg = await loadCommentrayConfig(folder.uri.fsPath);
+    const sourcePrefix = storageCommentraySourcePrefix(cfg.storageDir);
+    if (!normalized.startsWith(sourcePrefix)) {
+      await setBoth(false, false);
+      return;
+    }
+    const relFromSourceDir = normalized.slice(sourcePrefix.length);
+    const storageNorm = normalizeRepoRelativePath(cfg.storageDir.replaceAll("\\", "/"));
+    const anglesOn = commentrayAnglesLayoutEnabled(folder.uri.fsPath, cfg.storageDir);
+    const pair = pairFromCommentraySourceRel(storageNorm, relFromSourceDir, anglesOn);
+    await setBoth(true, Boolean(pair));
+  } catch {
+    await setBoth(false, false);
+  }
 }
 
 function disposeScrollSync() {
@@ -727,6 +786,68 @@ async function openCommentrayPreviewCommand(): Promise<void> {
   await vscode.commands.executeCommand("markdown.showPreview", ensured);
 }
 
+async function openCorrespondingSourceCommand(): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    await vscode.window.showWarningMessage("Open a Commentray companion markdown file first.");
+    return;
+  }
+  if (!vscode.workspace.workspaceFolders?.length) {
+    await vscode.window.showWarningMessage("Open a workspace folder first.");
+    return;
+  }
+  const active = await requireEditorInWorkspaceFolder(editor);
+  if (!active) return;
+
+  let normalized: string;
+  try {
+    const relative = vscode.workspace.asRelativePath(active.editor.document.uri, false);
+    normalized = normalizeRepoRelativePath(relative.replaceAll("\\", "/"));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await vscode.window.showErrorMessage(
+      `Could not resolve a repo-relative path for the active editor: ${message}`,
+    );
+    return;
+  }
+
+  const repoRoot = active.folder.uri.fsPath;
+  const cfg = await loadCommentrayConfig(repoRoot);
+  const sourcePrefix = storageCommentraySourcePrefix(cfg.storageDir);
+
+  if (!normalized.startsWith(sourcePrefix) || !normalized.endsWith(".md")) {
+    await vscode.window.showInformationMessage(
+      "Open a Commentray companion `.md` under your project’s Commentray storage (…/source/…) — this command jumps to its primary source file.",
+    );
+    return;
+  }
+
+  const relFromSourceDir = normalized.slice(sourcePrefix.length);
+  const storageNorm = normalizeRepoRelativePath(cfg.storageDir.replaceAll("\\", "/"));
+  const anglesOn = commentrayAnglesLayoutEnabled(repoRoot, cfg.storageDir);
+  const pair = pairFromCommentraySourceRel(storageNorm, relFromSourceDir, anglesOn);
+  if (!pair) {
+    await vscode.window.showWarningMessage(
+      "Could not map this companion path to a source file (unexpected path under …/source/).",
+    );
+    return;
+  }
+
+  const sourceAbs = path.join(repoRoot, ...pair.sourcePath.split("/"));
+  const sourceUri = vscode.Uri.file(sourceAbs);
+  try {
+    await vscode.workspace.fs.stat(sourceUri);
+  } catch {
+    await vscode.window.showErrorMessage(
+      `Primary source file is missing on disk: ${pair.sourcePath}`,
+    );
+    return;
+  }
+
+  const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+  await vscode.window.showTextDocument(sourceDoc, { preview: false });
+}
+
 async function openRenderedPreviewCore(
   editor: vscode.TextEditor,
   folder: vscode.WorkspaceFolder,
@@ -790,6 +911,10 @@ export function activate(context: vscode.ExtensionContext) {
       openCommentrayPreviewCommand,
     ),
     vscode.commands.registerCommand(
+      "commentray.openCorrespondingSource",
+      openCorrespondingSourceCommand,
+    ),
+    vscode.commands.registerCommand(
       "commentray.openRenderedPreview",
       openRenderedPreviewFromSourceCommand,
     ),
@@ -809,8 +934,17 @@ export function activate(context: vscode.ExtensionContext) {
         logCommentray(`[commentray] scroll sync setting handler: ${msg}`);
       }
     }),
+    vscode.window.onDidChangeActiveTextEditor((ed) => {
+      void applyCommentrayActiveEditorUiContexts(ed?.document.uri);
+    }),
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      if (path.basename(doc.uri.fsPath) !== ".commentray.toml") return;
+      void applyCommentrayActiveEditorUiContexts(vscode.window.activeTextEditor?.document.uri);
+    }),
     { dispose: () => disposeScrollSync() },
   );
+
+  void applyCommentrayActiveEditorUiContexts(vscode.window.activeTextEditor?.document.uri);
 }
 
 export function deactivate() {
@@ -818,4 +952,5 @@ export function deactivate() {
   disposeScrollSync();
   lastBoundScrollPair = undefined;
   commentrayOutput = undefined;
+  void applyCommentrayActiveEditorUiContexts(undefined);
 }

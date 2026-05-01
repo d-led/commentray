@@ -58,6 +58,27 @@ describe("Commentray Angles in VS Code (integration)", () => {
         angleId: "alt",
       });
     });
+
+    it('Given Angles layout and the main-angle companion is active, when the user runs "Commentray: Open corresponding source file", then the primary source file is focused.', async () => {
+      await openFixtureSourceFile(dogfoodWorkspace.root());
+      await vscode.commands.executeCommand("commentray.openCommentrayAngle", { angleId: "main" });
+
+      const mainUri = vscode.Uri.joinPath(
+        dogfoodWorkspace.root(),
+        ".commentray/source/src/sample.ts/main.md",
+      );
+      const mainDoc = await vscode.workspace.openTextDocument(mainUri);
+      await vscode.window.showTextDocument(mainDoc);
+
+      await vscode.commands.executeCommand("commentray.openCorrespondingSource");
+
+      const active = vscode.window.activeTextEditor;
+      assert.ok(active, "Expected an active editor after opening corresponding source.");
+      assert.strictEqual(
+        active.document.uri.fsPath,
+        vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts").fsPath,
+      );
+    });
   });
 
   describe("Add angle to project (programmatic)", () => {
