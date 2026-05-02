@@ -73,7 +73,7 @@ import {
 
 /**
  * Hub pages emit `./browse/…` relative to the site root. From `/…/browse/current.html` the browser
- * would otherwise resolve that to `…/browse/browse/…`.
+ * would otherwise resolve `./browse/…` against that folder and nest a second `browse/` segment.
  */
 function rewriteHubRelativeBrowseAnchorsIn(root: ParentNode): void {
   const path = globalThis.location.pathname;

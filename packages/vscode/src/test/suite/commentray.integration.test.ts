@@ -15,6 +15,18 @@ import {
   registerDogfoodWorkspaceLifecycle,
 } from "./commentray-dogfood-test-support.js";
 
+/** Opens dogfood `sample.ts`, runs paired-markdown beside, then focuses the paired Markdown buffer. */
+async function openDogfoodPairedMarkdownActiveEditor(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): Promise<vscode.Uri> {
+  await openFixtureSourceFile(dogfoodWorkspace.root());
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+  const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
+  const pairedDoc = await vscode.workspace.openTextDocument(pairedUri);
+  await vscode.window.showTextDocument(pairedDoc);
+  return pairedUri;
+}
+
 /** Same implementation the extension calls; loaded via relative path because the EDH resolves `@commentray/core` package exports poorly under `require()`. */
 type ValidateProjectFn = (
   repoRoot: string,
@@ -214,15 +226,7 @@ function registerActiveEditorUiFlagsContractTests(
 function registerOpenCorrespondingSourceTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
   describe("Open corresponding source file from companion markdown", () => {
     it('Given the paired Commentray markdown is active, when the user runs "Commentray: Open corresponding source file", then the primary source editor becomes active for that pair.', async () => {
-      await openFixtureSourceFile(dogfoodWorkspace.root());
-      await vscode.commands.executeCommand("commentray.openSideBySide");
-
-      const pairedUri = vscode.Uri.joinPath(
-        dogfoodWorkspace.root(),
-        ...pairedMarkdownPath.split("/"),
-      );
-      const pairedDoc = await vscode.workspace.openTextDocument(pairedUri);
-      await vscode.window.showTextDocument(pairedDoc);
+      const pairedUri = await openDogfoodPairedMarkdownActiveEditor(dogfoodWorkspace);
 
       await vscode.commands.executeCommand("commentray.openCorrespondingSource");
 
@@ -252,15 +256,7 @@ function registerOpenCorrespondingSourceTests(dogfoodWorkspace: DogfoodWorkspace
 function registerMarkdownPreviewTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
   describe("Open Markdown preview for paired file", () => {
     it('Given the paired Markdown file is active, when the user runs "Commentray: Open Markdown preview for paired file", then the command runs without rejecting.', async () => {
-      await openFixtureSourceFile(dogfoodWorkspace.root());
-      await vscode.commands.executeCommand("commentray.openSideBySide");
-
-      const pairedUri = vscode.Uri.joinPath(
-        dogfoodWorkspace.root(),
-        ...pairedMarkdownPath.split("/"),
-      );
-      const pairedDoc = await vscode.workspace.openTextDocument(pairedUri);
-      await vscode.window.showTextDocument(pairedDoc);
+      await openDogfoodPairedMarkdownActiveEditor(dogfoodWorkspace);
 
       await vscode.commands.executeCommand("commentray.openCommentrayPreview");
     });

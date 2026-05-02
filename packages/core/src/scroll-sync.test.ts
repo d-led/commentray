@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CURRENT_SCHEMA_VERSION } from "./model.js";
+import { CURRENT_SCHEMA_VERSION, type CommentrayIndex } from "./model.js";
 import {
   blockStrictlyContainingSourceViewportLine,
   buildBlockScrollLinks,
@@ -151,7 +151,7 @@ describe("Block scroll link derivation from index and markers", () => {
 
   it("returns no links when the index entry’s stored companion path disagrees with the lookup key", () => {
     const key = ".commentray/source/README.md/main.md";
-    const mismatched: typeof index = {
+    const mismatched: CommentrayIndex = {
       schemaVersion: CURRENT_SCHEMA_VERSION,
       byCommentrayPath: {
         [key]: {
@@ -198,9 +198,14 @@ describe("Markdown HTML commentray regions (synthetic scroll links)", () => {
     const src = Array.from({ length: 20 }, (_, i) => `L${i + 1}`).join("\n");
     const links = buildBlockScrollLinks(null, "x.ts", "y.md", md, src);
     expect(links).toHaveLength(2);
-    expect(links[0]!.sourceStart).toBe(1);
-    expect(links[1]!.sourceEnd).toBe(20);
-    expect(links[0]!.sourceEnd + 1).toBe(links[1]!.sourceStart);
+    const first = links[0];
+    const second = links[1];
+    expect(first).toBeDefined();
+    expect(second).toBeDefined();
+    if (first === undefined || second === undefined) return;
+    expect(first.sourceStart).toBe(1);
+    expect(second.sourceEnd).toBe(20);
+    expect(first.sourceEnd + 1).toBe(second.sourceStart);
   });
 });
 

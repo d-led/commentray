@@ -8,6 +8,21 @@ import {
   commentrayStorageSourcePrefix,
 } from "./commentray-active-editor-ui-context.js";
 
+async function withCommentrayAnglesSentinelRepo(
+  tmpPrefix: string,
+  fn: (repoRoot: string) => Promise<void>,
+): Promise<void> {
+  const tmpRepo = await mkdtemp(path.join(os.tmpdir(), tmpPrefix));
+  try {
+    const sentinel = path.join(tmpRepo, ".commentray", "source", ".default");
+    await mkdir(path.dirname(sentinel), { recursive: true });
+    await writeFile(sentinel, "", "utf8");
+    await fn(tmpRepo);
+  } finally {
+    await rm(tmpRepo, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 describe("commentrayStorageSourcePrefix", () => {
   it("given a storage dir with backslashes, when building the prefix, then the prefix uses forward slashes", () => {
     expect(commentrayStorageSourcePrefix(".commentray")).toBe(".commentray/source/");
@@ -65,12 +80,7 @@ describe("commentrayActiveEditorUiFlags", () => {
   });
 
   it("given angles sentinel exists on disk, when the path is a per-angle companion markdown, then markdown is resolvable", async () => {
-    const tmpRepo = await mkdtemp(path.join(os.tmpdir(), "cr-ui-angles-"));
-    try {
-      const sentinel = path.join(tmpRepo, ".commentray", "source", ".default");
-      await mkdir(path.dirname(sentinel), { recursive: true });
-      await writeFile(sentinel, "", "utf8");
-
+    await withCommentrayAnglesSentinelRepo("cr-ui-angles-", async (tmpRepo) => {
       const flags = commentrayActiveEditorUiFlags({
         normalizedRepoRelativePath: ".commentray/source/pkg/mod.ts/main.md",
         storageDir: ".commentray",
@@ -80,18 +90,11 @@ describe("commentrayActiveEditorUiFlags", () => {
         underCompanionSourceTree: true,
         isResolvableCompanionMarkdown: true,
       });
-    } finally {
-      await rm(tmpRepo, { recursive: true, force: true }).catch(() => {});
-    }
+    });
   });
 
   it("given angles sentinel exists, when the companion uses another angle id, then markdown is still resolvable", async () => {
-    const tmpRepo = await mkdtemp(path.join(os.tmpdir(), "cr-ui-angles-readme-"));
-    try {
-      const sentinel = path.join(tmpRepo, ".commentray", "source", ".default");
-      await mkdir(path.dirname(sentinel), { recursive: true });
-      await writeFile(sentinel, "", "utf8");
-
+    await withCommentrayAnglesSentinelRepo("cr-ui-angles-readme-", async (tmpRepo) => {
       const flags = commentrayActiveEditorUiFlags({
         normalizedRepoRelativePath: ".commentray/source/README.md/architecture.md",
         storageDir: ".commentray",
@@ -101,9 +104,7 @@ describe("commentrayActiveEditorUiFlags", () => {
         underCompanionSourceTree: true,
         isResolvableCompanionMarkdown: true,
       });
-    } finally {
-      await rm(tmpRepo, { recursive: true, force: true }).catch(() => {});
-    }
+    });
   });
 
   it("given angles sentinel is missing, when the path looks like nested folders plus markdown, then flat slice rule applies", () => {

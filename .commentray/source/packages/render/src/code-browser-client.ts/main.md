@@ -4,7 +4,7 @@ Browser bundle wired into static HTML from [`code-browser.ts`](../code-browser.t
 
 ## Static hub browse links
 
-Hub pages emit `./browse/…` relative to the site root. From a URL like `/…/browse/current.html`, the browser would otherwise resolve `./browse/…` to `…/browse/browse/…`. **`rewriteHubRelativeBrowseAnchorsIn`** rewrites those anchors using the current pathname and origin (`code-browser-pair-nav` helpers).
+Hub pages emit `./browse/…` relative to the site root. From a URL like `/…/browse/current.html`, the browser would otherwise resolve `./browse/…` against that folder and nest a second `browse/` segment. **`rewriteHubRelativeBrowseAnchorsIn`** rewrites those anchors using the current pathname and origin (`code-browser-pair-nav` helpers).
 
 ## Dual-pane scroll sync (high level)
 

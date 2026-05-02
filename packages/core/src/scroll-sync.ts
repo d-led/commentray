@@ -81,28 +81,37 @@ export function parseMarkdownHtmlCommentrayRegions(
     const line = lines[i] ?? "";
     const sm = line.match(startRe);
     if (sm) {
+      const startId = sm[1];
+      if (startId === undefined) continue;
       try {
-        assertValidMarkerId(sm[1]!);
+        assertValidMarkerId(startId);
       } catch {
         continue;
       }
-      stack.push({ id: sm[1]!, start: i });
+      stack.push({ id: startId, start: i });
       continue;
     }
     const em = line.match(endRe);
     if (!em) continue;
+    const endId = em[1];
+    if (endId === undefined) continue;
     try {
-      assertValidMarkerId(em[1]!);
+      assertValidMarkerId(endId);
     } catch {
       continue;
     }
-    const id = em[1]!;
     let k = stack.length - 1;
-    while (k >= 0 && stack[k]!.id.toLowerCase() !== id.toLowerCase()) k -= 1;
+    while (k >= 0) {
+      const frame = stack[k];
+      if (frame !== undefined && frame.id.toLowerCase() === endId.toLowerCase()) break;
+      k -= 1;
+    }
     if (k < 0) continue;
-    const { start } = stack[k]!;
+    const matched = stack[k];
+    if (matched === undefined) continue;
+    const { start } = matched;
     stack.splice(k);
-    out.push({ id, mdStartLine: start, mdEndExclusive: i + 1 });
+    out.push({ id: endId, mdStartLine: start, mdEndExclusive: i + 1 });
   }
   out.sort((a, b) => a.mdStartLine - b.mdStartLine);
   return out;
@@ -130,7 +139,10 @@ function buildSyntheticBlockScrollLinksFromHtmlRegions(
   let total = slices.reduce((a, b) => a + b, 0);
   let guard = 0;
   while (total < sourceLineCount && guard < sourceLineCount + 8) {
-    slices[guard % slices.length]! += 1;
+    const idx = guard % slices.length;
+    const bump = slices[idx];
+    if (bump === undefined) break;
+    slices[idx] = bump + 1;
     total += 1;
     guard += 1;
   }
@@ -138,16 +150,19 @@ function buildSyntheticBlockScrollLinksFromHtmlRegions(
   while (total > sourceLineCount && guard < sourceLineCount + 8) {
     const j = slices.findIndex((s) => s > 1);
     if (j < 0) break;
-    slices[j]! -= 1;
+    const cur = slices[j];
+    if (cur === undefined) break;
+    slices[j] = cur - 1;
     total -= 1;
     guard += 1;
   }
   const links: BlockScrollLink[] = [];
   let srcLo = 1;
   for (let j = 0; j < regions.length; j++) {
-    const slice = slices[j]!;
+    const slice = slices[j];
+    const r = regions[j];
+    if (slice === undefined || r === undefined) continue;
     const srcHi = Math.min(sourceLineCount, srcLo + slice - 1);
-    const r = regions[j]!;
     links.push({
       id: r.id,
       commentrayLine: r.mdStartLine,
