@@ -70,6 +70,7 @@ import {
   wireBlockStretchBufferSync,
   type BlockStretchBufferSyncHandle,
 } from "./block-stretch-buffer-sync.js";
+import { COMMENTRAY_MERMAID_MODULE_READY_EVENT } from "./commentray-mermaid-events.js";
 
 /**
  * Hub pages emit `./browse/…` relative to the site root. From `/…/browse/current.html` the browser
@@ -91,6 +92,26 @@ type CommentrayMermaidGlobal = {
   run: (opts: { nodes?: HTMLElement[]; querySelector?: string }) => Promise<unknown>;
 };
 
+/**
+ * The Mermaid bundle is loaded via a trailing `type="module"` script (async `import()`). The main
+ * client runs as a classic inline script **before** that module executes, so `cy.visit` + an
+ * immediate pane flip can call {@link runMermaidOnFreshDocNodes} while `commentrayMermaid` is still
+ * undefined. We enqueue roots and flush on {@link COMMENTRAY_MERMAID_MODULE_READY_EVENT}.
+ */
+const pendingMermaidDocRoots = new Set<HTMLElement>();
+
+function flushPendingMermaidDocRoots(): void {
+  const roots = Array.from(pendingMermaidDocRoots);
+  pendingMermaidDocRoots.clear();
+  for (const root of roots) {
+    void runMermaidOnFreshDocNodes(root);
+  }
+}
+
+globalThis.addEventListener(COMMENTRAY_MERMAID_MODULE_READY_EVENT, () => {
+  flushPendingMermaidDocRoots();
+});
+
 function runMermaidOnFreshDocNodes(docBody: HTMLElement): Promise<void> {
   if (typeof globalThis.location !== "undefined" && globalThis.location.protocol === "file:")
     return Promise.resolve();
@@ -104,7 +125,10 @@ function runMermaidOnFreshDocNodes(docBody: HTMLElement): Promise<void> {
   if (nodes.length === 0) return Promise.resolve();
   const m = (globalThis as unknown as { commentrayMermaid?: CommentrayMermaidGlobal })
     .commentrayMermaid;
-  if (!m) return Promise.resolve();
+  if (!m) {
+    pendingMermaidDocRoots.add(docBody);
+    return Promise.resolve();
+  }
   return m
     .run({ nodes })
     .then(() => {
