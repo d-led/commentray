@@ -637,7 +637,8 @@ describe("Code browser page — companion Markdown rendering basics", () => {
       commentrayMarkdown: "Use `commentray validate` first.\n\n```bash\ncommentray validate\n```",
     });
     expect(html).toContain(":where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code");
-    expect(html).toContain(':root[data-commentray-theme="dark"] .pane--doc .doc-pane-body');
+    const styleFlat = html.replace(/\s+/g, " ");
+    expect(styleFlat).toContain(':root[data-commentray-theme="dark"] .pane--doc .doc-pane-body');
     expect(html).toContain("#doc-pane-body.wrap pre code");
   });
 });

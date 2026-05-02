@@ -1,0 +1,1918 @@
+:root {
+  --cr-control-h: 32px;
+  --cr-control-radius: 8px;
+  --cr-icon-inner: 18px;
+  --cr-label-caps-fs: 10px;
+  --cr-label-caps-track: 0.06em;
+  --cr-ui-fs: 12px;
+  /** Matches code/doc pane horizontal padding so pair-context rows line up with pane content (e.g. line nums). */
+  --cr-pane-inline-pad: 12px;
+}
+:root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) {
+  color-scheme: light dark;
+}
+:root[data-commentray-theme="light"] {
+  color-scheme: light;
+}
+:root[data-commentray-theme="dark"] {
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  background: Canvas;
+  color: CanvasText;
+}
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    sans-serif;
+  background: Canvas;
+  color: CanvasText;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10000;
+  padding: 8px 16px;
+  margin: 0;
+  font: inherit;
+  font-size: 14px;
+  text-decoration: none;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+  background: Canvas;
+  color: CanvasText;
+}
+.skip-link:focus {
+  left: 12px;
+  top: 8px;
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+.skip-link:focus:not(:focus-visible) {
+  left: -9999px;
+  top: 0;
+  outline: none;
+}
+.skip-link:focus-visible {
+  left: 12px;
+  top: 8px;
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+.app__chrome {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
+  background: color-mix(in oklab, CanvasText 4%, Canvas);
+  max-height: min(40vh, 420px);
+  min-height: 0;
+  overflow: auto;
+}
+.chrome__search-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.chrome__search-row input[type="search"] {
+  flex: 1 1 auto;
+  min-width: 140px;
+  min-height: var(--cr-control-h);
+  padding: 0 12px;
+  font: inherit;
+  font-size: var(--cr-ui-fs);
+  line-height: 1.25;
+  border-radius: var(--cr-control-radius);
+  border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+  background: Canvas;
+  color: CanvasText;
+}
+.chrome__search-row #search-clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--cr-control-h);
+  padding: 0 12px;
+  font: inherit;
+  font-size: var(--cr-ui-fs);
+  font-weight: 500;
+  border-radius: var(--cr-control-radius);
+  cursor: pointer;
+  border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+  background: color-mix(in oklab, CanvasText 6%, Canvas);
+  color: CanvasText;
+  white-space: nowrap;
+}
+.chrome__search-row #search-clear:hover {
+  background: color-mix(in oklab, CanvasText 11%, Canvas);
+}
+.chrome__search-row input[type="search"]:focus-visible,
+.chrome__search-row #search-clear:focus-visible {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+.chrome__search-label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}
+/* Wide viewports: same legible caps word as historic Pages shell (icon hidden). */
+.chrome__search-label__glyph {
+  display: none;
+}
+.nav-rail__search-label {
+  font-size: var(--cr-label-caps-fs);
+  font-weight: 700;
+  letter-spacing: var(--cr-label-caps-track);
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+.nav-rail__doc-hub {
+  position: relative;
+  flex: 0 0 auto;
+  align-self: center;
+  display: block;
+  border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
+  border-radius: var(--cr-control-radius);
+  background: Canvas;
+  overflow: visible;
+}
+.nav-rail__doc-hub-summary {
+  cursor: pointer;
+  font-size: var(--cr-ui-fs);
+  font-weight: 500;
+  color: color-mix(in oklab, CanvasText 88%, Canvas);
+  padding: 0 12px;
+  min-height: var(--cr-control-h);
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  box-sizing: border-box;
+  list-style: none;
+  user-select: none;
+  line-height: 1.25;
+}
+.nav-rail__doc-hub-summary:hover {
+  background: color-mix(in oklab, CanvasText 6%, Canvas);
+}
+.nav-rail__doc-hub-summary__caption {
+  white-space: nowrap;
+}
+.nav-rail__doc-hub-summary__glyph {
+  display: none;
+}
+.nav-rail__doc-hub-summary svg {
+  display: block;
+  flex: 0 0 auto;
+}
+.nav-rail__doc-hub-summary::-webkit-details-marker {
+  display: none;
+}
+.nav-rail__doc-hub-inner {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 60;
+  min-width: min(280px, 78vw);
+  max-width: min(440px, 94vw);
+  max-height: min(52vh, 400px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  padding: 8px 10px;
+  font-size: 12px;
+  border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
+  border-radius: 8px;
+  background: Canvas;
+  box-shadow: 0 8px 28px color-mix(in oklab, CanvasText 12%, transparent);
+}
+.nav-rail__doc-hub-filter-row {
+  flex: 0 0 auto;
+}
+.nav-rail__doc-hub-filter-label {
+  display: block;
+  font-size: var(--cr-label-caps-fs);
+  font-weight: 700;
+  letter-spacing: var(--cr-label-caps-track);
+  text-transform: uppercase;
+  opacity: 0.78;
+  margin-bottom: 4px;
+}
+.nav-rail__doc-hub-filter {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+  background: color-mix(in oklab, CanvasText 4%, Canvas);
+  color: CanvasText;
+}
+.nav-rail__doc-hub-filter:focus {
+  outline: 2px solid color-mix(in oklab, CanvasText 40%, Canvas);
+  outline-offset: 1px;
+}
+.nav-rail__doc-hub-hint {
+  margin: 0 0 8px;
+  opacity: 0.78;
+  line-height: 1.4;
+  font-size: 12px;
+}
+.app__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app__footer {
+  flex: 0 0 auto;
+  padding: 6px 12px 10px;
+  border-top: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+  background: color-mix(in oklab, CanvasText 3%, Canvas);
+  font-size: 11px;
+  line-height: 1.4;
+  color: color-mix(in oklab, CanvasText 72%, Canvas);
+}
+.app__footer-line {
+  margin: 0;
+}
+.app__footer time {
+  font-variant-numeric: tabular-nums;
+}
+.toolbar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
+  background: color-mix(in oklab, CanvasText 4%, Canvas);
+  font-size: var(--cr-ui-fs);
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.toolbar__primary {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.toolbar__primary-main {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.toolbar__primary-trail {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 0;
+}
+.toolbar__end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px 14px;
+  min-width: 0;
+}
+.toolbar-github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--cr-control-h);
+  height: var(--cr-control-h);
+  border-radius: var(--cr-control-radius);
+  border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+  background: color-mix(in oklab, CanvasText 6%, Canvas);
+  color: CanvasText;
+}
+.toolbar-github svg {
+  width: var(--cr-icon-inner);
+  height: var(--cr-icon-inner);
+  display: block;
+}
+.toolbar-github:hover {
+  background: color-mix(in oklab, CanvasText 11%, Canvas);
+}
+.toolbar-github:focus-visible {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+.app__footer-attribution {
+  margin: 0;
+  color: color-mix(in oklab, CanvasText 88%, Canvas);
+}
+.app__footer-attribution a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.app__footer-attribution__version {
+  font-weight: 600;
+}
+.app__footer-attribution__sha {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  font-size: 0.95em;
+  font-weight: 500;
+  padding: 0 2px;
+  word-break: break-all;
+}
+.toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.toolbar label[hidden] {
+  display: none !important;
+}
+.toolbar-wrap-lines {
+  position: relative;
+  margin: 0;
+  min-height: var(--cr-control-h);
+  padding: 0 12px 0 10px;
+  border-radius: var(--cr-control-radius);
+  border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
+  background: Canvas;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  font-size: var(--cr-ui-fs);
+  font-weight: 500;
+  color: color-mix(in oklab, CanvasText 88%, Canvas);
+  cursor: pointer;
+}
+.toolbar-wrap-lines:hover {
+  background: color-mix(in oklab, CanvasText 6%, Canvas);
+}
+.toolbar-wrap-lines__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+}
+/** Visible tick box: the real input is visually hidden for a11y; unchecked looked like an empty box with no mark when on. */
+.toolbar-wrap-lines__box {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1.5px solid color-mix(in oklab, CanvasText 38%, Canvas);
+  border-radius: 3px;
+  background: Canvas;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: CanvasText;
+}
+.toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) .toolbar-wrap-lines__box {
+  border-color: color-mix(in oklab, CanvasText 52%, Canvas);
+  background: color-mix(in oklab, CanvasText 6%, Canvas);
+}
+.toolbar-wrap-lines__box::after {
+  content: "";
+  display: none;
+  width: 4px;
+  height: 9px;
+  margin-top: -2px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) .toolbar-wrap-lines__box::after {
+  display: block;
+}
+.toolbar-wrap-lines__face {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--cr-control-h);
+  min-width: var(--cr-control-h);
+  color: color-mix(in oklab, CanvasText 82%, Canvas);
+}
+.toolbar-wrap-lines__caption {
+  white-space: nowrap;
+}
+.toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) {
+  color: CanvasText;
+  background: color-mix(in oklab, CanvasText 10%, Canvas);
+}
+.toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) .toolbar-wrap-lines__caption {
+  color: CanvasText;
+}
+.toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) .toolbar-wrap-lines__face {
+  color: CanvasText;
+  background: color-mix(in oklab, CanvasText 10%, Canvas);
+  border-radius: calc(var(--cr-control-radius) - 1px);
+}
+.toolbar-wrap-lines:has(.toolbar-wrap-lines__input:focus-visible) {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+.toolbar-icon-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--cr-control-h);
+  height: var(--cr-control-h);
+  padding: 0;
+  margin: 0;
+  border-radius: var(--cr-control-radius);
+  border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+  background: color-mix(in oklab, CanvasText 6%, Canvas);
+  color: CanvasText;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.toolbar-icon-btn svg {
+  display: block;
+  flex: 0 0 auto;
+}
+.toolbar-icon-btn:hover {
+  background: color-mix(in oklab, CanvasText 14%, Canvas);
+  border-color: color-mix(in oklab, CanvasText 34%, Canvas);
+}
+.toolbar-icon-btn:focus-visible {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+.toolbar-source-render-toggle {
+  position: relative;
+  margin: 0;
+  min-height: var(--cr-control-h);
+  padding: 0 12px 0 10px;
+  border-radius: var(--cr-control-radius);
+  border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
+  background: Canvas;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  font-size: var(--cr-ui-fs);
+  font-weight: 500;
+  color: color-mix(in oklab, CanvasText 88%, Canvas);
+  cursor: pointer;
+}
+.toolbar-source-render-toggle:hover {
+  background: color-mix(in oklab, CanvasText 6%, Canvas);
+}
+.toolbar-source-render-toggle__box {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1.5px solid color-mix(in oklab, CanvasText 38%, Canvas);
+  border-radius: 3px;
+  background: Canvas;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: CanvasText;
+}
+.toolbar-source-render-toggle[aria-pressed="true"] .toolbar-source-render-toggle__box {
+  border-color: color-mix(in oklab, CanvasText 52%, Canvas);
+  background: color-mix(in oklab, CanvasText 6%, Canvas);
+}
+.toolbar-source-render-toggle__box::after {
+  content: "";
+  display: none;
+  width: 4px;
+  height: 9px;
+  margin-top: -2px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.toolbar-source-render-toggle[aria-pressed="true"] .toolbar-source-render-toggle__box::after {
+  display: block;
+}
+.toolbar-source-render-toggle__face {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--cr-control-h);
+  min-width: var(--cr-control-h);
+  color: color-mix(in oklab, CanvasText 82%, Canvas);
+}
+.toolbar-source-render-toggle__caption {
+  white-space: nowrap;
+}
+.toolbar-source-render-toggle[aria-pressed="true"] {
+  color: CanvasText;
+  background: color-mix(in oklab, CanvasText 10%, Canvas);
+}
+.toolbar-source-render-toggle:focus-visible {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+.toolbar-icon-btn--source-markdown {
+  display: inline-flex;
+}
+/* __COMMENTRAY_INTRO_CSS__ */
+.toolbar label input:focus-visible {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+.toolbar .toolbar-theme {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  border: 0;
+}
+.toolbar-theme__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--cr-control-h);
+  height: var(--cr-control-h);
+  padding: 0;
+  margin: 0;
+  border-radius: var(--cr-control-radius);
+  border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+  background: color-mix(in oklab, CanvasText 6%, Canvas);
+  color: CanvasText;
+  cursor: pointer;
+}
+.toolbar-theme__trigger:hover {
+  background: color-mix(in oklab, CanvasText 14%, Canvas);
+  border-color: color-mix(in oklab, CanvasText 34%, Canvas);
+}
+.toolbar-theme__trigger:active {
+  background: color-mix(in oklab, CanvasText 18%, Canvas);
+}
+.toolbar-theme__trigger:focus-visible {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+.toolbar-theme__trigger svg {
+  width: var(--cr-icon-inner);
+  height: var(--cr-icon-inner);
+  display: block;
+  flex: 0 0 auto;
+}
+.toolbar-share-link-btn[data-copied="true"] {
+  background: color-mix(in oklab, #2ea043 24%, Canvas);
+  border-color: color-mix(in oklab, #2ea043 48%, CanvasText);
+}
+.toolbar-theme__trigger .toolbar-theme__icon {
+  display: none;
+  flex: 0 0 auto;
+}
+.toolbar-theme__trigger[data-commentray-trigger-mode="system"] .toolbar-theme__icon--system,
+.toolbar-theme__trigger[data-commentray-trigger-mode="light"] .toolbar-theme__icon--light,
+.toolbar-theme__trigger[data-commentray-trigger-mode="dark"] .toolbar-theme__icon--dark {
+  display: block;
+}
+.toolbar-theme__menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 80;
+  min-width: 148px;
+  padding: 4px;
+  margin: 0;
+  list-style: none;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, CanvasText 16%, Canvas);
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 8px 28px color-mix(in oklab, CanvasText 12%, transparent);
+}
+.toolbar-theme__menu[hidden] {
+  display: none !important;
+}
+.toolbar-theme__menuitem {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: var(--cr-ui-fs);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  color: CanvasText;
+  background: transparent;
+}
+.toolbar-theme__menuitem:hover {
+  background: color-mix(in oklab, CanvasText 8%, Canvas);
+}
+.toolbar-theme__menuitem:focus-visible {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 0;
+}
+.toolbar-theme__menuitem[aria-checked="true"] {
+  background: color-mix(in oklab, CanvasText 10%, Canvas);
+  font-weight: 500;
+}
+.toolbar .file-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: var(--cr-ui-fs);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  margin-right: 4px;
+  max-width: 60vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toolbar .file-path__dir {
+  color: color-mix(in oklab, CanvasText 55%, Canvas);
+}
+.toolbar .file-path__dir--root {
+  letter-spacing: 0;
+}
+.toolbar .file-path__base {
+  color: CanvasText;
+  font-weight: 500;
+}
+.toolbar .file-path--title {
+  font-weight: 500;
+}
+.toolbar-related {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  max-width: min(520px, 90vw);
+  font-size: var(--cr-ui-fs);
+  line-height: 1.35;
+  color: color-mix(in oklab, CanvasText 88%, Canvas);
+}
+.toolbar-related__prefix {
+  font-weight: 500;
+  opacity: 0.88;
+  white-space: nowrap;
+}
+.toolbar-related__links {
+  min-width: 0;
+}
+.toolbar-related a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 500;
+  word-break: break-word;
+}
+.toolbar-related__sep {
+  opacity: 0.55;
+  user-select: none;
+}
+#documented-files-tree {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.documented-files-tree ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 12px;
+}
+.documented-files-tree > ul {
+  padding-left: 0;
+}
+.documented-files-tree li {
+  margin: 2px 0;
+  line-height: 1.35;
+}
+.documented-files-tree .tree-dir {
+  font-weight: 600;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.documented-files-tree .tree-file {
+  margin: 3px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 11px;
+}
+.documented-files-tree .tree-file-link {
+  color: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+.documented-files-tree .tree-file-link:hover {
+  opacity: 0.92;
+}
+.documented-files-tree .tree-file-link.tree-file-link--current {
+  font-weight: 600;
+  text-decoration-thickness: 2px;
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  background: color-mix(in oklab, CanvasText 10%, Canvas);
+}
+.documented-files-tree .tree-file-link:focus-visible {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+.toolbar button {
+  font: inherit;
+  font-size: var(--cr-ui-fs);
+  font-weight: 500;
+  min-height: var(--cr-control-h);
+  padding: 0 12px;
+  border-radius: var(--cr-control-radius);
+  cursor: pointer;
+  border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+  background: color-mix(in oklab, CanvasText 6%, Canvas);
+  color: CanvasText;
+}
+.search-results {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: min(320px, 38vh);
+  overflow: auto;
+  padding: 8px 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+  background: Canvas;
+  font-size: 13px;
+}
+.search-results[hidden] {
+  display: none !important;
+}
+.search-results .hint {
+  opacity: 0.75;
+  margin-bottom: 8px;
+  line-height: 1.45;
+}
+.search-results button.hit {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 4px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
+  background: color-mix(in oklab, CanvasText 5%, Canvas);
+  color: CanvasText;
+  cursor: pointer;
+  font: inherit;
+}
+.search-results button.hit:hover {
+  background: color-mix(in oklab, CanvasText 10%, Canvas);
+}
+.search-results button.hit:focus-visible {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+.search-results button.hit .meta {
+  opacity: 0.8;
+  font-size: 12px;
+}
+.search-results button.hit .src-tag {
+  opacity: 0.75;
+  font-weight: 500;
+  font-size: 11px;
+}
+.search-results button.hit .snippet {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-top: 4px;
+}
+.search-results mark.search-hit {
+  padding: 0 2px;
+  border-radius: 3px;
+  font: inherit;
+  background: color-mix(in oklab, #f5a623 70%, Canvas);
+  color: CanvasText;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+@media (prefers-color-scheme: dark) {
+  :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"])
+    .search-results
+    mark.search-hit {
+    background: color-mix(in oklab, #c9a227 55%, Canvas);
+  }
+}
+:root[data-commentray-theme="dark"] .search-results mark.search-hit {
+  background: color-mix(in oklab, #c9a227 55%, Canvas);
+}
+.shell:not(.shell--stretch-rows) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  --split-pct: 46%;
+}
+.app__main .shell {
+  flex: 1 1 auto;
+}
+.shell__panes {
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+.shell__pair-context {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  padding: 6px 0 8px;
+  border-bottom: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
+  background: color-mix(in oklab, CanvasText 3%, Canvas);
+  font-size: var(--cr-ui-fs);
+  line-height: 1.3;
+}
+.shell__pair-cell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.shell__pair-cell--src {
+  flex: 0 0 var(--split-pct);
+  padding-left: var(--cr-pane-inline-pad);
+}
+.shell__pair-gutter-spacer {
+  flex: 0 0 14px;
+  min-width: 14px;
+  align-self: stretch;
+}
+.shell__pair-cell--doc {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: var(--cr-pane-inline-pad);
+}
+.shell__pair-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: var(--cr-ui-fs);
+  color: CanvasText;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell__pair-path--secondary {
+  opacity: 0.88;
+  text-align: right;
+}
+.shell--stretch-rows .shell__pair-context {
+  --shell-pair-gutter-w: 14px;
+  --shell-pair-gutter-half: calc(var(--shell-pair-gutter-w) / 2);
+  display: grid;
+  grid-template-columns:
+    minmax(0, calc(var(--stretch-code-pct, 50%) - var(--shell-pair-gutter-half)))
+    var(--shell-pair-gutter-w)
+    minmax(0, calc(100% - var(--stretch-code-pct, 50%) - var(--shell-pair-gutter-half)));
+  width: 100%;
+  box-sizing: border-box;
+}
+.shell--stretch-rows .shell__pair-cell--src,
+.shell--stretch-rows .shell__pair-cell--doc,
+.shell--stretch-rows .shell__pair-gutter-spacer {
+  min-width: 0;
+}
+.shell--stretch-rows .shell__pair-cell--src {
+  grid-column: 1;
+  padding-left: var(--cr-pane-inline-pad);
+  padding-right: 0;
+}
+.shell--stretch-rows .shell__pair-gutter-spacer {
+  grid-column: 2;
+  width: var(--shell-pair-gutter-w);
+  min-width: var(--shell-pair-gutter-w);
+}
+.shell--stretch-rows .shell__pair-cell--doc {
+  grid-column: 3;
+  padding-left: var(--cr-pane-inline-pad);
+  padding-right: var(--cr-pane-inline-pad);
+}
+.shell[data-mobile-single-pane="true"] .shell__pair-context {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px 0 6px;
+}
+.shell[data-mobile-single-pane="true"] .shell__pair-cell--src,
+.shell[data-mobile-single-pane="true"] .shell__pair-cell--doc {
+  width: 100%;
+  padding-right: var(--cr-pane-inline-pad);
+  box-sizing: border-box;
+}
+.shell[data-mobile-single-pane="true"][data-dual-mobile-pane="code"] .shell__pair-cell--doc,
+.shell[data-mobile-single-pane="true"][data-dual-mobile-pane="code"] .shell__pair-gutter-spacer {
+  display: none;
+}
+.shell[data-mobile-single-pane="true"][data-dual-mobile-pane="doc"] .shell__pair-cell--src,
+.shell[data-mobile-single-pane="true"][data-dual-mobile-pane="doc"] .shell__pair-gutter-spacer {
+  display: none;
+}
+.shell[data-mobile-single-pane="true"]:not([data-dual-mobile-pane]) .shell__pair-cell--src,
+.shell[data-mobile-single-pane="true"]:not([data-dual-mobile-pane]) .shell__pair-gutter-spacer {
+  display: none;
+}
+.pane--code {
+  flex: 0 0 var(--split-pct, 46%);
+  min-width: 120px;
+  overflow: auto;
+  padding: 12px var(--cr-pane-inline-pad);
+  border-right: 1px solid color-mix(in oklab, CanvasText 15%, Canvas);
+  --code-line-font-size: 13px;
+  --code-line-height: 1.5;
+}
+.source-pane {
+  min-width: 0;
+}
+.source-pane--rendered-md {
+  font-size: 15px;
+  line-height: 1.45;
+}
+.source-pane--rendered-md img {
+  max-width: 100%;
+  height: auto;
+}
+.source-pane--rendered-md .commentray-mermaid {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.source-pane--rendered-md .commentray-line-anchor--source {
+  display: inline;
+  vertical-align: baseline;
+}
+#shell[data-source-pane-mode="rendered-markdown"] .source-pane--code {
+  display: none;
+}
+#shell[data-source-pane-mode="source"] .source-pane--rendered-md {
+  display: none;
+}
+.pane--code .code-line-stack {
+  --code-ln-min-ch: 3;
+}
+.pane--code .code-line {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+  min-width: 0;
+}
+.pane--code .code-line pre {
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.pane--code .code-line pre code.hljs {
+  display: block;
+  margin: 0;
+  padding: 0;
+  font-size: var(--code-line-font-size);
+  line-height: var(--code-line-height);
+}
+.pane--code .code-line .ln {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  user-select: none;
+  -webkit-user-select: none;
+  color: color-mix(in oklab, CanvasText 45%, Canvas);
+  padding-right: 8px;
+  border-right: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+  white-space: nowrap;
+  font-size: var(--code-line-font-size);
+  line-height: var(--code-line-height);
+  min-width: calc(var(--code-ln-min-ch, 3) * 1ch + 0.6ch);
+  box-sizing: content-box;
+}
+.pane--code .code-line:target .ln,
+.pane--code .code-line:hover .ln {
+  color: color-mix(in oklab, CanvasText 75%, Canvas);
+}
+.pane--code.wrap .code-line pre,
+.pane--code.wrap .code-line pre code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.pane--code:not(.wrap) .code-line pre,
+.pane--code:not(.wrap) .code-line pre code {
+  white-space: pre;
+}
+.gutter {
+  flex: 0 0 14px;
+  cursor: col-resize;
+  background: color-mix(in oklab, CanvasText 12%, Canvas);
+  position: relative;
+  --commentray-ray-accent: #3b7dd8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) .gutter {
+    --commentray-ray-accent: #6eb0ff;
+  }
+}
+:root[data-commentray-theme="dark"] .gutter {
+  --commentray-ray-accent: #6eb0ff;
+}
+.gutter__rays {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.gutter__rays svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+}
+.gutter__rays-path {
+  fill: none;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  stroke: color-mix(in oklab, var(--commentray-ray-accent) 72%, CanvasText);
+  stroke-width: 1.35px;
+  opacity: 0.26;
+}
+.gutter__rays-path--active {
+  stroke-width: 2.4px;
+  opacity: 0.88;
+}
+.gutter__rays-path--trail {
+  stroke-dasharray: 3 4;
+  opacity: 0.42;
+}
+.gutter__rays-path--active.gutter__rays-path--trail {
+  opacity: 0.72;
+}
+.gutter:hover {
+  background: color-mix(in oklab, CanvasText 22%, Canvas);
+}
+.gutter::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+}
+.pane--doc {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px var(--cr-pane-inline-pad);
+  background: Canvas;
+  color: CanvasText;
+}
+/* #doc-pane-body.wrap beats pre code.hljs from the hljs theme so fenced blocks follow the toggle. */
+#doc-pane-body.wrap pre,
+#doc-pane-body.wrap pre code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+#doc-pane-body:not(.wrap) pre,
+#doc-pane-body:not(.wrap) pre code {
+  white-space: pre;
+  word-break: normal;
+}
+.doc-pane-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+/* scroll-behavior: smooth was removed: it interpolates many scroll events per gesture and
+ * exhausts the partner-echo guard in wireBidirectionalScroll, so doc↔code ping-pong returns. */
+/* Inline backtick code chips (GitHub-like): prose context only, never fenced pre/code blocks. */
+.pane--doc .doc-pane-body :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6) > code,
+.shell--stretch-rows
+  .stretch-preamble
+  :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6)
+  > code,
+.block-stretch
+  td.stretch-doc
+  .stretch-doc-inner
+  :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6)
+  > code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.92em;
+  padding: 0.12em 0.36em;
+  border-radius: 6px;
+  border: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+  background: color-mix(in oklab, CanvasText 8%, Canvas);
+  color: inherit;
+}
+@media (prefers-color-scheme: dark) {
+  :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"])
+    .pane--doc
+    .doc-pane-body
+    :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6)
+    > code,
+  :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"])
+    .shell--stretch-rows
+    .stretch-preamble
+    :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6)
+    > code,
+  :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"])
+    .block-stretch
+    td.stretch-doc
+    .stretch-doc-inner
+    :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6)
+    > code {
+    border-color: color-mix(in oklab, CanvasText 26%, Canvas);
+    background: color-mix(in oklab, CanvasText 16%, Canvas);
+  }
+}
+:root[data-commentray-theme="dark"]
+  .pane--doc
+  .doc-pane-body
+  :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6)
+  > code,
+:root[data-commentray-theme="dark"]
+  .shell--stretch-rows
+  .stretch-preamble
+  :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6)
+  > code,
+:root[data-commentray-theme="dark"]
+  .block-stretch
+  td.stretch-doc
+  .stretch-doc-inner
+  :where(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6)
+  > code {
+  border-color: color-mix(in oklab, CanvasText 26%, Canvas);
+  background: color-mix(in oklab, CanvasText 16%, Canvas);
+}
+/**
+ * GFM tables in rendered Markdown (doc pane, stretch preamble, per-block doc cells).
+ * Intrinsic width so the pane scrolls sideways instead of squeezing columns; borders
+ * and padding match familiar GitHub-style readability.
+ */
+.pane--doc .doc-pane-body :where(table),
+.shell--stretch-rows .stretch-preamble :where(table),
+.block-stretch td.stretch-doc .stretch-doc-inner :where(table) {
+  width: max-content;
+  max-width: none;
+  border-collapse: collapse;
+  margin: 0.85em 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+.pane--doc .doc-pane-body :where(th, td),
+.shell--stretch-rows .stretch-preamble :where(th, td),
+.block-stretch td.stretch-doc .stretch-doc-inner :where(th, td) {
+  border: 1px solid color-mix(in oklab, CanvasText 22%, Canvas);
+  padding: 8px 12px;
+  vertical-align: top;
+}
+.pane--doc .doc-pane-body :where(thead th),
+.shell--stretch-rows .stretch-preamble :where(thead th),
+.block-stretch td.stretch-doc .stretch-doc-inner :where(thead th) {
+  font-weight: 600;
+  background: color-mix(in oklab, CanvasText 7%, Canvas);
+}
+.pane--doc .doc-pane-body tbody tr:nth-child(even) :where(td),
+.shell--stretch-rows .stretch-preamble tbody tr:nth-child(even) :where(td),
+.block-stretch td.stretch-doc .stretch-doc-inner tbody tr:nth-child(even) :where(td) {
+  background: color-mix(in oklab, CanvasText 3.5%, Canvas);
+}
+.pane--doc .doc-pane-body :where(ul.contains-task-list),
+.shell--stretch-rows .stretch-preamble :where(ul.contains-task-list),
+.block-stretch td.stretch-doc .stretch-doc-inner :where(ul.contains-task-list) {
+  list-style: none;
+  padding-inline-start: 1.2em;
+}
+.pane--doc .doc-pane-body :where(li.task-list-item),
+.shell--stretch-rows .stretch-preamble :where(li.task-list-item),
+.block-stretch td.stretch-doc .stretch-doc-inner :where(li.task-list-item) {
+  position: relative;
+}
+.pane--doc .doc-pane-body :where(li.task-list-item input[type="checkbox"]),
+.shell--stretch-rows .stretch-preamble :where(li.task-list-item input[type="checkbox"]),
+.block-stretch td.stretch-doc .stretch-doc-inner :where(li.task-list-item input[type="checkbox"]) {
+  position: absolute;
+  margin-inline-start: -1.35em;
+  margin-top: 0.2em;
+}
+.pane--doc .doc-pane-body :where(del),
+.shell--stretch-rows .stretch-preamble :where(del),
+.block-stretch td.stretch-doc .stretch-doc-inner :where(del) {
+  opacity: 0.82;
+}
+.pane--doc .doc-pane-body :where(section.footnotes),
+.shell--stretch-rows .stretch-preamble :where(section.footnotes),
+.block-stretch td.stretch-doc .stretch-doc-inner :where(section.footnotes) {
+  margin-top: 1.5em;
+  padding-top: 0.75em;
+  border-top: 1px solid color-mix(in oklab, CanvasText 18%, Canvas);
+  font-size: 0.92em;
+}
+.pane--doc .doc-pane-body .commentray-mermaid {
+  overflow-x: auto;
+  max-width: 100%;
+}
+/** Wrap on: break long URLs/words in prose; tables opt out so they stay wide + scroll with the body. */
+#doc-pane-body.wrap {
+  overflow-wrap: break-word;
+}
+#doc-pane-body.wrap :where(table) {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+#doc-pane-body:not(.wrap) {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+#doc-pane-body .commentray-page-break {
+  position: relative;
+  min-height: var(--commentray-page-break-min-height, clamp(260px, 56vh, 620px));
+  margin: 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+#doc-pane-body .commentray-page-break__rule {
+  width: 100%;
+  border-top: 1px dashed var(--border);
+  opacity: 0.38;
+}
+#shell[data-page-breaks-enabled="false"] .commentray-page-break {
+  display: none;
+}
+.toolbar-angle-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+/* Angle caption uses the same class as the Search label (.nav-rail__search-label). */
+.toolbar-angle-picker__lab {
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+  cursor: default;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  user-select: none;
+}
+.toolbar-angle-picker select {
+  font: inherit;
+  font-size: var(--cr-ui-fs);
+  font-weight: 500;
+  min-height: var(--cr-control-h);
+  height: var(--cr-control-h);
+  padding: 0 10px;
+  border-radius: var(--cr-control-radius);
+  border: 1px solid color-mix(in oklab, CanvasText 25%, Canvas);
+  background: Canvas;
+  color: color-mix(in oklab, CanvasText 88%, Canvas);
+}
+.toolbar-angle-picker select:focus-visible {
+  outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+  outline-offset: 2px;
+}
+/* Single-pane + compact chrome below typical tablet / Bootstrap md threshold (768px). */
+@media (max-width: 767px) {
+  html,
+  body {
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+  .app {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+  .app__main {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 0;
+  }
+  .app__main > #shell:not(.shell--stretch-rows) {
+    flex: none !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+  .app__main > #shell:not(.shell--stretch-rows) .shell__panes {
+    flex: none !important;
+    min-height: auto !important;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .app__main > #shell:not(.shell--stretch-rows) .pane--code,
+  .app__main > #shell:not(.shell--stretch-rows) .pane--doc {
+    flex: none !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    max-height: none !important;
+    /* flex:none + basis:auto otherwise sizes to max-content so line-wrap has no width cap */
+    width: 100%;
+    max-width: 100%;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+  .app__main > #shell:not(.shell--stretch-rows) .pane--doc {
+    display: block;
+  }
+  .app__main > #shell:not(.shell--stretch-rows) .doc-pane-body {
+    flex: none !important;
+    min-height: auto !important;
+    min-width: 0;
+    overflow: visible !important;
+  }
+  .app__footer {
+    margin-top: auto;
+    flex-shrink: 0;
+    padding: 5px 10px 8px;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+  .app__main > #shell.shell--stretch-rows {
+    flex: 1 1 auto;
+    min-height: min(72vh, 720px);
+    min-height: min(72dvh, 720px);
+    overflow: auto;
+  }
+  .toolbar {
+    padding: 5px 8px 5px;
+    row-gap: 4px;
+  }
+  .toolbar__primary {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .toolbar__primary-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px;
+    scrollbar-width: thin;
+  }
+  .toolbar__primary-trail {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-self: center;
+  }
+  .toolbar-angle-picker {
+    position: relative;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .toolbar-angle-picker__lab {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .toolbar-angle-picker select {
+    max-width: min(200px, 52vw);
+    min-width: 0;
+    text-overflow: ellipsis;
+  }
+  .app__chrome {
+    padding: 5px 8px 6px;
+    gap: 5px;
+    max-height: min(36vh, 360px);
+  }
+  /* Compact chrome: avoid heavy rings on inline fields (clear stays a real button). */
+  .chrome__search-row input[type="search"]:focus-visible {
+    outline: none;
+    border-color: color-mix(in oklab, CanvasText 42%, Canvas);
+  }
+  .chrome__search-row #search-clear:focus-visible {
+    outline: 2px solid color-mix(in oklab, CanvasText 45%, Canvas);
+    outline-offset: 2px;
+  }
+  .chrome__search-label__caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .chrome__search-label__glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 2px;
+    margin: 0;
+    color: color-mix(in oklab, CanvasText 72%, Canvas);
+  }
+  .chrome__search-label__glyph:hover {
+    color: color-mix(in oklab, CanvasText 88%, Canvas);
+  }
+  .chrome__search-label:focus-within {
+    outline: none;
+  }
+  .chrome__search-label__glyph svg {
+    display: block;
+    flex: 0 0 auto;
+  }
+  .toolbar-angle-picker select:focus-visible {
+    outline: none;
+    border-color: color-mix(in oklab, CanvasText 42%, Canvas);
+  }
+  .toolbar-icon-btn--flip-only-narrow {
+    display: inline-flex;
+  }
+  /**
+   * Secondary flip: only on narrow viewports, only while the toolbar flip is off-screen
+   * (see client IntersectionObserver). Same control as toolbar; fixed so it stays reachable.
+   */
+  .toolbar-icon-btn--flip-scroll-narrow {
+    display: none;
+  }
+  #mobile-pane-flip-scroll.toolbar-icon-btn--flip-scroll-narrow.is-visible {
+    display: inline-flex;
+    position: fixed;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    z-index: 50;
+    box-shadow:
+      0 1px 2px color-mix(in oklab, CanvasText 12%, transparent),
+      0 4px 14px color-mix(in oklab, CanvasText 18%, transparent);
+  }
+  .toolbar-icon-btn--source-markdown-scroll-narrow {
+    display: none;
+  }
+  #source-markdown-pane-flip-scroll.toolbar-icon-btn--source-markdown-scroll-narrow.is-visible {
+    display: inline-flex;
+    position: fixed;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    z-index: 50;
+    box-shadow:
+      0 1px 2px color-mix(in oklab, CanvasText 12%, transparent),
+      0 4px 14px color-mix(in oklab, CanvasText 18%, transparent);
+  }
+  /** Region connector lines are not needed on the narrow single-pane layout (gutter is hidden). */
+  .shell:not(.shell--stretch-rows) .gutter .gutter__rays {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  .nav-rail__doc-hub-summary {
+    min-width: var(--cr-control-h);
+    padding: 0 10px;
+    justify-content: center;
+    gap: 0;
+  }
+  .nav-rail__doc-hub-summary__caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .nav-rail__doc-hub-summary__glyph {
+    display: inline-flex;
+  }
+  .toolbar-wrap-lines {
+    min-width: var(--cr-control-h);
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    font-weight: 500;
+  }
+  .toolbar-wrap-lines__caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .toolbar-wrap-lines__box {
+    display: none;
+  }
+  .toolbar-wrap-lines__face {
+    display: inline-flex;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: var(--cr-control-h);
+    min-width: var(--cr-control-h);
+  }
+  .toolbar-wrap-lines:has(.toolbar-wrap-lines__input:checked) .toolbar-wrap-lines__face::after {
+    content: "✓";
+    position: absolute;
+    right: 1px;
+    bottom: 0;
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 800;
+    color: CanvasText;
+    text-shadow:
+      0 0 2px Canvas,
+      0 0 3px Canvas;
+  }
+  .toolbar-source-render-toggle {
+    min-width: var(--cr-control-h);
+    width: var(--cr-control-h);
+    height: var(--cr-control-h);
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+  }
+  .toolbar-source-render-toggle__caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .toolbar-source-render-toggle__box {
+    display: none;
+  }
+  .toolbar-source-render-toggle__face {
+    display: inline-flex;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: var(--cr-control-h);
+    min-width: var(--cr-control-h);
+  }
+  .toolbar-source-render-toggle[aria-pressed="true"] .toolbar-source-render-toggle__face::after {
+    content: "✓";
+    position: absolute;
+    right: 1px;
+    bottom: 0;
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 800;
+    color: CanvasText;
+    text-shadow:
+      0 0 2px Canvas,
+      0 0 3px Canvas;
+  }
+  .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="code"] .pane--doc,
+  .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="code"] .gutter {
+    display: none !important;
+  }
+  .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="doc"] .pane--code,
+  .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="doc"] .gutter {
+    display: none !important;
+  }
+  .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="code"] .pane--code,
+  .shell:not(.shell--stretch-rows)[data-dual-mobile-pane="doc"] .pane--doc {
+    border-right: 0 !important;
+  }
+  .shell:not(.shell--stretch-rows) .shell__pair-context {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 4px 0 6px;
+  }
+  .shell:not(.shell--stretch-rows) .shell__pair-gutter-spacer {
+    display: none;
+  }
+  .shell:not(.shell--stretch-rows) .shell__pair-cell--src {
+    flex: 1 1 auto;
+    padding-left: var(--cr-pane-inline-pad);
+  }
+  .shell:not(.shell--stretch-rows) .shell__pair-cell--doc {
+    flex: 1 1 auto;
+    padding-left: var(--cr-pane-inline-pad);
+  }
+  .shell.shell--stretch-rows[data-dual-mobile-pane="code"] .stretch-col-doc,
+  .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] .stretch-col-code,
+  .shell.shell--stretch-rows[data-dual-mobile-pane="code"] td.stretch-doc,
+  .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] td.stretch-code {
+    display: none;
+  }
+  .shell.shell--stretch-rows[data-dual-mobile-pane="code"] td.stretch-code,
+  .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] td.stretch-doc {
+    display: table-cell;
+    width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .shell.shell--stretch-rows[data-dual-mobile-pane] #stretch-gutter {
+    display: none;
+  }
+}
+.pane--doc {
+  font-size: 15px;
+  line-height: 1.45;
+}
+.pane--doc img {
+  max-width: 100%;
+  height: auto;
+}
+.pane--doc .commentray-line-anchor {
+  display: inline;
+  vertical-align: baseline;
+  scroll-margin-top: 10px;
+}
+.pane--doc .commentray-block-anchor {
+  display: block;
+  height: 0;
+  margin: 0;
+  border: 0;
+  pointer-events: none;
+}
+.shell--stretch-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: block;
+  padding: 0 0 20px;
+}
+.shell--stretch-rows .stretch-preamble {
+  padding: 8px 4px 16px;
+  margin-bottom: 8px;
+  font-size: 15px;
+  line-height: 1.45;
+  overflow-x: auto;
+  /* overflow-x other than visible makes overflow-y:visible compute to auto, which traps
+   * vertical wheel on this node instead of the shell scrollport when height is ever capped. */
+  overflow-y: hidden;
+  max-width: 100%;
+}
+.shell--stretch-rows .stretch-preamble img {
+  max-width: 100%;
+  height: auto;
+}
+.block-stretch {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.stretch-grid {
+  position: relative;
+}
+.stretch-col-code {
+  width: var(--stretch-code-pct, 50%);
+}
+.stretch-col-doc {
+  width: calc(100% - var(--stretch-code-pct, 50%));
+}
+.block-stretch td.stretch-code {
+  vertical-align: top;
+  padding: 0 12px 0 0;
+  box-shadow: inset -1px 0 0 color-mix(in oklab, CanvasText 10%, Canvas);
+}
+#shell[data-stretch-buffer-sync="flow-synchronizer"]
+  .block-stretch
+  td.stretch-code
+  > .stretch-cell-measure,
+#shell[data-stretch-buffer-sync="flow-synchronizer"]
+  .block-stretch
+  td.stretch-doc
+  > .stretch-cell-measure {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  height: max-content;
+  max-height: max-content;
+}
+#shell[data-stretch-buffer-sync="flow-synchronizer"]
+  .block-stretch
+  td.stretch-doc
+  .stretch-doc-inner {
+  height: max-content;
+  max-height: max-content;
+}
+#shell[data-stretch-buffer-sync="flow-synchronizer"] .block-stretch .stretch-code-stack {
+  height: max-content;
+  max-height: max-content;
+}
+.block-stretch td.stretch-doc {
+  vertical-align: top;
+  padding: 0 0 0 12px;
+  box-shadow: inset 1px 0 0 color-mix(in oklab, CanvasText 8%, Canvas);
+}
+.block-stretch td.stretch-doc .stretch-doc-inner {
+  font-size: 15px;
+  line-height: 1.45;
+  min-width: 0;
+  overflow-x: auto;
+  /* Keep vertical scrolling on the shell; see stretch-preamble rule above. */
+  overflow-y: hidden;
+}
+.block-stretch td.stretch-doc .stretch-doc-inner img {
+  max-width: 100%;
+  height: auto;
+}
+.block-stretch td.stretch-doc .stretch-doc-inner .commentray-mermaid {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+.block-stretch.wrap td.stretch-doc .stretch-doc-inner {
+  overflow-wrap: break-word;
+}
+.block-stretch.wrap td.stretch-doc .stretch-doc-inner :where(table) {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.block-stretch:not(.wrap) td.stretch-doc .stretch-doc-inner {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.block-stretch td.stretch-doc--gap {
+  color: color-mix(in oklab, CanvasText 38%, Canvas);
+  font-size: 13px;
+  vertical-align: top;
+}
+.block-stretch .stretch-code-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+.block-stretch .code-line {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  align-items: start;
+}
+.block-stretch .code-line pre {
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.block-stretch .code-line pre code.hljs {
+  display: block;
+  margin: 0;
+  padding: 0;
+  font-size: var(--code-line-font-size, 13px);
+  line-height: var(--code-line-height, 1.5);
+}
+.block-stretch .code-line-stack {
+  --code-ln-min-ch: 3;
+}
+.block-stretch .code-line .ln {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  user-select: none;
+  -webkit-user-select: none;
+  color: color-mix(in oklab, CanvasText 45%, Canvas);
+  padding-right: 8px;
+  border-right: 1px solid color-mix(in oklab, CanvasText 12%, Canvas);
+  white-space: nowrap;
+  font-size: var(--code-line-font-size, 13px);
+  line-height: var(--code-line-height, 1.5);
+  min-width: calc(var(--code-ln-min-ch, 3) * 1ch + 0.6ch);
+  box-sizing: content-box;
+}
+.block-stretch.wrap .code-line pre,
+.block-stretch.wrap .code-line pre code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.block-stretch:not(.wrap) .code-line pre,
+.block-stretch:not(.wrap) .code-line pre code {
+  white-space: pre;
+}
+.block-stretch.wrap .stretch-doc-inner pre,
+.block-stretch.wrap .stretch-doc-inner pre code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.block-stretch:not(.wrap) .stretch-doc-inner pre,
+.block-stretch:not(.wrap) .stretch-doc-inner pre code {
+  white-space: pre;
+}
+.stretch-gutter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--stretch-code-pct, 50%);
+  transform: translateX(-50%);
+  width: 14px;
+  cursor: col-resize;
+  touch-action: none;
+  border-left: 1px solid color-mix(in oklab, CanvasText 14%, Canvas);
+  border-right: 1px solid color-mix(in oklab, CanvasText 10%, Canvas);
+  background: color-mix(in oklab, CanvasText 8%, Canvas);
+  border-radius: 999px;
+  --commentray-ray-accent: #3b7dd8;
+  z-index: 6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:is(:not([data-commentray-theme]), [data-commentray-theme="system"]) .stretch-gutter {
+    --commentray-ray-accent: #6eb0ff;
+  }
+}
+:root[data-commentray-theme="dark"] .stretch-gutter {
+  --commentray-ray-accent: #6eb0ff;
+}

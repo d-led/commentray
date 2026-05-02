@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { COMMENTRAY_MERMAID_MODULE_READY_EVENT } from "./commentray-mermaid-events.js";
 import { mermaidRuntimeScriptHtml } from "./mermaid-runtime-html.js";
 
 describe("Optional Mermaid runtime script injection", () => {
@@ -14,10 +15,10 @@ describe("Optional Mermaid runtime script injection", () => {
     expect(html).toContain('s.type="module"');
     expect(html).toContain("cdn.jsdelivr.net/npm/mermaid@11.14.0");
     expect(html).toContain("mermaid.initialize");
-    expect(html).toContain("globalThis.commentrayMermaid=mermaid");
-    expect(html).toContain("commentray-mermaid-module-ready");
+    expect(html).toMatch(/globalThis\.commentrayMermaid\s*=\s*mermaid/);
+    expect(html).toContain(COMMENTRAY_MERMAID_MODULE_READY_EVENT);
     expect(html).toContain("skipInitial");
-    expect(html).toMatch(/layout===.*stretch/);
+    expect(html).toMatch(/skipInitial[\s\S]*\\"dual\\"[\s\S]*\\"stretch\\"/);
     expect(html).toContain("commentray-mermaid-done");
     expect(html).not.toContain('<script type="module">');
   });
