@@ -2975,6 +2975,35 @@ function focusDocumentedFilesFilterInput(): void {
   focusListRowAndReveal(el);
 }
 
+function focusDocumentedFilesHubSummaryIfPresent(hub: HTMLDetailsElement): void {
+  const sum = hub.querySelector("summary");
+  if (sum instanceof HTMLElement) sum.focus({ preventScroll: true });
+}
+
+/** Escape to close; pointer outside `#documented-files-hub` to close (capture). */
+function wireDocumentedFilesHubDismissalHandlers(hub: HTMLDetailsElement): void {
+  function onEscape(ev: KeyboardEvent): void {
+    if (!hub.open || ev.key !== "Escape") return;
+    ev.preventDefault();
+    hub.open = false;
+    focusDocumentedFilesHubSummaryIfPresent(hub);
+  }
+  document.addEventListener("keydown", onEscape, true);
+
+  document.addEventListener(
+    "pointerdown",
+    (ev: PointerEvent) => {
+      if (!hub.open) return;
+      const t = ev.target;
+      if (!(t instanceof Node)) return;
+      if (hub.contains(t)) return;
+      hub.open = false;
+      focusDocumentedFilesHubSummaryIfPresent(hub);
+    },
+    true,
+  );
+}
+
 function wireDocumentedFilesTree(): void {
   const hub = document.getElementById("documented-files-hub");
   const treeHost = document.getElementById("documented-files-tree");
@@ -3032,28 +3061,7 @@ function wireDocumentedFilesTree(): void {
     void hydrateTree();
   });
 
-  function onDocumentedFilesHubEscape(ev: KeyboardEvent): void {
-    if (!detailsHub.open || ev.key !== "Escape") return;
-    ev.preventDefault();
-    detailsHub.open = false;
-    const sum = detailsHub.querySelector("summary");
-    if (sum instanceof HTMLElement) sum.focus({ preventScroll: true });
-  }
-  document.addEventListener("keydown", onDocumentedFilesHubEscape, true);
-
-  document.addEventListener(
-    "pointerdown",
-    (ev: PointerEvent) => {
-      if (!detailsHub.open) return;
-      const t = ev.target;
-      if (!(t instanceof Node)) return;
-      if (detailsHub.contains(t)) return;
-      detailsHub.open = false;
-      const sum = detailsHub.querySelector("summary");
-      if (sum instanceof HTMLElement) sum.focus({ preventScroll: true });
-    },
-    true,
-  );
+  wireDocumentedFilesHubDismissalHandlers(detailsHub);
 
   treeMount.addEventListener("keydown", (e: KeyboardEvent) => {
     if (!detailsHub.open || e.isComposing) return;

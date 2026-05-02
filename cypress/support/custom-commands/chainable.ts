@@ -101,7 +101,7 @@ declare global {
       ConstrainCommentRayedFilesTreeHeightForScrollCoverage(): Chainable<void>;
       TreeKeyboardNavigateFromFirstLinkToLastLink(): Chainable<void>;
       CommentRayedFilesTreeScrollTopShouldBeGreaterThan(pixels: number): Chainable<void>;
-      ClickMainLandmarkToDismissCommentRayedFilesHub(): Chainable<void>;
+      ClickPageFooterToDismissCommentRayedFilesHub(): Chainable<void>;
       CommentRayedFilesHubOpenPropShouldBe(open: boolean): Chainable<void>;
 
       OptionsOfAngleSelectShouldIncludeMainAndArchitecture(): Chainable<void>;

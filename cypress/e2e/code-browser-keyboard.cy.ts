@@ -137,9 +137,9 @@ describe("Code browser keyboard usability on the static site", () => {
           });
         });
 
-        it("then clicking outside the hub on the main landmark closes the tree", () => {
+        it("then clicking outside the hub on the page footer closes the tree", () => {
           cy.CommentRayedFilesHubOpenPropShouldBe(true);
-          cy.ClickMainLandmarkToDismissCommentRayedFilesHub();
+          cy.ClickPageFooterToDismissCommentRayedFilesHub();
           cy.CommentRayedFilesHubOpenPropShouldBe(false);
         });
       });

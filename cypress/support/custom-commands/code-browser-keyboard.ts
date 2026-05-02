@@ -69,11 +69,16 @@ Cypress.Commands.add("OpenCommentRayedFilesHubWithTreeVisible", () => {
 
 /** Forces vertical overflow so ArrowDown through hits must scroll `#search-results`. */
 Cypress.Commands.add("ConstrainSearchResultsPanelHeightForScrollCoverage", () => {
+  cy.get(shellA11y.search.results).should("be.visible");
   cy.get(shellA11y.search.results)
-    .should("be.visible")
-    .then(($r) => {
-      cy.wrap($r).invoke("css", "max-height", "48px").invoke("css", "overflow-y", "auto");
-    });
+    .invoke("css", "max-height", "36px")
+    .invoke("css", "overflow-y", "auto");
+  cy.get(shellA11y.search.results).should(($el) => {
+    const el = $el[0] as HTMLElement;
+    expect(el.scrollHeight, "search results list should overflow").to.be.greaterThan(
+      el.clientHeight + 2,
+    );
+  });
 });
 
 /** Assumes keyboard focus is already on the first hit; walks to the last with ArrowDown. */
@@ -93,11 +98,16 @@ Cypress.Commands.add("SearchResultsPanelScrollTopShouldBeGreaterThan", (pixels: 
 });
 
 Cypress.Commands.add("ConstrainCommentRayedFilesTreeHeightForScrollCoverage", () => {
+  cy.get(shellA11y.documentedFiles.tree).should("be.visible");
   cy.get(shellA11y.documentedFiles.tree)
-    .should("be.visible")
-    .then(($t) => {
-      cy.wrap($t).invoke("css", "max-height", "36px").invoke("css", "overflow-y", "auto");
-    });
+    .invoke("css", "max-height", "22px")
+    .invoke("css", "overflow-y", "auto");
+  cy.get(shellA11y.documentedFiles.tree).should(($el) => {
+    const el = $el[0] as HTMLElement;
+    expect(el.scrollHeight, "documented-files tree should overflow").to.be.greaterThan(
+      el.clientHeight + 2,
+    );
+  });
 });
 
 /** Assumes keyboard focus is already on the first tree file link. */
@@ -116,9 +126,12 @@ Cypress.Commands.add("CommentRayedFilesTreeScrollTopShouldBeGreaterThan", (pixel
   cy.get(shellA11y.documentedFiles.tree).invoke("scrollTop").should("be.gt", pixels);
 });
 
-/** Pointer target outside the hub (`#documented-files-hub`); closes the `<details>` panel. */
-Cypress.Commands.add("ClickMainLandmarkToDismissCommentRayedFilesHub", () => {
-  cy.get(shellA11y.main).should("be.visible").click(12, 12);
+/**
+ * Clicks outside the hub. Uses the page footer so the hit target is never under the doc-hub
+ * flyout (which can stack above the top of `main` and swallow top-left clicks in CI).
+ */
+Cypress.Commands.add("ClickPageFooterToDismissCommentRayedFilesHub", () => {
+  cy.get(shellA11y.contentinfo).should("be.visible").click("center");
 });
 
 Cypress.Commands.add("CommentRayedFilesHubOpenPropShouldBe", (open: boolean) => {
