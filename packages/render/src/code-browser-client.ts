@@ -99,12 +99,60 @@ type CommentrayMermaidGlobal = {
  * undefined. We enqueue roots and flush on {@link COMMENTRAY_MERMAID_MODULE_READY_EVENT}.
  */
 const pendingMermaidDocRoots = new Set<HTMLElement>();
+const queuedMermaidDocRoots = new Set<HTMLElement>();
+let mermaidQueueInFlight: Promise<void> | null = null;
+
+function collectFreshMermaidPreNodes(roots: Iterable<HTMLElement>): HTMLElement[] {
+  const uniq = new Set<HTMLElement>();
+  for (const root of roots) {
+    for (const pre of Array.from(root.querySelectorAll("pre.mermaid")) as HTMLElement[]) {
+      const wrap = pre.closest(".commentray-mermaid");
+      if (wrap !== null && wrap.querySelector("svg") !== null) continue;
+      uniq.add(pre);
+    }
+  }
+  return Array.from(uniq);
+}
+
+function pumpQueuedMermaidRuns(): Promise<void> {
+  if (mermaidQueueInFlight) return mermaidQueueInFlight;
+  mermaidQueueInFlight = (async () => {
+    while (queuedMermaidDocRoots.size > 0) {
+      const m = (globalThis as unknown as { commentrayMermaid?: CommentrayMermaidGlobal })
+        .commentrayMermaid;
+      if (!m) {
+        for (const root of queuedMermaidDocRoots) pendingMermaidDocRoots.add(root);
+        queuedMermaidDocRoots.clear();
+        return;
+      }
+      const roots = Array.from(queuedMermaidDocRoots);
+      queuedMermaidDocRoots.clear();
+      const nodes = collectFreshMermaidPreNodes(roots);
+      if (nodes.length === 0) continue;
+      try {
+        await m.run({ nodes });
+        dispatchCommentrayMermaidDone();
+      } catch (err: unknown) {
+        console.error("Commentray: mermaid.run failed", err);
+      }
+    }
+  })().finally(() => {
+    mermaidQueueInFlight = null;
+    if (queuedMermaidDocRoots.size > 0) void pumpQueuedMermaidRuns();
+  });
+  return mermaidQueueInFlight;
+}
+
+function queueMermaidRunForDocRoot(docRoot: HTMLElement): Promise<void> {
+  queuedMermaidDocRoots.add(docRoot);
+  return pumpQueuedMermaidRuns();
+}
 
 function flushPendingMermaidDocRoots(): void {
   const roots = Array.from(pendingMermaidDocRoots);
   pendingMermaidDocRoots.clear();
   for (const root of roots) {
-    void runMermaidOnFreshDocNodes(root);
+    void queueMermaidRunForDocRoot(root);
   }
 }
 
@@ -115,28 +163,13 @@ globalThis.addEventListener(COMMENTRAY_MERMAID_MODULE_READY_EVENT, () => {
 function runMermaidOnFreshDocNodes(docBody: HTMLElement): Promise<void> {
   if (typeof globalThis.location !== "undefined" && globalThis.location.protocol === "file:")
     return Promise.resolve();
-  /** Only fenced diagram sources; Mermaid leaves other `.mermaid` nodes in the tree after render. */
-  const allPres = Array.from(docBody.querySelectorAll("pre.mermaid")) as HTMLElement[];
-  /** Do not re-run on wrappers that already have SVG (avoids corrupting output after dual-mobile pane flip). */
-  const nodes = allPres.filter((pre) => {
-    const wrap = pre.closest(".commentray-mermaid");
-    return wrap === null || wrap.querySelector("svg") === null;
-  });
-  if (nodes.length === 0) return Promise.resolve();
-  const m = (globalThis as unknown as { commentrayMermaid?: CommentrayMermaidGlobal })
-    .commentrayMermaid;
-  if (!m) {
+  if (
+    !(globalThis as unknown as { commentrayMermaid?: CommentrayMermaidGlobal }).commentrayMermaid
+  ) {
     pendingMermaidDocRoots.add(docBody);
     return Promise.resolve();
   }
-  return m
-    .run({ nodes })
-    .then(() => {
-      dispatchCommentrayMermaidDone();
-    })
-    .catch((err: unknown) => {
-      console.error("Commentray: mermaid.run failed", err);
-    });
+  return queueMermaidRunForDocRoot(docBody);
 }
 
 type HitKind = "code" | "md" | "path";
