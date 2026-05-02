@@ -55,9 +55,17 @@ function firstGithubBlobHrefIn(html) {
 }
 
 function assertNoBrowseStack(html, label) {
-  if (html.includes("/browse/browse/")) {
-    fail(`${label}: emitted HTML contains /browse/browse/`);
-  }
+  const needle = "/browse/browse/";
+  const idx = html.indexOf(needle);
+  if (idx < 0) return;
+  const lo = Math.max(0, idx - 48);
+  const hi = Math.min(html.length, idx + needle.length + 48);
+  const snippet = html.slice(lo, hi).replace(/\s+/g, " ");
+  fail(
+    `${label}: emitted HTML contains ${needle} (full-document substring check).\n` +
+      `Often prose or highlighted source that illustrates the bug — rephrase, or fix a real doubled browse path.\n` +
+      `Near: ${JSON.stringify(snippet)}`,
+  );
 }
 
 function assertGithubBlobUrl(label, href) {
