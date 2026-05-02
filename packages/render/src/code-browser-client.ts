@@ -1485,6 +1485,15 @@ function emptyBrowsePreviewInnerHtml(
   return emptySearchBrowsePreviewInnerHtml(hint, fb, hitCtx);
 }
 
+/**
+ * List rows use `focus({ preventScroll: true })` so the page does not jump; follow with
+ * `scrollIntoView` so overflow panels (`#search-results`, `#documented-files-tree`) still scroll.
+ */
+function focusListRowAndReveal(el: HTMLElement): void {
+  el.focus({ preventScroll: true });
+  el.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
 function wireSearchResultsHitListKeyboard(
   searchResults: HTMLElement,
   searchInput: HTMLInputElement,
@@ -1498,17 +1507,17 @@ function wireSearchResultsHitListKeyboard(
     const idx = hits.indexOf(active);
     if (idx < 0) return;
     if (e.key === "ArrowDown" && idx < hits.length - 1) {
-      hits[idx + 1].focus({ preventScroll: true });
+      focusListRowAndReveal(hits[idx + 1]);
       e.preventDefault();
       return;
     }
     if (e.key === "ArrowUp") {
       if (idx > 0) {
-        hits[idx - 1].focus({ preventScroll: true });
+        focusListRowAndReveal(hits[idx - 1]);
         e.preventDefault();
         return;
       }
-      searchInput.focus({ preventScroll: true });
+      focusListRowAndReveal(searchInput);
       e.preventDefault();
     }
   });
@@ -1533,7 +1542,7 @@ function wireSearchInputKeyboard(
       if (!searchResults.hidden) {
         const hits = listSearchHitButtons(searchResults);
         if (hits.length > 0 && document.activeElement === searchInput) {
-          hits[0].focus({ preventScroll: true });
+          focusListRowAndReveal(hits[0]);
           e.preventDefault();
           return;
         }
@@ -2963,7 +2972,7 @@ function wireDocumentedFilesTreeMobileFlyout(hub: HTMLDetailsElement): () => voi
 function focusDocumentedFilesFilterInput(): void {
   const el = document.getElementById("documented-files-filter");
   if (!(el instanceof HTMLInputElement)) return;
-  el.focus({ preventScroll: true });
+  focusListRowAndReveal(el);
 }
 
 function wireDocumentedFilesTree(): void {
@@ -3032,6 +3041,20 @@ function wireDocumentedFilesTree(): void {
   }
   document.addEventListener("keydown", onDocumentedFilesHubEscape, true);
 
+  document.addEventListener(
+    "pointerdown",
+    (ev: PointerEvent) => {
+      if (!detailsHub.open) return;
+      const t = ev.target;
+      if (!(t instanceof Node)) return;
+      if (detailsHub.contains(t)) return;
+      detailsHub.open = false;
+      const sum = detailsHub.querySelector("summary");
+      if (sum instanceof HTMLElement) sum.focus({ preventScroll: true });
+    },
+    true,
+  );
+
   treeMount.addEventListener("keydown", (e: KeyboardEvent) => {
     if (!detailsHub.open || e.isComposing) return;
     const t = e.target;
@@ -3042,19 +3065,19 @@ function wireDocumentedFilesTree(): void {
     if (idx < 0) return;
     if (e.key === "ArrowDown") {
       if (idx < links.length - 1) {
-        links[idx + 1].focus({ preventScroll: true });
+        focusListRowAndReveal(links[idx + 1]);
         e.preventDefault();
       }
       return;
     }
     if (e.key === "ArrowUp") {
       if (idx > 0) {
-        links[idx - 1].focus({ preventScroll: true });
+        focusListRowAndReveal(links[idx - 1]);
         e.preventDefault();
         return;
       }
       if (filterInput instanceof HTMLInputElement) {
-        filterInput.focus({ preventScroll: true });
+        focusListRowAndReveal(filterInput);
         e.preventDefault();
       }
     }
@@ -3069,7 +3092,7 @@ function wireDocumentedFilesTree(): void {
       if (!detailsHub.open || e.isComposing || e.key !== "ArrowDown") return;
       const links = listDocumentedTreeFileLinks(treeMount);
       if (links.length === 0) return;
-      links[0].focus({ preventScroll: true });
+      focusListRowAndReveal(links[0]);
       e.preventDefault();
     });
   }

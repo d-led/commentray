@@ -64,6 +64,12 @@ describe("Code browser keyboard usability on the static site", () => {
             cy.PressArrowUpInFocusedElement();
             cy.SearchHitButtonAtIndexShouldBeFocused(0);
           });
+
+          it("then ArrowDown through the list scrolls the results panel so the focused hit stays visible", () => {
+            cy.ConstrainSearchResultsPanelHeightForScrollCoverage();
+            cy.SearchKeyboardNavigateFromFirstHitToLastHit();
+            cy.SearchResultsPanelScrollTopShouldBeGreaterThan(0);
+          });
         });
       });
 
@@ -123,6 +129,18 @@ describe("Code browser keyboard usability on the static site", () => {
             cy.PressArrowUpInFocusedElement();
             cy.CommentRayedTreeFileLinkAtIndexShouldBeFocused(0);
           });
+
+          it("then ArrowDown through the list scrolls the tree so the focused link stays visible", () => {
+            cy.ConstrainCommentRayedFilesTreeHeightForScrollCoverage();
+            cy.TreeKeyboardNavigateFromFirstLinkToLastLink();
+            cy.CommentRayedFilesTreeScrollTopShouldBeGreaterThan(0);
+          });
+        });
+
+        it("then clicking outside the hub on the main landmark closes the tree", () => {
+          cy.CommentRayedFilesHubOpenPropShouldBe(true);
+          cy.ClickMainLandmarkToDismissCommentRayedFilesHub();
+          cy.CommentRayedFilesHubOpenPropShouldBe(false);
         });
       });
     });

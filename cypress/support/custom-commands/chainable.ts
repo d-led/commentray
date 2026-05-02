@@ -95,6 +95,14 @@ declare global {
       CommentRayedTreeFileLinkAtIndexShouldBeFocused(zeroBasedIndex: number): Chainable<void>;
       CommentRayedFilesTreeFileLinksShouldBeAtLeast(min: number): Chainable<void>;
       OpenCommentRayedFilesHubWithTreeVisible(): Chainable<void>;
+      ConstrainSearchResultsPanelHeightForScrollCoverage(): Chainable<void>;
+      SearchKeyboardNavigateFromFirstHitToLastHit(): Chainable<void>;
+      SearchResultsPanelScrollTopShouldBeGreaterThan(pixels: number): Chainable<void>;
+      ConstrainCommentRayedFilesTreeHeightForScrollCoverage(): Chainable<void>;
+      TreeKeyboardNavigateFromFirstLinkToLastLink(): Chainable<void>;
+      CommentRayedFilesTreeScrollTopShouldBeGreaterThan(pixels: number): Chainable<void>;
+      ClickMainLandmarkToDismissCommentRayedFilesHub(): Chainable<void>;
+      CommentRayedFilesHubOpenPropShouldBe(open: boolean): Chainable<void>;
 
       OptionsOfAngleSelectShouldIncludeMainAndArchitecture(): Chainable<void>;
       DisplayedValueOfAngleSelectShouldBe(value: string): Chainable<void>;
