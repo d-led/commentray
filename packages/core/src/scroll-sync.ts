@@ -1,6 +1,6 @@
 import { parseAnchor } from "./anchors.js";
 import type { BlockScrollLink } from "./block-scroll-pickers.js";
-import { MARKER_ID_BODY } from "./marker-ids.js";
+import { assertValidMarkerId, MARKER_ID_BODY } from "./marker-ids.js";
 import type { CommentrayIndex } from "./model.js";
 import { normalizeRepoRelativePath } from "./paths.js";
 import { markerViewportHalfOpen1Based, sourceLineRangeForMarkerId } from "./source-markers.js";
@@ -55,6 +55,121 @@ function buildMarkerFallbackLinks(
   return links;
 }
 
+/** One `<!-- #region commentray:id -->` … `<!-- #endregion commentray:id -->` span in companion Markdown. */
+export type MarkdownHtmlCommentrayRegion = {
+  readonly id: string;
+  /** 0-based line of the opening `<!-- #region commentray:<id> -->`. */
+  readonly mdStartLine: number;
+  /** Exclusive line index past the closing `<!-- #endregion commentray:<id> -->`. */
+  readonly mdEndExclusive: number;
+};
+
+/**
+ * Parses HTML-style Commentray regions in companion Markdown (`markdown` language family), the same
+ * shape `commentrayRegionInsertions("markdown", …)` emits. Used when there are no
+ * `<!-- commentray:block id=… -->` markers so scroll sync can still segment by authored sections.
+ */
+export function parseMarkdownHtmlCommentrayRegions(
+  markdown: string,
+): MarkdownHtmlCommentrayRegion[] {
+  const lines = markdown.split("\n");
+  const out: MarkdownHtmlCommentrayRegion[] = [];
+  const stack: { id: string; start: number }[] = [];
+  const startRe = /^<!--\s*#region\s+commentray:([a-z0-9][a-z0-9_-]{0,63})\s*-->$/i;
+  const endRe = /^<!--\s*#endregion\s+commentray:([a-z0-9][a-z0-9_-]{0,63})\s*-->$/i;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const sm = line.match(startRe);
+    if (sm) {
+      try {
+        assertValidMarkerId(sm[1]!);
+      } catch {
+        continue;
+      }
+      stack.push({ id: sm[1]!, start: i });
+      continue;
+    }
+    const em = line.match(endRe);
+    if (!em) continue;
+    try {
+      assertValidMarkerId(em[1]!);
+    } catch {
+      continue;
+    }
+    const id = em[1]!;
+    let k = stack.length - 1;
+    while (k >= 0 && stack[k]!.id.toLowerCase() !== id.toLowerCase()) k -= 1;
+    if (k < 0) continue;
+    const { start } = stack[k]!;
+    stack.splice(k);
+    out.push({ id, mdStartLine: start, mdEndExclusive: i + 1 });
+  }
+  out.sort((a, b) => a.mdStartLine - b.mdStartLine);
+  return out;
+}
+
+/**
+ * When companion Markdown uses HTML `#region commentray:…` / `#endregion` pairs but the primary
+ * file has **no** matching region delimiters, partition **1…sourceLineCount** across regions in
+ * proportion to each region’s Markdown body height so dual-pane scroll is **piecewise** instead
+ * of one global ratio.
+ */
+function buildSyntheticBlockScrollLinksFromHtmlRegions(
+  commentrayMarkdown: string,
+  sourceText: string | undefined,
+): BlockScrollLink[] {
+  if (sourceText === undefined) return [];
+  const sourceLineCount = sourceText.split("\n").length;
+  if (sourceLineCount < 1) return [];
+  const regions = parseMarkdownHtmlCommentrayRegions(commentrayMarkdown);
+  if (regions.length === 0) return [];
+  if (sourceLineCount < regions.length) return [];
+  const weights = regions.map((r) => Math.max(1, r.mdEndExclusive - r.mdStartLine - 2));
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const slices = weights.map((w) => Math.max(1, Math.floor((w / sum) * sourceLineCount)));
+  let total = slices.reduce((a, b) => a + b, 0);
+  let guard = 0;
+  while (total < sourceLineCount && guard < sourceLineCount + 8) {
+    slices[guard % slices.length]! += 1;
+    total += 1;
+    guard += 1;
+  }
+  guard = 0;
+  while (total > sourceLineCount && guard < sourceLineCount + 8) {
+    const j = slices.findIndex((s) => s > 1);
+    if (j < 0) break;
+    slices[j]! -= 1;
+    total -= 1;
+    guard += 1;
+  }
+  const links: BlockScrollLink[] = [];
+  let srcLo = 1;
+  for (let j = 0; j < regions.length; j++) {
+    const slice = slices[j]!;
+    const srcHi = Math.min(sourceLineCount, srcLo + slice - 1);
+    const r = regions[j]!;
+    links.push({
+      id: r.id,
+      commentrayLine: r.mdStartLine,
+      sourceStart: srcLo,
+      sourceEnd: srcHi,
+      markerViewportHalfOpen1Based: { lo: srcLo, hiExclusive: srcHi + 1 },
+    });
+    srcLo = srcHi + 1;
+  }
+  return links;
+}
+
+function markerFallbackThenSynthetic(
+  markerLineById: Map<string, number>,
+  commentrayMarkdown: string,
+  sourceText: string | undefined,
+): BlockScrollLink[] {
+  const fb = buildMarkerFallbackLinks(markerLineById, sourceText);
+  if (fb.length > 0) return fb;
+  return buildSyntheticBlockScrollLinksFromHtmlRegions(commentrayMarkdown, sourceText);
+}
+
 /** Join index + companion markers into `BlockScrollLink[]`; see scroll-sync commentray. */
 export function buildBlockScrollLinks(
   index: CommentrayIndex | null | undefined,
@@ -66,11 +181,13 @@ export function buildBlockScrollLinks(
   const markerLineById = markerLineByIdFromMarkdown(commentrayMarkdown);
   const entry = index?.byCommentrayPath[commentrayPath];
   if (!entry || entry.sourcePath !== sourceRelative || entry.blocks.length === 0) {
-    return buildMarkerFallbackLinks(markerLineById, sourceText);
+    return markerFallbackThenSynthetic(markerLineById, commentrayMarkdown, sourceText);
   }
   const entryCrNorm = normalizeRepoRelativePath(entry.commentrayPath.replaceAll("\\", "/"));
   const lookupCrNorm = normalizeRepoRelativePath(commentrayPath.replaceAll("\\", "/"));
-  if (entryCrNorm !== lookupCrNorm) return buildMarkerFallbackLinks(markerLineById, sourceText);
+  if (entryCrNorm !== lookupCrNorm) {
+    return markerFallbackThenSynthetic(markerLineById, commentrayMarkdown, sourceText);
+  }
   const links: BlockScrollLink[] = [];
   for (const block of entry.blocks) {
     const anchor = parseAnchor(block.anchor);
@@ -103,5 +220,6 @@ export function buildBlockScrollLinks(
     }
   }
   links.sort((a, b) => a.sourceStart - b.sourceStart);
-  return links;
+  if (links.length > 0) return links;
+  return buildSyntheticBlockScrollLinksFromHtmlRegions(commentrayMarkdown, sourceText);
 }

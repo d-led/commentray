@@ -11,6 +11,7 @@ import {
   pickCommentrayLineForSourceDualPane,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
+  parseMarkdownHtmlCommentrayRegions,
   sourceTopLineStrictlyBeforeFirstIndexLine,
 } from "./scroll-sync.js";
 
@@ -176,6 +177,30 @@ describe("Block scroll link derivation from index and markers", () => {
         markerViewportHalfOpen1Based: { lo: 1, hiExclusive: 3 },
       },
     ]);
+  });
+});
+
+describe("Markdown HTML commentray regions (synthetic scroll links)", () => {
+  it("parses paired region / endregion spans in companion Markdown", () => {
+    const md =
+      "<!-- #region commentray:aa -->\nA\n<!-- #endregion commentray:aa -->\n" +
+      "<!-- #region commentray:bb -->\nB\n<!-- #endregion commentray:bb -->\n";
+    const regions = parseMarkdownHtmlCommentrayRegions(md);
+    expect(regions).toHaveLength(2);
+    expect(regions[0]).toMatchObject({ id: "aa", mdStartLine: 0, mdEndExclusive: 3 });
+    expect(regions[1]).toMatchObject({ id: "bb", mdStartLine: 3, mdEndExclusive: 6 });
+  });
+
+  it("when there are no block markers but HTML regions exist, buildBlockScrollLinks yields weighted synthetic spans on the source file", () => {
+    const md =
+      "<!-- #region commentray:r1 -->\nX\n<!-- #endregion commentray:r1 -->\n" +
+      "<!-- #region commentray:r2 -->\nY\n<!-- #endregion commentray:r2 -->\n";
+    const src = Array.from({ length: 20 }, (_, i) => `L${i + 1}`).join("\n");
+    const links = buildBlockScrollLinks(null, "x.ts", "y.md", md, src);
+    expect(links).toHaveLength(2);
+    expect(links[0]!.sourceStart).toBe(1);
+    expect(links[1]!.sourceEnd).toBe(20);
+    expect(links[0]!.sourceEnd + 1).toBe(links[1]!.sourceStart);
   });
 });
 

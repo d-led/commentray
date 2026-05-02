@@ -151,7 +151,11 @@ export {
 export { relocationHintMessages } from "./relocation-hints.js";
 export type { RelocationHintsInput } from "./relocation-hints.js";
 export { runCommanderMain } from "./cli-bootstrap.js";
-export type { BlockScrollLink, BlockScrollStickyState } from "./scroll-sync.js";
+export type {
+  BlockScrollLink,
+  BlockScrollStickyState,
+  MarkdownHtmlCommentrayRegion,
+} from "./scroll-sync.js";
 export {
   blockStrictlyContainingSourceViewportLine,
   buildBlockScrollLinks,
@@ -165,6 +169,7 @@ export {
   pickCommentrayLineForSourceDualPane,
   pickCommentrayLineForSourceScroll,
   pickSourceLine0ForCommentrayScroll,
+  parseMarkdownHtmlCommentrayRegions,
   sourceTopLineStrictlyBeforeFirstIndexLine,
 } from "./scroll-sync.js";
 export {
