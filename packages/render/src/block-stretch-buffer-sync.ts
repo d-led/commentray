@@ -140,6 +140,24 @@ function clearPaddingOnStretchRows(rows: HTMLTableRowElement[]): void {
   }
 }
 
+/**
+ * In narrow mode, one stretch column can be hidden via `data-dual-mobile-pane`; temporarily remove
+ * the attribute so both columns are measurable with real geometry.
+ */
+function withBothColumnsVisibleForMeasure<T>(rows: HTMLTableRowElement[], fn: () => T): T {
+  const firstRow = rows[0];
+  const table = firstRow?.closest<HTMLTableElement>("table") ?? null;
+  const shell = table?.closest<HTMLElement>("[data-dual-mobile-pane]") ?? null;
+  if (shell === null) return fn();
+  const savedPane = shell.getAttribute("data-dual-mobile-pane");
+  shell.removeAttribute("data-dual-mobile-pane");
+  try {
+    return fn();
+  } finally {
+    if (savedPane !== null) shell.setAttribute("data-dual-mobile-pane", savedPane);
+  }
+}
+
 function collectStretchRowHeights(rows: HTMLTableRowElement[]): {
   left: HeightAdjustable[];
   right: HeightAdjustable[];
@@ -201,7 +219,7 @@ export function applyBlockStretchRowBuffers(table: HTMLTableElement): void {
   const rows = stretchRowsWithSyncId(table);
   if (rows.length === 0) return;
   clearPaddingOnStretchRows(rows);
-  const columns = collectStretchRowHeights(rows);
+  const columns = withBothColumnsVisibleForMeasure(rows, () => collectStretchRowHeights(rows));
   if (columns === null) return;
   const sync = synchronizer.synchronize(columns.left, columns.right);
   applySynchronizedPaddingToStretchRows(rows, sync);

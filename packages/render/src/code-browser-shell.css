@@ -1690,17 +1690,42 @@ body {
     padding-left: var(--cr-pane-inline-pad);
   }
   .shell.shell--stretch-rows[data-dual-mobile-pane="code"] .stretch-col-doc,
-  .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] .stretch-col-code,
-  .shell.shell--stretch-rows[data-dual-mobile-pane="code"] td.stretch-doc,
-  .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] td.stretch-code {
+  .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] .stretch-col-code {
     display: none;
   }
-  .shell.shell--stretch-rows[data-dual-mobile-pane="code"] td.stretch-code,
-  .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] td.stretch-doc {
-    display: table-cell;
+  .shell.shell--stretch-rows[data-dual-mobile-pane] .block-stretch tbody tr.stretch-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .shell.shell--stretch-rows[data-dual-mobile-pane]
+    .block-stretch
+    tbody
+    tr.stretch-row
+    > td.stretch-code,
+  .shell.shell--stretch-rows[data-dual-mobile-pane]
+    .block-stretch
+    tbody
+    tr.stretch-row
+    > td.stretch-doc {
+    display: block;
+    grid-column: 1;
+    grid-row: 1;
     width: 100%;
     padding-left: 0;
     padding-right: 0;
+  }
+  .shell.shell--stretch-rows[data-dual-mobile-pane="code"] td.stretch-doc,
+  .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] td.stretch-code {
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .shell.shell--stretch-rows[data-dual-mobile-pane="code"] td.stretch-code,
+  .shell.shell--stretch-rows[data-dual-mobile-pane="doc"] td.stretch-doc {
+    visibility: visible;
+    pointer-events: auto;
+    position: relative;
+    z-index: 2;
   }
   .shell.shell--stretch-rows[data-dual-mobile-pane] #stretch-gutter {
     display: none;

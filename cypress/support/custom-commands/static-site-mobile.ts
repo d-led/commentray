@@ -53,14 +53,16 @@ Cypress.Commands.add("MobileSinglePaneLayoutShouldShowCommentaryColumnOnly", () 
       cy.get("#code-pane tbody tr.stretch-row--block td.stretch-code")
         .first()
         .should(($td) => {
-          const display = getComputedStyle($td[0]).display;
-          expect(display).to.eq("none");
+          const style = getComputedStyle($td[0]);
+          const hidden = style.display === "none" || style.visibility === "hidden";
+          expect(hidden).to.eq(true);
         });
       cy.get("#code-pane tbody tr.stretch-row--block td.stretch-doc")
         .first()
         .should(($td) => {
-          const display = getComputedStyle($td[0]).display;
-          expect(display).to.not.eq("none");
+          const style = getComputedStyle($td[0]);
+          const hidden = style.display === "none" || style.visibility === "hidden";
+          expect(hidden).to.eq(false);
         });
       return;
     }
@@ -76,14 +78,16 @@ Cypress.Commands.add("MobileSinglePaneLayoutShouldShowSourceColumnOnly", () => {
       cy.get("#code-pane tbody tr.stretch-row--block td.stretch-code")
         .first()
         .should(($td) => {
-          const display = getComputedStyle($td[0]).display;
-          expect(display).to.not.eq("none");
+          const style = getComputedStyle($td[0]);
+          const hidden = style.display === "none" || style.visibility === "hidden";
+          expect(hidden).to.eq(false);
         });
       cy.get("#code-pane tbody tr.stretch-row--block td.stretch-doc")
         .first()
         .should(($td) => {
-          const display = getComputedStyle($td[0]).display;
-          expect(display).to.eq("none");
+          const style = getComputedStyle($td[0]);
+          const hidden = style.display === "none" || style.visibility === "hidden";
+          expect(hidden).to.eq(true);
         });
       return;
     }

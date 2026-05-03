@@ -66,6 +66,7 @@ import {
 import { wireWideModeIntroTour } from "./code-browser-wide-intro-controller.js";
 import { readWebStorageItem, writeWebStorageItem } from "./code-browser-web-storage.js";
 import {
+  applyBlockStretchRowBuffers,
   dispatchCommentrayMermaidDone,
   wireBlockStretchBufferSync,
   type BlockStretchBufferSyncHandle,
@@ -3491,44 +3492,64 @@ function wireStretchMobilePaneFlip(
   flipScrollBtn: HTMLButtonElement | null,
   onAfterFlip?: () => void,
 ): void {
-  void codePane;
-  void onAfterFlip;
-  const mq = globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ);
-  function readStoredPane(): "code" | "doc" {
-    return normalizedDualMobilePane(readWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE));
-  }
-  function applyForViewport(): void {
-    if (mq.matches) {
-      syncSinglePaneShellState(shell, true);
-      shell.setAttribute("data-dual-mobile-pane", readStoredPane());
-    } else {
-      syncSinglePaneShellState(shell, false);
-      shell.removeAttribute("data-dual-mobile-pane");
+  const stretchTable = codePane instanceof HTMLTableElement ? codePane : null;
+  let anchorRow: HTMLTableRowElement | null = null;
+  let anchorTopBefore = 0;
+  let rootTopBefore = 0;
+
+  const captureAnchor = (): void => {
+    const root = rootScrollingElement();
+    rootTopBefore = root.scrollTop;
+    if (stretchTable === null) {
+      anchorRow = null;
+      anchorTopBefore = 0;
+      return;
     }
-  }
-  const runFlip = (): void => {
-    if (!mq.matches) return;
-    const cur = normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane"));
-    const next = cur === "code" ? "doc" : "code";
-    shell.setAttribute("data-dual-mobile-pane", next);
-    writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, next);
-    // When revealing the doc pane, (re)run Mermaid — diagrams inside display:none cells are
-    // skipped on initial load, so they need a triggered pass once the cells become visible.
-    if (next === "doc") {
-      queueMicrotask(() => {
+    const rows = stretchBlockRows(stretchTable);
+    anchorRow = rows.find((row) => row.getBoundingClientRect().bottom > 0) ?? null;
+    anchorTopBefore = anchorRow?.getBoundingClientRect().top ?? 0;
+  };
+
+  const restoreAnchor = (): void => {
+    const root = rootScrollingElement();
+    if (anchorRow !== null) {
+      const delta = anchorRow.getBoundingClientRect().top - anchorTopBefore;
+      if (Math.abs(delta) > 0.5) {
+        const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
+        root.scrollTop = clamp(root.scrollTop + delta, 0, maxY);
+        return;
+      }
+    }
+    const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
+    root.scrollTop = clamp(rootTopBefore, 0, maxY);
+  };
+
+  const applyBuffersAndRestore = (): void => {
+    if (stretchTable !== null) applyBlockStretchRowBuffers(stretchTable);
+    restoreAnchor();
+  };
+
+  const runners: DualPaneScrollSyncRunners = {
+    syncFromCodeToDoc: () => {},
+    syncFromDocToCode: () => {},
+    prepareMobileFlipToCode: captureAnchor,
+    prepareMobileFlipToDoc: captureAnchor,
+    finishMobileFlipToCode: () => {
+      applyBuffersAndRestore();
+      onAfterFlip?.();
+    },
+    finishMobileFlipToDoc: () => {
+      applyBuffersAndRestore();
+      onAfterFlip?.();
+      void runMermaidOnFreshDocNodes(shell).then(() => {
         requestAnimationFrame(() => {
-          void runMermaidOnFreshDocNodes(shell);
+          applyBuffersAndRestore();
         });
       });
-    }
+    },
   };
-  flipBtn.addEventListener("click", runFlip);
-  if (flipScrollBtn) {
-    flipScrollBtn.addEventListener("click", runFlip);
-    wireDualMobilePaneFlipScrollAffordance(flipBtn, flipScrollBtn, mq);
-  }
-  mq.addEventListener("change", applyForViewport);
-  applyForViewport();
+
+  wireDualMobilePaneFlip(shell, flipBtn, runners, flipScrollBtn);
 }
 
 /** Multi-angle stretch swaps `#shell` innerHTML; disconnect the previous table observer so listeners do not accumulate. */
