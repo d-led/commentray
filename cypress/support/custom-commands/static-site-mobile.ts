@@ -5,6 +5,21 @@ const MOBILE_VIEWPORT_WIDTH = 390;
 const MOBILE_VIEWPORT_HEIGHT = 844;
 const WIDE_MODE_INTRO_STORAGE_KEY = "commentray.codeCommentrayStatic.wideModeIntro.v1";
 
+function assertStretchCellVisibility(selector: string, shouldBeHidden: boolean): void {
+  cy.get(selector)
+    .first()
+    .should(($td) => {
+      const style = getComputedStyle($td[0]);
+      const hidden = style.display === "none" || style.visibility === "hidden";
+      expect(hidden).to.eq(shouldBeHidden);
+    });
+}
+
+function assertStretchMobileSinglePane(codeHidden: boolean, docHidden: boolean): void {
+  assertStretchCellVisibility("#code-pane tbody tr.stretch-row--block td.stretch-code", codeHidden);
+  assertStretchCellVisibility("#code-pane tbody tr.stretch-row--block td.stretch-doc", docHidden);
+}
+
 Cypress.Commands.add("PrepareStaticSiteHomeAtMobileViewport", () => {
   cy.clearLocalStorage();
   cy.viewport(MOBILE_VIEWPORT_WIDTH, MOBILE_VIEWPORT_HEIGHT);
@@ -50,20 +65,7 @@ Cypress.Commands.add("MobileSinglePaneLayoutShouldShowCommentaryColumnOnly", () 
   cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane", "doc");
   cy.get(shellA11y.shell).then(($shell) => {
     if ($shell.attr("data-layout") === "stretch") {
-      cy.get("#code-pane tbody tr.stretch-row--block td.stretch-code")
-        .first()
-        .should(($td) => {
-          const style = getComputedStyle($td[0]);
-          const hidden = style.display === "none" || style.visibility === "hidden";
-          expect(hidden).to.eq(true);
-        });
-      cy.get("#code-pane tbody tr.stretch-row--block td.stretch-doc")
-        .first()
-        .should(($td) => {
-          const style = getComputedStyle($td[0]);
-          const hidden = style.display === "none" || style.visibility === "hidden";
-          expect(hidden).to.eq(false);
-        });
+      assertStretchMobileSinglePane(true, false);
       return;
     }
     cy.get(shellA11y.panes.source).should("not.be.visible");
@@ -75,20 +77,7 @@ Cypress.Commands.add("MobileSinglePaneLayoutShouldShowSourceColumnOnly", () => {
   cy.get(shellA11y.shell).should("have.attr", "data-dual-mobile-pane", "code");
   cy.get(shellA11y.shell).then(($shell) => {
     if ($shell.attr("data-layout") === "stretch") {
-      cy.get("#code-pane tbody tr.stretch-row--block td.stretch-code")
-        .first()
-        .should(($td) => {
-          const style = getComputedStyle($td[0]);
-          const hidden = style.display === "none" || style.visibility === "hidden";
-          expect(hidden).to.eq(false);
-        });
-      cy.get("#code-pane tbody tr.stretch-row--block td.stretch-doc")
-        .first()
-        .should(($td) => {
-          const style = getComputedStyle($td[0]);
-          const hidden = style.display === "none" || style.visibility === "hidden";
-          expect(hidden).to.eq(true);
-        });
+      assertStretchMobileSinglePane(false, true);
       return;
     }
     cy.get(shellA11y.panes.source).should("be.visible");

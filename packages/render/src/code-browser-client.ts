@@ -3177,10 +3177,7 @@ function mobilePaneFromLocationHash(rawHash: string): "code" | "doc" | null {
   return null;
 }
 
-function updateLocationHashToken(
-  token: string,
-  shouldReplace: (t: string) => boolean,
-): void {
+function updateLocationHashToken(token: string, shouldReplace: (t: string) => boolean): void {
   const tokens = splitLocationHashTokens(globalThis.location.hash).filter((t) => !shouldReplace(t));
   tokens.push(token);
   const u = new URL(globalThis.location.href);
