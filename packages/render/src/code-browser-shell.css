@@ -1575,6 +1575,18 @@ body {
   .nav-rail__doc-hub-summary__glyph {
     display: inline-flex;
   }
+  .documented-files-tree .tree-file {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .documented-files-tree .tree-file-link {
+    display: inline-block;
+    min-height: 0;
+    padding: 3px 5px;
+    margin: 0;
+    border-radius: 0;
+    touch-action: manipulation;
+  }
   .toolbar-wrap-lines {
     min-width: var(--cr-control-h);
     padding: 0;

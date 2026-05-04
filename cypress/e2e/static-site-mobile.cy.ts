@@ -72,4 +72,27 @@ describe("The Commentray GitHub Pages static build on a narrow viewport", () => 
     cy.MobileSinglePaneLayoutShouldShowCommentaryColumnOnly();
     cy.DocPaneMermaidSvgShouldExist();
   });
+
+  it("writes pane hash on mobile flip and restores pane from hash on load", () => {
+    cy.MobileStaticSiteCodeBrowserChromeShouldBeReady();
+    cy.MobileSinglePaneLayoutShouldShowCommentaryColumnOnly();
+
+    cy.TapMobilePaneFlipControl();
+    cy.MobileSinglePaneLayoutShouldShowSourceColumnOnly();
+    cy.location("hash").should("contain", "mobile-pane-code");
+
+    cy.viewport(390, 844);
+    cy.visit("/#mobile-pane-code", {
+      onBeforeLoad(win) {
+        win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
+        win.localStorage.setItem("commentray.codeCommentrayStatic.dualMobilePane", "doc");
+      },
+    });
+    cy.MobileStaticSiteCodeBrowserChromeShouldBeReady();
+    cy.MobileSinglePaneLayoutShouldShowSourceColumnOnly();
+
+    cy.TapMobilePaneFlipControl();
+    cy.MobileSinglePaneLayoutShouldShowCommentaryColumnOnly();
+    cy.location("hash").should("contain", "mobile-pane-doc");
+  });
 });

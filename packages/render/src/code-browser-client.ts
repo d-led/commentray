@@ -3155,6 +3155,43 @@ function normalizedDualMobilePane(v: string | null | undefined): "code" | "doc" 
   return v === "code" ? "code" : "doc";
 }
 
+function splitLocationHashTokens(rawHash: string): string[] {
+  const hash = rawHash.replace(/^#/, "").trim();
+  if (hash.length === 0) return [];
+  return hash
+    .split(/--|&/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+}
+
+function mobilePaneHashToken(pane: "code" | "doc"): string {
+  return `mobile-pane-${pane}`;
+}
+
+function mobilePaneFromLocationHash(rawHash: string): "code" | "doc" | null {
+  const tokens = splitLocationHashTokens(rawHash);
+  for (const token of tokens) {
+    if (token === "mobile-pane-code") return "code";
+    if (token === "mobile-pane-doc") return "doc";
+  }
+  return null;
+}
+
+function updateLocationHashToken(
+  token: string,
+  shouldReplace: (t: string) => boolean,
+): void {
+  const tokens = splitLocationHashTokens(globalThis.location.hash).filter((t) => !shouldReplace(t));
+  tokens.push(token);
+  const u = new URL(globalThis.location.href);
+  u.hash = tokens.length > 0 ? tokens.join("&") : "";
+  globalThis.history.replaceState(globalThis.history.state, "", u.toString());
+}
+
+function updateLocationHashForMobilePane(pane: "code" | "doc"): void {
+  updateLocationHashToken(mobilePaneHashToken(pane), (t) => /^mobile-pane-(?:code|doc)$/.test(t));
+}
+
 function isNarrowViewport(): boolean {
   return globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ).matches;
 }
@@ -3400,6 +3437,7 @@ function wireSourceMarkdownPaneFlip(
       if (curPane === "doc") {
         shell.setAttribute("data-dual-mobile-pane", "code");
         writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, "code");
+        updateLocationHashForMobilePane("code");
       }
     }
     syncSourceMarkdownFlipA11y();
@@ -3434,6 +3472,8 @@ function wireDualMobilePaneFlip(
 ): void {
   const mq = globalThis.matchMedia(DUAL_MOBILE_SINGLE_PANE_MQ);
   function readStoredPane(): "code" | "doc" {
+    const fromHash = mobilePaneFromLocationHash(globalThis.location.hash);
+    if (fromHash !== null) return fromHash;
     return normalizedDualMobilePane(readWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE));
   }
   function applyForViewport(): void {
@@ -3457,6 +3497,7 @@ function wireDualMobilePaneFlip(
     }
     shell.setAttribute("data-dual-mobile-pane", next);
     writeWebStorageItem(localStorage, STORAGE_DUAL_MOBILE_PANE, next);
+    updateLocationHashForMobilePane(next);
     globalThis.requestAnimationFrame(() => {
       globalThis.requestAnimationFrame(() => {
         if (next === "code") {
@@ -3482,6 +3523,7 @@ function wireDualMobilePaneFlip(
     wireDualMobilePaneFlipScrollAffordance(flipBtn, flipScrollBtn, mq);
   }
   mq.addEventListener("change", applyForViewport);
+  globalThis.addEventListener("hashchange", applyForViewport);
   applyForViewport();
 }
 
@@ -4772,6 +4814,11 @@ function permalinkHashSuffixFromUi(): string {
     if (id.length > 0) {
       pushUnique(`angle-${encodeURIComponent(id)}`);
     }
+  }
+  const shell = document.getElementById("shell");
+  if (shell instanceof HTMLElement && shell.getAttribute("data-mobile-single-pane") === "true") {
+    const pane = normalizedDualMobilePane(shell.getAttribute("data-dual-mobile-pane"));
+    pushUnique(mobilePaneHashToken(pane));
   }
   const activeAnchor = activeCommentrayHashTokenFromViewport();
   if (activeAnchor) pushUnique(activeAnchor);
