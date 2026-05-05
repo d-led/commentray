@@ -2,7 +2,7 @@
   "name": "commentray-vscode",
   "displayName": "Commentray",
   "description": "Side-by-side authoring for Commentray markdown tracks",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "publisher": "d-led",
   "private": true,
   "license": "MPL-2.0",
@@ -190,8 +190,8 @@
     "test:vscode": "tsc -p tsconfig.tests.json && vscode-test"
   },
   "dependencies": {
-    "@commentray/core": "0.3.5",
-    "@commentray/render": "0.3.5"
+    "@commentray/core": "0.3.6",
+    "@commentray/render": "0.3.6"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
