@@ -8,6 +8,7 @@ import { migrateIndex } from "./migrate.js";
 import { coerceIndexSchemaVersion, CURRENT_SCHEMA_VERSION, type CommentrayIndex } from "./model.js";
 import { defaultMetadataIndexPath, normalizeRepoRelativePath } from "./paths.js";
 import {
+  extractCommentrayBlockIdsInMarkdownOrder,
   extractCommentrayBlockIdsFromMarkdown,
   validateIndexMarkerSemantics,
   validateMarkerBoundariesInSource,
@@ -46,8 +47,12 @@ function stagedScopeNeedsFullIndexValidation(staged: ReadonlySet<string>): boole
 async function loadMarkdownBlockIdsByIndexedSource(
   repoRoot: string,
   index: CommentrayIndex,
-): Promise<Map<string, Set<string>>> {
+): Promise<{
+  idsBySourceNorm: Map<string, Set<string>>;
+  orderByCommentrayPath: Map<string, string[]>;
+}> {
   const bySource = new Map<string, Set<string>>();
+  const orderByCommentrayPath = new Map<string, string[]>();
   for (const [crPath, entry] of Object.entries(index.byCommentrayPath)) {
     const norm = normalizeRepoRelativePath(entry.sourcePath);
     let set = bySource.get(norm);
@@ -58,6 +63,7 @@ async function loadMarkdownBlockIdsByIndexedSource(
     const abs = path.join(repoRoot, crPath);
     try {
       const md = await fs.readFile(abs, "utf8");
+      orderByCommentrayPath.set(crPath, extractCommentrayBlockIdsInMarkdownOrder(md));
       for (const id of extractCommentrayBlockIdsFromMarkdown(md)) {
         set.add(id);
       }
@@ -65,7 +71,7 @@ async function loadMarkdownBlockIdsByIndexedSource(
       /* missing or unreadable companion — other validation may warn */
     }
   }
-  return bySource;
+  return { idsBySourceNorm: bySource, orderByCommentrayPath };
 }
 
 function indexFilteredForStaged(
@@ -126,11 +132,12 @@ async function collectIssuesForLoadedIndex(
     }
   }
 
-  const markdownBlockIdsBySourceNorm = await loadMarkdownBlockIdsByIndexedSource(repoRoot, index);
+  const markdownIndexSignals = await loadMarkdownBlockIdsByIndexedSource(repoRoot, index);
   for (const issue of validateMarkerRegionsAgainstIndexedSources(
     index,
     indexedSourceTexts,
-    markdownBlockIdsBySourceNorm,
+    markdownIndexSignals.idsBySourceNorm,
+    markdownIndexSignals.orderByCommentrayPath,
   )) {
     issues.push({ level: issue.level, message: issue.message });
   }

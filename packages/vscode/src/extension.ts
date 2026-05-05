@@ -3,18 +3,21 @@ import {
   type BlockScrollLink,
   type CommentrayIndex,
   addBlockToIndex,
-  appendBlockToCommentray,
   assertValidAngleId,
   buildBlockScrollLinks,
   commentrayActiveEditorUiFlags,
   commentrayAnglesLayoutEnabled,
   commentrayAnglesSentinelPath,
+  companionPlaceholderMarkdown,
   commentrayStorageSourcePrefix,
   createBlockForRange,
   defaultMetadataIndexPath,
   defaultRegionMarkerNamingStrategy,
   emptyIndex,
   ensureAnglesSentinelFile,
+  initializeCommentrayProject,
+  insertBlockBySourceMarkerOrder,
+  isCommentrayProjectInitialized,
   loadCommentrayConfig,
   normalizeRepoRelativePath,
   pickCommentrayLineForSourceDualPane,
@@ -84,12 +87,26 @@ const CTX_ACTIVE_EDITOR_UNDER_COMPANION_SOURCE_TREE =
   "commentray.activeEditorUnderCompanionSourceTree";
 const CTX_ACTIVE_EDITOR_IS_RESOLVABLE_COMPANION_MD =
   "commentray.activeEditorIsResolvableCompanionMarkdown";
+const CTX_WORKSPACE_INITIALIZED = "commentray.workspaceInitialized";
 
 /**
  * Drives `when` / `enablement` clauses so editor-only commands match companion vs primary files.
  */
 async function applyCommentrayActiveEditorUiContexts(uri: vscode.Uri | undefined): Promise<void> {
-  const setBoth = async (
+  const folderFromUri = uri ? vscode.workspace.getWorkspaceFolder(uri) : undefined;
+  const fallbackFolder = vscode.workspace.workspaceFolders?.[0];
+  const contextFolder = folderFromUri ?? fallbackFolder;
+
+  let workspaceInitialized = false;
+  if (contextFolder) {
+    try {
+      workspaceInitialized = await isCommentrayProjectInitialized(contextFolder.uri.fsPath);
+    } catch {
+      workspaceInitialized = false;
+    }
+  }
+
+  const setContexts = async (
     underCompanionTree: boolean,
     resolvableCompanionMd: boolean,
   ): Promise<void> => {
@@ -103,22 +120,27 @@ async function applyCommentrayActiveEditorUiContexts(uri: vscode.Uri | undefined
       CTX_ACTIVE_EDITOR_IS_RESOLVABLE_COMPANION_MD,
       resolvableCompanionMd,
     );
+    await vscode.commands.executeCommand(
+      "setContext",
+      CTX_WORKSPACE_INITIALIZED,
+      workspaceInitialized,
+    );
   };
 
   if (!uri || uri.scheme !== "file") {
-    await setBoth(false, false);
+    await setContexts(false, false);
     return;
   }
   const folder = vscode.workspace.getWorkspaceFolder(uri);
   if (!folder) {
-    await setBoth(false, false);
+    await setContexts(false, false);
     return;
   }
 
   try {
     const relative = vscode.workspace.asRelativePath(uri, false);
     if (path.isAbsolute(relative)) {
-      await setBoth(false, false);
+      await setContexts(false, false);
       return;
     }
     const normalized = normalizeRepoRelativePath(relative.replaceAll("\\", "/"));
@@ -127,10 +149,11 @@ async function applyCommentrayActiveEditorUiContexts(uri: vscode.Uri | undefined
       normalizedRepoRelativePath: normalized,
       storageDir: cfg.storageDir,
       repoRoot: folder.uri.fsPath,
+      staticSiteCommentrayMarkdownFile: cfg.staticSite.commentrayMarkdownFile,
     });
-    await setBoth(flags.underCompanionSourceTree, flags.isResolvableCompanionMarkdown);
+    await setContexts(flags.underCompanionSourceTree, flags.isResolvableCompanionMarkdown);
   } catch {
-    await setBoth(false, false);
+    await setContexts(false, false);
   }
 }
 
@@ -772,6 +795,7 @@ async function startBlockFromSelectionCommand(): Promise<void> {
     markerId: blockId,
   });
   await replaceDocumentContents(active.editor.document, wrapped.sourceText);
+  await active.editor.document.save();
   const sourceText = active.editor.document.getText();
   const created = createBlockForRange({
     sourcePath: paths.sourceRelative,
@@ -782,7 +806,16 @@ async function startBlockFromSelectionCommand(): Promise<void> {
 
   const ensured = await ensureCommentrayFile(paths.commentrayUri);
   const commentrayDoc = await vscode.workspace.openTextDocument(ensured);
-  const nextContent = appendBlockToCommentray(commentrayDoc.getText(), created.markdown);
+  const existingCommentray = commentrayDoc.getText();
+  const scaffold = companionPlaceholderMarkdown(paths.sourceRelative).trim();
+  const normalizedExisting = existingCommentray.replaceAll("\r\n", "\n").trim();
+  const baseCommentrayForInsert = normalizedExisting === scaffold ? "" : existingCommentray;
+  const nextContent = insertBlockBySourceMarkerOrder({
+    existingCommentray: baseCommentrayForInsert,
+    blockMarkdown: created.markdown,
+    sourceText,
+    markerId: created.block.id,
+  });
   await replaceDocumentContents(commentrayDoc, nextContent);
   await commentrayDoc.save();
 
@@ -799,6 +832,49 @@ async function startBlockFromSelectionCommand(): Promise<void> {
     commentrayEditor.selection = selection;
     commentrayEditor.revealRange(selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
   }
+}
+
+async function initWorkspaceCommand(output: vscode.OutputChannel): Promise<void> {
+  const folder = pickWorkspaceFolderForRepoWideCommand();
+  if (!folder) {
+    await vscode.window.showWarningMessage("Open a workspace folder first.");
+    return;
+  }
+
+  const repoRoot = folder.uri.fsPath;
+  let init;
+  try {
+    init = await initializeCommentrayProject(repoRoot, {
+      ensureSiteGitignore: true,
+      runValidation: true,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await vscode.window.showErrorMessage(`Commentray init failed: ${msg}`);
+    return;
+  }
+
+  output.clear();
+  output.appendLine("Commentray init summary:");
+  output.appendLine(`- created index: ${init.createdIndex ? "yes" : "no"}`);
+  output.appendLine(`- migrated index: ${init.migratedIndex ? "yes" : "no"}`);
+  output.appendLine(`- created .commentray.toml: ${init.createdToml ? "yes" : "no"}`);
+  output.appendLine(`- added _site to .gitignore: ${init.addedSiteGitignore ? "yes" : "no"}`);
+  for (const issue of init.validationIssues) {
+    output.appendLine(`[${issue.level}] ${issue.message}`);
+  }
+
+  const hasErrors = init.validationIssues.some((i) => i.level === "error");
+  if (hasErrors) {
+    output.show(true);
+    void vscode.window.showErrorMessage(
+      "Commentray initialized, but validation reported errors. See the Commentray output panel.",
+    );
+  } else {
+    void vscode.window.showInformationMessage("Commentray initialized for this workspace.");
+  }
+
+  void applyCommentrayActiveEditorUiContexts(vscode.window.activeTextEditor?.document.uri);
 }
 
 async function validateWorkspaceCommand(output: vscode.OutputChannel): Promise<void> {
@@ -869,22 +945,11 @@ async function openCorrespondingSourceCommand(): Promise<void> {
 
   const repoRoot = active.folder.uri.fsPath;
   const cfg = await loadCommentrayConfig(repoRoot);
-  const sourcePrefix = commentrayStorageSourcePrefix(cfg.storageDir);
+  const diskPair = resolveCompanionPathToSourcePair(normalized, repoRoot, cfg);
 
-  if (!normalized.startsWith(sourcePrefix) || !normalized.endsWith(".md")) {
-    await vscode.window.showInformationMessage(
-      "Open a Commentray companion `.md` under your project’s Commentray storage (…/source/…) — this command jumps to its primary source file.",
-    );
-    return;
-  }
-
-  const relFromSourceDir = normalized.slice(sourcePrefix.length);
-  const storageNorm = normalizeRepoRelativePath(cfg.storageDir.replaceAll("\\", "/"));
-  const anglesOn = commentrayAnglesLayoutEnabled(repoRoot, cfg.storageDir);
-  const diskPair = pairFromCommentraySourceRel(storageNorm, relFromSourceDir, anglesOn);
   if (!diskPair) {
-    await vscode.window.showWarningMessage(
-      "Could not map this companion path to a source file (unexpected path under …/source/).",
+    await vscode.window.showInformationMessage(
+      "Open a Commentray companion `.md` (under storage/source or the configured static_site.commentray_markdown path) to jump to its primary source file.",
     );
     return;
   }
@@ -904,6 +969,41 @@ async function openCorrespondingSourceCommand(): Promise<void> {
   const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
   const { code, commentray } = await revealSourceLeftOfCompanionAndReturnEditors(editor, sourceDoc);
   await bindPairScrollSync(code, commentray, paths);
+  await vscode.window.showTextDocument(code.document, {
+    viewColumn: code.viewColumn,
+    preview: false,
+    preserveFocus: false,
+  });
+}
+
+function resolveCompanionPathToSourcePair(
+  normalizedRepoPath: string,
+  repoRoot: string,
+  cfg: Awaited<ReturnType<typeof loadCommentrayConfig>>,
+): { sourcePath: string; commentrayPath: string } | null {
+  const sourcePrefix = commentrayStorageSourcePrefix(cfg.storageDir);
+  if (normalizedRepoPath.startsWith(sourcePrefix) && normalizedRepoPath.endsWith(".md")) {
+    const relFromSourceDir = normalizedRepoPath.slice(sourcePrefix.length);
+    const storageNorm = normalizeRepoRelativePath(cfg.storageDir.replaceAll("\\", "/"));
+    const anglesOn = commentrayAnglesLayoutEnabled(repoRoot, cfg.storageDir);
+    return pairFromCommentraySourceRel(storageNorm, relFromSourceDir, anglesOn);
+  }
+
+  const configured = cfg.staticSite.commentrayMarkdownFile
+    ? normalizeRepoRelativePath(cfg.staticSite.commentrayMarkdownFile.replaceAll("\\", "/"))
+    : "";
+  if (
+    configured.length > 0 &&
+    normalizedRepoPath === configured &&
+    cfg.staticSite.sourceFile.trim().length > 0
+  ) {
+    return {
+      sourcePath: normalizeRepoRelativePath(cfg.staticSite.sourceFile.replaceAll("\\", "/")),
+      commentrayPath: configured,
+    };
+  }
+
+  return null;
 }
 
 async function openRenderedPreviewCore(
@@ -952,11 +1052,14 @@ async function openRenderedPreviewChooseAngleCommand(arg?: unknown): Promise<voi
 export function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel("Commentray");
   commentrayOutput = output;
+  const refreshUiContexts = () =>
+    void applyCommentrayActiveEditorUiContexts(vscode.window.activeTextEditor?.document.uri);
 
   // Register commands before any listener that might throw — otherwise the host can show
   // "command … not found" when activation aborts mid-way.
   context.subscriptions.push(
     output,
+    vscode.commands.registerCommand("commentray.init", () => initWorkspaceCommand(output)),
     vscode.commands.registerCommand("commentray.openSideBySide", openSideBySideCommand),
     vscode.commands.registerCommand("commentray.openCommentrayAngle", openCommentrayAngleCommand),
     vscode.commands.registerCommand("commentray.addAngleDefinition", addAngleDefinitionCommand),
@@ -995,14 +1098,47 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.onDidChangeActiveTextEditor((ed) => {
       void applyCommentrayActiveEditorUiContexts(ed?.document.uri);
     }),
+    vscode.window.onDidChangeWindowState((state) => {
+      if (!state.focused) return;
+      refreshUiContexts();
+    }),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      refreshUiContexts();
+    }),
     vscode.workspace.onDidSaveTextDocument((doc) => {
       if (path.basename(doc.uri.fsPath) !== ".commentray.toml") return;
-      void applyCommentrayActiveEditorUiContexts(vscode.window.activeTextEditor?.document.uri);
+      refreshUiContexts();
     }),
+    // Watch for external init (e.g. `commentray serve` creating files without a save event).
+    (() => {
+      const watcher = vscode.workspace.createFileSystemWatcher("**/.commentray.toml");
+      const refresh = () => refreshUiContexts();
+      watcher.onDidCreate(refresh);
+      watcher.onDidChange(refresh);
+      watcher.onDidDelete(refresh);
+      return watcher;
+    })(),
+    (() => {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        "**/.commentray/metadata/index.json",
+      );
+      const refresh = () => refreshUiContexts();
+      watcher.onDidCreate(refresh);
+      watcher.onDidChange(refresh);
+      watcher.onDidDelete(refresh);
+      return watcher;
+    })(),
+    (() => {
+      const watcher = vscode.workspace.createFileSystemWatcher("**/.commentray/source/**");
+      const refresh = () => refreshUiContexts();
+      watcher.onDidCreate(refresh);
+      watcher.onDidDelete(refresh);
+      return watcher;
+    })(),
     { dispose: () => disposeScrollSync() },
   );
 
-  void applyCommentrayActiveEditorUiContexts(vscode.window.activeTextEditor?.document.uri);
+  refreshUiContexts();
 }
 
 export function deactivate() {

@@ -28,12 +28,6 @@ This file on disk is the **contract** the tools read first: storage root, SCM ba
 
 <!-- commentray:page-break -->
 
-<!-- commentray:block id=toml-angles -->
-
-`[angles]` (commented in this repo) — After you add `{storage}/source/.default`, each primary file can own a folder of `angleId.md` files; TOML lists ids and titles and picks `default_angle`. VS Code can enable this layout and open a chosen angle; Pages still use a single `commentray_markdown` path until the static viewer grows a switcher.
-
-<!-- commentray:page-break -->
-
 <!-- commentray:block id=toml-static-site -->
 
 `[static_site]` — Feeds `npm run pages:build`: which source fills the code pane, which Markdown file (and optional intro) fills the commentray pane, toolbar GitHub links, and related file shortcuts. Normative detail: [`docs/spec/storage.md`](https://github.com/d-led/commentray/blob/main/docs/spec/storage.md) and the plan’s Static code browser section.
@@ -54,6 +48,18 @@ This file on disk is the **contract** the tools read first: storage root, SCM ba
 
 <!-- commentray:page-break -->
 
+<!-- commentray:block id=toml-angles -->
+
+`[angles]` (commented in this repo) — After you add `{storage}/source/.default`, each primary file can own a folder of `angleId.md` files; TOML lists ids and titles and picks `default_angle`. VS Code can enable this layout and open a chosen angle; Pages still use a single `commentray_markdown` path until the static viewer grows a switcher.
+
+<!-- commentray:page-break -->
+
+<!-- commentray:block id=toml-pointers -->
+
+**Pointers:** [`docs/user/source-region-delimiters.md`](https://github.com/d-led/commentray/blob/main/docs/user/source-region-delimiters.md) (delimiter table by VS Code `languageId`) · [`packages/core/src/config.ts`](https://github.com/d-led/commentray/blob/main/packages/core/src/config.ts) · [`packages/core/src/config.test.ts`](https://github.com/d-led/commentray/blob/main/packages/core/src/config.test.ts)
+
+<!-- commentray:page-break -->
+
 <!-- commentray:block id=toml-buffering-flow-sync -->
 
 **BufferingFlowSynchronizer** — normative sketch (column tracing, constraints in pipeline order). On disk, [`.commentray.toml`](https://github.com/d-led/commentray/blob/main/.commentray.toml) keeps only the `commentray:start` / `commentray:end` anchor for this id; readable text lives here. Implementation: [`packages/core/src/buffering-flow-synchronizer.ts`](../../../packages/core/src/buffering-flow-synchronizer.ts) — fuller narrative in [that file’s commentray](../../../packages/core/src/buffering-flow-synchronizer.ts/main.md).
@@ -69,9 +75,3 @@ This file on disk is the **contract** the tools read first: storage root, SCM ba
 **Approval round-trip:** parse grids → synchronize → print ([`approval-flow-grid.ts`](../../../packages/core/src/approval-flow-grid.ts), [`buffering-flow-synchronizer-approval-printer.ts`](../../../packages/core/src/buffering-flow-synchronizer-approval-printer.ts)). Harness invariants (see [`buffering-flow-synchronizer.approval.test.ts`](../../../packages/core/src/buffering-flow-synchronizer.approval.test.ts)): equal column scroll totals after sync; never `BBBB` in both cells on one ASCII line (split to stagger); many consecutive `BBBB` rows in one column are OK when slack depth requires it; only `R{N}XX` pairs get region sync — plain `XXXX` blocks never use stagger-as-region-height (stagger geometry is only inside an `R…XX` block); one full-width blank row between consecutive `HeightAdjustable` items (visual only; never 0, never double-stacked blank lines).
 
 **Synced-region continuations:** `XXXX` only where that column had a body line; stagger (empty cell, partner ink) reprints as spaces in that cell — not a spurious `XXXX` (see `syncRegionContinuationRows`).
-
-<!-- commentray:page-break -->
-
-<!-- commentray:block id=toml-pointers -->
-
-**Pointers:** [`docs/user/source-region-delimiters.md`](https://github.com/d-led/commentray/blob/main/docs/user/source-region-delimiters.md) (delimiter table by VS Code `languageId`) · [`packages/core/src/config.ts`](https://github.com/d-led/commentray/blob/main/packages/core/src/config.ts) · [`packages/core/src/config.test.ts`](https://github.com/d-led/commentray/blob/main/packages/core/src/config.test.ts)

@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -10,6 +10,7 @@ import {
   defaultAngleIdForOpen,
   githubRepoBlobFileUrl,
   parseGithubRepoWebUrl,
+  resolveCommentrayMarkdownPath,
 } from "@commentray/core";
 import {
   type CodeBrowserMultiAngleBrowsing,
@@ -18,7 +19,11 @@ import {
 
 import { browsePairStaticBrowseRelUrl } from "./browse-pair-static-url.js";
 import type { BuildCommentrayStaticOptions } from "./build.js";
-import { composeCommentrayMarkdown, pathExists } from "./github-pages-site-shared.js";
+import {
+  composeCommentrayMarkdown,
+  emptyCommentrayMarkdown,
+  pathExists,
+} from "./github-pages-site-shared.js";
 
 export type GithubNavBase = { owner: string; repo: string; branch: string };
 
@@ -97,14 +102,29 @@ export async function loadMultiAngleBrowsingIfEnabled(
 
 export async function readFlatCompanionMarkdown(
   repoRoot: string,
+  cfg: ResolvedCommentrayConfig,
   ss: ResolvedStaticSite,
 ): Promise<string> {
-  if (!ss.commentrayMarkdownFile) return "";
-  const mdAbs = path.join(repoRoot, ss.commentrayMarkdownFile);
-  if (!(await pathExists(mdAbs))) {
-    throw new Error(`static_site.commentray_markdown not found: ${ss.commentrayMarkdownFile}`);
+  const configuredRel = ss.commentrayMarkdownFile?.trim();
+  const fallbackRel = resolveCommentrayMarkdownPath(repoRoot, ss.sourceFile, cfg).commentrayPath;
+  const candidates =
+    configuredRel && configuredRel.length > 0
+      ? [configuredRel]
+      : [fallbackRel].filter((p): p is string => typeof p === "string" && p.length > 0);
+
+  for (const rel of candidates) {
+    const mdAbs = path.join(repoRoot, rel);
+    try {
+      const st = await stat(mdAbs);
+      if (!st.isFile()) continue;
+      return await readFile(mdAbs, "utf8");
+    } catch {
+      continue;
+    }
   }
-  return readFile(mdAbs, "utf8");
+
+  // Missing companion markdown is a valid state for onboarding; caller will render empty-state UI.
+  return "";
 }
 
 export function pickCommentrayBody(
@@ -115,7 +135,7 @@ export function pickCommentrayBody(
   if (multi) {
     return (
       (multi.angles.find((a) => a.id === multi.defaultAngleId) ?? multi.angles[0])?.markdown ??
-      "_No commentray content configured._\n"
+      emptyCommentrayMarkdown()
     );
   }
   return composeCommentrayMarkdown(intro, fileMarkdown);
@@ -159,7 +179,12 @@ export function flatBlockStretchRows(
   ss: ResolvedStaticSite,
   hasMultiAngle: boolean,
 ): BuildCommentrayStaticOptions["blockStretchRows"] {
-  if (hasMultiAngle || !ss.commentrayMarkdownFile) return undefined;
+  const sourceLower = ss.sourceFile.trim().toLowerCase();
+  const sourceIsMarkdown =
+    sourceLower.endsWith(".md") ||
+    sourceLower.endsWith(".mdx") ||
+    sourceLower.endsWith(".markdown");
+  if (hasMultiAngle || !ss.commentrayMarkdownFile || sourceIsMarkdown) return undefined;
   return blockStretchRowsForDocumentedPair(projectIndex, ss.sourceFile, ss.commentrayMarkdownFile);
 }
 

@@ -94,6 +94,34 @@ describe("Full init in an empty or partial repository", () => {
   });
 });
 
+describe("Init gitignore integration", () => {
+  it("appends _site to .gitignore when missing", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "commentray-init-gitignore-"));
+    try {
+      await writeFile(path.join(dir, ".gitignore"), "node_modules\n", "utf8");
+      expect(await runInitFull(dir)).toBe(0);
+      const next = await readFile(path.join(dir, ".gitignore"), "utf8");
+      expect(next).toContain("node_modules\n");
+      expect(next.endsWith("_site\n")).toBe(true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not duplicate _site in .gitignore", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "commentray-init-gitignore-dupe-"));
+    try {
+      await writeFile(path.join(dir, ".gitignore"), "node_modules\n_site\n", "utf8");
+      expect(await runInitFull(dir)).toBe(0);
+      const next = await readFile(path.join(dir, ".gitignore"), "utf8");
+      const lines = next.split(/\r?\n/).filter((line) => line === "_site");
+      expect(lines).toHaveLength(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("VS Code extension recommendations for Commentray", () => {
   it("creates .vscode/extensions.json when absent", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "commentray-ext-"));

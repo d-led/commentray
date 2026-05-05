@@ -26,6 +26,24 @@ export function extractCommentrayBlockIdsFromMarkdown(markdown: string): Set<str
 }
 
 /**
+ * Block ids declared in companion markdown, preserving appearance order.
+ */
+export function extractCommentrayBlockIdsInMarkdownOrder(markdown: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(`<!--\\s*commentray:block\\s+id=(${MARKER_ID_BODY})\\s*-->`, "gi");
+  for (const m of markdown.matchAll(re)) {
+    const raw = m[1];
+    if (raw === undefined) continue;
+    try {
+      out.push(assertValidMarkerId(raw));
+    } catch {
+      /* ignore malformed ids on that line */
+    }
+  }
+  return out;
+}
+
+/**
  * Detects two or more well-formed marker regions whose **inner** 1-based inclusive line ranges
  * intersect. Adjacent regions (last inner line N, next inner starts N+1) do not overlap.
  */
@@ -248,12 +266,75 @@ export function validateMarkerRegionsAgainstIndexedSources(
   index: CommentrayIndex,
   indexedSourceTexts: Map<string, string>,
   markdownBlockIdsBySourceNorm?: Map<string, Set<string>>,
+  markdownBlockOrderByCommentrayPath?: Map<string, string[]>,
 ): MarkerValidationIssue[] {
   const claimed = claimedMarkerIdsByNormalizedSource(index);
   return [
     ...unresolvedMarkerAnchorIssues(index, indexedSourceTexts),
     ...orphanRegionIssues(index, indexedSourceTexts, claimed, markdownBlockIdsBySourceNorm),
+    ...unsortedCompanionBlockOrderIssues(
+      index,
+      indexedSourceTexts,
+      markdownBlockOrderByCommentrayPath,
+    ),
   ];
+}
+
+function unsortedCompanionBlockOrderIssues(
+  index: CommentrayIndex,
+  indexedSourceTexts: Map<string, string>,
+  markdownBlockOrderByCommentrayPath: Map<string, string[]> | undefined,
+): MarkerValidationIssue[] {
+  if (markdownBlockOrderByCommentrayPath === undefined) return [];
+  const issues: MarkerValidationIssue[] = [];
+  for (const [commentrayPath, entry] of Object.entries(index.byCommentrayPath)) {
+    const mdOrder = markdownBlockOrderByCommentrayPath.get(commentrayPath);
+    if (mdOrder === undefined || mdOrder.length < 2) continue;
+
+    const sourceNorm = normalizeRepoRelativePath(entry.sourcePath);
+    const sourceText = indexedSourceTexts.get(sourceNorm);
+    if (sourceText === undefined) continue;
+
+    const sourceOrder = markerStartOrderMap(sourceText);
+
+    let lastRank = -1;
+    let lastId: string | null = null;
+    for (const id of mdOrder) {
+      const rank = sourceOrder.get(id);
+      if (rank === undefined) continue;
+      if (rank < lastRank) {
+        issues.push({
+          level: "warn",
+          message:
+            `Companion "${commentrayPath}" lists block id "${id}" before "${lastId ?? "(unknown)"}", ` +
+            `but source "${entry.sourcePath}" orders their regions the other way around. ` +
+            `Reorder companion sections to match source region order, or re-create misplaced blocks via ` +
+            `“Commentray: Start new block from selection” to auto-place them by source flow.`,
+        });
+        break;
+      }
+      lastRank = rank;
+      lastId = id;
+    }
+  }
+  return issues;
+}
+
+function markerStartOrderMap(sourceText: string): Map<string, number> {
+  const order = new Map<string, number>();
+  let next = 0;
+  const lines = sourceText.replaceAll("\r\n", "\n").split("\n");
+  for (const line of lines) {
+    const hit = parseCommentrayRegionBoundary(line);
+    if (!hit || hit.kind !== "start") continue;
+    if (order.has(hit.id)) continue;
+    order.set(hit.id, next++);
+  }
+  for (const pair of findCommentrayMarkerPairs(sourceText)) {
+    if (order.has(pair.id)) continue;
+    order.set(pair.id, next++);
+  }
+  return order;
 }
 
 function markerIdFromBlock(block: { anchor: string; markerId?: string }): string | null {

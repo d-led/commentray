@@ -13,14 +13,22 @@ import { buildGithubPagesStaticSite } from "./github-pages-site.js";
 
 async function writeMinimalPagesFixture(
   repo: string,
-  opts: { title: string; githubUrl?: string; githubBlobBranch?: string },
+  opts: {
+    title: string;
+    githubUrl?: string;
+    githubBlobBranch?: string;
+    commentrayMarkdown?: string;
+  },
 ): Promise<void> {
   const staticSite: string[] = [
     "[static_site]",
     `title = "${opts.title}"`,
     'source_file = "src/x.ts"',
-    'commentray_markdown = ".commentray/source/src/x.ts.md"',
   ];
+  const commentrayMarkdown = opts.commentrayMarkdown ?? ".commentray/source/src/x.ts.md";
+  if (commentrayMarkdown.trim().length > 0) {
+    staticSite.push(`commentray_markdown = "${commentrayMarkdown}"`);
+  }
   if (opts.githubUrl !== undefined) {
     staticSite.push(`github_url = "${opts.githubUrl}"`);
   }
@@ -385,6 +393,23 @@ describe("GitHub Pages static site output — hub, angles, and defaults", () => 
 
   it("writes _site/index.html and nav search from [static_site] flat companions", async () => {
     repo = await runWritesSiteAndNavFromFlatCompanions();
+  });
+
+  it("uses resolved storage companion path when static_site.commentray_markdown is unset", async () => {
+    repo = await mkdtemp(path.join(tmpdir(), "cr-pages-flat-default-rel-"));
+    await writeMinimalPagesFixture(repo, {
+      title: "Demo",
+      githubUrl: "https://github.com/acme/demo",
+      commentrayMarkdown: "",
+    });
+
+    await buildGithubPagesStaticSite({ repoRoot: repo });
+
+    const html = await readFile(path.join(repo, "_site", "index.html"), "utf8");
+    expect(html).toContain('data-search-commentray-path=".commentray/source/src/x.ts.md"');
+    expect(html).toContain(
+      'title=".commentray/source/src/x.ts.md">.commentray/source/src/x.ts.md<',
+    );
   });
 
   it("stamps pagesBuildCommitSha into the hub and browse footers when the builder passes it", async () => {

@@ -13,6 +13,7 @@ export {
   appendBlockToCommentray,
   createBlockForRange,
   generateBlockId,
+  insertBlockBySourceMarkerOrder,
   wrapSourceLineRangeWithCommentrayMarkers,
 } from "./blocks.js";
 export { assertValidAngleId } from "./angles.js";
@@ -118,6 +119,22 @@ export {
   validateProject,
   writeIndex,
 } from "./validate-project.js";
+export {
+  DEFAULT_COMMENTRAY_TOML,
+  initializeCommentrayProject,
+  isCommentrayProjectInitialized,
+  pathExists,
+} from "./init-project.js";
+export type {
+  InitializeCommentrayProjectOptions,
+  InitializeCommentrayProjectResult,
+} from "./init-project.js";
+export { ensureCompanionForSource } from "./companion-bootstrap.js";
+export type {
+  EnsureCompanionForSourceOptions,
+  EnsureCompanionForSourceResult,
+} from "./companion-bootstrap.js";
+export { companionPlaceholderMarkdown } from "./companion-bootstrap.js";
 export { plannedSymbolResolutionStrategy } from "./language-intelligence.js";
 export type { SymbolResolutionStrategy } from "./language-intelligence.js";
 export type {
@@ -207,6 +224,7 @@ export {
 export { MARKER_ID_BODY, assertValidMarkerId, normaliseMarkerSlugOrThrow } from "./marker-ids.js";
 export type { MarkerValidationIssue } from "./marker-validation.js";
 export {
+  extractCommentrayBlockIdsInMarkdownOrder,
   extractCommentrayBlockIdsFromMarkdown,
   validateIndexMarkerSemantics,
   validateMarkerBoundariesInSource,

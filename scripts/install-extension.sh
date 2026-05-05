@@ -9,12 +9,13 @@ set -euo pipefail
 # so Marketplace / old .vsix builds cannot linger beside the new package.
 #
 # Usage:
-#   bash scripts/install-extension.sh                  # build + install
+#   bash scripts/install-extension.sh                  # build + install into all detected editors
 #   bash scripts/install-extension.sh --package-only   # just produce the .vsix
 #   bash scripts/install-extension.sh --publish       # build, package, vsce publish (Marketplace)
-#   bash scripts/install-extension.sh --uninstall      # remove the installed extension
+#   bash scripts/install-extension.sh --uninstall      # remove from all detected editors
 #
-# Honors $COMMENTRAY_EDITOR (path or command), else prefers `cursor`, else `code`.
+# Honors $COMMENTRAY_EDITOR (path or command) to target one editor only.
+# Otherwise installs/uninstalls in all detected CLIs among: `cursor`, `code`.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -26,6 +27,27 @@ source "$REPO_ROOT/scripts/lib/commentray-vscode-ext.sh"
 
 EXT_DIR="$REPO_ROOT/packages/vscode"
 EXT_ID="$COMMENTRAY_VSCODE_EXTENSION_ID"
+
+collect_editor_clis() {
+  if [[ -n "${COMMENTRAY_EDITOR:-}" ]]; then
+    printf '%s\n' "$COMMENTRAY_EDITOR"
+    return 0
+  fi
+
+  local found=0
+  if command -v cursor >/dev/null 2>&1; then
+    echo cursor
+    found=1
+  fi
+  if command -v code >/dev/null 2>&1; then
+    echo code
+    found=1
+  fi
+  if [[ "$found" -eq 0 ]]; then
+    echo "Could not find 'cursor' or 'code' on PATH. Install the editor shell command, or set COMMENTRAY_EDITOR." >&2
+    return 1
+  fi
+}
 
 ext_version() {
   node -e "process.stdout.write(require('$EXT_DIR/package.json').version)"
@@ -41,10 +63,15 @@ case "${1:-}" in
 esac
 
 if [[ "$mode" == "uninstall" ]]; then
-  editor_cli="$(commentray_pick_editor_cli)"
-  echo "Uninstalling $EXT_ID from $editor_cli..."
-  "$editor_cli" --uninstall-extension "$EXT_ID" >/dev/null 2>&1 || true
-  echo "Done (no error if it was already absent)." >&2
+  editor_clis=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && editor_clis+=("$line")
+  done < <(collect_editor_clis)
+  for editor_cli in "${editor_clis[@]}"; do
+    echo "Uninstalling $EXT_ID from $editor_cli..."
+    "$editor_cli" --uninstall-extension "$EXT_ID" >/dev/null 2>&1 || true
+  done
+  echo "Done for: ${editor_clis[*]} (no error if already absent)." >&2
   exit 0
 fi
 
@@ -81,9 +108,15 @@ if [[ "$mode" == "publish" ]]; then
   exit 0
 fi
 
-editor_cli="$(commentray_pick_editor_cli)"
-commentray_uninstall_packaged_commentray_if_present "$editor_cli"
-echo "Installing into $editor_cli..."
-"$editor_cli" --install-extension "$vsix_path" --force
-echo "Installed. Reload your editor window (Cmd/Ctrl+Shift+P → 'Developer: Reload Window')."
+editor_clis=()
+while IFS= read -r line; do
+  [[ -n "$line" ]] && editor_clis+=("$line")
+done < <(collect_editor_clis)
+for editor_cli in "${editor_clis[@]}"; do
+  commentray_uninstall_packaged_commentray_if_present "$editor_cli"
+  echo "Installing into $editor_cli..."
+  "$editor_cli" --install-extension "$vsix_path" --force
+done
+echo "Installed into: ${editor_clis[*]}"
+echo "Reload each editor window (Cmd/Ctrl+Shift+P → 'Developer: Reload Window')."
 echo "Uninstall later with: bash scripts/install-extension.sh --uninstall"

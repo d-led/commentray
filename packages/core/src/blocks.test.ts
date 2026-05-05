@@ -5,6 +5,7 @@ import {
   appendBlockToCommentray,
   createBlockForRange,
   generateBlockId,
+  insertBlockBySourceMarkerOrder,
   wrapSourceLineRangeWithCommentrayMarkers,
 } from "./blocks.js";
 import { emptyIndex } from "./metadata.js";
@@ -152,6 +153,92 @@ describe("Appending a block into companion Markdown", () => {
   it("handles an empty file by writing the block at the top", () => {
     const next = appendBlockToCommentray("", "<!-- commentray:block id=abc -->\n## x\n");
     expect(next).toBe("<!-- commentray:block id=abc -->\n## x\n");
+  });
+});
+
+describe("Inserting a block by source marker order", () => {
+  it("places a new block before the first companion section that maps after it in source", () => {
+    const source = [
+      "//#region commentray:a",
+      "a",
+      "//#endregion commentray:a",
+      "//#region commentray:b",
+      "b",
+      "//#endregion commentray:b",
+      "//#region commentray:c",
+      "c",
+      "//#endregion commentray:c",
+    ].join("\n");
+    const existing = [
+      "<!-- commentray:block id=a -->",
+      "## a",
+      "",
+      "A",
+      "",
+      "<!-- commentray:block id=c -->",
+      "## c",
+      "",
+      "C",
+      "",
+    ].join("\n");
+    const blockB = ["<!-- commentray:block id=b -->", "## b", "", "B", ""].join("\n");
+
+    const next = insertBlockBySourceMarkerOrder({
+      existingCommentray: existing,
+      blockMarkdown: blockB,
+      sourceText: source,
+      markerId: "b",
+    });
+
+    const aPos = next.indexOf("<!-- commentray:block id=a -->");
+    const bPos = next.indexOf("<!-- commentray:block id=b -->");
+    const cPos = next.indexOf("<!-- commentray:block id=c -->");
+    expect(aPos).toBeGreaterThanOrEqual(0);
+    expect(bPos).toBeGreaterThan(aPos);
+    expect(cPos).toBeGreaterThan(bPos);
+  });
+
+  it("falls back to append when marker id is missing from source order", () => {
+    const source = ["//#region commentray:a", "a", "//#endregion commentray:a"].join("\n");
+    const existing = "<!-- commentray:block id=a -->\n## a\n";
+    const blockZ = "<!-- commentray:block id=z -->\n## z\n";
+
+    const next = insertBlockBySourceMarkerOrder({
+      existingCommentray: existing,
+      blockMarkdown: blockZ,
+      sourceText: source,
+      markerId: "z",
+    });
+
+    expect(next).toBe(`${existing.trimEnd()}\n\n${blockZ}`);
+  });
+
+  it("uses first marker starts for ordering even when a prior region is temporarily unclosed", () => {
+    const source = [
+      "<!-- #region commentray:running -->",
+      "running body",
+      "<!-- #region commentray:unit -->",
+      "unit body",
+      "<!-- #endregion commentray:unit -->",
+    ].join("\n");
+    const existing = ["<!-- commentray:block id=unit -->", "## unit", "", "Unit text", ""].join(
+      "\n",
+    );
+    const running = ["<!-- commentray:block id=running -->", "## running", "", "Run text", ""].join(
+      "\n",
+    );
+
+    const next = insertBlockBySourceMarkerOrder({
+      existingCommentray: existing,
+      blockMarkdown: running,
+      sourceText: source,
+      markerId: "running",
+    });
+
+    const runningPos = next.indexOf("<!-- commentray:block id=running -->");
+    const unitPos = next.indexOf("<!-- commentray:block id=unit -->");
+    expect(runningPos).toBeGreaterThanOrEqual(0);
+    expect(unitPos).toBeGreaterThan(runningPos);
   });
 });
 

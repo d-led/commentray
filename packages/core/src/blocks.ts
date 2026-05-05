@@ -1,8 +1,8 @@
 import { buildCommentraySnippetV1 } from "./block-snippet.js";
 import { formatMarkerAnchor } from "./anchors.js";
 import { assertValidMarkerId } from "./marker-ids.js";
-import { leadingIndentOfLine } from "./region-marker-convert.js";
-import { commentrayRegionInsertions } from "./source-markers.js";
+import { findCommentrayMarkerPairs, leadingIndentOfLine } from "./region-marker-convert.js";
+import { commentrayRegionInsertions, parseCommentrayRegionBoundary } from "./source-markers.js";
 import type { CommentrayBlock, CommentrayIndex, SourceFileIndexEntry } from "./model.js";
 
 /** 1-based inclusive range of source lines a block points to. */
@@ -114,6 +114,98 @@ export function appendBlockToCommentray(existing: string, blockMarkdown: string)
   const body = trimmed.length === 0 ? "" : `${trimmed}\n\n`;
   const fragment = blockMarkdown.endsWith("\n") ? blockMarkdown : `${blockMarkdown}\n`;
   return `${body}${fragment}`;
+}
+
+type CommentrayBlockMarkerHit = {
+  id: string;
+  start: number;
+};
+
+/**
+ * Inserts `blockMarkdown` into companion markdown based on source-region order.
+ *
+ * The insertion point is chosen from existing `<!-- commentray:block id=... -->`
+ * sections: the new block is inserted before the first section whose marker id
+ * appears *after* `markerId` in source order. If ordering cannot be resolved,
+ * falls back to {@link appendBlockToCommentray}.
+ */
+export function insertBlockBySourceMarkerOrder(args: {
+  existingCommentray: string;
+  blockMarkdown: string;
+  sourceText: string;
+  markerId: string;
+}): string {
+  const markerId = assertValidMarkerId(args.markerId);
+  const order = markerStartOrderMap(args.sourceText);
+  const targetRank = order.get(markerId);
+  if (targetRank === undefined) {
+    return appendBlockToCommentray(args.existingCommentray, args.blockMarkdown);
+  }
+
+  const hits = findCommentrayBlockMarkerHits(args.existingCommentray);
+  if (hits.length === 0) {
+    return appendBlockToCommentray(args.existingCommentray, args.blockMarkdown);
+  }
+
+  let insertionIndex: number | null = null;
+  for (const hit of hits) {
+    const rank = order.get(hit.id);
+    if (rank === undefined || rank <= targetRank) continue;
+    insertionIndex = hit.start;
+    break;
+  }
+  if (insertionIndex === null) {
+    return appendBlockToCommentray(args.existingCommentray, args.blockMarkdown);
+  }
+
+  const left = args.existingCommentray.slice(0, insertionIndex).trimEnd();
+  const right = args.existingCommentray.slice(insertionIndex).trimStart();
+  const fragment = args.blockMarkdown.endsWith("\n")
+    ? args.blockMarkdown
+    : `${args.blockMarkdown}\n`;
+  const leftPart = left.length === 0 ? "" : `${left}\n\n`;
+  const rightPart = right.length === 0 ? "" : `\n\n${right}`;
+  return `${leftPart}${fragment.trimEnd()}${rightPart}\n`;
+}
+
+function markerStartOrderMap(sourceText: string): Map<string, number> {
+  const order = new Map<string, number>();
+  let next = 0;
+
+  // Prefer first explicit start-boundary position so ordering still works while a region is mid-edit.
+  const lines = sourceText.replaceAll("\r\n", "\n").split("\n");
+  for (const line of lines) {
+    const hit = parseCommentrayRegionBoundary(line);
+    if (!hit || hit.kind !== "start") continue;
+    if (order.has(hit.id)) continue;
+    order.set(hit.id, next++);
+  }
+
+  // Keep pair-based fallback for any id represented by a full pair but missing from start scan.
+  for (const pair of findCommentrayMarkerPairs(sourceText)) {
+    if (order.has(pair.id)) continue;
+    order.set(pair.id, next++);
+  }
+
+  return order;
+}
+
+function findCommentrayBlockMarkerHits(markdown: string): CommentrayBlockMarkerHit[] {
+  const hits: CommentrayBlockMarkerHit[] = [];
+  const markerRe = /<!--\s*commentray:block\s+id=([a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?)\s*-->/gi;
+  for (const m of markdown.matchAll(markerRe)) {
+    const idRaw = m[1];
+    if (idRaw === undefined) continue;
+    const start = m.index ?? -1;
+    if (start < 0) continue;
+    try {
+      hits.push({ id: assertValidMarkerId(idRaw), start });
+    } catch {
+      /* ignore malformed marker ids */
+    }
+  }
+  hits.sort((a, b) => a.start - b.start);
+  return hits;
 }
 
 export type AddBlockToIndexInput = {

@@ -17,6 +17,7 @@ describe("Commentray Angles in VS Code (integration)", () => {
 
   beforeEach(async () => {
     await enableAnglesDogfoodFixture(dogfoodWorkspace.root());
+    await vscode.commands.executeCommand("commentray.init");
   });
 
   afterEach(async () => {

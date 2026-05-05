@@ -9,7 +9,30 @@ import { CURRENT_SCHEMA_VERSION } from "@commentray/core";
 import {
   blockStretchRowsForDocumentedPair,
   loadMultiAngleBrowsingIfEnabled,
+  readFlatCompanionMarkdown,
 } from "./github-pages-site-prep.js";
+
+async function cleanupTempDirs(tempDirs: string[]): Promise<void> {
+  await Promise.all(
+    tempDirs.splice(0).map(async (dir) => {
+      await import("node:fs/promises").then(({ rm }) => rm(dir, { recursive: true, force: true }));
+    }),
+  );
+}
+
+function flatCfg() {
+  return { storageDir: ".commentray", angles: { definitions: [] } };
+}
+
+function flatStaticSite(sourceFile: string, commentrayMarkdownFile?: string) {
+  return {
+    sourceFile,
+    ...(commentrayMarkdownFile ? { commentrayMarkdownFile } : {}),
+    introMarkdown: "",
+    githubUrl: "",
+    githubBlobBranch: "main",
+  };
+}
 
 describe("blockStretchRowsForDocumentedPair", () => {
   const cr = ".commentray/source/extra.ts/main.md";
@@ -65,13 +88,7 @@ describe("loadMultiAngleBrowsingIfEnabled", () => {
   const tempDirs: string[] = [];
 
   afterEach(async () => {
-    await Promise.all(
-      tempDirs.splice(0).map(async (dir) => {
-        await import("node:fs/promises").then(({ rm }) =>
-          rm(dir, { recursive: true, force: true }),
-        );
-      }),
-    );
+    await cleanupTempDirs(tempDirs);
   });
 
   it("keeps block stretch wiring for angles that rely on marker fallback instead of their own index slice", async () => {
@@ -133,5 +150,81 @@ describe("loadMultiAngleBrowsingIfEnabled", () => {
       sourceRelative: "README.md",
       commentrayPathRel: ".commentray/source/README.md/architecture.md",
     });
+  });
+});
+
+describe("readFlatCompanionMarkdown", () => {
+  const tempDirs: string[] = [];
+
+  afterEach(async () => {
+    await cleanupTempDirs(tempDirs);
+  });
+
+  it("reads explicit static_site.commentray_markdown when configured", async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), "commentray-prep-flat-explicit-"));
+    tempDirs.push(repoRoot);
+    const rel = ".commentray/source/docs/guide.md.md";
+    const abs = path.join(repoRoot, rel);
+    await mkdir(path.dirname(abs), { recursive: true });
+    await writeFile(abs, "# guide\n", "utf8");
+
+    const cfg = flatCfg();
+    const ss = flatStaticSite("docs/guide.md", rel);
+
+    const md = await readFlatCompanionMarkdown(repoRoot, cfg as never, ss as never);
+    expect(md).toContain("# guide");
+  });
+
+  it("falls back to core-resolved default companion path when commentray_markdown is omitted", async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), "commentray-prep-flat-fallback-"));
+    tempDirs.push(repoRoot);
+    const rel = ".commentray/source/README.md.md";
+    const abs = path.join(repoRoot, rel);
+    await mkdir(path.dirname(abs), { recursive: true });
+    await writeFile(abs, "# readme\n", "utf8");
+
+    const cfg = flatCfg();
+    const ss = flatStaticSite("README.md");
+
+    const md = await readFlatCompanionMarkdown(repoRoot, cfg as never, ss as never);
+    expect(md).toContain("# readme");
+  });
+
+  it("returns empty markdown when neither configured nor fallback companion file exists", async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), "commentray-prep-flat-missing-"));
+    tempDirs.push(repoRoot);
+
+    const cfg = flatCfg();
+    const ss = flatStaticSite("README.md");
+
+    const md = await readFlatCompanionMarkdown(repoRoot, cfg as never, ss as never);
+    expect(md).toBe("");
+  });
+
+  it("returns empty when explicit commentray_markdown points to a directory", async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), "commentray-prep-flat-eisdir-"));
+    tempDirs.push(repoRoot);
+
+    const configuredDir = path.join(repoRoot, ".commentray", "source", "README.md");
+    await mkdir(configuredDir, { recursive: true });
+
+    const cfg = flatCfg();
+    const ss = flatStaticSite("README.md", ".commentray/source/README.md");
+
+    const md = await readFlatCompanionMarkdown(repoRoot, cfg as never, ss as never);
+    expect(md).toBe("");
+  });
+
+  it("returns empty when explicit commentray_markdown file is missing", async () => {
+    const repoRoot = await mkdtemp(
+      path.join(os.tmpdir(), "commentray-prep-flat-explicit-missing-"),
+    );
+    tempDirs.push(repoRoot);
+
+    const cfg = flatCfg();
+    const ss = flatStaticSite("README.md", "commentray.md");
+
+    const md = await readFlatCompanionMarkdown(repoRoot, cfg as never, ss as never);
+    expect(md).toBe("");
   });
 });

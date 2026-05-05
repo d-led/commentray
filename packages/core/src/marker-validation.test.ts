@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CURRENT_SCHEMA_VERSION } from "./model.js";
 import {
+  extractCommentrayBlockIdsInMarkdownOrder,
   extractCommentrayBlockIdsFromMarkdown,
   validateIndexMarkerSemantics,
   validateMarkerBoundariesInSource,
@@ -69,6 +70,11 @@ describe("extractCommentrayBlockIdsFromMarkdown", () => {
       "<!-- commentray:block id=intro -->\n# Hi\n\n<!-- commentray:block id=tail -->\nBye\n";
     expect([...extractCommentrayBlockIdsFromMarkdown(md)].sort()).toEqual(["intro", "tail"]);
   });
+
+  it("keeps block ids in markdown appearance order", () => {
+    const md = "<!-- commentray:block id=first -->\nA\n\n<!-- commentray:block id=second -->\nB\n";
+    expect(extractCommentrayBlockIdsInMarkdownOrder(md)).toEqual(["first", "second"]);
+  });
 });
 
 describe("Index marker semantics versus on-disk source", () => {
@@ -121,20 +127,20 @@ describe("Index marker semantics versus on-disk source", () => {
   });
 });
 
-describe("Marker anchors versus regions in indexed primaries", () => {
-  const cr = ".commentray/source/x.md";
-  const indexMarkerX1 = {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
-    byCommentrayPath: {
-      [cr]: {
-        sourcePath: "src/p.ts",
-        commentrayPath: cr,
-        blocks: [{ id: "x1", anchor: "marker:x1", markerId: "x1" }],
-      },
+const cr = ".commentray/source/x.md";
+const indexMarkerX1 = {
+  schemaVersion: CURRENT_SCHEMA_VERSION,
+  byCommentrayPath: {
+    [cr]: {
+      sourcePath: "src/p.ts",
+      commentrayPath: cr,
+      blocks: [{ id: "x1", anchor: "marker:x1", markerId: "x1" }],
     },
-  };
-  const srcMarkerX1 = ["//#region commentray:x1", "ok", "//#endregion commentray:x1"].join("\n");
+  },
+};
+const srcMarkerX1 = ["//#region commentray:x1", "ok", "//#endregion commentray:x1"].join("\n");
 
+describe("Marker anchors versus regions in indexed primaries", () => {
   it("errors when a marker anchor does not resolve in the primary", () => {
     const index = {
       schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -213,6 +219,81 @@ describe("Marker anchors versus regions in indexed primaries", () => {
           i.level === "warn" &&
           i.message.includes("not referenced") &&
           i.message.includes("indexed block uses anchor marker:x1"),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("Companion markdown ordering versus source region order", () => {
+  it("warns when companion markdown block sequence is out of source region order", () => {
+    const source = [
+      "//#region commentray:a",
+      "one",
+      "//#endregion commentray:a",
+      "//#region commentray:b",
+      "two",
+      "//#endregion commentray:b",
+    ].join("\n");
+    const issues = validateMarkerRegionsAgainstIndexedSources(
+      {
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        byCommentrayPath: {
+          [cr]: {
+            sourcePath: "src/p.ts",
+            commentrayPath: cr,
+            blocks: [
+              { id: "a", anchor: "marker:a", markerId: "a" },
+              { id: "b", anchor: "marker:b", markerId: "b" },
+            ],
+          },
+        },
+      },
+      new Map([["src/p.ts", source]]),
+      new Map([["src/p.ts", new Set(["a", "b"])]]),
+      new Map([[cr, ["b", "a"]]]),
+    );
+
+    expect(
+      issues.some(
+        (i) =>
+          i.level === "warn" &&
+          i.message.includes("orders their regions the other way around") &&
+          i.message.includes("Start new block from selection"),
+      ),
+    ).toBe(true);
+  });
+
+  it("still warns on out-of-order companion blocks when the earlier source region is start-only", () => {
+    const source = [
+      "<!-- #region commentray:running -->",
+      "run",
+      "<!-- #region commentray:unit -->",
+      "unit",
+      "<!-- #endregion commentray:unit -->",
+    ].join("\n");
+    const issues = validateMarkerRegionsAgainstIndexedSources(
+      {
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        byCommentrayPath: {
+          [cr]: {
+            sourcePath: "src/p.md",
+            commentrayPath: cr,
+            blocks: [
+              { id: "running", anchor: "marker:running", markerId: "running" },
+              { id: "unit", anchor: "marker:unit", markerId: "unit" },
+            ],
+          },
+        },
+      },
+      new Map([["src/p.md", source]]),
+      new Map([["src/p.md", new Set(["running", "unit"])]]),
+      new Map([[cr, ["unit", "running"]]]),
+    );
+
+    expect(
+      issues.some(
+        (i) =>
+          i.level === "warn" && i.message.includes("orders their regions the other way around"),
       ),
     ).toBe(true);
   });

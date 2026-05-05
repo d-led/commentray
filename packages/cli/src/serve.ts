@@ -4,9 +4,16 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import path from "node:path";
 import process from "node:process";
 
+import {
+  ensureCompanionForSource,
+  isCommentrayProjectInitialized,
+  loadCommentrayConfig,
+  resolveCommentrayMarkdownPath,
+} from "@commentray/core";
 import { appendHtmlToOpaqueBrowseRequestUrl } from "@commentray/render";
 import handler from "serve-handler";
 
+import { runInitFull } from "./init.js";
 import { injectServeDevBuildWatchIntoSite } from "./serve-dev-build-watch.js";
 import { startServeRebuildWatcher } from "./serve-rebuild-watcher.js";
 import { startLivereloadServer } from "./serve-livereload.js";
@@ -14,6 +21,139 @@ import { startLivereloadServer } from "./serve-livereload.js";
 export type ServeCliOptions = {
   port: number;
 };
+
+const EMPTY_STATE_MARKDOWN_ENV = "COMMENTRAY_EMPTY_STATE_MARKDOWN" as const;
+export const SERVE_ROUTE_INIT = "/__commentray/serve/init" as const;
+export const SERVE_ROUTE_GENERATE_ENTRY = "/__commentray/serve/generate-entry" as const;
+
+type ServeActionContext = {
+  repoRoot: string;
+  rebuild: (notifyBrowser?: boolean) => Promise<void>;
+};
+
+async function serveEmptyStateMarkdown(port: number, repoRoot: string): Promise<string> {
+  const base = `http://127.0.0.1:${String(port)}`;
+  try {
+    const initialized = await isCommentrayProjectInitialized(repoRoot);
+    if (!initialized) {
+      return [
+        "Use local actions to bootstrap this page:",
+        `- [Initialize Commentray in this repository](${base}${SERVE_ROUTE_INIT})`,
+      ].join("\n");
+    }
+    const cfg = await loadCommentrayConfig(repoRoot);
+    const explicit = cfg.staticSite.commentrayMarkdownFile?.trim();
+    const desiredCommentrayPath =
+      explicit && explicit.length > 0
+        ? explicit
+        : resolveCommentrayMarkdownPath(repoRoot, cfg.staticSite.sourceFile, cfg).commentrayPath;
+    const mdAbs = path.resolve(repoRoot, desiredCommentrayPath);
+    if (!existsSync(mdAbs)) {
+      return [
+        "Use local actions to bootstrap this page:",
+        `- [Generate commentray for \`${cfg.staticSite.sourceFile}\`](${base}${SERVE_ROUTE_GENERATE_ENTRY})`,
+      ].join("\n");
+    }
+  } catch {
+    // config not yet readable — fall through to no CTA
+  }
+  return "";
+}
+
+async function withServeEmptyStateMarkdown<T>(
+  markdown: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  const previous = process.env[EMPTY_STATE_MARKDOWN_ENV];
+  process.env[EMPTY_STATE_MARKDOWN_ENV] = markdown;
+  try {
+    return await work();
+  } finally {
+    process.env[EMPTY_STATE_MARKDOWN_ENV] = previous;
+  }
+}
+
+function pathnameFromReq(req: IncomingMessage): string | undefined {
+  const raw = req.url;
+  if (typeof raw !== "string") return undefined;
+  try {
+    return new URL(raw, "http://127.0.0.1").pathname;
+  } catch {
+    return undefined;
+  }
+}
+
+function redirectHome(res: ServerResponse): void {
+  res.writeHead(303, { Location: "/" });
+  res.end();
+}
+
+function writePlain(res: ServerResponse, statusCode: number, body: string): void {
+  res.writeHead(statusCode, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(body);
+}
+
+export async function runServeAction(pathname: string, ctx: ServeActionContext): Promise<void> {
+  if (pathname === SERVE_ROUTE_INIT) {
+    const code = await runInitFull(ctx.repoRoot);
+    if (code !== 0) {
+      throw new Error("commentray init reported validation errors; fix them, then retry.");
+    }
+    process.stderr.write("[commentray serve] initialized repository via serve action\n");
+    await ctx.rebuild(true);
+    return;
+  }
+
+  if (pathname === SERVE_ROUTE_GENERATE_ENTRY) {
+    const initCode = await runInitFull(ctx.repoRoot);
+    if (initCode !== 0) {
+      throw new Error("commentray init reported validation errors; fix them, then retry.");
+    }
+    const cfg = await loadCommentrayConfig(ctx.repoRoot);
+    const generated = await ensureCompanionForSource(ctx.repoRoot, cfg.staticSite.sourceFile, {
+      commentrayPath: cfg.staticSite.commentrayMarkdownFile,
+    });
+    const actionWord = generated.createdMarkdown ? "created" : "already existed";
+    const indexWord = generated.createdIndexEntry ? "added" : "already indexed";
+    process.stderr.write(
+      `[commentray serve] ${actionWord}: ${generated.commentrayPath} (for ${generated.sourcePath}; index ${indexWord})\n`,
+    );
+    await ctx.rebuild(true);
+    return;
+  }
+
+  throw new Error(`Unknown serve action route: ${pathname}`);
+}
+
+function tryServeActionRoute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServeActionContext,
+): boolean {
+  const pathname = pathnameFromReq(req);
+  if (pathname !== SERVE_ROUTE_INIT && pathname !== SERVE_ROUTE_GENERATE_ENTRY) return false;
+
+  const method = req.method ?? "GET";
+  if (method !== "GET" && method !== "POST") {
+    writePlain(res, 405, "Method not allowed\n");
+    return true;
+  }
+
+  void (async () => {
+    try {
+      await runServeAction(pathname, ctx);
+      redirectHome(res);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`[commentray serve] action failed: ${message}\n`);
+      if (!res.headersSent) writePlain(res, 500, `${message}\n`);
+    }
+  })();
+  return true;
+}
 
 function serveHandlerOptions(siteAbs: string): Parameters<typeof handler>[2] {
   let renderSingle = true;
@@ -127,7 +267,10 @@ export async function runServeStaticPages(
 
   async function rebuild(notifyBrowser = false): Promise<void> {
     process.stderr.write("[commentray serve] rebuilding…\n");
-    await buildGithubPagesStaticSite({ repoRoot });
+    const emptyStateMarkdown = await serveEmptyStateMarkdown(opts.port, repoRoot);
+    await withServeEmptyStateMarkdown(emptyStateMarkdown, async () => {
+      await buildGithubPagesStaticSite({ repoRoot });
+    });
     await livereload?.injectIntoSite(siteAbs);
     await injectServeDevBuildWatchIntoSite(siteAbs, serveDevBuildId);
     process.stderr.write("[commentray serve] rebuild finished\n");
@@ -138,6 +281,7 @@ export async function runServeStaticPages(
 
   const httpServer = createServer((req, res) => {
     if (tryServeDevBuildIdRoute(req, res, serveDevBuildId)) return;
+    if (tryServeActionRoute(req, res, { repoRoot, rebuild })) return;
     attachStaticSiteHandler(siteAbs)(req, res);
   });
   try {

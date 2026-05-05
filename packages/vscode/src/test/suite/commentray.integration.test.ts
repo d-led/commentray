@@ -12,6 +12,7 @@ import {
   type DogfoodWorkspaceAccessor,
   openFixtureSourceFile,
   pairedMarkdownPath,
+  resetGeneratedCommentrayStorage,
   registerDogfoodWorkspaceLifecycle,
 } from "./commentray-dogfood-test-support.js";
 
@@ -19,6 +20,7 @@ import {
 async function openDogfoodPairedMarkdownActiveEditor(
   dogfoodWorkspace: DogfoodWorkspaceAccessor,
 ): Promise<vscode.Uri> {
+  await vscode.commands.executeCommand("commentray.init");
   await openFixtureSourceFile(dogfoodWorkspace.root());
   await vscode.commands.executeCommand("commentray.openSideBySide");
   const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
@@ -35,6 +37,7 @@ type ValidateProjectFn = (
 function registerExtensionSurfaceTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
   describe("Extension command surface", () => {
     before(async () => {
+      await vscode.commands.executeCommand("commentray.init");
       const editor = await openFixtureSourceFile(dogfoodWorkspace.root());
       await vscode.commands.executeCommand("commentray.openSideBySide");
       await vscode.window.showTextDocument(editor.document, { preview: false });
@@ -42,6 +45,7 @@ function registerExtensionSurfaceTests(dogfoodWorkspace: DogfoodWorkspaceAccesso
 
     it("Given the extension is active, when querying VS Code commands, then Angles-related Commentray commands are registered.", async () => {
       const cmds = await vscode.commands.getCommands(true);
+      assert.ok(cmds.includes("commentray.init"));
       assert.ok(cmds.includes("commentray.openCommentrayAngle"));
       assert.ok(cmds.includes("commentray.addAngleDefinition"));
       assert.ok(cmds.includes("commentray.openRenderedPreview"));
@@ -51,18 +55,31 @@ function registerExtensionSurfaceTests(dogfoodWorkspace: DogfoodWorkspaceAccesso
   });
 }
 
+/** Opens the dogfood `sample.ts`, runs `openSideBySide`, then reads and returns the paired Markdown text. */
+async function openSideBySideAndReadPairedText(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): Promise<string> {
+  await openFixtureSourceFile(dogfoodWorkspace.root());
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+  const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
+  const bytes = await vscode.workspace.fs.readFile(pairedUri);
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
 function registerOpenPairedMarkdownTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
   describe("Open paired markdown beside the source editor", () => {
-    it('Given a workspace with Commentray configured, when the user runs "Commentray: Open paired markdown beside editor" from a source file, then the paired Markdown file exists under `.commentray/source/` and starts with a Commentray heading.', async () => {
-      await openFixtureSourceFile(dogfoodWorkspace.root());
-      await vscode.commands.executeCommand("commentray.openSideBySide");
+    it('Given a clean workspace, when the user runs "Commentray: Initialize workspace", then commentray.openSideBySide can create the paired markdown.', async () => {
+      await resetGeneratedCommentrayStorage(dogfoodWorkspace.root());
+      await vscode.commands.executeCommand("commentray.init");
 
-      const pairedUri = vscode.Uri.joinPath(
-        dogfoodWorkspace.root(),
-        ...pairedMarkdownPath.split("/"),
-      );
-      const bytes = await vscode.workspace.fs.readFile(pairedUri);
-      const text = new TextDecoder("utf-8").decode(bytes);
+      const text = await openSideBySideAndReadPairedText(dogfoodWorkspace);
+      assert.ok(text.includes("# Commentray"));
+    });
+
+    it('Given a workspace with Commentray configured, when the user runs "Commentray: Open paired markdown beside editor" from a source file, then the paired Markdown file exists under `.commentray/source/` and starts with a Commentray heading.', async () => {
+      await vscode.commands.executeCommand("commentray.init");
+
+      const text = await openSideBySideAndReadPairedText(dogfoodWorkspace);
       assert.ok(
         text.includes("# Commentray"),
         "Expected default placeholder heading in new paired file.",
@@ -70,6 +87,7 @@ function registerOpenPairedMarkdownTests(dogfoodWorkspace: DogfoodWorkspaceAcces
     });
 
     it("Given a primary file URI (as from Explorer), when the user runs open paired with that URI, then the paired Markdown is created the same way.", async () => {
+      await vscode.commands.executeCommand("commentray.init");
       await vscode.commands.executeCommand("workbench.action.closeAllEditors");
       const sampleUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts");
       await vscode.commands.executeCommand("commentray.openSideBySide", sampleUri);
@@ -134,6 +152,7 @@ function registerValidateWorkspaceTests(dogfoodWorkspace: DogfoodWorkspaceAccess
     });
 
     it("Given paired Markdown was opened once, when `validateProject` runs, then the `.commentray/source` tree exists so validation no longer warns about a missing source directory.", async () => {
+      await vscode.commands.executeCommand("commentray.init");
       await openFixtureSourceFile(dogfoodWorkspace.root());
       await vscode.commands.executeCommand("commentray.openSideBySide");
       const root = dogfoodWorkspace.root().fsPath;
@@ -147,48 +166,125 @@ function registerValidateWorkspaceTests(dogfoodWorkspace: DogfoodWorkspaceAccess
   });
 }
 
+async function assertTypescriptSelectionBlockFlow(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): Promise<void> {
+  await vscode.commands.executeCommand("commentray.init");
+  const editor = await openFixtureSourceFile(dogfoodWorkspace.root());
+  const doc = editor.document;
+  const start = new vscode.Position(5, 0);
+  const end = doc.lineAt(7).range.end;
+  editor.selection = new vscode.Selection(start, end);
+
+  await vscode.commands.executeCommand("commentray.startBlockFromSelection");
+
+  const samplePath = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts").fsPath;
+  const sampleDoc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === samplePath);
+  assert.ok(sampleDoc, "Expected sample.ts buffer after add-block.");
+  const sampleText = sampleDoc.getText();
+  assert.strictEqual(sampleDoc.isDirty, false, "Expected source file saved after add-block.");
+  assert.ok(
+    sampleText.includes("//#region commentray:") && sampleText.includes("//#endregion commentray:"),
+    "Expected TypeScript Commentray region delimiters around the selection in the primary file.",
+  );
+
+  const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
+  const mdBytes = await vscode.workspace.fs.readFile(pairedUri);
+  const mdText = new TextDecoder("utf-8").decode(mdBytes);
+  assert.ok(
+    mdText.includes("<!-- commentray:block id="),
+    "Expected block marker in paired Markdown.",
+  );
+  assert.ok(
+    !mdText.includes("Write documentation for src/sample.ts here."),
+    "Expected default placeholder guidance removed after first authored block.",
+  );
+
+  const indexUri = vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    ".commentray",
+    "metadata",
+    "index.json",
+  );
+  const indexBytes = await vscode.workspace.fs.readFile(indexUri);
+  const indexText = new TextDecoder("utf-8").decode(indexBytes);
+  assert.ok(indexText.includes('"blocks"'), "Expected blocks array in index.json.");
+}
+
+async function assertMarkdownSelectionBlockFlow(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): Promise<void> {
+  await vscode.commands.executeCommand("commentray.init");
+
+  const sourceUri = vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    "docs",
+    "integration-markdown-source.md",
+  );
+  const sourceContent = ["# Markdown source fixture", "", "alpha", "beta", "gamma", ""].join("\n");
+  await vscode.workspace.fs.writeFile(sourceUri, new TextEncoder().encode(sourceContent));
+  const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+  const sourceEditor = await vscode.window.showTextDocument(sourceDoc, { preview: false });
+
+  sourceEditor.selection = new vscode.Selection(
+    new vscode.Position(2, 0),
+    new vscode.Position(3, 4),
+  );
+  await vscode.commands.executeCommand("commentray.startBlockFromSelection");
+
+  const mutated = (await vscode.workspace.openTextDocument(sourceUri)).getText();
+  assert.ok(
+    mutated.includes("<!-- #region commentray:"),
+    "Expected Markdown start region marker in primary source.",
+  );
+  assert.ok(
+    mutated.includes("<!-- #endregion commentray:"),
+    "Expected Markdown end region marker in primary source.",
+  );
+
+  const pairedUri = vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    ".commentray",
+    "source",
+    "docs",
+    "integration-markdown-source.md",
+    "main.md",
+  );
+  const pairedText = new TextDecoder("utf-8").decode(await vscode.workspace.fs.readFile(pairedUri));
+  const markerMatch = /<!--\s*commentray:block\s+id=([a-z0-9][a-z0-9-]{0,63})\s*-->/i.exec(
+    pairedText,
+  );
+  assert.ok(markerMatch?.[1], "Expected block marker id in paired Markdown.");
+  assert.ok(
+    !pairedText.includes("Write documentation for docs/integration-markdown-source.md here."),
+    "Expected default placeholder guidance removed after first authored block.",
+  );
+  const blockId = markerMatch?.[1] ?? "";
+
+  const indexUri = vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    ".commentray",
+    "metadata",
+    "index.json",
+  );
+  const indexText = new TextDecoder("utf-8").decode(await vscode.workspace.fs.readFile(indexUri));
+  assert.ok(
+    indexText.includes(`"anchor":"marker:${blockId}"`) ||
+      indexText.includes(`"anchor": "marker:${blockId}"`),
+    "Expected marker anchor in index for Markdown-source block.",
+  );
+}
+
 function registerAddBlockFromSelectionTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
   describe("Add commentary block from selection", () => {
     it('Given a source file with a non-empty selection, when the user runs "Commentray: Add commentary block from selection", then the paired Markdown gains a `commentray:block` marker and the metadata index is updated.', async function () {
       this.timeout(90_000);
-      const editor = await openFixtureSourceFile(dogfoodWorkspace.root());
-      const doc = editor.document;
-      const start = new vscode.Position(5, 0);
-      const end = doc.lineAt(7).range.end;
-      editor.selection = new vscode.Selection(start, end);
+      await assertTypescriptSelectionBlockFlow(dogfoodWorkspace);
+    });
 
-      await vscode.commands.executeCommand("commentray.startBlockFromSelection");
-
-      const samplePath = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts").fsPath;
-      const sampleDoc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === samplePath);
-      assert.ok(sampleDoc, "Expected sample.ts buffer after add-block.");
-      const sampleText = sampleDoc.getText();
-      assert.ok(
-        sampleText.includes("//#region commentray:") &&
-          sampleText.includes("//#endregion commentray:"),
-        "Expected TypeScript Commentray region delimiters around the selection in the primary file.",
-      );
-
-      const pairedUri = vscode.Uri.joinPath(
-        dogfoodWorkspace.root(),
-        ...pairedMarkdownPath.split("/"),
-      );
-      const mdBytes = await vscode.workspace.fs.readFile(pairedUri);
-      const mdText = new TextDecoder("utf-8").decode(mdBytes);
-      assert.ok(
-        mdText.includes("<!-- commentray:block id="),
-        "Expected block marker in paired Markdown.",
-      );
-
-      const indexUri = vscode.Uri.joinPath(
-        dogfoodWorkspace.root(),
-        ".commentray",
-        "metadata",
-        "index.json",
-      );
-      const indexBytes = await vscode.workspace.fs.readFile(indexUri);
-      const indexText = new TextDecoder("utf-8").decode(indexBytes);
-      assert.ok(indexText.includes('"blocks"'), "Expected blocks array in index.json.");
+    it("Given a Markdown primary source selection, when add-block runs, then paired HTML region markers are inserted and the index anchor uses marker:<id> for that source.", async function () {
+      this.timeout(90_000);
+      await assertMarkdownSelectionBlockFlow(dogfoodWorkspace);
     });
   });
 }

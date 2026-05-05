@@ -116,4 +116,17 @@ describe("commentrayActiveEditorUiFlags", () => {
     expect(flags.underCompanionSourceTree).toBe(true);
     expect(flags.isResolvableCompanionMarkdown).toBe(true);
   });
+
+  it("given static_site.commentray_markdown points outside storage, when that file is active, then it is still treated as a resolvable companion", () => {
+    const flags = commentrayActiveEditorUiFlags({
+      normalizedRepoRelativePath: "README.md.md",
+      storageDir: ".commentray",
+      repoRoot: "/tmp/ignored",
+      staticSiteCommentrayMarkdownFile: "README.md.md",
+    });
+    expect(flags).toEqual({
+      underCompanionSourceTree: true,
+      isResolvableCompanionMarkdown: true,
+    });
+  });
 });

@@ -3,12 +3,11 @@ import path from "node:path";
 import process from "node:process";
 
 import {
+  DEFAULT_COMMENTRAY_TOML,
   defaultMetadataIndexPath,
-  emptyIndex,
+  initializeCommentrayProject,
   loadCommentrayConfig,
-  refreshIndexMigrationsOnDisk,
-  validateProject,
-  writeIndex,
+  pathExists,
   type ValidationIssue,
 } from "@commentray/core";
 
@@ -123,66 +122,6 @@ export async function mergeCommentrayVscodeExtensionRecommendation(
   return "wrote";
 }
 
-export const DEFAULT_COMMENTRAY_TOML = [
-  "# Commentray configuration (defaults are commented)",
-  "",
-  "[storage]",
-  "# Repo-relative. Must not live inside .git/ (Git treats that directory as",
-  "# opaque metadata and routine operations can wipe it).",
-  '# dir = ".commentray"',
-  "",
-  "[scm]",
-  '# provider = "git"',
-  "",
-  "[render]",
-  "# mermaid = true",
-  '# syntaxTheme = "github-dark"',
-  "# When true, GitHub blob/tree links for static_site.github_url rewrite to paths",
-  "# relative to generated HTML (Pages, `commentray render`). Needs a repo home URL.",
-  "# relative_github_blob_links = false",
-  "# Local images: `/repo/path` = repo root; `./x` or `sub/x` = next to the commentray `.md`",
-  "# (see docs/spec/storage.md — Images; vocabulary — Commentray vs commentray).",
-  "",
-  "[anchors]",
-  "# defaultStrategy = [",
-  '#   "symbol",',
-  '#   "lines",',
-  "# ]",
-  "",
-  "# Named **Angles** — multiple commentrays per source (Introduction, Architecture, …).",
-  "# Optional UI list + default selection. On disk, multi-angle layout is enabled only when",
-  "# `{storage.dir}/source/.default` exists (file or dir); see docs/spec/storage.md.",
-  "# [angles]",
-  '# default_angle = "introduction"',
-  "# [[angles.definitions]]",
-  '# id = "introduction"',
-  '# title = "Introduction"',
-  "# [[angles.definitions]]",
-  '# id = "architecture"',
-  '# title = "Architecture"',
-  "",
-  "# GitHub Pages static browser (optional). `related_github_files` adds toolbar links",
-  "# to other repo paths on github.com (single index.html cannot serve every file).",
-  "# [static_site]",
-  '# title = "My project"',
-  '# github_url = "https://github.com/you/repo"',
-  '# github_blob_branch = "main"',
-  '# source_file = "README.md"',
-  '# commentray_markdown = ".commentray/source/README.md.md"',
-  "# [[static_site.related_github_files]]",
-  '# path = "CONTRIBUTING.md"',
-  "",
-].join("\n");
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function initVscodeExtensionRecommendation(repoRoot: string): Promise<void> {
   try {
     if ((await mergeCommentrayVscodeExtensionRecommendation(repoRoot)) === "wrote") {
@@ -203,24 +142,12 @@ async function initVscodeExtensionRecommendation(repoRoot: string): Promise<void
  * is valid JSON; always runs index migrations and `validateProject` (non-zero exit on validation errors).
  */
 export async function runInitFull(repoRoot: string): Promise<number> {
-  const cfg = await loadCommentrayConfig(repoRoot);
-  const storage = path.join(repoRoot, cfg.storageDir);
-  await fs.mkdir(path.join(storage, "source"), { recursive: true });
-  await fs.mkdir(path.join(storage, "metadata"), { recursive: true });
-
-  const indexPath = path.join(repoRoot, defaultMetadataIndexPath());
-  if (!(await pathExists(indexPath))) {
-    await writeIndex(repoRoot, emptyIndex());
-    console.log(`Created ${defaultMetadataIndexPath()}.`);
-  }
-
+  let init;
   try {
-    const { changed } = await refreshIndexMigrationsOnDisk(repoRoot);
-    if (changed) {
-      console.log(
-        `Updated ${defaultMetadataIndexPath()} (schema migration and/or snippet normalization).`,
-      );
-    }
+    init = await initializeCommentrayProject(repoRoot, {
+      ensureSiteGitignore: true,
+      runValidation: true,
+    });
   } catch (e) {
     logCliError(
       `Could not load or migrate ${defaultMetadataIndexPath()}: ${e instanceof Error ? e.message : String(e)}`,
@@ -228,25 +155,28 @@ export async function runInitFull(repoRoot: string): Promise<number> {
     return 1;
   }
 
-  const tomlPath = path.join(repoRoot, ".commentray.toml");
-  let createdToml = false;
-  try {
-    await fs.stat(tomlPath);
-  } catch {
-    await fs.writeFile(tomlPath, DEFAULT_COMMENTRAY_TOML, "utf8");
-    createdToml = true;
+  if (init.createdIndex) {
+    console.log(`Created ${defaultMetadataIndexPath()}.`);
   }
-  if (createdToml) {
+  if (init.migratedIndex) {
+    console.log(
+      `Updated ${defaultMetadataIndexPath()} (schema migration and/or snippet normalization).`,
+    );
+  }
+  if (init.createdToml) {
     console.log("Created .commentray.toml with commented defaults.");
+  }
+  if (init.addedSiteGitignore) {
+    console.log("Updated .gitignore (added _site).");
   }
 
   await initVscodeExtensionRecommendation(repoRoot);
 
-  const validation = await validateProject(repoRoot);
-  for (const issue of validation.issues) {
+  for (const issue of init.validationIssues) {
     logCliValidationIssue(issue);
   }
-  const hasError = validation.issues.some((i: ValidationIssue) => i.level === "error");
+  const cfg = await loadCommentrayConfig(repoRoot);
+  const hasError = init.validationIssues.some((i: ValidationIssue) => i.level === "error");
 
   console.log(`Initialized Commentray storage under ${cfg.storageDir}`);
   return hasError ? 1 : 0;

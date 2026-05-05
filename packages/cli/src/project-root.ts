@@ -1,5 +1,6 @@
-import fs from "node:fs/promises";
 import path from "node:path";
+
+import { pathExists } from "@commentray/core";
 
 /**
  * How a project root was located. `config` means a `.commentray.toml` was
@@ -12,15 +13,6 @@ export type ProjectRoot = {
   dir: string;
   source: ProjectRootSource;
 };
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function walkUpFor(startDir: string, marker: string): Promise<string | null> {
   let dir = path.resolve(startDir);

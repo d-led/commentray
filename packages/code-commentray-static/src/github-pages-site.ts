@@ -8,6 +8,7 @@ import {
   type ResolvedStaticSite,
   loadCommentrayConfig,
   readIndex,
+  resolveCommentrayMarkdownPath,
   resolvePathUnderRepoRoot,
   staticBrowseIndexRelPathFromPair,
 } from "@commentray/core";
@@ -95,6 +96,12 @@ function browseBlockStretchRowsOpts(
   projectIndex: CommentrayIndex | null,
   p: { sourcePath: string; commentrayPath: string },
 ): Pick<BuildCommentrayStaticOptions, "blockStretchRows"> | undefined {
+  const sourceLower = p.sourcePath.trim().toLowerCase();
+  const sourceIsMarkdown =
+    sourceLower.endsWith(".md") ||
+    sourceLower.endsWith(".mdx") ||
+    sourceLower.endsWith(".markdown");
+  if (sourceIsMarkdown) return undefined;
   const blockStretchRows = blockStretchRowsForDocumentedPair(
     projectIndex,
     p.sourcePath,
@@ -471,16 +478,21 @@ export async function buildGithubPagesStaticSite(
     projectIndex,
     ghNavBase,
   );
-  const fileMarkdown = multiAngleBrowsing ? "" : await readFlatCompanionMarkdown(repoRoot, ss);
+  const fileMarkdown = multiAngleBrowsing ? "" : await readFlatCompanionMarkdown(repoRoot, cfg, ss);
   const commentrayBody = pickCommentrayBody(multiAngleBrowsing, ss.introMarkdown, fileMarkdown);
   const tmpMd = path.join(tmpdir(), `commentray-pages-${process.pid}.md`);
   await writeFile(tmpMd, commentrayBody, "utf8");
 
   const outDir = path.join(repoRoot, "_site");
   const outHtml = path.join(outDir, "index.html");
+  const resolvedDefaultCommentrayRel = resolveCommentrayMarkdownPath(
+    repoRoot,
+    ss.sourceFile,
+    cfg,
+  ).commentrayPath;
   const defaultCommentrayRel = pickDefaultCommentrayRel(
     multiAngleBrowsing,
-    ss.commentrayMarkdownFile,
+    ss.commentrayMarkdownFile?.trim() || resolvedDefaultCommentrayRel,
   );
   const markdownUrlBaseDirAbs = defaultCommentrayRel
     ? path.join(repoRoot, path.dirname(defaultCommentrayRel))

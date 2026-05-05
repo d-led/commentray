@@ -1,8 +1,12 @@
 import * as assert from "node:assert";
-import { before, beforeEach } from "mocha";
+import { afterEach, before, beforeEach } from "mocha";
 import * as vscode from "vscode";
 
-export const pairedMarkdownPath = ".commentray/source/src/sample.ts.md";
+export const pairedMarkdownPath = ".commentray/source/src/sample.ts/main.md";
+
+const DOGFOOD_INTEGRATION_MARKDOWN_SOURCE_BYTES = new TextEncoder().encode(
+  ["# Markdown source fixture", "", "alpha", "beta", "gamma", ""].join("\n"),
+);
 
 /** Tracked `fixtures/dogfood/src/sample.ts` (restored each test so “add block” region wraps do not accumulate). */
 const DOGFOOD_SAMPLE_TS_BYTES = new TextEncoder().encode(
@@ -31,6 +35,20 @@ export type DogfoodWorkspaceAccessor = {
   root(): vscode.Uri;
 };
 
+async function restoreDogfoodMutableFixtures(workspaceRoot: vscode.Uri): Promise<void> {
+  const sampleUri = vscode.Uri.joinPath(workspaceRoot, "src", "sample.ts");
+  await vscode.workspace.fs.writeFile(sampleUri, DOGFOOD_SAMPLE_TS_BYTES);
+  const integrationMarkdownSourceUri = vscode.Uri.joinPath(
+    workspaceRoot,
+    "docs",
+    "integration-markdown-source.md",
+  );
+  await vscode.workspace.fs.writeFile(
+    integrationMarkdownSourceUri,
+    DOGFOOD_INTEGRATION_MARKDOWN_SOURCE_BYTES,
+  );
+}
+
 /**
  * Registers suite-level `before` / `beforeEach` that resolve the dogfood folder and reset `.commentray/`.
  */
@@ -41,8 +59,10 @@ export function registerDogfoodWorkspaceLifecycle(): DogfoodWorkspaceAccessor {
   });
   beforeEach(async () => {
     await resetGeneratedCommentrayStorage(workspaceRoot);
-    const sampleUri = vscode.Uri.joinPath(workspaceRoot, "src", "sample.ts");
-    await vscode.workspace.fs.writeFile(sampleUri, DOGFOOD_SAMPLE_TS_BYTES);
+    await restoreDogfoodMutableFixtures(workspaceRoot);
+  });
+  afterEach(async () => {
+    await restoreDogfoodMutableFixtures(workspaceRoot);
   });
   return {
     root: () => workspaceRoot,

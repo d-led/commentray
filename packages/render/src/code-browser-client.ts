@@ -1267,17 +1267,15 @@ function scrollDocToMarkdownLine0(
 ): void {
   const el = docScrollEl.querySelector(`#commentray-md-line-${String(line0)}`);
   if (el instanceof HTMLElement) {
-    const top = Math.round(
-      scrollTopToAlignChildTop(docScrollEl, el, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX),
-    );
-    const maxY = Math.round(Math.max(0, docScrollEl.scrollHeight - docScrollEl.clientHeight));
-    docScrollEl.scrollTo({ top: clamp(top, 0, maxY), behavior: "smooth" });
+    applyRevealChildInPane(docScrollEl, el, DUAL_PANE_BLOCK_REVEAL_LEAD_CSS_PX);
     return;
   }
   if (mdLineCount <= 1) return;
-  const ratio = line0 / Math.max(1, mdLineCount - 1);
-  const maxScroll = Math.max(0, docScrollEl.scrollHeight - docScrollEl.clientHeight);
-  docScrollEl.scrollTo({ top: ratio * maxScroll, behavior: "smooth" });
+  const lineClamped = clamp(line0, 0, Math.max(0, mdLineCount - 1));
+  const scrollTarget = paneUsesInternalYScroll(docScrollEl) ? docScrollEl : rootScrollingElement();
+  const maxScroll = Math.max(0, scrollTarget.scrollHeight - scrollTarget.clientHeight);
+  const top = clamp((lineClamped / Math.max(1, mdLineCount - 1)) * maxScroll, 0, maxScroll);
+  scrollTarget.scrollTo({ top, behavior: "smooth" });
 }
 
 function navigateToDocumentedPair(pair: DocumentedPairNav, mdLine0: number | null): void {
@@ -1418,7 +1416,10 @@ function handlePathSearchHit(button: HTMLElement, deps: SearchHitClickDeps): voi
   const hitSp = (button.getAttribute("data-sp-path") ?? "").trim();
   const pair = findDocumentedPair(deps.mutable.documentedPairs, hitCr, hitSp);
   if (pair && isSameDocumentedPair(pair, deps.filePathLabel, deps.mutable.commentrayPathLabel)) {
-    deps.docScrollEl.scrollTo({ top: 0, behavior: "smooth" });
+    const scrollTarget = paneUsesInternalYScroll(deps.docScrollEl)
+      ? deps.docScrollEl
+      : rootScrollingElement();
+    scrollTarget.scrollTo({ top: 0, behavior: "smooth" });
     return;
   }
   if (pair) navigateToDocumentedPair(pair, null);
@@ -4097,6 +4098,31 @@ function initialCommentrayScopePathState(
   return { documentedPairs, pathRowsForOrdering, pathBlobWide };
 }
 
+function effectiveCommentrayPathLabelFromDocumentedPairs(
+  scope: SearchScope,
+  filePathLabel: string,
+  commentrayPathLabel: string,
+  documentedPairs: DocumentedPairNav[],
+): string {
+  if (scope !== "commentray-and-paths") return commentrayPathLabel;
+  const sourcePath = filePathLabel.trim();
+  if (sourcePath.length === 0) return commentrayPathLabel;
+  const pair = findDocumentedPair(documentedPairs, "", sourcePath);
+  if (!pair) return commentrayPathLabel;
+
+  const fromShell = commentrayPathLabel.trim();
+  const fromPair = pair.commentrayPath.trim();
+  if (fromPair.length === 0) return commentrayPathLabel;
+  if (fromShell.length === 0) return fromPair;
+
+  // Older hub HTML can carry placeholder `commentray.md` while documentedPairs already has the real path.
+  if (normPosixPath(fromShell) === "commentray.md" && normPosixPath(fromPair) !== "commentray.md") {
+    return fromPair;
+  }
+
+  return commentrayPathLabel;
+}
+
 type DualPaneSearchIndexState = {
   hubNavRows: Row[];
   documentedPairs: DocumentedPairNav[];
@@ -4446,6 +4472,20 @@ function buildDualPaneSearcherBundle(
     filePathLabel,
     commentrayPathLabel,
   );
+  const effectiveCommentrayPathLabel = effectiveCommentrayPathLabelFromDocumentedPairs(
+    scope,
+    filePathLabel,
+    commentrayPathLabel,
+    pathInit.documentedPairs,
+  );
+  if (effectiveCommentrayPathLabel.trim().length > 0) {
+    shell.setAttribute("data-search-commentray-path", effectiveCommentrayPathLabel);
+    const docPathEl = document.getElementById("nav-rail-doc-path");
+    if (docPathEl) {
+      docPathEl.textContent = effectiveCommentrayPathLabel;
+      docPathEl.setAttribute("title", effectiveCommentrayPathLabel);
+    }
+  }
   const indexState: DualPaneSearchIndexState = {
     hubNavRows: [],
     documentedPairs: pathInit.documentedPairs,
@@ -4455,7 +4495,7 @@ function buildDualPaneSearcherBundle(
   const mutable: MutableSearchFields = {
     rawMd,
     mdLines: rawMd.split("\n"),
-    commentrayPathLabel,
+    commentrayPathLabel: effectiveCommentrayPathLabel,
     searcher: indexSearchLineRows([]),
     pathBlobWide: pathInit.pathBlobWide,
     pathRowsForOrdering: indexState.pathRowsForOrdering,
@@ -4483,7 +4523,7 @@ function buildDualPaneSearcherBundle(
     scrollLinksRef,
     scope,
     filePathLabel,
-    commentrayPathLabel,
+    commentrayPathLabel: effectiveCommentrayPathLabel,
     pathInit,
     indexState,
     mutable,

@@ -23,12 +23,23 @@ export function commentrayActiveEditorUiFlags(input: {
   normalizedRepoRelativePath: string;
   storageDir: string;
   repoRoot: string;
+  staticSiteCommentrayMarkdownFile?: string;
 }): CommentrayActiveEditorUiFlags {
   const normalized = normalizeRepoRelativePath(
     input.normalizedRepoRelativePath.replaceAll("\\", "/"),
   );
+  const configuredStaticCompanion = input.staticSiteCommentrayMarkdownFile
+    ? normalizeRepoRelativePath(input.staticSiteCommentrayMarkdownFile.replaceAll("\\", "/"))
+    : "";
   const sourcePrefix = commentrayStorageSourcePrefix(input.storageDir);
   if (!normalized.startsWith(sourcePrefix)) {
+    if (
+      configuredStaticCompanion.length > 0 &&
+      normalized === configuredStaticCompanion &&
+      normalized.endsWith(".md")
+    ) {
+      return { underCompanionSourceTree: true, isResolvableCompanionMarkdown: true };
+    }
     return { underCompanionSourceTree: false, isResolvableCompanionMarkdown: false };
   }
   const relFromSourceDir = normalized.slice(sourcePrefix.length);
