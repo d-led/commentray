@@ -74,6 +74,17 @@ The core library computes lightweight diagnostics:
 
 These diagnostics are designed to be surfaced in editors and CI without silently rewriting commentray content.
 
+## VS Code Add-Block Resilience (normative)
+
+When users run `Commentray: Add commentary block from selection`, extension behavior is:
+
+- If the selection touches an existing marker boundary line (`#region commentray:...`, `commentray:start id=...`, etc.), the extension should treat that as intent to continue working on the existing block: keep source unchanged, reveal the existing companion block, and recover the companion/index entry if source markers exist but companion metadata drifted.
+- If the selection is fully inside an already marked region, the extension should keep source unchanged and reveal the existing companion block rather than creating a duplicate block.
+- Marker ids are suggested by naming strategy, but the extension must de-duplicate against existing source markers, companion block ids, and current index entries for that companion path. On collision, choose a new valid id instead of failing.
+- For Markdown primary files, selections that intersect fenced code blocks are unrecoverable: the command must stop with a regular VS Code warning toast and must not mutate source, companion, or index.
+- Unexpected failures must be surfaced via normal VS Code error messages (`showErrorMessage`) rather than uncaught JS exceptions.
+- Companion insertion must preserve all existing companion content; it must not replace or remove scaffold placeholder text automatically.
+
 ## See also
 
 - [Keeping blocks, regions, and metadata consistent](../user/keeping-blocks-in-sync.md) — checklists, CLI commands, and workflows after renames or refactors.

@@ -6,6 +6,7 @@
  * (“given / when / then”) without naming internal implementation details.
  */
 import * as assert from "node:assert";
+import * as path from "node:path";
 import * as vscode from "vscode";
 
 import {
@@ -64,6 +65,28 @@ async function openSideBySideAndReadPairedText(
   const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
   const bytes = await vscode.workspace.fs.readFile(pairedUri);
   return new TextDecoder("utf-8").decode(bytes);
+}
+
+async function replaceDocumentText(uri: vscode.Uri, text: string): Promise<void> {
+  try {
+    await vscode.workspace.fs.stat(uri);
+  } catch {
+    const parent = path.dirname(uri.fsPath);
+    await vscode.workspace.fs.createDirectory(vscode.Uri.file(parent));
+    await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(""));
+  }
+  const doc = await vscode.workspace.openTextDocument(uri);
+  const edit = new vscode.WorkspaceEdit();
+  const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
+  edit.replace(uri, fullRange, text);
+  await vscode.workspace.applyEdit(edit);
+  await doc.save();
+}
+
+async function writeTextFileDirect(uri: vscode.Uri, text: string): Promise<void> {
+  const parent = path.dirname(uri.fsPath);
+  await vscode.workspace.fs.createDirectory(vscode.Uri.file(parent));
+  await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
 }
 
 function registerOpenPairedMarkdownTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
@@ -171,6 +194,10 @@ async function assertTypescriptSelectionBlockFlow(
 ): Promise<void> {
   await vscode.commands.executeCommand("commentray.init");
   const editor = await openFixtureSourceFile(dogfoodWorkspace.root());
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+  const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
+  const beforeText = new TextDecoder("utf-8").decode(await vscode.workspace.fs.readFile(pairedUri));
+  await vscode.window.showTextDocument(editor.document, { preview: false });
   const doc = editor.document;
   const start = new vscode.Position(5, 0);
   const end = doc.lineAt(7).range.end;
@@ -188,7 +215,6 @@ async function assertTypescriptSelectionBlockFlow(
     "Expected TypeScript Commentray region delimiters around the selection in the primary file.",
   );
 
-  const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
   const mdBytes = await vscode.workspace.fs.readFile(pairedUri);
   const mdText = new TextDecoder("utf-8").decode(mdBytes);
   assert.ok(
@@ -196,8 +222,8 @@ async function assertTypescriptSelectionBlockFlow(
     "Expected block marker in paired Markdown.",
   );
   assert.ok(
-    !mdText.includes("Write documentation for src/sample.ts here."),
-    "Expected default placeholder guidance removed after first authored block.",
+    mdText.includes(beforeText.trim()),
+    "Expected pre-existing companion text preserved after first authored block.",
   );
 
   const indexUri = vscode.Uri.joinPath(
@@ -222,9 +248,21 @@ async function assertMarkdownSelectionBlockFlow(
     "integration-markdown-source.md",
   );
   const sourceContent = ["# Markdown source fixture", "", "alpha", "beta", "gamma", ""].join("\n");
-  await vscode.workspace.fs.writeFile(sourceUri, new TextEncoder().encode(sourceContent));
+  await replaceDocumentText(sourceUri, sourceContent);
   const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
   const sourceEditor = await vscode.window.showTextDocument(sourceDoc, { preview: false });
+
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+  const pairedUri = vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    ".commentray",
+    "source",
+    "docs",
+    "integration-markdown-source.md",
+    "main.md",
+  );
+  const beforeText = new TextDecoder("utf-8").decode(await vscode.workspace.fs.readFile(pairedUri));
+  await vscode.window.showTextDocument(sourceDoc, { preview: false });
 
   sourceEditor.selection = new vscode.Selection(
     new vscode.Position(2, 0),
@@ -242,22 +280,14 @@ async function assertMarkdownSelectionBlockFlow(
     "Expected Markdown end region marker in primary source.",
   );
 
-  const pairedUri = vscode.Uri.joinPath(
-    dogfoodWorkspace.root(),
-    ".commentray",
-    "source",
-    "docs",
-    "integration-markdown-source.md",
-    "main.md",
-  );
   const pairedText = new TextDecoder("utf-8").decode(await vscode.workspace.fs.readFile(pairedUri));
   const markerMatch = /<!--\s*commentray:block\s+id=([a-z0-9][a-z0-9-]{0,63})\s*-->/i.exec(
     pairedText,
   );
   assert.ok(markerMatch?.[1], "Expected block marker id in paired Markdown.");
   assert.ok(
-    !pairedText.includes("Write documentation for docs/integration-markdown-source.md here."),
-    "Expected default placeholder guidance removed after first authored block.",
+    pairedText.includes(beforeText.trim()),
+    "Expected pre-existing companion text preserved after first authored block.",
   );
   const blockId = markerMatch?.[1] ?? "";
 
@@ -275,6 +305,346 @@ async function assertMarkdownSelectionBlockFlow(
   );
 }
 
+async function assertManualCompanionContentIsPreservedOnAddBlock(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): Promise<void> {
+  await vscode.commands.executeCommand("commentray.init");
+
+  const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "manual-preserve.ts");
+  const sourceContent = [
+    "export function top(): number {",
+    "  return 1;",
+    "}",
+    "",
+    "export function bottom(): number {",
+    "  return 2;",
+    "}",
+    "",
+  ].join("\n");
+  await replaceDocumentText(sourceUri, sourceContent);
+  const editor = await vscode.window.showTextDocument(
+    await vscode.workspace.openTextDocument(sourceUri),
+    {
+      preview: false,
+    },
+  );
+
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+  const pairedUri = vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    ".commentray",
+    "source",
+    "src",
+    "manual-preserve.ts",
+    "main.md",
+  );
+  const custom = [
+    "# custom",
+    "",
+    "manual intro text",
+    "",
+    "<!-- commentray:block id=existing -->",
+    "## existing",
+    "",
+    "existing block body",
+    "",
+  ].join("\n");
+  await replaceDocumentText(pairedUri, custom);
+
+  await vscode.window.showTextDocument(editor.document, { preview: false });
+  editor.selection = new vscode.Selection(new vscode.Position(4, 0), new vscode.Position(5, 12));
+  await vscode.commands.executeCommand("commentray.startBlockFromSelection");
+
+  const next = new TextDecoder("utf-8").decode(await vscode.workspace.fs.readFile(pairedUri));
+  assert.ok(next.includes("manual intro text"), "Expected manual prose preserved.");
+  assert.ok(next.includes("existing block body"), "Expected existing block body preserved.");
+  assert.ok(
+    next.includes("<!-- commentray:block id=existing -->"),
+    "Expected existing block marker preserved.",
+  );
+}
+
+async function assertSelectionInsideExistingRegionRevealsExistingBlock(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): Promise<void> {
+  await vscode.commands.executeCommand("commentray.init");
+  const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts");
+  const withRegion = [
+    "export function greet(name: string): string {",
+    "  //#region commentray:greet",
+    "  const x = `Hello, ${name}!`;",
+    "  //#endregion commentray:greet",
+    "  return x;",
+    "}",
+    "",
+    "export function farewell(name: string): string {",
+    "  return `Goodbye, ${name}.`;",
+    "}",
+    "",
+  ].join("\n");
+  await replaceDocumentText(sourceUri, withRegion);
+
+  const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
+  const pairedBefore = [
+    "<!-- commentray:block id=greet -->",
+    "## greet",
+    "",
+    "already documented",
+    "",
+  ].join("\n");
+  await writeTextFileDirect(pairedUri, pairedBefore);
+
+  const doc = await vscode.workspace.openTextDocument(sourceUri);
+  const ed = await vscode.window.showTextDocument(doc, { preview: false });
+  ed.selection = new vscode.Selection(new vscode.Position(2, 2), new vscode.Position(2, 20));
+
+  await vscode.commands.executeCommand("commentray.startBlockFromSelection");
+
+  const sourceAfter = (await vscode.workspace.openTextDocument(sourceUri)).getText();
+  assert.strictEqual(
+    sourceAfter,
+    withRegion,
+    "Expected source unchanged when selection is in region.",
+  );
+  const pairedAfter = new TextDecoder("utf-8").decode(
+    await vscode.workspace.fs.readFile(pairedUri),
+  );
+  assert.strictEqual(
+    pairedAfter,
+    pairedBefore,
+    "Expected companion unchanged when selection is in existing region.",
+  );
+  assert.strictEqual(
+    vscode.window.activeTextEditor?.document.uri.fsPath,
+    pairedUri.fsPath,
+    "Expected add-block inside an existing region to focus the existing companion block.",
+  );
+}
+
+async function assertSelectionTouchingBoundaryRecoversMissingBlock(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): Promise<void> {
+  await vscode.commands.executeCommand("commentray.init");
+  const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts");
+  const withRegion = [
+    "export function greet(name: string): string {",
+    "  //#region commentray:greet",
+    "  const x = `Hello, ${name}!`;",
+    "  //#endregion commentray:greet",
+    "  return x;",
+    "}",
+    "",
+  ].join("\n");
+  await replaceDocumentText(sourceUri, withRegion);
+
+  const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
+  const pairedBefore = ["# custom", ""].join("\n");
+  await writeTextFileDirect(pairedUri, pairedBefore);
+  await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+
+  const doc = await vscode.workspace.openTextDocument(sourceUri);
+  const ed = await vscode.window.showTextDocument(doc, { preview: false });
+  ed.selection = new vscode.Selection(new vscode.Position(1, 2), new vscode.Position(1, 20));
+
+  await vscode.commands.executeCommand("commentray.startBlockFromSelection");
+
+  const sourceAfter = (await vscode.workspace.openTextDocument(sourceUri)).getText();
+  assert.strictEqual(
+    sourceAfter,
+    withRegion,
+    "Expected source unchanged when reusing boundary block.",
+  );
+
+  const pairedAfter = vscode.window.activeTextEditor?.document.getText() ?? "";
+  assert.ok(
+    pairedAfter.includes("<!-- commentray:block id=greet -->"),
+    "Expected missing companion block to be recovered from existing source marker.",
+  );
+  assert.strictEqual(
+    vscode.window.activeTextEditor?.document.uri.fsPath,
+    pairedUri.fsPath,
+    "Expected boundary selection to focus the recovered companion block.",
+  );
+}
+
+async function assertMarkdownFenceSelectionDoesNotMutate(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): Promise<void> {
+  await vscode.commands.executeCommand("commentray.init");
+
+  const sourceUri = vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    "docs",
+    "integration-markdown-source.md",
+  );
+  const sourceContent = ["# Markdown source fixture", "", "```ts", "const x = 1;", "```", ""].join(
+    "\n",
+  );
+  await replaceDocumentText(sourceUri, sourceContent);
+  const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+  await vscode.window.showTextDocument(sourceDoc, { preview: false });
+
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+  const pairedUri = vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    ".commentray",
+    "source",
+    "docs",
+    "integration-markdown-source.md",
+    "main.md",
+  );
+  const pairedBefore = new TextDecoder("utf-8").decode(
+    await vscode.workspace.fs.readFile(pairedUri),
+  );
+  const activeSourceEditor = await vscode.window.showTextDocument(sourceDoc, { preview: false });
+
+  activeSourceEditor.selection = new vscode.Selection(
+    new vscode.Position(3, 0),
+    new vscode.Position(3, 12),
+  );
+  await vscode.commands.executeCommand("commentray.startBlockFromSelection");
+
+  const sourceAfter = (await vscode.workspace.openTextDocument(sourceUri)).getText();
+  assert.strictEqual(
+    sourceAfter,
+    sourceContent,
+    "Expected fenced Markdown source to remain unchanged.",
+  );
+  const pairedAfter = new TextDecoder("utf-8").decode(
+    await vscode.workspace.fs.readFile(pairedUri),
+  );
+  assert.strictEqual(
+    pairedAfter,
+    pairedBefore,
+    "Expected companion unchanged for fenced Markdown selections.",
+  );
+}
+
+async function assertStaleIndexMarkerIdCollisionIsHandled(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): Promise<void> {
+  await vscode.commands.executeCommand("commentray.init");
+  const editor = await openFixtureSourceFile(dogfoodWorkspace.root());
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+
+  const indexUri = vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    ".commentray",
+    "metadata",
+    "index.json",
+  );
+  const indexRaw = new TextDecoder("utf-8").decode(await vscode.workspace.fs.readFile(indexUri));
+  const index = JSON.parse(indexRaw) as {
+    schemaVersion: number;
+    byCommentrayPath: Record<
+      string,
+      { sourcePath: string; commentrayPath: string; blocks: Array<Record<string, unknown>> }
+    >;
+  };
+  const entry = index.byCommentrayPath[pairedMarkdownPath];
+  index.byCommentrayPath[pairedMarkdownPath] = {
+    ...(entry ? { ...entry } : {}),
+    sourcePath: "src/sample.ts",
+    commentrayPath: pairedMarkdownPath,
+    blocks: [{ id: "greet", anchor: "marker:greet", markerId: "greet" }],
+  };
+  await vscode.workspace.fs.writeFile(
+    indexUri,
+    new TextEncoder().encode(`${JSON.stringify(index)}\n`),
+  );
+
+  await vscode.window.showTextDocument(editor.document, { preview: false });
+
+  editor.selection = new vscode.Selection(new vscode.Position(8, 0), new vscode.Position(10, 1));
+  await vscode.commands.executeCommand("commentray.startBlockFromSelection");
+
+  const sourceAfter = editor.document.getText();
+  const markerMatch = /commentray:([a-z0-9][a-z0-9_-]{0,62}[a-z0-9])/i.exec(sourceAfter);
+  assert.ok(markerMatch?.[1], "Expected an inserted marker id in source.");
+  assert.notStrictEqual(
+    markerMatch?.[1],
+    "greet",
+    "Expected stale-index id collision to be avoided.",
+  );
+}
+
+async function assertUnsortedInsertionsReorderedBySourceFlow(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+): Promise<void> {
+  await vscode.commands.executeCommand("commentray.init");
+
+  const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts");
+  const sourceContent = [
+    "export function greet(name: string): string {",
+    "  return `Hello, ${name}!`;",
+    "}",
+    "",
+    "export function farewell(name: string): string {",
+    "  //#region commentray:farewell",
+    "  return `Goodbye, ${name}.`;",
+    "  //#endregion commentray:farewell",
+    "}",
+    "",
+  ].join("\n");
+  await replaceDocumentText(sourceUri, sourceContent);
+
+  const pairedUri = vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    ".commentray",
+    "source",
+    "src",
+    "sample.ts",
+    "main.md",
+  );
+  const pairedSeed = [
+    "# custom",
+    "",
+    "<!-- commentray:block id=farewell -->",
+    "## farewell",
+    "",
+    "bottom block",
+    "",
+  ].join("\n");
+  await writeTextFileDirect(pairedUri, pairedSeed);
+
+  await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+  const editor = await vscode.window.showTextDocument(
+    await vscode.workspace.openTextDocument(sourceUri),
+    {
+      preview: false,
+    },
+  );
+
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+  await vscode.window.showTextDocument(editor.document, { preview: false });
+
+  const markdownOrder = async (): Promise<string[]> => {
+    const text = new TextDecoder("utf-8").decode(await vscode.workspace.fs.readFile(pairedUri));
+    return import("../../../../core/dist/marker-validation.js").then((m) =>
+      m.extractCommentrayBlockIdsInMarkdownOrder(text),
+    );
+  };
+
+  const idsBefore = await markdownOrder();
+  assert.ok(idsBefore.includes("farewell"), "Expected pre-seeded bottom block marker.");
+
+  // Add top block after a pre-existing bottom block.
+  editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 28));
+  await vscode.window.showTextDocument(editor.document, { preview: false });
+  await vscode.commands.executeCommand("commentray.startBlockFromSelection");
+
+  const idsAfter = await markdownOrder();
+  const insertedTopId = idsAfter.find((id) => id !== "farewell") ?? "";
+  assert.ok(insertedTopId.length > 0, "Expected newly inserted top block marker id.");
+  const topIdx = idsAfter.indexOf(insertedTopId);
+  const bottomIdx = idsAfter.indexOf("farewell");
+  assert.ok(topIdx >= 0 && bottomIdx >= 0, "Expected top and bottom block markers in companion.");
+  assert.ok(
+    topIdx < bottomIdx,
+    "Expected top block (inserted after a bottom block) to be ordered before the existing bottom block.",
+  );
+}
+
 function registerAddBlockFromSelectionTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
   describe("Add commentary block from selection", () => {
     it('Given a source file with a non-empty selection, when the user runs "Commentray: Add commentary block from selection", then the paired Markdown gains a `commentray:block` marker and the metadata index is updated.', async function () {
@@ -285,6 +655,36 @@ function registerAddBlockFromSelectionTests(dogfoodWorkspace: DogfoodWorkspaceAc
     it("Given a Markdown primary source selection, when add-block runs, then paired HTML region markers are inserted and the index anchor uses marker:<id> for that source.", async function () {
       this.timeout(90_000);
       await assertMarkdownSelectionBlockFlow(dogfoodWorkspace);
+    });
+
+    it("Given manually-authored companion prose, when add-block runs, then existing companion content is preserved and a new block is inserted.", async function () {
+      this.timeout(90_000);
+      await assertManualCompanionContentIsPreservedOnAddBlock(dogfoodWorkspace);
+    });
+
+    it("Given selection is inside an existing region, when add-block runs, then source remains unchanged and the existing companion block is focused.", async function () {
+      this.timeout(90_000);
+      await assertSelectionInsideExistingRegionRevealsExistingBlock(dogfoodWorkspace);
+    });
+
+    it("Given selection touches an existing marker boundary and the companion block is missing, when add-block runs, then the block is recovered without mutating source.", async function () {
+      this.timeout(90_000);
+      await assertSelectionTouchingBoundaryRecoversMissingBlock(dogfoodWorkspace);
+    });
+
+    it("Given stale index already claims the preferred marker id, when add-block runs, then a unique marker id is chosen instead of failing.", async function () {
+      this.timeout(90_000);
+      await assertStaleIndexMarkerIdCollisionIsHandled(dogfoodWorkspace);
+    });
+
+    it("Given blocks are authored out-of-order (bottom then top), when add-block runs twice, then companion block order still follows source flow.", async function () {
+      this.timeout(90_000);
+      await assertUnsortedInsertionsReorderedBySourceFlow(dogfoodWorkspace);
+    });
+
+    it("Given a Markdown fenced code selection, when add-block runs, then source and companion remain unchanged.", async function () {
+      this.timeout(90_000);
+      await assertMarkdownFenceSelectionDoesNotMutate(dogfoodWorkspace);
     });
   });
 }

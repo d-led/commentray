@@ -47,6 +47,17 @@ async function restoreDogfoodMutableFixtures(workspaceRoot: vscode.Uri): Promise
     integrationMarkdownSourceUri,
     DOGFOOD_INTEGRATION_MARKDOWN_SOURCE_BYTES,
   );
+  const generatedFixtureUris = [
+    vscode.Uri.joinPath(workspaceRoot, "src", "manual-preserve.ts"),
+    vscode.Uri.joinPath(workspaceRoot, "src", "unsorted-order.ts"),
+  ];
+  for (const uri of generatedFixtureUris) {
+    try {
+      await vscode.workspace.fs.delete(uri, { useTrash: false });
+    } catch {
+      // Missing file is fine.
+    }
+  }
 }
 
 /**
@@ -58,10 +69,12 @@ export function registerDogfoodWorkspaceLifecycle(): DogfoodWorkspaceAccessor {
     workspaceRoot = dogfoodWorkspaceRoot();
   });
   beforeEach(async () => {
+    await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     await resetGeneratedCommentrayStorage(workspaceRoot);
     await restoreDogfoodMutableFixtures(workspaceRoot);
   });
   afterEach(async () => {
+    await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     await restoreDogfoodMutableFixtures(workspaceRoot);
   });
   return {

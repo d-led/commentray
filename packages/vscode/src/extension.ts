@@ -4,27 +4,31 @@ import {
   type CommentrayIndex,
   addBlockToIndex,
   assertValidAngleId,
+  assertValidMarkerId,
   buildBlockScrollLinks,
   commentrayActiveEditorUiFlags,
   commentrayAnglesLayoutEnabled,
   commentrayAnglesSentinelPath,
-  companionPlaceholderMarkdown,
   commentrayStorageSourcePrefix,
   createBlockForRange,
   defaultMetadataIndexPath,
   defaultRegionMarkerNamingStrategy,
   emptyIndex,
   ensureAnglesSentinelFile,
+  extractCommentrayBlockIdsFromMarkdown,
+  findCommentrayMarkerPairs,
   initializeCommentrayProject,
   insertBlockBySourceMarkerOrder,
   isCommentrayProjectInitialized,
   loadCommentrayConfig,
   normalizeRepoRelativePath,
+  parseCommentrayRegionBoundary,
   pickCommentrayLineForSourceDualPane,
   pickSourceLine0ForCommentrayScroll,
   pairFromCommentraySourceRel,
   readIndex,
   resolveCommentrayMarkdownPath,
+  sourceLineRangeForMarkerId,
   upsertAngleDefinitionInCommentrayToml,
   validateProject,
   wrapSourceLineRangeWithCommentrayMarkers,
@@ -346,6 +350,146 @@ function fullLineBlockRange(editor: vscode.TextEditor): BlockRange {
   return { startLine: lo + 1, endLine: hi + 1 };
 }
 
+function selectedRangeTouchesMarkerBoundary(sourceText: string, range: BlockRange): string | null {
+  const lines = sourceText.replaceAll("\r\n", "\n").split("\n");
+  const start0 = Math.max(0, range.startLine - 1);
+  const end0 = Math.min(lines.length - 1, range.endLine - 1);
+  for (let i = start0; i <= end0; i++) {
+    const hit = parseCommentrayRegionBoundary(lines[i] ?? "");
+    if (hit) return hit.id;
+  }
+  return null;
+}
+
+function selectedRangeInsideMarkerRegion(sourceText: string, range: BlockRange): string | null {
+  const lines = sourceText.replaceAll("\r\n", "\n").split("\n");
+  const start0 = Math.max(0, range.startLine - 1);
+  const end0 = Math.min(lines.length - 1, range.endLine - 1);
+
+  for (const pair of findCommentrayMarkerPairs(sourceText)) {
+    const innerStart = pair.startLine0 + 2;
+    const innerEnd = pair.endLine0;
+    if (innerEnd < innerStart) continue;
+    if (range.startLine >= innerStart && range.endLine <= innerEnd) return pair.id;
+  }
+
+  // Fallback for partially edited/unbalanced files: if selected content lines are currently
+  // inside any open marker region, treat them as enclosed and refuse insertion.
+  const openIds = new Set<string>();
+  for (let i = 0; i < lines.length; i++) {
+    const hit = parseCommentrayRegionBoundary(lines[i] ?? "");
+    if (hit?.kind === "start") {
+      openIds.add(hit.id);
+      continue;
+    }
+    if (hit?.kind === "end") {
+      openIds.delete(hit.id);
+      continue;
+    }
+    if (i >= start0 && i <= end0 && openIds.size > 0) {
+      return [...openIds][0] ?? null;
+    }
+  }
+
+  return null;
+}
+
+function selectionIntersectsMarkdownFence(sourceText: string, range: BlockRange): boolean {
+  const lines = sourceText.replaceAll("\r\n", "\n").split("\n");
+  const start0 = Math.max(0, range.startLine - 1);
+  const end0 = Math.min(lines.length - 1, range.endLine - 1);
+  let inFence = false;
+  let activeFence: "```" | "~~~" | null = null;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const trimmed = (lines[i] ?? "").trimStart();
+    const fenceToken = trimmed.startsWith("```") ? "```" : trimmed.startsWith("~~~") ? "~~~" : null;
+    if (fenceToken !== null) {
+      if (i >= start0 && i <= end0) return true;
+      if (!inFence) {
+        inFence = true;
+        activeFence = fenceToken;
+      } else if (activeFence === fenceToken) {
+        inFence = false;
+        activeFence = null;
+      }
+      continue;
+    }
+    if (i >= start0 && i <= end0 && inFence) return true;
+  }
+
+  return false;
+}
+
+function markerIdFromAnchor(anchor: string): string | null {
+  const m = /^marker:([a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?)$/i.exec(anchor.trim());
+  if (!m?.[1]) return null;
+  try {
+    return assertValidMarkerId(m[1]);
+  } catch {
+    return null;
+  }
+}
+
+function collectUsedMarkerIds(input: {
+  sourceText: string;
+  existingCommentray: string;
+  index: CommentrayIndex | null;
+  commentrayPathRel: string;
+}): Set<string> {
+  const used = new Set<string>();
+  for (const pair of findCommentrayMarkerPairs(input.sourceText)) {
+    used.add(pair.id);
+  }
+  const lines = input.sourceText.replaceAll("\r\n", "\n").split("\n");
+  for (const line of lines) {
+    const hit = parseCommentrayRegionBoundary(line);
+    if (hit) used.add(hit.id);
+  }
+  for (const id of extractCommentrayBlockIdsFromMarkdown(input.existingCommentray)) {
+    used.add(id);
+  }
+  const indexed = input.index?.byCommentrayPath[input.commentrayPathRel];
+  for (const b of indexed?.blocks ?? []) {
+    if (typeof b.markerId === "string" && b.markerId.trim().length > 0) {
+      used.add(b.markerId.trim().toLowerCase());
+      continue;
+    }
+    if (typeof b.anchor === "string") {
+      const mid = markerIdFromAnchor(b.anchor);
+      if (mid) used.add(mid);
+    }
+  }
+  return used;
+}
+
+function chooseUniqueMarkerId(preferred: string, used: Set<string>): string {
+  const base = preferred.trim().toLowerCase();
+  if (base.length > 0 && !used.has(base)) return base;
+
+  for (let i = 2; i <= 999; i++) {
+    const candidate = `${base}-${String(i)}`;
+    try {
+      const valid = assertValidMarkerId(candidate);
+      if (!used.has(valid)) return valid;
+    } catch {
+      continue;
+    }
+  }
+
+  for (let i = 0; i < 999; i++) {
+    const rand = Math.random().toString(36).slice(2, 8);
+    const candidate = `block-${rand}`;
+    try {
+      const valid = assertValidMarkerId(candidate);
+      if (!used.has(valid)) return valid;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("Could not generate a unique Commentray marker id for this selection.");
+}
+
 function scrollSyncEnabled(): boolean {
   const v = vscode.workspace.getConfiguration("commentray").get("scrollSync.enabled");
   return v !== false;
@@ -512,6 +656,189 @@ function findPlaceholderSelection(
   const start = doc.positionAt(placeholderIndex);
   const end = doc.positionAt(placeholderIndex + PLACEHOLDER_TEXT.length);
   return new vscode.Selection(start, end);
+}
+
+function findBlockMarkerSelection(
+  doc: vscode.TextDocument,
+  blockId: string,
+): vscode.Selection | null {
+  const marker = `<!-- commentray:block id=${blockId} -->`;
+  const text = doc.getText();
+  const markerIndex = text.indexOf(marker);
+  if (markerIndex < 0) return null;
+  const headingStart = text.indexOf("\n## ", markerIndex);
+  const start = doc.positionAt(markerIndex);
+  if (headingStart < 0) {
+    return new vscode.Selection(start, start);
+  }
+  const headingLineStart = headingStart + 1;
+  const headingLineEnd = text.indexOf("\n", headingLineStart);
+  const endOffset = headingLineEnd < 0 ? text.length : headingLineEnd;
+  return new vscode.Selection(start, doc.positionAt(endOffset));
+}
+
+async function ensureMarkerBlockPresent(args: {
+  markerId: string;
+  sourceText: string;
+  repoRoot: string;
+  sourceRelative: string;
+  commentrayPathRel: string;
+  commentrayDoc: vscode.TextDocument;
+}): Promise<void> {
+  const sourceRange = sourceLineRangeForMarkerId(args.sourceText, args.markerId);
+  if (sourceRange === null) {
+    throw new Error(
+      `Existing marker region "${args.markerId}" could not be resolved to source lines.`,
+    );
+  }
+
+  const existingCommentray = args.commentrayDoc.getText();
+  const markdownHasBlock = extractCommentrayBlockIdsFromMarkdown(existingCommentray).has(
+    args.markerId,
+  );
+  const created = createBlockForRange({
+    sourcePath: args.sourceRelative,
+    sourceText: args.sourceText,
+    range: { startLine: sourceRange.start, endLine: sourceRange.end },
+    id: args.markerId,
+  });
+
+  if (!markdownHasBlock) {
+    const nextContent = insertBlockBySourceMarkerOrder({
+      existingCommentray,
+      blockMarkdown: created.markdown,
+      sourceText: args.sourceText,
+      markerId: created.block.id,
+    });
+    const existingMarkers = [...extractCommentrayBlockIdsFromMarkdown(existingCommentray)];
+    const nextMarkers = extractCommentrayBlockIdsFromMarkdown(nextContent);
+    const lostMarker = existingMarkers.find((id) => !nextMarkers.has(id));
+    if (lostMarker) {
+      throw new Error(
+        `Refusing to recover block "${args.markerId}" because existing block marker "${lostMarker}" would be removed unexpectedly.`,
+      );
+    }
+    await replaceDocumentContents(args.commentrayDoc, nextContent);
+    await args.commentrayDoc.save();
+  }
+
+  const index = await readIndex(args.repoRoot);
+  const indexed = index?.byCommentrayPath[args.commentrayPathRel];
+  const indexHasBlock =
+    indexed?.blocks.some(
+      (block) =>
+        block.id === args.markerId ||
+        block.markerId === args.markerId ||
+        block.anchor === `marker:${args.markerId}`,
+    ) ?? false;
+  if (!indexHasBlock) {
+    await upsertBlockMetadata(
+      args.repoRoot,
+      args.sourceRelative,
+      args.commentrayPathRel,
+      created.block,
+    );
+  }
+}
+
+async function revealExistingMarkerBlock(args: {
+  markerId: string;
+  activeEditor: vscode.TextEditor;
+  paths: PairedPaths;
+  sourceText: string;
+}): Promise<void> {
+  const ensured = await ensureCommentrayFile(args.paths.commentrayUri);
+  const commentrayDoc = await vscode.workspace.openTextDocument(ensured);
+  await ensureMarkerBlockPresent({
+    markerId: args.markerId,
+    sourceText: args.sourceText,
+    repoRoot: args.paths.repoRoot,
+    sourceRelative: args.paths.sourceRelative,
+    commentrayPathRel: args.paths.commentrayPathRel,
+    commentrayDoc,
+  });
+
+  const commentrayEditor = await openBesideAndSync(args.activeEditor, args.paths);
+  const selection =
+    findPlaceholderSelection(commentrayEditor.document, args.markerId) ??
+    findBlockMarkerSelection(commentrayEditor.document, args.markerId);
+  if (selection) {
+    commentrayEditor.selection = selection;
+    commentrayEditor.revealRange(selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  }
+}
+
+async function createNewBlockFromSelection(args: {
+  activeEditor: vscode.TextEditor;
+  paths: PairedPaths;
+  lineRange: BlockRange;
+  sourceTextBeforeWrap: string;
+}): Promise<void> {
+  const ensured = await ensureCommentrayFile(args.paths.commentrayUri);
+  const commentrayDoc = await vscode.workspace.openTextDocument(ensured);
+  const existingCommentray = commentrayDoc.getText();
+  const index = await readIndex(args.paths.repoRoot);
+  const suggestedId = defaultRegionMarkerNamingStrategy.suggestMarkerId({
+    languageId: args.activeEditor.document.languageId,
+    sourceText: args.sourceTextBeforeWrap,
+    range: args.lineRange,
+  });
+  const usedIds = collectUsedMarkerIds({
+    sourceText: args.sourceTextBeforeWrap,
+    existingCommentray,
+    index,
+    commentrayPathRel: args.paths.commentrayPathRel,
+  });
+  const blockId = chooseUniqueMarkerId(suggestedId, usedIds);
+
+  const wrapped = wrapSourceLineRangeWithCommentrayMarkers({
+    sourceText: args.sourceTextBeforeWrap,
+    range: args.lineRange,
+    languageId: args.activeEditor.document.languageId,
+    markerId: blockId,
+  });
+  await replaceDocumentContents(args.activeEditor.document, wrapped.sourceText);
+  await args.activeEditor.document.save();
+  const sourceText = args.activeEditor.document.getText();
+  const created = createBlockForRange({
+    sourcePath: args.paths.sourceRelative,
+    sourceText,
+    range: wrapped.innerRange,
+    id: blockId,
+  });
+
+  const nextContent = insertBlockBySourceMarkerOrder({
+    existingCommentray,
+    blockMarkdown: created.markdown,
+    sourceText,
+    markerId: created.block.id,
+  });
+
+  const existingMarkers = [...extractCommentrayBlockIdsFromMarkdown(existingCommentray)];
+  const nextMarkers = extractCommentrayBlockIdsFromMarkdown(nextContent);
+  const lostMarker = existingMarkers.find((id) => !nextMarkers.has(id));
+  if (lostMarker) {
+    throw new Error(
+      `Refusing to overwrite companion content because existing block marker "${lostMarker}" would be removed unexpectedly.`,
+    );
+  }
+
+  await replaceDocumentContents(commentrayDoc, nextContent);
+  await commentrayDoc.save();
+
+  await upsertBlockMetadata(
+    args.paths.repoRoot,
+    args.paths.sourceRelative,
+    args.paths.commentrayPathRel,
+    created.block,
+  );
+
+  const commentrayEditor = await openBesideAndSync(args.activeEditor, args.paths);
+  const selection = findPlaceholderSelection(commentrayEditor.document, created.block.id);
+  if (selection) {
+    commentrayEditor.selection = selection;
+    commentrayEditor.revealRange(selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  }
 }
 
 async function upsertBlockMetadata(
@@ -781,56 +1108,52 @@ async function startBlockFromSelectionCommand(): Promise<void> {
   if (!active) return;
   const paths = await resolvePairedPaths(active.editor, active.folder);
   if (!paths) return;
+  try {
+    const lineRange = fullLineBlockRange(active.editor);
+    const sourceTextBeforeWrap = active.editor.document.getText();
 
-  const lineRange = fullLineBlockRange(active.editor);
-  const blockId = defaultRegionMarkerNamingStrategy.suggestMarkerId({
-    languageId: active.editor.document.languageId,
-    sourceText: active.editor.document.getText(),
-    range: lineRange,
-  });
-  const wrapped = wrapSourceLineRangeWithCommentrayMarkers({
-    sourceText: active.editor.document.getText(),
-    range: lineRange,
-    languageId: active.editor.document.languageId,
-    markerId: blockId,
-  });
-  await replaceDocumentContents(active.editor.document, wrapped.sourceText);
-  await active.editor.document.save();
-  const sourceText = active.editor.document.getText();
-  const created = createBlockForRange({
-    sourcePath: paths.sourceRelative,
-    sourceText,
-    range: wrapped.innerRange,
-    id: blockId,
-  });
+    if (
+      (active.editor.document.languageId === "markdown" ||
+        active.editor.document.languageId === "md") &&
+      selectionIntersectsMarkdownFence(sourceTextBeforeWrap, lineRange)
+    ) {
+      void vscode.window.showWarningMessage(
+        "Selection intersects a fenced Markdown code block. Add-block stays strict here because inserting Commentray markers would change rendered code content.",
+      );
+      return;
+    }
 
-  const ensured = await ensureCommentrayFile(paths.commentrayUri);
-  const commentrayDoc = await vscode.workspace.openTextDocument(ensured);
-  const existingCommentray = commentrayDoc.getText();
-  const scaffold = companionPlaceholderMarkdown(paths.sourceRelative).trim();
-  const normalizedExisting = existingCommentray.replaceAll("\r\n", "\n").trim();
-  const baseCommentrayForInsert = normalizedExisting === scaffold ? "" : existingCommentray;
-  const nextContent = insertBlockBySourceMarkerOrder({
-    existingCommentray: baseCommentrayForInsert,
-    blockMarkdown: created.markdown,
-    sourceText,
-    markerId: created.block.id,
-  });
-  await replaceDocumentContents(commentrayDoc, nextContent);
-  await commentrayDoc.save();
+    const touchedBoundaryId = selectedRangeTouchesMarkerBoundary(sourceTextBeforeWrap, lineRange);
+    if (touchedBoundaryId) {
+      await revealExistingMarkerBlock({
+        markerId: touchedBoundaryId,
+        activeEditor: active.editor,
+        paths,
+        sourceText: sourceTextBeforeWrap,
+      });
+      return;
+    }
+    const enclosingId = selectedRangeInsideMarkerRegion(sourceTextBeforeWrap, lineRange);
+    if (enclosingId) {
+      await revealExistingMarkerBlock({
+        markerId: enclosingId,
+        activeEditor: active.editor,
+        paths,
+        sourceText: sourceTextBeforeWrap,
+      });
+      return;
+    }
 
-  await upsertBlockMetadata(
-    paths.repoRoot,
-    paths.sourceRelative,
-    paths.commentrayPathRel,
-    created.block,
-  );
-
-  const commentrayEditor = await openBesideAndSync(active.editor, paths);
-  const selection = findPlaceholderSelection(commentrayEditor.document, created.block.id);
-  if (selection) {
-    commentrayEditor.selection = selection;
-    commentrayEditor.revealRange(selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    await createNewBlockFromSelection({
+      activeEditor: active.editor,
+      paths,
+      lineRange,
+      sourceTextBeforeWrap,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logCommentray(`[commentray] startBlockFromSelection failed: ${msg}`);
+    await vscode.window.showErrorMessage(`Could not add Commentray block: ${msg}`);
   }
 }
 
