@@ -89,6 +89,41 @@ async function writeTextFileDirect(uri: vscode.Uri, text: string): Promise<void>
   await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
 }
 
+function integrationMarkdownSourceUri(dogfoodWorkspace: DogfoodWorkspaceAccessor): vscode.Uri {
+  return vscode.Uri.joinPath(dogfoodWorkspace.root(), "docs", "integration-markdown-source.md");
+}
+
+function integrationMarkdownPairedUri(dogfoodWorkspace: DogfoodWorkspaceAccessor): vscode.Uri {
+  return vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    ".commentray",
+    "source",
+    "docs",
+    "integration-markdown-source.md",
+    "main.md",
+  );
+}
+
+function sampleSourceWithGreetRegion(includeFarewell: boolean): string {
+  return [
+    "export function greet(name: string): string {",
+    "  //#region commentray:greet",
+    "  const x = `Hello, ${name}!`;",
+    "  //#endregion commentray:greet",
+    "  return x;",
+    "}",
+    "",
+    ...(includeFarewell
+      ? [
+          "export function farewell(name: string): string {",
+          "  return `Goodbye, ${name}.`;",
+          "}",
+          "",
+        ]
+      : []),
+  ].join("\n");
+}
+
 function registerOpenPairedMarkdownTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
   describe("Open paired markdown beside the source editor", () => {
     it('Given a clean workspace, when the user runs "Commentray: Initialize workspace", then commentray.openSideBySide can create the paired markdown.', async () => {
@@ -242,25 +277,14 @@ async function assertMarkdownSelectionBlockFlow(
 ): Promise<void> {
   await vscode.commands.executeCommand("commentray.init");
 
-  const sourceUri = vscode.Uri.joinPath(
-    dogfoodWorkspace.root(),
-    "docs",
-    "integration-markdown-source.md",
-  );
+  const sourceUri = integrationMarkdownSourceUri(dogfoodWorkspace);
   const sourceContent = ["# Markdown source fixture", "", "alpha", "beta", "gamma", ""].join("\n");
   await replaceDocumentText(sourceUri, sourceContent);
   const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
   const sourceEditor = await vscode.window.showTextDocument(sourceDoc, { preview: false });
 
   await vscode.commands.executeCommand("commentray.openSideBySide");
-  const pairedUri = vscode.Uri.joinPath(
-    dogfoodWorkspace.root(),
-    ".commentray",
-    "source",
-    "docs",
-    "integration-markdown-source.md",
-    "main.md",
-  );
+  const pairedUri = integrationMarkdownPairedUri(dogfoodWorkspace);
   const beforeText = new TextDecoder("utf-8").decode(await vscode.workspace.fs.readFile(pairedUri));
   await vscode.window.showTextDocument(sourceDoc, { preview: false });
 
@@ -369,19 +393,7 @@ async function assertSelectionInsideExistingRegionRevealsExistingBlock(
 ): Promise<void> {
   await vscode.commands.executeCommand("commentray.init");
   const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts");
-  const withRegion = [
-    "export function greet(name: string): string {",
-    "  //#region commentray:greet",
-    "  const x = `Hello, ${name}!`;",
-    "  //#endregion commentray:greet",
-    "  return x;",
-    "}",
-    "",
-    "export function farewell(name: string): string {",
-    "  return `Goodbye, ${name}.`;",
-    "}",
-    "",
-  ].join("\n");
+  const withRegion = sampleSourceWithGreetRegion(true);
   await replaceDocumentText(sourceUri, withRegion);
 
   const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
@@ -426,15 +438,7 @@ async function assertSelectionTouchingBoundaryRecoversMissingBlock(
 ): Promise<void> {
   await vscode.commands.executeCommand("commentray.init");
   const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts");
-  const withRegion = [
-    "export function greet(name: string): string {",
-    "  //#region commentray:greet",
-    "  const x = `Hello, ${name}!`;",
-    "  //#endregion commentray:greet",
-    "  return x;",
-    "}",
-    "",
-  ].join("\n");
+  const withRegion = sampleSourceWithGreetRegion(false);
   await replaceDocumentText(sourceUri, withRegion);
 
   const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
@@ -472,11 +476,7 @@ async function assertMarkdownFenceSelectionDoesNotMutate(
 ): Promise<void> {
   await vscode.commands.executeCommand("commentray.init");
 
-  const sourceUri = vscode.Uri.joinPath(
-    dogfoodWorkspace.root(),
-    "docs",
-    "integration-markdown-source.md",
-  );
+  const sourceUri = integrationMarkdownSourceUri(dogfoodWorkspace);
   const sourceContent = ["# Markdown source fixture", "", "```ts", "const x = 1;", "```", ""].join(
     "\n",
   );
@@ -485,14 +485,7 @@ async function assertMarkdownFenceSelectionDoesNotMutate(
   await vscode.window.showTextDocument(sourceDoc, { preview: false });
 
   await vscode.commands.executeCommand("commentray.openSideBySide");
-  const pairedUri = vscode.Uri.joinPath(
-    dogfoodWorkspace.root(),
-    ".commentray",
-    "source",
-    "docs",
-    "integration-markdown-source.md",
-    "main.md",
-  );
+  const pairedUri = integrationMarkdownPairedUri(dogfoodWorkspace);
   const pairedBefore = new TextDecoder("utf-8").decode(
     await vscode.workspace.fs.readFile(pairedUri),
   );
