@@ -3,6 +3,7 @@ import {
   type BlockScrollLink,
   type CommentrayIndex,
   addBlockToIndex,
+  alignAndCleanRegions,
   assertValidAngleId,
   assertValidMarkerId,
   buildBlockScrollLinks,
@@ -27,6 +28,9 @@ import {
   pickSourceLine0ForCommentrayScroll,
   pairFromCommentraySourceRel,
   readIndex,
+  removeBlockFromCommentray,
+  removeBlockFromIndex,
+  removeSourceMarkersFromText,
   resolveCommentrayMarkdownPath,
   sourceLineRangeForMarkerId,
   upsertAngleDefinitionInCommentrayToml,
@@ -1157,6 +1161,225 @@ async function startBlockFromSelectionCommand(): Promise<void> {
   }
 }
 
+async function resolvePathsForActiveEditor(active: {
+  editor: vscode.TextEditor;
+  folder: vscode.WorkspaceFolder;
+}): Promise<PairedPaths | null> {
+  const relative = vscode.workspace.asRelativePath(active.editor.document.uri, false);
+  let normalized: string;
+  try {
+    normalized = normalizeRepoRelativePath(relative.replaceAll("\\", "/"));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await vscode.window.showErrorMessage(
+      `Could not resolve a repo-relative path for the active editor: ${message}`,
+    );
+    return null;
+  }
+  const repoRoot = active.folder.uri.fsPath;
+  const cfg = await loadCommentrayConfig(repoRoot);
+
+  const diskPair = resolveCompanionPathToSourcePair(normalized, repoRoot, cfg);
+  if (diskPair) {
+    const commentrayUri = vscode.Uri.file(path.join(repoRoot, ...diskPair.commentrayPath.split("/")));
+    return {
+      repoRoot,
+      sourceRelative: diskPair.sourcePath,
+      commentrayUri,
+      commentrayPathRel: diskPair.commentrayPath,
+      angleId: null,
+    };
+  }
+
+  return resolvePairedPaths(active.editor, active.folder);
+}
+
+async function removeBlockCommand(): Promise<void> {
+  const active = await requireActiveEditorInWorkspace();
+  if (!active) return;
+
+  const paths = await resolvePathsForActiveEditor(active);
+  if (!paths) return;
+
+  let blockId: string | undefined;
+
+  const sourceText = active.editor.document.getText();
+  const lineRange = fullLineBlockRange(active.editor);
+
+  const isMarkdown =
+    active.editor.document.languageId === "markdown" ||
+    active.editor.document.languageId === "md";
+  if (isMarkdown) {
+    const offset = active.editor.document.offsetAt(active.editor.selection.active);
+    const hits: { id: string; start: number }[] = [];
+    const markerRe = /<!--\s*commentray:block\s+id=([a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?)\s*-->/gi;
+    for (const m of sourceText.matchAll(markerRe)) {
+      const idRaw = m[1];
+      if (idRaw === undefined) continue;
+      const start = m.index ?? -1;
+      if (start < 0) continue;
+      try {
+        hits.push({ id: assertValidMarkerId(idRaw), start });
+      } catch {
+        // ignore
+      }
+    }
+    for (let i = hits.length - 1; i >= 0; i--) {
+      if (hits[i]!.start <= offset) {
+        blockId = hits[i]!.id;
+        break;
+      }
+    }
+  } else {
+    const touchedBoundaryId = selectedRangeTouchesMarkerBoundary(sourceText, lineRange);
+    if (touchedBoundaryId) {
+      blockId = touchedBoundaryId;
+    } else {
+      const enclosingId = selectedRangeInsideMarkerRegion(sourceText, lineRange);
+      if (enclosingId) {
+        blockId = enclosingId;
+      }
+    }
+  }
+
+  if (!blockId) {
+    blockId = await vscode.window.showInputBox({
+      prompt: "Enter block / region ID to remove",
+      placeHolder: "e.g. abc123",
+      validateInput: (val) => {
+        try {
+          assertValidMarkerId(val);
+          return null;
+        } catch (e) {
+          return e instanceof Error ? e.message : String(e);
+        }
+      },
+    });
+  }
+
+  if (!blockId) return;
+
+  try {
+    // 1. Remove markers from source code
+    const sourceUri = vscode.Uri.file(path.join(paths.repoRoot, ...paths.sourceRelative.split("/")));
+    const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+    const sourceContent = sourceDoc.getText();
+    const updatedSource = removeSourceMarkersFromText(sourceContent, blockId);
+    if (updatedSource !== sourceContent) {
+      const sourceEditor = vscode.window.visibleTextEditors.find(
+        (te) => te.document.uri.toString() === sourceDoc.uri.toString(),
+      );
+      if (sourceEditor) {
+        await replaceDocumentContents(sourceEditor.document, updatedSource);
+        await sourceEditor.document.save();
+      } else {
+        await replaceDocumentContents(sourceDoc, updatedSource);
+        await sourceDoc.save();
+      }
+    }
+
+    // 2. Remove block from companion Markdown
+    let commentrayDoc: vscode.TextDocument;
+    try {
+      commentrayDoc = await vscode.workspace.openTextDocument(paths.commentrayUri);
+    } catch {
+      commentrayDoc = null as any;
+    }
+
+    if (commentrayDoc) {
+      const commentrayContent = commentrayDoc.getText();
+      const updatedCommentray = removeBlockFromCommentray(commentrayContent, blockId);
+      if (updatedCommentray !== commentrayContent) {
+        const commentrayEditor = vscode.window.visibleTextEditors.find(
+          (te) => te.document.uri.toString() === commentrayDoc.uri.toString(),
+        );
+        if (commentrayEditor) {
+          await replaceDocumentContents(commentrayEditor.document, updatedCommentray);
+          await commentrayEditor.document.save();
+        } else {
+          await replaceDocumentContents(commentrayDoc, updatedCommentray);
+          await commentrayDoc.save();
+        }
+      }
+    }
+
+    // 3. Remove block from index
+    let currentIdx: CommentrayIndex;
+    try {
+      currentIdx = (await readIndex(paths.repoRoot)) ?? emptyIndex();
+    } catch {
+      currentIdx = emptyIndex();
+    }
+    const updatedIdx = removeBlockFromIndex(currentIdx, paths.commentrayPathRel, blockId);
+    await writeIndex(paths.repoRoot, updatedIdx);
+
+    void vscode.window.showInformationMessage(`Commentary block "${blockId}" removed successfully.`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logCommentray(`[commentray] removeBlock failed: ${msg}`);
+    await vscode.window.showErrorMessage(`Could not remove block: ${msg}`);
+  }
+}
+
+async function cleanRegionsCommand(): Promise<void> {
+  const active = await requireActiveEditorInWorkspace();
+  if (!active) return;
+
+  const paths = await resolvePathsForActiveEditor(active);
+  if (!paths) return;
+
+  try {
+    const sourceUri = vscode.Uri.file(path.join(paths.repoRoot, ...paths.sourceRelative.split("/")));
+    const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+    const sourceText = sourceDoc.getText();
+
+    let commentrayDoc: vscode.TextDocument;
+    try {
+      commentrayDoc = await vscode.workspace.openTextDocument(paths.commentrayUri);
+    } catch {
+      await vscode.window.showWarningMessage("Paired companion markdown file does not exist.");
+      return;
+    }
+    const commentrayMarkdown = commentrayDoc.getText();
+
+    let index: CommentrayIndex;
+    try {
+      index = (await readIndex(paths.repoRoot)) ?? emptyIndex();
+    } catch {
+      index = emptyIndex();
+    }
+
+    const result = alignAndCleanRegions({
+      sourceText,
+      commentrayMarkdown,
+      index,
+      commentrayPath: paths.commentrayPathRel,
+      sourcePath: paths.sourceRelative,
+    });
+
+    await writeIndex(paths.repoRoot, result.index);
+
+    if (result.commentrayMarkdown !== commentrayMarkdown) {
+      const commentrayEditor = vscode.window.visibleTextEditors.find(
+        (te) => te.document.uri.toString() === commentrayDoc.uri.toString(),
+      );
+      if (commentrayEditor) {
+        await replaceDocumentContents(commentrayEditor.document, result.commentrayMarkdown);
+        await commentrayEditor.document.save();
+      } else {
+        await replaceDocumentContents(commentrayDoc, result.commentrayMarkdown);
+        await commentrayDoc.save();
+      }
+    }
+
+    void vscode.window.showInformationMessage("Commentary regions aligned and cleaned up.");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logCommentray(`[commentray] cleanRegions failed: ${msg}`);
+    await vscode.window.showErrorMessage(`Could not clean regions: ${msg}`);
+  }
+}
+
 async function initWorkspaceCommand(output: vscode.OutputChannel): Promise<void> {
   const folder = pickWorkspaceFolderForRepoWideCommand();
   if (!folder) {
@@ -1409,6 +1632,8 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("commentray.validateWorkspace", () =>
       validateWorkspaceCommand(output),
     ),
+    vscode.commands.registerCommand("commentray.removeBlock", removeBlockCommand),
+    vscode.commands.registerCommand("commentray.cleanRegions", cleanRegionsCommand),
     vscode.workspace.onDidChangeConfiguration((e) => {
       try {
         if (!e.affectsConfiguration("commentray.scrollSync")) return;
