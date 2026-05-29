@@ -32,7 +32,9 @@
     "onCommand:commentray.openRenderedPreview",
     "onCommand:commentray.openRenderedPreviewChooseAngle",
     "onCommand:commentray.validateWorkspace",
-    "onCommand:commentray.openCorrespondingSource"
+    "onCommand:commentray.openCorrespondingSource",
+    "onCommand:commentray.removeBlock",
+    "onCommand:commentray.cleanRegions"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -105,6 +107,18 @@
         "title": "Open corresponding source file",
         "category": "Commentray",
         "enablement": "commentray.workspaceInitialized && commentray.activeEditorIsResolvableCompanionMarkdown"
+      },
+      {
+        "command": "commentray.removeBlock",
+        "title": "Remove commentary block/region",
+        "category": "Commentray",
+        "enablement": "commentray.workspaceInitialized && !editorReadonly"
+      },
+      {
+        "command": "commentray.cleanRegions",
+        "title": "Clean and align commentary regions",
+        "category": "Commentray",
+        "enablement": "commentray.workspaceInitialized"
       }
     ],
     "keybindings": [
@@ -162,6 +176,16 @@
           "command": "commentray.openCorrespondingSource",
           "group": "commentray@1f",
           "when": "editorTextFocus && commentray.workspaceInitialized && commentray.activeEditorIsResolvableCompanionMarkdown"
+        },
+        {
+          "command": "commentray.removeBlock",
+          "group": "commentray@2a",
+          "when": "editorTextFocus && commentray.workspaceInitialized && !editorReadonly"
+        },
+        {
+          "command": "commentray.cleanRegions",
+          "group": "commentray@2b",
+          "when": "editorTextFocus && commentray.workspaceInitialized"
         }
       ],
       "explorer/context": [
