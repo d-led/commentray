@@ -130,13 +130,11 @@ describe("Semantic link checking and permalink verification", () => {
 
     cy.get("#commentray-share-link").click();
 
-    cy.get("@clipboardWrite").should("have.been.calledOnce");
-    cy.get("@clipboardWrite").then((stub: any) => {
+    cy.get<Cypress.SinonStub>("@clipboardWrite").should("have.been.calledOnce");
+    cy.get<Cypress.SinonStub>("@clipboardWrite").then((stub) => {
       const copiedUrl = stub.firstCall.args[0];
-      expect(copiedUrl).to.be.a("string").and.not.be.empty;
-
-      cy.request(copiedUrl).its("status").should("eq", 200);
-
+      expect(copiedUrl).to.be.a("string");
+      expect(copiedUrl).to.not.equal("");
       cy.visit(copiedUrl);
       cy.CurrentPageShouldDisplayCodeBrowserShell();
     });
@@ -161,8 +159,8 @@ describe("Semantic link checking and permalink verification", () => {
 
     cy.get("#commentray-share-link").click();
 
-    cy.get("@clipboardWriteArch").should("have.been.calledOnce");
-    cy.get("@clipboardWriteArch").then((stub: any) => {
+    cy.get<Cypress.SinonStub>("@clipboardWriteArch").should("have.been.calledOnce");
+    cy.get<Cypress.SinonStub>("@clipboardWriteArch").then((stub) => {
       const copiedUrl = stub.firstCall.args[0];
       expect(copiedUrl).to.contain("/architecture/");
 
@@ -205,8 +203,8 @@ describe("Semantic link checking and permalink verification", () => {
 
     cy.get("#commentray-share-link").click();
 
-    cy.get("@clipboardWriteScroll").should("have.been.calledOnce");
-    cy.get("@clipboardWriteScroll").then((stub: any) => {
+    cy.get<Cypress.SinonStub>("@clipboardWriteScroll").should("have.been.calledOnce");
+    cy.get<Cypress.SinonStub>("@clipboardWriteScroll").then((stub) => {
       const copiedUrl = stub.firstCall.args[0];
       expect(copiedUrl).to.match(/#.*commentray-md-line-\d+/);
 

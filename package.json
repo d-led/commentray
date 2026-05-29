@@ -69,6 +69,7 @@
     "pree2e": "npm run pages:build",
     "e2e": "start-server-and-test e2e:server http://127.0.0.1:14173 \"cypress run --e2e --browser chrome\"",
     "e2e:ci": "CYPRESS_CI=true npm run e2e",
+    "e2e:gh-pages": "bash scripts/e2e-gh-pages.sh",
     "precy": "npm run pages:build",
     "cy": "start-server-and-test e2e:server http://127.0.0.1:14173 \"cypress open --e2e --browser chrome\""
   },
