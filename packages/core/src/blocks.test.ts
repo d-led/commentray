@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import { buildCommentraySnippetV1 } from "./block-snippet.js";
 import {
   addBlockToIndex,
+  alignAndCleanRegions,
   appendBlockToCommentray,
   createBlockForRange,
   generateBlockId,
   insertBlockBySourceMarkerOrder,
+  removeBlockFromCommentray,
+  removeBlockFromIndex,
+  removeSourceMarkersFromText,
   wrapSourceLineRangeWithCommentrayMarkers,
 } from "./blocks.js";
 import { emptyIndex } from "./metadata.js";
@@ -312,5 +316,302 @@ describe("Generating stable block identifiers", () => {
   it("returns a six-character lowercase alphanumeric id", () => {
     const id = generateBlockId(seeded([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]));
     expect(id).toMatch(/^[a-z0-9]{6}$/);
+  });
+});
+
+describe("Removing a block from companion Markdown", () => {
+  it("returns original text when the block ID does not exist", () => {
+    const md = "<!-- commentray:block id=abc -->\n## src/x.ts line 1\n\nprose\n";
+    const result = removeBlockFromCommentray(md, "nonexistent");
+    expect(result).toBe(md);
+  });
+
+  it("removes the only block completely and returns the prelude only", () => {
+    const md = "# Prelude Title\nIntro text\n\n<!-- commentray:block id=abc -->\n## src/x.ts line 1\n\nprose\n";
+    const result = removeBlockFromCommentray(md, "abc");
+    expect(result.trim()).toBe("# Prelude Title\nIntro text");
+  });
+
+  it("removes a block in the middle of other blocks, joining them cleanly", () => {
+    const md = [
+      "<!-- commentray:block id=a -->",
+      "## src/x.ts line 1",
+      "",
+      "prose A",
+      "",
+      "<!-- commentray:block id=b -->",
+      "## src/x.ts line 2",
+      "",
+      "prose B",
+      "",
+      "<!-- commentray:block id=c -->",
+      "## src/x.ts line 3",
+      "",
+      "prose C",
+      "",
+    ].join("\n");
+
+    const result = removeBlockFromCommentray(md, "b");
+
+    expect(result).toContain("id=a");
+    expect(result).not.toContain("id=b");
+    expect(result).toContain("id=c");
+    expect(result).toContain("prose A");
+    expect(result).not.toContain("prose B");
+    expect(result).toContain("prose C");
+  });
+
+  it("removes the last block, preserving the preceding block and its layout", () => {
+    const md = [
+      "<!-- commentray:block id=a -->",
+      "## src/x.ts line 1",
+      "",
+      "prose A",
+      "",
+      "<!-- commentray:block id=b -->",
+      "## src/x.ts line 2",
+      "",
+      "prose B",
+      "",
+    ].join("\n");
+
+    const result = removeBlockFromCommentray(md, "b");
+
+    expect(result.trim()).toBe([
+      "<!-- commentray:block id=a -->",
+      "## src/x.ts line 1",
+      "",
+      "prose A",
+    ].join("\n"));
+  });
+});
+
+describe("Removing source markers from source files", () => {
+  it("returns unchanged text when the marker ID is not found", () => {
+    const src = "function foo() {\n  return 1;\n}\n";
+    const result = removeSourceMarkersFromText(src, "abc");
+    expect(result).toBe(src);
+  });
+
+  it("removes starting and ending marker lines for the given ID", () => {
+    const src = [
+      "function foo() {",
+      "//#region commentray:abc",
+      "  console.log('hello');",
+      "//#endregion commentray:abc",
+      "}",
+    ].join("\n");
+
+    const result = removeSourceMarkersFromText(src, "abc");
+
+    expect(result).toBe([
+      "function foo() {",
+      "  console.log('hello');",
+      "}",
+    ].join("\n"));
+  });
+
+  it("supports multiple comment styles", () => {
+    const src = [
+      "<!-- #region commentray:abc -->",
+      "some markdown",
+      "<!-- #endregion commentray:abc -->",
+    ].join("\n");
+
+    const result = removeSourceMarkersFromText(src, "abc");
+
+    expect(result).toBe("some markdown");
+  });
+});
+
+describe("Removing a block from the metadata index", () => {
+  it("returns the exact same index when the path or block ID does not exist", () => {
+    const base = emptyIndex();
+    const result = removeBlockFromIndex(base, "nonexistent.md", "abc");
+    expect(result).toBe(base);
+  });
+
+  it("removes only the specified block from the entry, keeping other blocks", () => {
+    const cp = "docs/x.md";
+    let idx = addBlockToIndex(emptyIndex(), {
+      sourcePath: "src/x.ts",
+      commentrayPath: cp,
+      block: { id: "a", anchor: "marker:a" },
+    });
+    idx = addBlockToIndex(idx, {
+      sourcePath: "src/x.ts",
+      commentrayPath: cp,
+      block: { id: "b", anchor: "marker:b" },
+    });
+
+    const result = removeBlockFromIndex(idx, cp, "a");
+
+    expect(result.byCommentrayPath[cp]?.blocks.map(b => b.id)).toEqual(["b"]);
+  });
+
+  it("removes the entire entry from byCommentrayPath when the last block is deleted", () => {
+    const cp = "docs/x.md";
+    const idx = addBlockToIndex(emptyIndex(), {
+      sourcePath: "src/x.ts",
+      commentrayPath: cp,
+      block: { id: "a", anchor: "marker:a" },
+    });
+
+    const result = removeBlockFromIndex(idx, cp, "a");
+
+    expect(result.byCommentrayPath[cp]).toBeUndefined();
+  });
+});
+
+describe("Aligning and cleaning regions across source, markdown, and index", () => {
+  const sourceText = [
+    "function main() {",
+    "//#region commentray:first",
+    "  console.log(1);",
+    "//#endregion commentray:first",
+    "  console.log(2);",
+    "//#region commentray:second",
+    "  console.log(3);",
+    "//#endregion commentray:second",
+    "}",
+  ].join("\n");
+
+  it("reorders markdown block segments and index blocks to match source region order", () => {
+    // Markdown has "second" block first, and "first" block second
+    const markdown = [
+      "<!-- commentray:block id=second -->",
+      "## src/main.ts line 7",
+      "",
+      "prose second",
+      "",
+      "<!-- commentray:block id=first -->",
+      "## src/main.ts line 3",
+      "",
+      "prose first",
+      "",
+    ].join("\n");
+
+    const baseIndex = {
+      schemaVersion: 3,
+      byCommentrayPath: {
+        "docs/main.md": {
+          sourcePath: "src/main.ts",
+          commentrayPath: "docs/main.md",
+          blocks: [
+            { id: "second", anchor: "marker:second" },
+            { id: "first", anchor: "marker:first" },
+          ],
+        },
+      },
+    };
+
+    const { commentrayMarkdown, index } = alignAndCleanRegions({
+      sourceText,
+      commentrayMarkdown: markdown,
+      index: baseIndex,
+      commentrayPath: "docs/main.md",
+      sourcePath: "src/main.ts",
+    });
+
+    // Verify markdown ordering
+    const firstPos = commentrayMarkdown.indexOf("id=first");
+    const secondPos = commentrayMarkdown.indexOf("id=second");
+    expect(firstPos).toBeGreaterThan(-1);
+    expect(secondPos).toBeGreaterThan(-1);
+    expect(firstPos).toBeLessThan(secondPos);
+
+    // Verify index ordering
+    const entry = index.byCommentrayPath["docs/main.md"];
+    expect(entry?.blocks.map(b => b.id)).toEqual(["first", "second"]);
+  });
+
+  it("creates placeholder blocks when a new region is added in source code", () => {
+    // Companion Markdown has only the "first" block, but source has "first" and "second"
+    const markdown = [
+      "<!-- commentray:block id=first -->",
+      "## src/main.ts line 3",
+      "",
+      "prose first",
+      "",
+    ].join("\n");
+
+    const baseIndex = {
+      schemaVersion: 3,
+      byCommentrayPath: {
+        "docs/main.md": {
+          sourcePath: "src/main.ts",
+          commentrayPath: "docs/main.md",
+          blocks: [{ id: "first", anchor: "marker:first" }],
+        },
+      },
+    };
+
+    const { commentrayMarkdown, index } = alignAndCleanRegions({
+      sourceText,
+      commentrayMarkdown: markdown,
+      index: baseIndex,
+      commentrayPath: "docs/main.md",
+      sourcePath: "src/main.ts",
+    });
+
+    expect(commentrayMarkdown).toContain("id=first");
+    expect(commentrayMarkdown).toContain("id=second");
+    expect(commentrayMarkdown).toContain("_(write commentary here)_");
+
+    const entry = index.byCommentrayPath["docs/main.md"];
+    expect(entry?.blocks.map(b => b.id)).toEqual(["first", "second"]);
+    expect(entry?.blocks.find(b => b.id === "second")?.snippet).toContain("console.log(3)");
+  });
+
+  it("removes block sections and index entries when region markers are removed from source", () => {
+    // Source code has only "first" (we pass a source text with only "first")
+    const srcOnlyFirst = [
+      "function main() {",
+      "//#region commentray:first",
+      "  console.log(1);",
+      "//#endregion commentray:first",
+      "}",
+    ].join("\n");
+
+    const markdown = [
+      "<!-- commentray:block id=first -->",
+      "## src/main.ts line 3",
+      "",
+      "prose first",
+      "",
+      "<!-- commentray:block id=second -->",
+      "## src/main.ts line 7",
+      "",
+      "prose second",
+      "",
+    ].join("\n");
+
+    const baseIndex = {
+      schemaVersion: 3,
+      byCommentrayPath: {
+        "docs/main.md": {
+          sourcePath: "src/main.ts",
+          commentrayPath: "docs/main.md",
+          blocks: [
+            { id: "first", anchor: "marker:first" },
+            { id: "second", anchor: "marker:second" },
+          ],
+        },
+      },
+    };
+
+    const { commentrayMarkdown, index } = alignAndCleanRegions({
+      sourceText: srcOnlyFirst,
+      commentrayMarkdown: markdown,
+      index: baseIndex,
+      commentrayPath: "docs/main.md",
+      sourcePath: "src/main.ts",
+    });
+
+    expect(commentrayMarkdown).toContain("id=first");
+    expect(commentrayMarkdown).not.toContain("id=second");
+
+    const entry = index.byCommentrayPath["docs/main.md"];
+    expect(entry?.blocks.map(b => b.id)).toEqual(["first"]);
   });
 });

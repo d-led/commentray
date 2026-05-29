@@ -2,7 +2,11 @@ import { buildCommentraySnippetV1 } from "./block-snippet.js";
 import { formatMarkerAnchor } from "./anchors.js";
 import { assertValidMarkerId } from "./marker-ids.js";
 import { findCommentrayMarkerPairs, leadingIndentOfLine } from "./region-marker-convert.js";
-import { commentrayRegionInsertions, parseCommentrayRegionBoundary } from "./source-markers.js";
+import {
+  commentrayRegionInsertions,
+  parseCommentrayRegionBoundary,
+  sourceLineRangeForMarkerId,
+} from "./source-markers.js";
 import type { CommentrayBlock, CommentrayIndex, SourceFileIndexEntry } from "./model.js";
 
 /** 1-based inclusive range of source lines a block points to. */
@@ -272,7 +276,7 @@ function clampRange(range: BlockRange, sourceText: string): BlockRange {
   return { startLine: start, endLine: end };
 }
 
-function snippetFromRange(sourceText: string, range: BlockRange): string {
+export function snippetFromRange(sourceText: string, range: BlockRange): string {
   const lines = sourceText.split("\n");
   const trimmed: string[] = [];
   for (let ln = range.startLine; ln <= range.endLine; ln++) {
@@ -299,4 +303,180 @@ function rangeLabel(range: BlockRange): string {
 function placeholderLineOffset(markdown: string): number {
   const lines = markdown.split("\n");
   return Math.max(0, lines.indexOf(CARET_PLACEHOLDER));
+}
+
+export function removeBlockFromCommentray(markdown: string, blockId: string): string {
+  const normalizedId = assertValidMarkerId(blockId);
+  const hits = findCommentrayBlockMarkerHits(markdown);
+  const targetHitIndex = hits.findIndex((h) => h.id === normalizedId);
+  if (targetHitIndex === -1) {
+    return markdown;
+  }
+  const targetHit = hits[targetHitIndex];
+  if (!targetHit) return markdown;
+
+  // The prelude is from 0 to the start of the first hit.
+  const prelude = markdown.slice(0, hits[0]!.start);
+
+  // We filter out the block that has the target ID
+  const segments: string[] = [];
+  for (let i = 0; i < hits.length; i++) {
+    if (i === targetHitIndex) continue;
+    const hit = hits[i]!;
+    const nextHit = hits[i + 1];
+    const end = nextHit ? nextHit.start : markdown.length;
+    segments.push(markdown.slice(hit.start, end));
+  }
+
+  // Combine prelude and other segments
+  let result = prelude;
+  for (const segment of segments) {
+    result = appendBlockToCommentray(result, segment);
+  }
+  return result;
+}
+
+export function removeSourceMarkersFromText(sourceText: string, markerId: string): string {
+  const normalizedId = assertValidMarkerId(markerId);
+  const lines = sourceText.replaceAll("\r\n", "\n").split("\n");
+  const filtered = lines.filter((line) => {
+    const hit = parseCommentrayRegionBoundary(line);
+    return hit === null || hit.id !== normalizedId;
+  });
+  return filtered.join("\n");
+}
+
+export function removeBlockFromIndex(
+  index: CommentrayIndex,
+  commentrayPath: string,
+  blockId: string,
+): CommentrayIndex {
+  const entry = index.byCommentrayPath[commentrayPath];
+  if (!entry) {
+    return index;
+  }
+  const nextBlocks = entry.blocks.filter((b) => b.id !== blockId);
+  if (nextBlocks.length === entry.blocks.length) {
+    return index;
+  }
+  const nextByCommentrayPath = { ...index.byCommentrayPath };
+  if (nextBlocks.length === 0) {
+    delete nextByCommentrayPath[commentrayPath];
+  } else {
+    nextByCommentrayPath[commentrayPath] = {
+      ...entry,
+      blocks: nextBlocks,
+    };
+  }
+  return {
+    ...index,
+    byCommentrayPath: nextByCommentrayPath,
+  };
+}
+
+export type AlignAndCleanRegionsInput = {
+  sourceText: string;
+  commentrayMarkdown: string;
+  index: CommentrayIndex;
+  commentrayPath: string;
+  sourcePath: string;
+};
+
+export function alignAndCleanRegions(args: AlignAndCleanRegionsInput): {
+  commentrayMarkdown: string;
+  index: CommentrayIndex;
+} {
+  const sourcePairs = findCommentrayMarkerPairs(args.sourceText);
+  const sourceMarkerIds = Array.from(new Set(sourcePairs.map((p) => p.id)));
+
+  // 1. Extract prelude and existing blocks from markdown
+  const hits = findCommentrayBlockMarkerHits(args.commentrayMarkdown);
+  const prelude = hits.length > 0 ? args.commentrayMarkdown.slice(0, hits[0]!.start) : args.commentrayMarkdown;
+
+  const segmentMap = new Map<string, string>();
+  for (let i = 0; i < hits.length; i++) {
+    const hit = hits[i]!;
+    const nextHit = hits[i + 1];
+    const end = nextHit ? nextHit.start : args.commentrayMarkdown.length;
+    const segment = args.commentrayMarkdown.slice(hit.start, end);
+    // Keep the first segment if duplicates exist
+    if (!segmentMap.has(hit.id)) {
+      segmentMap.set(hit.id, segment);
+    }
+  }
+
+  // 2. Reconstruct markdown and index blocks based on source order
+  const entry = args.index.byCommentrayPath[args.commentrayPath];
+  const nextBlocks: CommentrayBlock[] = [];
+  let nextMarkdown = prelude;
+
+  for (const markerId of sourceMarkerIds) {
+    const rawRange = sourceLineRangeForMarkerId(args.sourceText, markerId);
+    if (!rawRange) continue;
+    const range: BlockRange = { startLine: rawRange.start, endLine: rawRange.end };
+    const snippet = snippetFromRange(args.sourceText, range);
+
+    // Get or create markdown segment
+    let prose = "";
+    const existingSegment = segmentMap.get(markerId);
+    if (existingSegment !== undefined) {
+      const parsed = parseBlockSegment(existingSegment);
+      prose = parsed.prose;
+    }
+
+    // Construct segment
+    const marker = `${BLOCK_MARKER_PREFIX}${markerId}${BLOCK_MARKER_SUFFIX}`;
+    const heading = `## \`${args.sourcePath}\` ${rangeLabel(range)}`;
+    const newSegment = `${marker}\n${heading}\n\n${prose || CARET_PLACEHOLDER}\n`;
+
+    nextMarkdown = appendBlockToCommentray(nextMarkdown, newSegment);
+
+    // Get or create index block
+    const existingBlock = entry?.blocks.find((b) => b.id === markerId);
+    const updatedBlock: CommentrayBlock = {
+      ...existingBlock,
+      id: markerId,
+      anchor: `marker:${markerId}`,
+      markerId,
+      snippet,
+    };
+    nextBlocks.push(updatedBlock);
+  }
+
+  // 3. Construct new index
+  const nextByCommentrayPath = { ...args.index.byCommentrayPath };
+  if (nextBlocks.length > 0) {
+    nextByCommentrayPath[args.commentrayPath] = {
+      sourcePath: args.sourcePath,
+      commentrayPath: args.commentrayPath,
+      blocks: nextBlocks,
+    };
+  } else {
+    delete nextByCommentrayPath[args.commentrayPath];
+  }
+
+  return {
+    commentrayMarkdown: nextMarkdown,
+    index: {
+      ...args.index,
+      byCommentrayPath: nextByCommentrayPath,
+    },
+  };
+}
+
+function parseBlockSegment(segment: string): { heading: string; prose: string } {
+  const lines = segment.split("\n");
+  let headingIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]?.startsWith("## ")) {
+      headingIdx = i;
+      break;
+    }
+  }
+  if (headingIdx === -1) {
+    return { heading: "", prose: segment.trim() };
+  }
+  const heading = lines[headingIdx] ?? "";
+  const prose = lines.slice(headingIdx + 1).join("\n").trim();
+  return { heading, prose };
 }

@@ -2,6 +2,7 @@ export type { CommentrayBlock, CommentrayIndex, SourceFileIndexEntry } from "./m
 export { coerceIndexSchemaVersion, CURRENT_SCHEMA_VERSION } from "./model.js";
 export type {
   AddBlockToIndexInput,
+  AlignAndCleanRegionsInput,
   BlockRange,
   CreateBlockForRangeInput,
   CreatedBlock,
@@ -10,10 +11,14 @@ export type {
 } from "./blocks.js";
 export {
   addBlockToIndex,
+  alignAndCleanRegions,
   appendBlockToCommentray,
   createBlockForRange,
   generateBlockId,
   insertBlockBySourceMarkerOrder,
+  removeBlockFromCommentray,
+  removeBlockFromIndex,
+  removeSourceMarkersFromText,
   wrapSourceLineRangeWithCommentrayMarkers,
 } from "./blocks.js";
 export { assertValidAngleId } from "./angles.js";
