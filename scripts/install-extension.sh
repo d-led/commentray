@@ -35,6 +35,17 @@ collect_editor_clis() {
   fi
 
   local found=0
+  if command -v antigravity-ide >/dev/null 2>&1; then
+    echo antigravity-ide
+    found=1
+  elif [[ -n "${ANTIGRAVITY_EDITOR_APP_ROOT:-}" ]] && [[ -f "$ANTIGRAVITY_EDITOR_APP_ROOT/bin/antigravity-ide" ]]; then
+    echo "$ANTIGRAVITY_EDITOR_APP_ROOT/bin/antigravity-ide"
+    found=1
+  elif [[ -f "/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide" ]]; then
+    echo "/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide"
+    found=1
+  fi
+
   if command -v cursor >/dev/null 2>&1; then
     echo cursor
     found=1
@@ -44,7 +55,7 @@ collect_editor_clis() {
     found=1
   fi
   if [[ "$found" -eq 0 ]]; then
-    echo "Could not find 'cursor' or 'code' on PATH. Install the editor shell command, or set COMMENTRAY_EDITOR." >&2
+    echo "Could not find 'antigravity-ide', 'cursor' or 'code' on PATH. Install the editor shell command, or set COMMENTRAY_EDITOR." >&2
     return 1
   fi
 }
