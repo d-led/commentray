@@ -1,7 +1,9 @@
 describe("Semantic link checking and permalink verification", () => {
   function currentPageSupportsScrollAnchors(): Cypress.Chainable<boolean> {
     return cy.document().then((doc) => {
-      return doc.querySelectorAll(".commentray-block-anchor, [id^='commentray-md-line-']").length > 0;
+      return (
+        doc.querySelectorAll(".commentray-block-anchor, [id^='commentray-md-line-']").length > 0
+      );
     });
   }
 
@@ -17,7 +19,13 @@ describe("Semantic link checking and permalink verification", () => {
       for (const link of Array.from(doc.querySelectorAll<HTMLAnchorElement>("a[href]"))) {
         const href = link.getAttribute("href")?.trim() ?? "";
         if (!href) continue;
-        if (href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("data:") || href.startsWith("javascript:")) {
+        if (
+          href.startsWith("#") ||
+          href.startsWith("mailto:") ||
+          href.startsWith("tel:") ||
+          href.startsWith("data:") ||
+          href.startsWith("javascript:")
+        ) {
           continue;
         }
         if (href.startsWith("/") && !href.startsWith("//")) {
@@ -25,7 +33,10 @@ describe("Semantic link checking and permalink verification", () => {
         }
       }
 
-      const candidates = Array.from(hrefs).filter((href) => href.includes("/browse/") || href.includes("/__e2e__/") || href.includes("/README.md/"));
+      const candidates = Array.from(hrefs).filter(
+        (href) =>
+          href.includes("/browse/") || href.includes("/__e2e__/") || href.includes("/README.md/"),
+      );
       if (candidates.length > 0) {
         return candidates;
       }
@@ -35,22 +46,25 @@ describe("Semantic link checking and permalink verification", () => {
 
   function visitFirstAnchorCapablePage(candidates: string[], index = 0): Cypress.Chainable<void> {
     if (index >= candidates.length) {
-      throw new Error("Could not find an anchor-capable page to verify permalink scroll preservation");
+      throw new Error(
+        "Could not find an anchor-capable page to verify permalink scroll preservation",
+      );
     }
 
     const candidate = candidates[index];
-    return cy.visit(candidate, {
-      onBeforeLoad(win) {
-        win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
-      },
-    })
-    .then(() => currentPageSupportsScrollAnchors())
-    .then((hasAnchors) => {
-      if (hasAnchors) {
-        return;
-      }
-      return visitFirstAnchorCapablePage(candidates, index + 1);
-    });
+    return cy
+      .visit(candidate, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
+        },
+      })
+      .then(() => currentPageSupportsScrollAnchors())
+      .then((hasAnchors) => {
+        if (hasAnchors) {
+          return;
+        }
+        return visitFirstAnchorCapablePage(candidates, index + 1);
+      });
   }
 
   beforeEach(() => {
@@ -60,40 +74,44 @@ describe("Semantic link checking and permalink verification", () => {
   it("checks if in-page same-origin/relative links point to valid locations", () => {
     const localLinks = new Set<string>();
 
-    cy.get("a, img, link, script").each(($el) => {
-      const href = $el.attr("href");
-      const src = $el.attr("src");
+    cy.get("a, img, link, script")
+      .each(($el) => {
+        const href = $el.attr("href");
+        const src = $el.attr("src");
 
-      for (const attr of [href, src]) {
-        if (attr) {
-          const trimmed = attr.trim();
-          if (
-            trimmed !== "" &&
-            !trimmed.startsWith("#") &&
-            !trimmed.startsWith("mailto:") &&
-            !trimmed.startsWith("tel:") &&
-            !trimmed.startsWith("data:") &&
-            !trimmed.startsWith("javascript:")
-          ) {
-            if (/^https?:\/\//i.test(trimmed)) {
-              const baseUrl = Cypress.config("baseUrl");
-              if (baseUrl && trimmed.startsWith(baseUrl)) {
+        for (const attr of [href, src]) {
+          if (attr) {
+            const trimmed = attr.trim();
+            if (
+              trimmed !== "" &&
+              !trimmed.startsWith("#") &&
+              !trimmed.startsWith("mailto:") &&
+              !trimmed.startsWith("tel:") &&
+              !trimmed.startsWith("data:") &&
+              !trimmed.startsWith("javascript:")
+            ) {
+              if (/^https?:\/\//i.test(trimmed)) {
+                const baseUrl = Cypress.config("baseUrl");
+                if (baseUrl && trimmed.startsWith(baseUrl)) {
+                  localLinks.add(trimmed);
+                }
+              } else {
                 localLinks.add(trimmed);
               }
-            } else {
-              localLinks.add(trimmed);
             }
           }
         }
-      }
-    }).then(() => {
-      localLinks.forEach((link) => {
-        cy.request({
-          url: link,
-          failOnStatusCode: true,
-        }).its("status").should("eq", 200);
+      })
+      .then(() => {
+        localLinks.forEach((link) => {
+          cy.request({
+            url: link,
+            failOnStatusCode: true,
+          })
+            .its("status")
+            .should("eq", 200);
+        });
       });
-    });
   });
 
   it("verifies the shareable permalink copying functionality and destination correctness", () => {
@@ -147,7 +165,7 @@ describe("Semantic link checking and permalink verification", () => {
     cy.get("@clipboardWriteArch").then((stub: any) => {
       const copiedUrl = stub.firstCall.args[0];
       expect(copiedUrl).to.contain("/architecture/");
-      
+
       cy.request(copiedUrl).its("status").should("eq", 200);
 
       cy.visit(copiedUrl);
@@ -163,7 +181,9 @@ describe("Semantic link checking and permalink verification", () => {
 
     currentPageSupportsScrollAnchors().then((hasAnchors) => {
       if (!hasAnchors) {
-        return gatherScrollAnchorCandidateHrefs().then((candidates) => visitFirstAnchorCapablePage(candidates));
+        return gatherScrollAnchorCandidateHrefs().then((candidates) =>
+          visitFirstAnchorCapablePage(candidates),
+        );
       }
     });
 
