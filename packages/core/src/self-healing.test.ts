@@ -4,6 +4,14 @@ import { addBlockToIndex } from "./blocks.js";
 import { emptyIndex } from "./metadata.js";
 import { buildCommentraySnippetV1 } from "./block-snippet.js";
 
+const testMarkdown = [
+  "<!-- commentray:block id=xyz -->",
+  "## src/main.ts line 3",
+  "",
+  "prose",
+  "",
+].join("\n");
+
 function createTestIndexWithBlock(id: string, lines: string[]) {
   return addBlockToIndex(emptyIndex(), {
     sourcePath: "src/main.ts",
@@ -30,6 +38,16 @@ function runHeal(args: {
   });
 }
 
+function assertHealNoChange(src: string, markdown: string, index: ReturnType<typeof emptyIndex>) {
+  const result = runHeal({
+    sourceText: src,
+    companionMarkdown: markdown,
+    index,
+  });
+  expect(result.healedCount).toBe(0);
+  expect(result.sourceText).toBe(src);
+}
+
 describe("Self-healing source file regions", () => {
   it("returns original source text and index when no markers are missing", () => {
     const src = [
@@ -40,42 +58,17 @@ describe("Self-healing source file regions", () => {
       "}",
     ].join("\n");
 
-    const markdown = [
-      "<!-- commentray:block id=xyz -->",
-      "## src/main.ts line 3",
-      "",
-      "prose",
-      "",
-    ].join("\n");
-
     const idx = createTestIndexWithBlock("xyz", ["console.log(1);"]);
-
-    const result = runHeal({
-      sourceText: src,
-      companionMarkdown: markdown,
-      index: idx,
-    });
-
-    expect(result.healedCount).toBe(0);
-    expect(result.sourceText).toBe(src);
+    assertHealNoChange(src, testMarkdown, idx);
   });
 
   it("restores missing region markers when the snippet unique match is found in the source", () => {
     const src = ["function main() {", "  console.log(1);", "}"].join("\n");
-
-    const markdown = [
-      "<!-- commentray:block id=xyz -->",
-      "## src/main.ts line 2",
-      "",
-      "prose",
-      "",
-    ].join("\n");
-
     const idx = createTestIndexWithBlock("xyz", ["console.log(1);"]);
 
     const result = runHeal({
       sourceText: src,
-      companionMarkdown: markdown,
+      companionMarkdown: testMarkdown,
       index: idx,
     });
 
@@ -88,15 +81,6 @@ describe("Self-healing source file regions", () => {
   it("does not heal a block if it is not present in index", () => {
     const src = "console.log(1);";
     const markdown = "<!-- commentray:block id=xyz -->\n## x\n\nprose";
-    const idx = emptyIndex();
-
-    const result = runHeal({
-      sourceText: src,
-      companionMarkdown: markdown,
-      index: idx,
-    });
-
-    expect(result.healedCount).toBe(0);
-    expect(result.sourceText).toBe(src);
+    assertHealNoChange(src, markdown, emptyIndex());
   });
 });

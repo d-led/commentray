@@ -631,6 +631,13 @@ describe("Recovering source markers from snippet", () => {
     });
   }
 
+  function verifySuccessfulRecovery(src: string, snippetLines: string[], blockId = "sum") {
+    const result = runRecoverSnippet({ sourceText: src, snippetLines, blockId });
+    expect(result.healed).toBe(true);
+    expect(result.range).toEqual({ startLine: 3, endLine: 4 });
+    return result;
+  }
+
   it("returns healed=false and unchanged sourceText when snippet is missing or empty", () => {
     const block: CommentrayBlock = { id: "greet", anchor: "marker:greet" };
     const src = "function greet() {\n  return 'hi';\n}";
@@ -645,15 +652,7 @@ describe("Recovering source markers from snippet", () => {
 
   it("re-inserts region markers when a unique match of snippet is found", () => {
     const src = ["function sum() {", "  const x = 1;", "  return x;", "}"].join("\n");
-
-    const result = runRecoverSnippet({
-      sourceText: src,
-      snippetLines: ["const x = 1;", "return x;"],
-      blockId: "sum",
-    });
-
-    expect(result.healed).toBe(true);
-    expect(result.range).toEqual({ startLine: 3, endLine: 4 });
+    const result = verifySuccessfulRecovery(src, ["const x = 1;", "return x;"]);
     expect(result.sourceText).toBe(
       [
         "function sum() {",
@@ -668,15 +667,7 @@ describe("Recovering source markers from snippet", () => {
 
   it("handles whitespace and indentation differences during snippet matching", () => {
     const src = ["function sum() {", "\tconst x = 1;", "\t\treturn x;", "}"].join("\n");
-
-    const result = runRecoverSnippet({
-      sourceText: src,
-      snippetLines: ["const x = 1;", "return x;"],
-      blockId: "sum",
-    });
-
-    expect(result.healed).toBe(true);
-    expect(result.range).toEqual({ startLine: 3, endLine: 4 });
+    verifySuccessfulRecovery(src, ["const x = 1;", "return x;"]);
   });
 
   it("returns healed=false when the snippet is not found in the source", () => {
