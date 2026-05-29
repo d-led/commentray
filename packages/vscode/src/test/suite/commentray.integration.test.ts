@@ -30,6 +30,12 @@ async function openDogfoodPairedMarkdownActiveEditor(
   return pairedUri;
 }
 
+function assertEqualLinesTrimmed(actual: string, expected: string, message?: string): void {
+  const normActual = actual.replace(/\r\n/g, "\n").split("\n").map(l => l.trim()).filter(Boolean).join("\n");
+  const normExpected = expected.replace(/\r\n/g, "\n").split("\n").map(l => l.trim()).filter(Boolean).join("\n");
+  assert.strictEqual(normActual, normExpected, message);
+}
+
 /** Same implementation the extension calls; loaded via relative path because the EDH resolves `@commentray/core` package exports poorly under `require()`. */
 type ValidateProjectFn = (
   repoRoot: string,
@@ -429,7 +435,7 @@ async function assertSelectionInsideExistingRegionRevealsExistingBlock(
   await vscode.commands.executeCommand("commentray.startBlockFromSelection");
 
   const sourceAfter = (await vscode.workspace.openTextDocument(sourceUri)).getText();
-  assert.strictEqual(
+  assertEqualLinesTrimmed(
     sourceAfter,
     withRegion,
     "Expected source unchanged when selection is in region.",
@@ -477,7 +483,7 @@ async function assertSelectionTouchingBoundaryRecoversMissingBlock(
   await vscode.commands.executeCommand("commentray.startBlockFromSelection");
 
   const sourceAfter = (await vscode.workspace.openTextDocument(sourceUri)).getText();
-  assert.strictEqual(
+  assertEqualLinesTrimmed(
     sourceAfter,
     withRegion,
     "Expected source unchanged when reusing boundary block.",

@@ -10,14 +10,22 @@ import { defineConfig } from "@vscode/test-cli";
  * in this package's package.json — see docs/development.md.
  */
 const vscodeVersion = (process.env.VSCODE_TEST_VERSION ?? "").trim() || "stable";
+const vscodePath = process.env.VSCODE_TEST_PATH;
 
-export default defineConfig({
+const config = {
   files: "dist/test/suite/**/*.integration.test.js",
   workspaceFolder: "./fixtures/dogfood",
-  version: vscodeVersion,
   mocha: {
     ui: "bdd",
     timeout: 60_000,
   },
   launchArgs: ["--disable-extensions"],
-});
+};
+
+if (vscodePath) {
+  config.useInstallation = { fromPath: vscodePath };
+} else {
+  config.version = vscodeVersion;
+}
+
+export default defineConfig(config);
