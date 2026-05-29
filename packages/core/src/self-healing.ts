@@ -30,7 +30,8 @@ export function healSourceFile(args: {
   for (const hit of markdownHits) {
     const blockIndex = updatedBlocks.findIndex((b) => b.id === hit.id);
     if (blockIndex === -1) continue;
-    const block = updatedBlocks[blockIndex]!;
+    const block = updatedBlocks[blockIndex];
+    if (!block) continue;
 
     if (!hasRegionInSource(currentSourceText, block.id)) {
       const recovery = recoverSourceMarkersFromSnippet({

@@ -328,7 +328,8 @@ describe("Removing a block from companion Markdown", () => {
   });
 
   it("removes the only block completely and returns the prelude only", () => {
-    const md = "# Prelude Title\nIntro text\n\n<!-- commentray:block id=abc -->\n## src/x.ts line 1\n\nprose\n";
+    const md =
+      "# Prelude Title\nIntro text\n\n<!-- commentray:block id=abc -->\n## src/x.ts line 1\n\nprose\n";
     const result = removeBlockFromCommentray(md, "abc");
     expect(result.trim()).toBe("# Prelude Title\nIntro text");
   });
@@ -378,12 +379,9 @@ describe("Removing a block from companion Markdown", () => {
 
     const result = removeBlockFromCommentray(md, "b");
 
-    expect(result.trim()).toBe([
-      "<!-- commentray:block id=a -->",
-      "## src/x.ts line 1",
-      "",
-      "prose A",
-    ].join("\n"));
+    expect(result.trim()).toBe(
+      ["<!-- commentray:block id=a -->", "## src/x.ts line 1", "", "prose A"].join("\n"),
+    );
   });
 });
 
@@ -405,11 +403,7 @@ describe("Removing source markers from source files", () => {
 
     const result = removeSourceMarkersFromText(src, "abc");
 
-    expect(result).toBe([
-      "function foo() {",
-      "  console.log('hello');",
-      "}",
-    ].join("\n"));
+    expect(result).toBe(["function foo() {", "  console.log('hello');", "}"].join("\n"));
   });
 
   it("supports multiple comment styles", () => {
@@ -447,7 +441,7 @@ describe("Removing a block from the metadata index", () => {
 
     const result = removeBlockFromIndex(idx, cp, "a");
 
-    expect(result.byCommentrayPath[cp]?.blocks.map(b => b.id)).toEqual(["b"]);
+    expect(result.byCommentrayPath[cp]?.blocks.map((b) => b.id)).toEqual(["b"]);
   });
 
   it("removes the entire entry from byCommentrayPath when the last block is deleted", () => {
@@ -463,6 +457,33 @@ describe("Removing a block from the metadata index", () => {
     expect(result.byCommentrayPath[cp]).toBeUndefined();
   });
 });
+
+function buildAlignIndex(blocks: { id: string; anchor: string }[]) {
+  return {
+    schemaVersion: 3 as const,
+    byCommentrayPath: {
+      "docs/main.md": {
+        sourcePath: "src/main.ts",
+        commentrayPath: "docs/main.md",
+        blocks,
+      },
+    },
+  };
+}
+
+function runAlign(args: {
+  sourceText: string;
+  commentrayMarkdown: string;
+  blocks: { id: string; anchor: string }[];
+}) {
+  return alignAndCleanRegions({
+    sourceText: args.sourceText,
+    commentrayMarkdown: args.commentrayMarkdown,
+    index: buildAlignIndex(args.blocks),
+    commentrayPath: "docs/main.md",
+    sourcePath: "src/main.ts",
+  });
+}
 
 describe("Aligning and cleaning regions across source, markdown, and index", () => {
   const sourceText = [
@@ -492,26 +513,13 @@ describe("Aligning and cleaning regions across source, markdown, and index", () 
       "",
     ].join("\n");
 
-    const baseIndex = {
-      schemaVersion: 3,
-      byCommentrayPath: {
-        "docs/main.md": {
-          sourcePath: "src/main.ts",
-          commentrayPath: "docs/main.md",
-          blocks: [
-            { id: "second", anchor: "marker:second" },
-            { id: "first", anchor: "marker:first" },
-          ],
-        },
-      },
-    };
-
-    const { commentrayMarkdown, index } = alignAndCleanRegions({
+    const { commentrayMarkdown, index } = runAlign({
       sourceText,
       commentrayMarkdown: markdown,
-      index: baseIndex,
-      commentrayPath: "docs/main.md",
-      sourcePath: "src/main.ts",
+      blocks: [
+        { id: "second", anchor: "marker:second" },
+        { id: "first", anchor: "marker:first" },
+      ],
     });
 
     // Verify markdown ordering
@@ -523,8 +531,22 @@ describe("Aligning and cleaning regions across source, markdown, and index", () 
 
     // Verify index ordering
     const entry = index.byCommentrayPath["docs/main.md"];
-    expect(entry?.blocks.map(b => b.id)).toEqual(["first", "second"]);
+    expect(entry?.blocks.map((b) => b.id)).toEqual(["first", "second"]);
   });
+});
+
+describe("Aligning and cleaning regions (adding and removing markers)", () => {
+  const sourceText = [
+    "function main() {",
+    "//#region commentray:first",
+    "  console.log(1);",
+    "//#endregion commentray:first",
+    "  console.log(2);",
+    "//#region commentray:second",
+    "  console.log(3);",
+    "//#endregion commentray:second",
+    "}",
+  ].join("\n");
 
   it("creates placeholder blocks when a new region is added in source code", () => {
     // Companion Markdown has only the "first" block, but source has "first" and "second"
@@ -536,23 +558,10 @@ describe("Aligning and cleaning regions across source, markdown, and index", () 
       "",
     ].join("\n");
 
-    const baseIndex = {
-      schemaVersion: 3,
-      byCommentrayPath: {
-        "docs/main.md": {
-          sourcePath: "src/main.ts",
-          commentrayPath: "docs/main.md",
-          blocks: [{ id: "first", anchor: "marker:first" }],
-        },
-      },
-    };
-
-    const { commentrayMarkdown, index } = alignAndCleanRegions({
+    const { commentrayMarkdown, index } = runAlign({
       sourceText,
       commentrayMarkdown: markdown,
-      index: baseIndex,
-      commentrayPath: "docs/main.md",
-      sourcePath: "src/main.ts",
+      blocks: [{ id: "first", anchor: "marker:first" }],
     });
 
     expect(commentrayMarkdown).toContain("id=first");
@@ -560,8 +569,8 @@ describe("Aligning and cleaning regions across source, markdown, and index", () 
     expect(commentrayMarkdown).toContain("_(write commentary here)_");
 
     const entry = index.byCommentrayPath["docs/main.md"];
-    expect(entry?.blocks.map(b => b.id)).toEqual(["first", "second"]);
-    expect(entry?.blocks.find(b => b.id === "second")?.snippet).toContain("console.log(3)");
+    expect(entry?.blocks.map((b) => b.id)).toEqual(["first", "second"]);
+    expect(entry?.blocks.find((b) => b.id === "second")?.snippet).toContain("console.log(3)");
   });
 
   it("removes block sections and index entries when region markers are removed from source", () => {
@@ -587,100 +596,103 @@ describe("Aligning and cleaning regions across source, markdown, and index", () 
       "",
     ].join("\n");
 
-    const baseIndex = {
-      schemaVersion: 3,
-      byCommentrayPath: {
-        "docs/main.md": {
-          sourcePath: "src/main.ts",
-          commentrayPath: "docs/main.md",
-          blocks: [
-            { id: "first", anchor: "marker:first" },
-            { id: "second", anchor: "marker:second" },
-          ],
-        },
-      },
-    };
-
-    const { commentrayMarkdown, index } = alignAndCleanRegions({
+    const { commentrayMarkdown, index } = runAlign({
       sourceText: srcOnlyFirst,
       commentrayMarkdown: markdown,
-      index: baseIndex,
-      commentrayPath: "docs/main.md",
-      sourcePath: "src/main.ts",
+      blocks: [
+        { id: "first", anchor: "marker:first" },
+        { id: "second", anchor: "marker:second" },
+      ],
     });
 
     expect(commentrayMarkdown).toContain("id=first");
     expect(commentrayMarkdown).not.toContain("id=second");
 
     const entry = index.byCommentrayPath["docs/main.md"];
-    expect(entry?.blocks.map(b => b.id)).toEqual(["first"]);
+    expect(entry?.blocks.map((b) => b.id)).toEqual(["first"]);
   });
 });
 
 describe("Recovering source markers from snippet", () => {
+  function runRecoverSnippet(args: {
+    sourceText: string;
+    snippetLines: string[];
+    blockId?: string;
+  }) {
+    const block: CommentrayBlock = {
+      id: args.blockId ?? "sum",
+      anchor: `marker:${args.blockId ?? "sum"}`,
+      snippet: buildCommentraySnippetV1(args.snippetLines),
+    };
+    return recoverSourceMarkersFromSnippet({
+      sourceText: args.sourceText,
+      languageId: "typescript",
+      block,
+    });
+  }
+
   it("returns healed=false and unchanged sourceText when snippet is missing or empty", () => {
     const block: CommentrayBlock = { id: "greet", anchor: "marker:greet" };
     const src = "function greet() {\n  return 'hi';\n}";
-    const result = recoverSourceMarkersFromSnippet({ sourceText: src, languageId: "typescript", block });
+    const result = recoverSourceMarkersFromSnippet({
+      sourceText: src,
+      languageId: "typescript",
+      block,
+    });
     expect(result.healed).toBe(false);
     expect(result.sourceText).toBe(src);
   });
 
   it("re-inserts region markers when a unique match of snippet is found", () => {
-    const snippet = buildCommentraySnippetV1(["const x = 1;", "return x;"]);
-    const block: CommentrayBlock = { id: "sum", anchor: "marker:sum", snippet };
-    const src = [
-      "function sum() {",
-      "  const x = 1;",
-      "  return x;",
-      "}",
-    ].join("\n");
+    const src = ["function sum() {", "  const x = 1;", "  return x;", "}"].join("\n");
 
-    const result = recoverSourceMarkersFromSnippet({ sourceText: src, languageId: "typescript", block });
+    const result = runRecoverSnippet({
+      sourceText: src,
+      snippetLines: ["const x = 1;", "return x;"],
+      blockId: "sum",
+    });
 
     expect(result.healed).toBe(true);
     expect(result.range).toEqual({ startLine: 3, endLine: 4 });
-    expect(result.sourceText).toBe([
-      "function sum() {",
-      "  //#region commentray:sum",
-      "  const x = 1;",
-      "  return x;",
-      "  //#endregion commentray:sum",
-      "}",
-    ].join("\n"));
+    expect(result.sourceText).toBe(
+      [
+        "function sum() {",
+        "  //#region commentray:sum",
+        "  const x = 1;",
+        "  return x;",
+        "  //#endregion commentray:sum",
+        "}",
+      ].join("\n"),
+    );
   });
 
   it("handles whitespace and indentation differences during snippet matching", () => {
-    const snippet = buildCommentraySnippetV1(["const x = 1;", "return x;"]);
-    const block: CommentrayBlock = { id: "sum", anchor: "marker:sum", snippet };
-    // source has different indentation
-    const src = [
-      "function sum() {",
-      "\tconst x = 1;",
-      "\t\treturn x;",
-      "}",
-    ].join("\n");
+    const src = ["function sum() {", "\tconst x = 1;", "\t\treturn x;", "}"].join("\n");
 
-    const result = recoverSourceMarkersFromSnippet({ sourceText: src, languageId: "typescript", block });
+    const result = runRecoverSnippet({
+      sourceText: src,
+      snippetLines: ["const x = 1;", "return x;"],
+      blockId: "sum",
+    });
 
     expect(result.healed).toBe(true);
     expect(result.range).toEqual({ startLine: 3, endLine: 4 });
   });
 
   it("returns healed=false when the snippet is not found in the source", () => {
-    const snippet = buildCommentraySnippetV1(["const x = 2;"]);
-    const block: CommentrayBlock = { id: "sum", anchor: "marker:sum", snippet };
     const src = "function sum() {\n  const x = 1;\n}";
 
-    const result = recoverSourceMarkersFromSnippet({ sourceText: src, languageId: "typescript", block });
+    const result = runRecoverSnippet({
+      sourceText: src,
+      snippetLines: ["const x = 2;"],
+      blockId: "sum",
+    });
 
     expect(result.healed).toBe(false);
     expect(result.sourceText).toBe(src);
   });
 
   it("returns healed=false when snippet matches multiple locations (ambiguous match)", () => {
-    const snippet = buildCommentraySnippetV1(["console.log(1);"]);
-    const block: CommentrayBlock = { id: "log", anchor: "marker:log", snippet };
     const src = [
       "function first() {",
       "  console.log(1);",
@@ -690,7 +702,11 @@ describe("Recovering source markers from snippet", () => {
       "}",
     ].join("\n");
 
-    const result = recoverSourceMarkersFromSnippet({ sourceText: src, languageId: "typescript", block });
+    const result = runRecoverSnippet({
+      sourceText: src,
+      snippetLines: ["console.log(1);"],
+      blockId: "log",
+    });
 
     expect(result.healed).toBe(false);
   });

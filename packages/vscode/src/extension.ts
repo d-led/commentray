@@ -42,6 +42,7 @@ import {
   validateProject,
   wrapSourceLineRangeWithCommentrayMarkers,
   writeIndex,
+  type SourceFileIndexEntry,
 } from "@commentray/core";
 import * as path from "node:path";
 import * as vscode from "vscode";
@@ -1186,7 +1187,9 @@ async function resolvePathsForActiveEditor(active: {
 
   const diskPair = resolveCompanionPathToSourcePair(normalized, repoRoot, cfg);
   if (diskPair) {
-    const commentrayUri = vscode.Uri.file(path.join(repoRoot, ...diskPair.commentrayPath.split("/")));
+    const commentrayUri = vscode.Uri.file(
+      path.join(repoRoot, ...diskPair.commentrayPath.split("/")),
+    );
     return {
       repoRoot,
       sourceRelative: diskPair.sourcePath,
@@ -1199,21 +1202,17 @@ async function resolvePathsForActiveEditor(active: {
   return resolvePairedPaths(active.editor, active.folder);
 }
 
-async function removeBlockCommand(): Promise<void> {
-  const active = await requireActiveEditorInWorkspace();
-  if (!active) return;
-
-  const paths = await resolvePathsForActiveEditor(active);
-  if (!paths) return;
-
+async function detectOrPromptBlockId(active: {
+  editor: vscode.TextEditor;
+  folder: vscode.WorkspaceFolder;
+}): Promise<string | undefined> {
   let blockId: string | undefined;
 
   const sourceText = active.editor.document.getText();
   const lineRange = fullLineBlockRange(active.editor);
 
   const isMarkdown =
-    active.editor.document.languageId === "markdown" ||
-    active.editor.document.languageId === "md";
+    active.editor.document.languageId === "markdown" || active.editor.document.languageId === "md";
   if (isMarkdown) {
     const offset = active.editor.document.offsetAt(active.editor.selection.active);
     const hits: { id: string; start: number }[] = [];
@@ -1230,8 +1229,9 @@ async function removeBlockCommand(): Promise<void> {
       }
     }
     for (let i = hits.length - 1; i >= 0; i--) {
-      if (hits[i]!.start <= offset) {
-        blockId = hits[i]!.id;
+      const hit = hits[i];
+      if (hit && hit.start <= offset) {
+        blockId = hit.id;
         break;
       }
     }
@@ -1262,63 +1262,83 @@ async function removeBlockCommand(): Promise<void> {
     });
   }
 
+  return blockId;
+}
+
+async function removeMarkersFromSource(paths: PairedPaths, blockId: string): Promise<void> {
+  const sourceUri = vscode.Uri.file(path.join(paths.repoRoot, ...paths.sourceRelative.split("/")));
+  const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+  const sourceContent = sourceDoc.getText();
+  const updatedSource = removeSourceMarkersFromText(sourceContent, blockId);
+  if (updatedSource !== sourceContent) {
+    const sourceEditor = vscode.window.visibleTextEditors.find(
+      (te) => te.document.uri.toString() === sourceDoc.uri.toString(),
+    );
+    if (sourceEditor) {
+      await replaceDocumentContents(sourceEditor.document, updatedSource);
+      await sourceEditor.document.save();
+    } else {
+      await replaceDocumentContents(sourceDoc, updatedSource);
+      await sourceDoc.save();
+    }
+  }
+}
+
+async function removeBlockFromCompanion(paths: PairedPaths, blockId: string): Promise<void> {
+  let commentrayDoc: vscode.TextDocument | null = null;
+  try {
+    commentrayDoc = await vscode.workspace.openTextDocument(paths.commentrayUri);
+  } catch {
+    // Ignore
+  }
+
+  if (commentrayDoc) {
+    const commentrayContent = commentrayDoc.getText();
+    const updatedCommentray = removeBlockFromCommentray(commentrayContent, blockId);
+    if (updatedCommentray !== commentrayContent) {
+      const commentrayEditor = vscode.window.visibleTextEditors.find(
+        (te) => te.document.uri.toString() === commentrayDoc.uri.toString(),
+      );
+      if (commentrayEditor) {
+        await replaceDocumentContents(commentrayEditor.document, updatedCommentray);
+        await commentrayEditor.document.save();
+      } else {
+        await replaceDocumentContents(commentrayDoc, updatedCommentray);
+        await commentrayDoc.save();
+      }
+    }
+  }
+}
+
+async function removeBlockFromIdx(paths: PairedPaths, blockId: string): Promise<void> {
+  let currentIdx: CommentrayIndex;
+  try {
+    currentIdx = (await readIndex(paths.repoRoot)) ?? emptyIndex();
+  } catch {
+    currentIdx = emptyIndex();
+  }
+  const updatedIdx = removeBlockFromIndex(currentIdx, paths.commentrayPathRel, blockId);
+  await writeIndex(paths.repoRoot, updatedIdx);
+}
+
+async function removeBlockCommand(): Promise<void> {
+  const active = await requireActiveEditorInWorkspace();
+  if (!active) return;
+
+  const paths = await resolvePathsForActiveEditor(active);
+  if (!paths) return;
+
+  const blockId = await detectOrPromptBlockId(active);
   if (!blockId) return;
 
   try {
-    // 1. Remove markers from source code
-    const sourceUri = vscode.Uri.file(path.join(paths.repoRoot, ...paths.sourceRelative.split("/")));
-    const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
-    const sourceContent = sourceDoc.getText();
-    const updatedSource = removeSourceMarkersFromText(sourceContent, blockId);
-    if (updatedSource !== sourceContent) {
-      const sourceEditor = vscode.window.visibleTextEditors.find(
-        (te) => te.document.uri.toString() === sourceDoc.uri.toString(),
-      );
-      if (sourceEditor) {
-        await replaceDocumentContents(sourceEditor.document, updatedSource);
-        await sourceEditor.document.save();
-      } else {
-        await replaceDocumentContents(sourceDoc, updatedSource);
-        await sourceDoc.save();
-      }
-    }
+    await removeMarkersFromSource(paths, blockId);
+    await removeBlockFromCompanion(paths, blockId);
+    await removeBlockFromIdx(paths, blockId);
 
-    // 2. Remove block from companion Markdown
-    let commentrayDoc: vscode.TextDocument;
-    try {
-      commentrayDoc = await vscode.workspace.openTextDocument(paths.commentrayUri);
-    } catch {
-      commentrayDoc = null as any;
-    }
-
-    if (commentrayDoc) {
-      const commentrayContent = commentrayDoc.getText();
-      const updatedCommentray = removeBlockFromCommentray(commentrayContent, blockId);
-      if (updatedCommentray !== commentrayContent) {
-        const commentrayEditor = vscode.window.visibleTextEditors.find(
-          (te) => te.document.uri.toString() === commentrayDoc.uri.toString(),
-        );
-        if (commentrayEditor) {
-          await replaceDocumentContents(commentrayEditor.document, updatedCommentray);
-          await commentrayEditor.document.save();
-        } else {
-          await replaceDocumentContents(commentrayDoc, updatedCommentray);
-          await commentrayDoc.save();
-        }
-      }
-    }
-
-    // 3. Remove block from index
-    let currentIdx: CommentrayIndex;
-    try {
-      currentIdx = (await readIndex(paths.repoRoot)) ?? emptyIndex();
-    } catch {
-      currentIdx = emptyIndex();
-    }
-    const updatedIdx = removeBlockFromIndex(currentIdx, paths.commentrayPathRel, blockId);
-    await writeIndex(paths.repoRoot, updatedIdx);
-
-    void vscode.window.showInformationMessage(`Commentary block "${blockId}" removed successfully.`);
+    void vscode.window.showInformationMessage(
+      `Commentary block "${blockId}" removed successfully.`,
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logCommentray(`[commentray] removeBlock failed: ${msg}`);
@@ -1334,7 +1354,9 @@ async function cleanRegionsCommand(): Promise<void> {
   if (!paths) return;
 
   try {
-    const sourceUri = vscode.Uri.file(path.join(paths.repoRoot, ...paths.sourceRelative.split("/")));
+    const sourceUri = vscode.Uri.file(
+      path.join(paths.repoRoot, ...paths.sourceRelative.split("/")),
+    );
     const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
     const sourceText = sourceDoc.getText();
 
@@ -1393,7 +1415,9 @@ async function repairFileCommand(): Promise<void> {
   if (!paths) return;
 
   try {
-    const sourceUri = vscode.Uri.file(path.join(paths.repoRoot, ...paths.sourceRelative.split("/")));
+    const sourceUri = vscode.Uri.file(
+      path.join(paths.repoRoot, ...paths.sourceRelative.split("/")),
+    );
     const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
     const sourceText = sourceDoc.getText();
 
@@ -1422,7 +1446,9 @@ async function repairFileCommand(): Promise<void> {
     });
 
     if (result.healedCount === 0) {
-      void vscode.window.showInformationMessage("No missing commentary region markers detected or healed.");
+      void vscode.window.showInformationMessage(
+        "No missing commentary region markers detected or healed.",
+      );
       return;
     }
 
@@ -1440,7 +1466,9 @@ async function repairFileCommand(): Promise<void> {
       await sourceDoc.save();
     }
 
-    void vscode.window.showInformationMessage(`Successfully repaired and restored ${result.healedCount} region marker(s).`);
+    void vscode.window.showInformationMessage(
+      `Successfully repaired and restored ${result.healedCount} region marker(s).`,
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logCommentray(`[commentray] repairFile failed: ${msg}`);
@@ -1448,65 +1476,93 @@ async function repairFileCommand(): Promise<void> {
   }
 }
 
+async function renameCompanionFile(
+  oldCp: string,
+  entry: SourceFileIndexEntry,
+  newNorm: string,
+  repoRoot: string,
+  cfg: Awaited<ReturnType<typeof loadCommentrayConfig>>,
+  anglesLayout: boolean,
+): Promise<void> {
+  let newCp = oldCp;
+  if (anglesLayout) {
+    const angleId = inferAngleIdFromCommentrayPath(
+      entry.commentrayPath,
+      entry.sourcePath,
+      cfg.storageDir,
+    );
+    if (angleId) {
+      try {
+        newCp = commentrayMarkdownPathForAngle(
+          newNorm,
+          assertValidAngleId(angleId),
+          cfg.storageDir,
+        );
+      } catch (err) {
+        logCommentray(`[commentray] rename watcher failed to resolve angle path: ${err}`);
+      }
+    }
+  } else {
+    newCp = commentrayMarkdownPath(newNorm, cfg.storageDir);
+  }
+
+  if (newCp !== oldCp) {
+    const oldUri = vscode.Uri.file(path.join(repoRoot, ...oldCp.split("/")));
+    const newUri = vscode.Uri.file(path.join(repoRoot, ...newCp.split("/")));
+    try {
+      const parent = path.dirname(newUri.fsPath);
+      await vscode.workspace.fs.createDirectory(vscode.Uri.file(parent));
+      await vscode.workspace.fs.rename(oldUri, newUri, { overwrite: true });
+      logCommentray(
+        `[commentray] Automatically renamed companion Markdown file on disk: ${oldCp} -> ${newCp}`,
+      );
+    } catch (renameErr) {
+      logCommentray(`[commentray] Failed to rename companion file on disk: ${renameErr}`);
+    }
+  }
+}
+
+async function handleFileRename(file: { oldUri: vscode.Uri; newUri: vscode.Uri }): Promise<void> {
+  try {
+    const relativeOld = vscode.workspace.asRelativePath(file.oldUri, false);
+    const relativeNew = vscode.workspace.asRelativePath(file.newUri, false);
+    const oldNorm = normalizeRepoRelativePath(relativeOld.replaceAll("\\", "/"));
+    const newNorm = normalizeRepoRelativePath(relativeNew.replaceAll("\\", "/"));
+
+    const folder = vscode.workspace.getWorkspaceFolder(file.newUri);
+    if (!folder) return;
+    const repoRoot = folder.uri.fsPath;
+
+    const cfg = await loadCommentrayConfig(repoRoot);
+    const index = await readIndex(repoRoot);
+    if (!index) return;
+
+    const anglesLayout = commentrayAnglesLayoutEnabled(repoRoot, cfg.storageDir);
+    const renames = [{ from: oldNorm, to: newNorm }];
+
+    for (const [oldCp, entry] of Object.entries(index.byCommentrayPath)) {
+      if (normalizeRepoRelativePath(entry.sourcePath) === oldNorm) {
+        await renameCompanionFile(oldCp, entry, newNorm, repoRoot, cfg, anglesLayout);
+      }
+    }
+
+    const result = applyPathRenamesToCommentrayIndex(index, renames, repoRoot, cfg);
+    if (result.changed) {
+      await writeIndex(repoRoot, result.index);
+      logCommentray(
+        `[commentray] Automatically updated index for renamed file: ${oldNorm} -> ${newNorm}`,
+      );
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logCommentray(`[commentray] rename watcher failed: ${msg}`);
+  }
+}
+
 function registerRenameWatcher(context: vscode.ExtensionContext) {
   const disposable = vscode.workspace.onDidRenameFiles(async (e) => {
     for (const file of e.files) {
-      try {
-        const relativeOld = vscode.workspace.asRelativePath(file.oldUri, false);
-        const relativeNew = vscode.workspace.asRelativePath(file.newUri, false);
-        const oldNorm = normalizeRepoRelativePath(relativeOld.replaceAll("\\", "/"));
-        const newNorm = normalizeRepoRelativePath(relativeNew.replaceAll("\\", "/"));
-
-        const folder = vscode.workspace.getWorkspaceFolder(file.newUri);
-        if (!folder) continue;
-        const repoRoot = folder.uri.fsPath;
-
-        const cfg = await loadCommentrayConfig(repoRoot);
-        const index = await readIndex(repoRoot);
-        if (!index) continue;
-
-        const anglesLayout = commentrayAnglesLayoutEnabled(repoRoot, cfg.storageDir);
-        const renames = [{ from: oldNorm, to: newNorm }];
-
-        // Physically rename companion files on disk if the source file was renamed
-        for (const [oldCp, entry] of Object.entries(index.byCommentrayPath)) {
-          if (normalizeRepoRelativePath(entry.sourcePath) === oldNorm) {
-            let newCp = oldCp;
-            if (anglesLayout) {
-              const angleId = inferAngleIdFromCommentrayPath(entry.commentrayPath, entry.sourcePath, cfg.storageDir);
-              if (angleId) {
-                try {
-                  newCp = commentrayMarkdownPathForAngle(newNorm, assertValidAngleId(angleId), cfg.storageDir);
-                } catch {}
-              }
-            } else {
-              newCp = commentrayMarkdownPath(newNorm, cfg.storageDir);
-            }
-
-            if (newCp !== oldCp) {
-              const oldUri = vscode.Uri.file(path.join(repoRoot, ...oldCp.split("/")));
-              const newUri = vscode.Uri.file(path.join(repoRoot, ...newCp.split("/")));
-              try {
-                const parent = path.dirname(newUri.fsPath);
-                await vscode.workspace.fs.createDirectory(vscode.Uri.file(parent));
-                await vscode.workspace.fs.rename(oldUri, newUri, { overwrite: true });
-                logCommentray(`[commentray] Automatically renamed companion Markdown file on disk: ${oldCp} -> ${newCp}`);
-              } catch (renameErr) {
-                logCommentray(`[commentray] Failed to rename companion file on disk: ${renameErr}`);
-              }
-            }
-          }
-        }
-
-        const result = applyPathRenamesToCommentrayIndex(index, renames, repoRoot, cfg);
-        if (result.changed) {
-          await writeIndex(repoRoot, result.index);
-          logCommentray(`[commentray] Automatically updated index for renamed file: ${oldNorm} -> ${newNorm}`);
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        logCommentray(`[commentray] rename watcher failed: ${msg}`);
-      }
+      await handleFileRename(file);
     }
   });
   context.subscriptions.push(disposable);

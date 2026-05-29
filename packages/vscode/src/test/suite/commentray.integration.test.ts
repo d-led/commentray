@@ -31,8 +31,18 @@ async function openDogfoodPairedMarkdownActiveEditor(
 }
 
 function assertEqualLinesTrimmed(actual: string, expected: string, message?: string): void {
-  const normActual = actual.replace(/\r\n/g, "\n").split("\n").map(l => l.trim()).filter(Boolean).join("\n");
-  const normExpected = expected.replace(/\r\n/g, "\n").split("\n").map(l => l.trim()).filter(Boolean).join("\n");
+  const normActual = actual
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join("\n");
+  const normExpected = expected
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join("\n");
   assert.strictEqual(normActual, normExpected, message);
 }
 
@@ -804,16 +814,19 @@ function registerSelfHealingTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): v
         "export function testFunc(): void {",
         "  const hello = 'world';",
         "}",
-        ""
+        "",
       ].join("\n");
       await replaceDocumentText(sourceUri, originalText);
       const editor = await vscode.window.showTextDocument(
         await vscode.workspace.openTextDocument(sourceUri),
-        { preview: false }
+        { preview: false },
       );
 
       // Select line to create a block
-      editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 24));
+      editor.selection = new vscode.Selection(
+        new vscode.Position(1, 0),
+        new vscode.Position(1, 24),
+      );
       await vscode.commands.executeCommand("commentray.startBlockFromSelection");
 
       // Extract generated block ID
@@ -829,20 +842,26 @@ function registerSelfHealingTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): v
         "export function testFunc(): void {",
         "  const hello = 'world';",
         "}",
-        ""
+        "",
       ].join("\n");
       await replaceDocumentText(sourceUri, deletedMarkersText);
 
       const activeEd = await vscode.window.showTextDocument(
         await vscode.workspace.openTextDocument(sourceUri),
-        { preview: false }
+        { preview: false },
       );
 
       await vscode.commands.executeCommand("commentray.repairFile");
 
       const healedText = activeEd.document.getText();
-      assert.ok(healedText.includes(`//#region commentray:${blockId}`), `Expected start region marker for ${blockId} to be restored`);
-      assert.ok(healedText.includes(`//#endregion commentray:${blockId}`), `Expected end region marker for ${blockId} to be restored`);
+      assert.ok(
+        healedText.includes(`//#region commentray:${blockId}`),
+        `Expected start region marker for ${blockId} to be restored`,
+      );
+      assert.ok(
+        healedText.includes(`//#endregion commentray:${blockId}`),
+        `Expected end region marker for ${blockId} to be restored`,
+      );
     });
   });
 }
@@ -854,29 +873,44 @@ function registerRenameWatcherTests(dogfoodWorkspace: DogfoodWorkspaceAccessor):
       await vscode.commands.executeCommand("commentray.init");
 
       const oldSourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "rename-temp.ts");
-      const newSourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "rename-temp-new.ts");
+      const newSourceUri = vscode.Uri.joinPath(
+        dogfoodWorkspace.root(),
+        "src",
+        "rename-temp-new.ts",
+      );
 
       const sourceContent = [
         "export function greet(): string {",
         "  return 'hello';",
         "}",
-        ""
+        "",
       ].join("\n");
       await replaceDocumentText(oldSourceUri, sourceContent);
 
       const editor = await vscode.window.showTextDocument(
         await vscode.workspace.openTextDocument(oldSourceUri),
-        { preview: false }
+        { preview: false },
       );
 
       // Select line to create a block
-      editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 18));
+      editor.selection = new vscode.Selection(
+        new vscode.Position(1, 0),
+        new vscode.Position(1, 18),
+      );
       await vscode.commands.executeCommand("commentray.startBlockFromSelection");
 
       await vscode.commands.executeCommand("workbench.action.closeAllEditors");
 
-      const oldCompanionUri = commentrayPairedUriForSource(dogfoodWorkspace, "src", "rename-temp.ts");
-      const newCompanionUri = commentrayPairedUriForSource(dogfoodWorkspace, "src", "rename-temp-new.ts");
+      const oldCompanionUri = commentrayPairedUriForSource(
+        dogfoodWorkspace,
+        "src",
+        "rename-temp.ts",
+      );
+      const newCompanionUri = commentrayPairedUriForSource(
+        dogfoodWorkspace,
+        "src",
+        "rename-temp-new.ts",
+      );
 
       // Verify old companion exists
       await vscode.workspace.fs.stat(oldCompanionUri);
@@ -909,8 +943,14 @@ function registerRenameWatcherTests(dogfoodWorkspace: DogfoodWorkspaceAccessor):
       );
       const indexBytes = await vscode.workspace.fs.readFile(indexUri);
       const indexText = new TextDecoder("utf-8").decode(indexBytes);
-      assert.ok(indexText.includes("src/rename-temp-new.ts"), "Index should contain renamed source path");
-      assert.ok(!indexText.includes("src/rename-temp.ts"), "Index should not contain old source path");
+      assert.ok(
+        indexText.includes("src/rename-temp-new.ts"),
+        "Index should contain renamed source path",
+      );
+      assert.ok(
+        !indexText.includes("src/rename-temp.ts"),
+        "Index should not contain old source path",
+      );
     });
   });
 }
@@ -928,4 +968,3 @@ describe("Commentray in VS Code (integration)", () => {
   registerSelfHealingTests(dogfoodWorkspace);
   registerRenameWatcherTests(dogfoodWorkspace);
 });
-

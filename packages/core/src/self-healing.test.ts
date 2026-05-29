@@ -4,6 +4,32 @@ import { addBlockToIndex } from "./blocks.js";
 import { emptyIndex } from "./metadata.js";
 import { buildCommentraySnippetV1 } from "./block-snippet.js";
 
+function createTestIndexWithBlock(id: string, lines: string[]) {
+  return addBlockToIndex(emptyIndex(), {
+    sourcePath: "src/main.ts",
+    commentrayPath: "docs/main.md",
+    block: {
+      id,
+      anchor: `marker:${id}`,
+      snippet: buildCommentraySnippetV1(lines),
+    },
+  });
+}
+
+function runHeal(args: {
+  sourceText: string;
+  companionMarkdown: string;
+  index: ReturnType<typeof emptyIndex>;
+}) {
+  return healSourceFile({
+    sourceText: args.sourceText,
+    languageId: "typescript",
+    companionMarkdown: args.companionMarkdown,
+    index: args.index,
+    commentrayPath: "docs/main.md",
+  });
+}
+
 describe("Self-healing source file regions", () => {
   it("returns original source text and index when no markers are missing", () => {
     const src = [
@@ -22,18 +48,12 @@ describe("Self-healing source file regions", () => {
       "",
     ].join("\n");
 
-    let idx = addBlockToIndex(emptyIndex(), {
-      sourcePath: "src/main.ts",
-      commentrayPath: "docs/main.md",
-      block: { id: "xyz", anchor: "marker:xyz", snippet: buildCommentraySnippetV1(["console.log(1);"]) },
-    });
+    const idx = createTestIndexWithBlock("xyz", ["console.log(1);"]);
 
-    const result = healSourceFile({
+    const result = runHeal({
       sourceText: src,
-      languageId: "typescript",
       companionMarkdown: markdown,
       index: idx,
-      commentrayPath: "docs/main.md",
     });
 
     expect(result.healedCount).toBe(0);
@@ -41,12 +61,7 @@ describe("Self-healing source file regions", () => {
   });
 
   it("restores missing region markers when the snippet unique match is found in the source", () => {
-    // region markers deleted in source
-    const src = [
-      "function main() {",
-      "  console.log(1);",
-      "}",
-    ].join("\n");
+    const src = ["function main() {", "  console.log(1);", "}"].join("\n");
 
     const markdown = [
       "<!-- commentray:block id=xyz -->",
@@ -56,18 +71,12 @@ describe("Self-healing source file regions", () => {
       "",
     ].join("\n");
 
-    let idx = addBlockToIndex(emptyIndex(), {
-      sourcePath: "src/main.ts",
-      commentrayPath: "docs/main.md",
-      block: { id: "xyz", anchor: "marker:xyz", snippet: buildCommentraySnippetV1(["console.log(1);"]) },
-    });
+    const idx = createTestIndexWithBlock("xyz", ["console.log(1);"]);
 
-    const result = healSourceFile({
+    const result = runHeal({
       sourceText: src,
-      languageId: "typescript",
       companionMarkdown: markdown,
       index: idx,
-      commentrayPath: "docs/main.md",
     });
 
     expect(result.healedCount).toBe(1);
@@ -77,17 +86,14 @@ describe("Self-healing source file regions", () => {
   });
 
   it("does not heal a block if it is not present in index", () => {
-    // source has no region, but companion markdown has block, but index does not have it
     const src = "console.log(1);";
     const markdown = "<!-- commentray:block id=xyz -->\n## x\n\nprose";
     const idx = emptyIndex();
 
-    const result = healSourceFile({
+    const result = runHeal({
       sourceText: src,
-      languageId: "typescript",
       companionMarkdown: markdown,
       index: idx,
-      commentrayPath: "docs/main.md",
     });
 
     expect(result.healedCount).toBe(0);

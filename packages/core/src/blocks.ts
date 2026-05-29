@@ -315,14 +315,17 @@ export function removeBlockFromCommentray(markdown: string, blockId: string): st
   const targetHit = hits[targetHitIndex];
   if (!targetHit) return markdown;
 
+  const firstHit = hits[0];
+  if (!firstHit) return markdown;
   // The prelude is from 0 to the start of the first hit.
-  const prelude = markdown.slice(0, hits[0]!.start);
+  const prelude = markdown.slice(0, firstHit.start);
 
   // We filter out the block that has the target ID
   const segments: string[] = [];
   for (let i = 0; i < hits.length; i++) {
     if (i === targetHitIndex) continue;
-    const hit = hits[i]!;
+    const hit = hits[i];
+    if (!hit) continue;
     const nextHit = hits[i + 1];
     const end = nextHit ? nextHit.start : markdown.length;
     segments.push(markdown.slice(hit.start, end));
@@ -359,18 +362,22 @@ export function removeBlockFromIndex(
   if (nextBlocks.length === entry.blocks.length) {
     return index;
   }
-  const nextByCommentrayPath = { ...index.byCommentrayPath };
   if (nextBlocks.length === 0) {
-    delete nextByCommentrayPath[commentrayPath];
-  } else {
-    nextByCommentrayPath[commentrayPath] = {
-      ...entry,
-      blocks: nextBlocks,
+    const { [commentrayPath]: _, ...nextByCommentrayPath } = index.byCommentrayPath;
+    return {
+      ...index,
+      byCommentrayPath: nextByCommentrayPath,
     };
   }
   return {
     ...index,
-    byCommentrayPath: nextByCommentrayPath,
+    byCommentrayPath: {
+      ...index.byCommentrayPath,
+      [commentrayPath]: {
+        ...entry,
+        blocks: nextBlocks,
+      },
+    },
   };
 }
 
@@ -391,11 +398,16 @@ export function alignAndCleanRegions(args: AlignAndCleanRegionsInput): {
 
   // 1. Extract prelude and existing blocks from markdown
   const hits = findCommentrayBlockMarkerHits(args.commentrayMarkdown);
-  const prelude = hits.length > 0 ? args.commentrayMarkdown.slice(0, hits[0]!.start) : args.commentrayMarkdown;
+  const firstHit = hits[0];
+  const prelude =
+    hits.length > 0 && firstHit
+      ? args.commentrayMarkdown.slice(0, firstHit.start)
+      : args.commentrayMarkdown;
 
   const segmentMap = new Map<string, string>();
   for (let i = 0; i < hits.length; i++) {
-    const hit = hits[i]!;
+    const hit = hits[i];
+    if (!hit) continue;
     const nextHit = hits[i + 1];
     const end = nextHit ? nextHit.start : args.commentrayMarkdown.length;
     const segment = args.commentrayMarkdown.slice(hit.start, end);
@@ -444,15 +456,19 @@ export function alignAndCleanRegions(args: AlignAndCleanRegionsInput): {
   }
 
   // 3. Construct new index
-  const nextByCommentrayPath = { ...args.index.byCommentrayPath };
+  let nextByCommentrayPath: CommentrayIndex["byCommentrayPath"];
   if (nextBlocks.length > 0) {
-    nextByCommentrayPath[args.commentrayPath] = {
-      sourcePath: args.sourcePath,
-      commentrayPath: args.commentrayPath,
-      blocks: nextBlocks,
+    nextByCommentrayPath = {
+      ...args.index.byCommentrayPath,
+      [args.commentrayPath]: {
+        sourcePath: args.sourcePath,
+        commentrayPath: args.commentrayPath,
+        blocks: nextBlocks,
+      },
     };
   } else {
-    delete nextByCommentrayPath[args.commentrayPath];
+    const { [args.commentrayPath]: _, ...rest } = args.index.byCommentrayPath;
+    nextByCommentrayPath = rest;
   }
 
   return {
@@ -477,7 +493,10 @@ function parseBlockSegment(segment: string): { heading: string; prose: string } 
     return { heading: "", prose: segment.trim() };
   }
   const heading = lines[headingIdx] ?? "";
-  const prose = lines.slice(headingIdx + 1).join("\n").trim();
+  const prose = lines
+    .slice(headingIdx + 1)
+    .join("\n")
+    .trim();
   return { heading, prose };
 }
 
@@ -516,7 +535,10 @@ export function recoverSourceMarkersFromSnippet(args: {
     return { sourceText: args.sourceText, healed: false };
   }
 
-  const matchIdx = matches[0]!;
+  const matchIdx = matches[0];
+  if (matchIdx === undefined) {
+    return { sourceText: args.sourceText, healed: false };
+  }
   const startLine = matchIdx + 1;
   const endLine = matchIdx + N;
 
