@@ -1,6 +1,10 @@
 import * as assert from "node:assert";
-import { afterEach, before, beforeEach } from "mocha";
+import type { HookFunction } from "mocha";
 import * as vscode from "vscode";
+
+declare const before: HookFunction;
+declare const beforeEach: HookFunction;
+declare const afterEach: HookFunction;
 
 export const pairedMarkdownPath = ".commentray/source/src/sample.ts/main.md";
 
