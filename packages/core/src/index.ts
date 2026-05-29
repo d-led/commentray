@@ -21,6 +21,7 @@ export {
   removeSourceMarkersFromText,
   wrapSourceLineRangeWithCommentrayMarkers,
 } from "./blocks.js";
+export { healSourceFile } from "./self-healing.js";
 export { assertValidAngleId } from "./angles.js";
 export {
   applyAnglesFlatMigrationToCommentrayToml,

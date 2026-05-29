@@ -52,6 +52,9 @@ async function restoreDogfoodMutableFixtures(workspaceRoot: vscode.Uri): Promise
     vscode.Uri.joinPath(workspaceRoot, "src", "existing-region.ts"),
     vscode.Uri.joinPath(workspaceRoot, "src", "manual-preserve.ts"),
     vscode.Uri.joinPath(workspaceRoot, "src", "unsorted-order.ts"),
+    vscode.Uri.joinPath(workspaceRoot, "src", "self-healing-test.ts"),
+    vscode.Uri.joinPath(workspaceRoot, "src", "rename-temp.ts"),
+    vscode.Uri.joinPath(workspaceRoot, "src", "rename-temp-new.ts"),
   ];
   for (const uri of generatedFixtureUris) {
     try {

@@ -787,6 +787,128 @@ function registerRenderedPreviewTests(dogfoodWorkspace: DogfoodWorkspaceAccessor
   });
 }
 
+function registerSelfHealingTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
+  describe("Self-healing region markers (repair command)", () => {
+    it("Given a source file with missing commentary region markers, when repair file command is executed, then the missing markers are restored.", async function () {
+      this.timeout(90_000);
+      await vscode.commands.executeCommand("commentray.init");
+
+      const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "self-healing-test.ts");
+      const originalText = [
+        "export function testFunc(): void {",
+        "  const hello = 'world';",
+        "}",
+        ""
+      ].join("\n");
+      await replaceDocumentText(sourceUri, originalText);
+      const editor = await vscode.window.showTextDocument(
+        await vscode.workspace.openTextDocument(sourceUri),
+        { preview: false }
+      );
+
+      // Select line to create a block
+      editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 24));
+      await vscode.commands.executeCommand("commentray.startBlockFromSelection");
+
+      // Extract generated block ID
+      const docText = editor.document.getText();
+      const match = /commentray:([a-z0-9][a-z0-9_-]{0,62}[a-z0-9])/i.exec(docText);
+      assert.ok(match?.[1], "Expected region marker to be inserted");
+      const blockId = match[1];
+
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+
+      // Delete region markers from source file
+      const deletedMarkersText = [
+        "export function testFunc(): void {",
+        "  const hello = 'world';",
+        "}",
+        ""
+      ].join("\n");
+      await replaceDocumentText(sourceUri, deletedMarkersText);
+
+      const activeEd = await vscode.window.showTextDocument(
+        await vscode.workspace.openTextDocument(sourceUri),
+        { preview: false }
+      );
+
+      await vscode.commands.executeCommand("commentray.repairFile");
+
+      const healedText = activeEd.document.getText();
+      assert.ok(healedText.includes(`//#region commentray:${blockId}`), `Expected start region marker for ${blockId} to be restored`);
+      assert.ok(healedText.includes(`//#endregion commentray:${blockId}`), `Expected end region marker for ${blockId} to be restored`);
+    });
+  });
+}
+
+function registerRenameWatcherTests(dogfoodWorkspace: DogfoodWorkspaceAccessor): void {
+  describe("SCM rename watcher", () => {
+    it("Given a primary source file is renamed, when the rename event is processed, then the companion Markdown is renamed on disk and the index.json is updated.", async function () {
+      this.timeout(90_000);
+      await vscode.commands.executeCommand("commentray.init");
+
+      const oldSourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "rename-temp.ts");
+      const newSourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "rename-temp-new.ts");
+
+      const sourceContent = [
+        "export function greet(): string {",
+        "  return 'hello';",
+        "}",
+        ""
+      ].join("\n");
+      await replaceDocumentText(oldSourceUri, sourceContent);
+
+      const editor = await vscode.window.showTextDocument(
+        await vscode.workspace.openTextDocument(oldSourceUri),
+        { preview: false }
+      );
+
+      // Select line to create a block
+      editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 18));
+      await vscode.commands.executeCommand("commentray.startBlockFromSelection");
+
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+
+      const oldCompanionUri = commentrayPairedUriForSource(dogfoodWorkspace, "src", "rename-temp.ts");
+      const newCompanionUri = commentrayPairedUriForSource(dogfoodWorkspace, "src", "rename-temp-new.ts");
+
+      // Verify old companion exists
+      await vscode.workspace.fs.stat(oldCompanionUri);
+
+      // Rename the source file using a WorkspaceEdit to trigger the VS Code workspace rename event
+      const edit = new vscode.WorkspaceEdit();
+      edit.renameFile(oldSourceUri, newSourceUri);
+      const success = await vscode.workspace.applyEdit(edit);
+      assert.ok(success, "Rename workspace edit should succeed");
+
+      // Give the rename watcher a moment to process the event
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      // Verify new companion exists and old companion does not
+      await vscode.workspace.fs.stat(newCompanionUri);
+      let oldCompanionExists = true;
+      try {
+        await vscode.workspace.fs.stat(oldCompanionUri);
+      } catch {
+        oldCompanionExists = false;
+      }
+      assert.strictEqual(oldCompanionExists, false, "Old companion should be removed/moved");
+
+      // Verify index.json was updated with new path
+      const indexUri = vscode.Uri.joinPath(
+        dogfoodWorkspace.root(),
+        ".commentray",
+        "metadata",
+        "index.json",
+      );
+      const indexBytes = await vscode.workspace.fs.readFile(indexUri);
+      const indexText = new TextDecoder("utf-8").decode(indexBytes);
+      assert.ok(indexText.includes("src/rename-temp-new.ts"), "Index should contain renamed source path");
+      assert.ok(!indexText.includes("src/rename-temp.ts"), "Index should not contain old source path");
+    });
+  });
+}
+
 describe("Commentray in VS Code (integration)", () => {
   const dogfoodWorkspace = registerDogfoodWorkspaceLifecycle();
   registerExtensionSurfaceTests(dogfoodWorkspace);
@@ -797,4 +919,7 @@ describe("Commentray in VS Code (integration)", () => {
   registerAddBlockFromSelectionTests(dogfoodWorkspace);
   registerMarkdownPreviewTests(dogfoodWorkspace);
   registerRenderedPreviewTests(dogfoodWorkspace);
+  registerSelfHealingTests(dogfoodWorkspace);
+  registerRenameWatcherTests(dogfoodWorkspace);
 });
+

@@ -34,7 +34,8 @@
     "onCommand:commentray.validateWorkspace",
     "onCommand:commentray.openCorrespondingSource",
     "onCommand:commentray.removeBlock",
-    "onCommand:commentray.cleanRegions"
+    "onCommand:commentray.cleanRegions",
+    "onCommand:commentray.repairFile"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -119,6 +120,12 @@
         "title": "Clean and align commentary regions",
         "category": "Commentray",
         "enablement": "commentray.workspaceInitialized"
+      },
+      {
+        "command": "commentray.repairFile",
+        "title": "Repair commentary region markers",
+        "category": "Commentray",
+        "enablement": "commentray.workspaceInitialized && !editorReadonly"
       }
     ],
     "keybindings": [
@@ -186,6 +193,11 @@
           "command": "commentray.cleanRegions",
           "group": "commentray@2b",
           "when": "editorTextFocus && commentray.workspaceInitialized"
+        },
+        {
+          "command": "commentray.repairFile",
+          "group": "commentray@2c",
+          "when": "editorTextFocus && commentray.workspaceInitialized && !editorReadonly"
         }
       ],
       "explorer/context": [

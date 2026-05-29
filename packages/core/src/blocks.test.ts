@@ -7,6 +7,7 @@ import {
   createBlockForRange,
   generateBlockId,
   insertBlockBySourceMarkerOrder,
+  recoverSourceMarkersFromSnippet,
   removeBlockFromCommentray,
   removeBlockFromIndex,
   removeSourceMarkersFromText,
@@ -613,5 +614,84 @@ describe("Aligning and cleaning regions across source, markdown, and index", () 
 
     const entry = index.byCommentrayPath["docs/main.md"];
     expect(entry?.blocks.map(b => b.id)).toEqual(["first"]);
+  });
+});
+
+describe("Recovering source markers from snippet", () => {
+  it("returns healed=false and unchanged sourceText when snippet is missing or empty", () => {
+    const block: CommentrayBlock = { id: "greet", anchor: "marker:greet" };
+    const src = "function greet() {\n  return 'hi';\n}";
+    const result = recoverSourceMarkersFromSnippet({ sourceText: src, languageId: "typescript", block });
+    expect(result.healed).toBe(false);
+    expect(result.sourceText).toBe(src);
+  });
+
+  it("re-inserts region markers when a unique match of snippet is found", () => {
+    const snippet = buildCommentraySnippetV1(["const x = 1;", "return x;"]);
+    const block: CommentrayBlock = { id: "sum", anchor: "marker:sum", snippet };
+    const src = [
+      "function sum() {",
+      "  const x = 1;",
+      "  return x;",
+      "}",
+    ].join("\n");
+
+    const result = recoverSourceMarkersFromSnippet({ sourceText: src, languageId: "typescript", block });
+
+    expect(result.healed).toBe(true);
+    expect(result.range).toEqual({ startLine: 3, endLine: 4 });
+    expect(result.sourceText).toBe([
+      "function sum() {",
+      "  //#region commentray:sum",
+      "  const x = 1;",
+      "  return x;",
+      "  //#endregion commentray:sum",
+      "}",
+    ].join("\n"));
+  });
+
+  it("handles whitespace and indentation differences during snippet matching", () => {
+    const snippet = buildCommentraySnippetV1(["const x = 1;", "return x;"]);
+    const block: CommentrayBlock = { id: "sum", anchor: "marker:sum", snippet };
+    // source has different indentation
+    const src = [
+      "function sum() {",
+      "\tconst x = 1;",
+      "\t\treturn x;",
+      "}",
+    ].join("\n");
+
+    const result = recoverSourceMarkersFromSnippet({ sourceText: src, languageId: "typescript", block });
+
+    expect(result.healed).toBe(true);
+    expect(result.range).toEqual({ startLine: 3, endLine: 4 });
+  });
+
+  it("returns healed=false when the snippet is not found in the source", () => {
+    const snippet = buildCommentraySnippetV1(["const x = 2;"]);
+    const block: CommentrayBlock = { id: "sum", anchor: "marker:sum", snippet };
+    const src = "function sum() {\n  const x = 1;\n}";
+
+    const result = recoverSourceMarkersFromSnippet({ sourceText: src, languageId: "typescript", block });
+
+    expect(result.healed).toBe(false);
+    expect(result.sourceText).toBe(src);
+  });
+
+  it("returns healed=false when snippet matches multiple locations (ambiguous match)", () => {
+    const snippet = buildCommentraySnippetV1(["console.log(1);"]);
+    const block: CommentrayBlock = { id: "log", anchor: "marker:log", snippet };
+    const src = [
+      "function first() {",
+      "  console.log(1);",
+      "}",
+      "function second() {",
+      "  console.log(1);",
+      "}",
+    ].join("\n");
+
+    const result = recoverSourceMarkersFromSnippet({ sourceText: src, languageId: "typescript", block });
+
+    expect(result.healed).toBe(false);
   });
 });

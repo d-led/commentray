@@ -4,12 +4,15 @@ import {
   type CommentrayIndex,
   addBlockToIndex,
   alignAndCleanRegions,
+  applyPathRenamesToCommentrayIndex,
   assertValidAngleId,
   assertValidMarkerId,
   buildBlockScrollLinks,
   commentrayActiveEditorUiFlags,
   commentrayAnglesLayoutEnabled,
   commentrayAnglesSentinelPath,
+  commentrayMarkdownPath,
+  commentrayMarkdownPathForAngle,
   commentrayStorageSourcePrefix,
   createBlockForRange,
   defaultMetadataIndexPath,
@@ -18,6 +21,8 @@ import {
   ensureAnglesSentinelFile,
   extractCommentrayBlockIdsFromMarkdown,
   findCommentrayMarkerPairs,
+  healSourceFile,
+  inferAngleIdFromCommentrayPath,
   initializeCommentrayProject,
   insertBlockBySourceMarkerOrder,
   isCommentrayProjectInitialized,
@@ -1380,6 +1385,133 @@ async function cleanRegionsCommand(): Promise<void> {
   }
 }
 
+async function repairFileCommand(): Promise<void> {
+  const active = await requireActiveEditorInWorkspace();
+  if (!active) return;
+
+  const paths = await resolvePathsForActiveEditor(active);
+  if (!paths) return;
+
+  try {
+    const sourceUri = vscode.Uri.file(path.join(paths.repoRoot, ...paths.sourceRelative.split("/")));
+    const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+    const sourceText = sourceDoc.getText();
+
+    let commentrayDoc: vscode.TextDocument;
+    try {
+      commentrayDoc = await vscode.workspace.openTextDocument(paths.commentrayUri);
+    } catch {
+      await vscode.window.showWarningMessage("Paired companion markdown file does not exist.");
+      return;
+    }
+    const companionMarkdown = commentrayDoc.getText();
+
+    let index: CommentrayIndex;
+    try {
+      index = (await readIndex(paths.repoRoot)) ?? emptyIndex();
+    } catch {
+      index = emptyIndex();
+    }
+
+    const result = healSourceFile({
+      sourceText,
+      languageId: active.editor.document.languageId,
+      companionMarkdown,
+      index,
+      commentrayPath: paths.commentrayPathRel,
+    });
+
+    if (result.healedCount === 0) {
+      void vscode.window.showInformationMessage("No missing commentary region markers detected or healed.");
+      return;
+    }
+
+    // Write index and source back
+    await writeIndex(paths.repoRoot, result.index);
+
+    const sourceEditor = vscode.window.visibleTextEditors.find(
+      (te) => te.document.uri.toString() === sourceDoc.uri.toString(),
+    );
+    if (sourceEditor) {
+      await replaceDocumentContents(sourceEditor.document, result.sourceText);
+      await sourceEditor.document.save();
+    } else {
+      await replaceDocumentContents(sourceDoc, result.sourceText);
+      await sourceDoc.save();
+    }
+
+    void vscode.window.showInformationMessage(`Successfully repaired and restored ${result.healedCount} region marker(s).`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logCommentray(`[commentray] repairFile failed: ${msg}`);
+    await vscode.window.showErrorMessage(`Could not repair file: ${msg}`);
+  }
+}
+
+function registerRenameWatcher(context: vscode.ExtensionContext) {
+  const disposable = vscode.workspace.onDidRenameFiles(async (e) => {
+    for (const file of e.files) {
+      try {
+        const relativeOld = vscode.workspace.asRelativePath(file.oldUri, false);
+        const relativeNew = vscode.workspace.asRelativePath(file.newUri, false);
+        const oldNorm = normalizeRepoRelativePath(relativeOld.replaceAll("\\", "/"));
+        const newNorm = normalizeRepoRelativePath(relativeNew.replaceAll("\\", "/"));
+
+        const folder = vscode.workspace.getWorkspaceFolder(file.newUri);
+        if (!folder) continue;
+        const repoRoot = folder.uri.fsPath;
+
+        const cfg = await loadCommentrayConfig(repoRoot);
+        const index = await readIndex(repoRoot);
+        if (!index) continue;
+
+        const anglesLayout = commentrayAnglesLayoutEnabled(repoRoot, cfg.storageDir);
+        const renames = [{ from: oldNorm, to: newNorm }];
+
+        // Physically rename companion files on disk if the source file was renamed
+        for (const [oldCp, entry] of Object.entries(index.byCommentrayPath)) {
+          if (normalizeRepoRelativePath(entry.sourcePath) === oldNorm) {
+            let newCp = oldCp;
+            if (anglesLayout) {
+              const angleId = inferAngleIdFromCommentrayPath(entry.commentrayPath, entry.sourcePath, cfg.storageDir);
+              if (angleId) {
+                try {
+                  newCp = commentrayMarkdownPathForAngle(newNorm, assertValidAngleId(angleId), cfg.storageDir);
+                } catch {}
+              }
+            } else {
+              newCp = commentrayMarkdownPath(newNorm, cfg.storageDir);
+            }
+
+            if (newCp !== oldCp) {
+              const oldUri = vscode.Uri.file(path.join(repoRoot, ...oldCp.split("/")));
+              const newUri = vscode.Uri.file(path.join(repoRoot, ...newCp.split("/")));
+              try {
+                const parent = path.dirname(newUri.fsPath);
+                await vscode.workspace.fs.createDirectory(vscode.Uri.file(parent));
+                await vscode.workspace.fs.rename(oldUri, newUri, { overwrite: true });
+                logCommentray(`[commentray] Automatically renamed companion Markdown file on disk: ${oldCp} -> ${newCp}`);
+              } catch (renameErr) {
+                logCommentray(`[commentray] Failed to rename companion file on disk: ${renameErr}`);
+              }
+            }
+          }
+        }
+
+        const result = applyPathRenamesToCommentrayIndex(index, renames, repoRoot, cfg);
+        if (result.changed) {
+          await writeIndex(repoRoot, result.index);
+          logCommentray(`[commentray] Automatically updated index for renamed file: ${oldNorm} -> ${newNorm}`);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logCommentray(`[commentray] rename watcher failed: ${msg}`);
+      }
+    }
+  });
+  context.subscriptions.push(disposable);
+}
+
 async function initWorkspaceCommand(output: vscode.OutputChannel): Promise<void> {
   const folder = pickWorkspaceFolderForRepoWideCommand();
   if (!folder) {
@@ -1634,6 +1766,7 @@ export function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand("commentray.removeBlock", removeBlockCommand),
     vscode.commands.registerCommand("commentray.cleanRegions", cleanRegionsCommand),
+    vscode.commands.registerCommand("commentray.repairFile", repairFileCommand),
     vscode.workspace.onDidChangeConfiguration((e) => {
       try {
         if (!e.affectsConfiguration("commentray.scrollSync")) return;
@@ -1686,6 +1819,7 @@ export function activate(context: vscode.ExtensionContext) {
     { dispose: () => disposeScrollSync() },
   );
 
+  registerRenameWatcher(context);
   refreshUiContexts();
 }
 

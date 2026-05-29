@@ -1,4 +1,4 @@
-import { buildCommentraySnippetV1 } from "./block-snippet.js";
+import { buildCommentraySnippetV1, parseCommentraySnippetV1 } from "./block-snippet.js";
 import { formatMarkerAnchor } from "./anchors.js";
 import { assertValidMarkerId } from "./marker-ids.js";
 import { findCommentrayMarkerPairs, leadingIndentOfLine } from "./region-marker-convert.js";
@@ -120,7 +120,7 @@ export function appendBlockToCommentray(existing: string, blockMarkdown: string)
   return `${body}${fragment}`;
 }
 
-type CommentrayBlockMarkerHit = {
+export type CommentrayBlockMarkerHit = {
   id: string;
   start: number;
 };
@@ -194,7 +194,7 @@ function markerStartOrderMap(sourceText: string): Map<string, number> {
   return order;
 }
 
-function findCommentrayBlockMarkerHits(markdown: string): CommentrayBlockMarkerHit[] {
+export function findCommentrayBlockMarkerHits(markdown: string): CommentrayBlockMarkerHit[] {
   const hits: CommentrayBlockMarkerHit[] = [];
   const markerRe = /<!--\s*commentray:block\s+id=([a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?)\s*-->/gi;
   for (const m of markdown.matchAll(markerRe)) {
@@ -479,4 +479,57 @@ function parseBlockSegment(segment: string): { heading: string; prose: string } 
   const heading = lines[headingIdx] ?? "";
   const prose = lines.slice(headingIdx + 1).join("\n").trim();
   return { heading, prose };
+}
+
+export function recoverSourceMarkersFromSnippet(args: {
+  sourceText: string;
+  languageId: string;
+  block: CommentrayBlock;
+}): { sourceText: string; healed: boolean; range?: BlockRange } {
+  if (!args.block.snippet) {
+    return { sourceText: args.sourceText, healed: false };
+  }
+  const snippetLines = parseCommentraySnippetV1(args.block.snippet);
+  if (!snippetLines || snippetLines.length === 0) {
+    return { sourceText: args.sourceText, healed: false };
+  }
+
+  const sourceLines = args.sourceText.replaceAll("\r\n", "\n").split("\n");
+  const S = sourceLines.length;
+  const N = snippetLines.length;
+
+  const matches: number[] = [];
+  for (let i = 0; i <= S - N; i++) {
+    let match = true;
+    for (let j = 0; j < N; j++) {
+      if ((sourceLines[i + j] ?? "").trim() !== snippetLines[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      matches.push(i);
+    }
+  }
+
+  if (matches.length !== 1) {
+    return { sourceText: args.sourceText, healed: false };
+  }
+
+  const matchIdx = matches[0]!;
+  const startLine = matchIdx + 1;
+  const endLine = matchIdx + N;
+
+  const wrapped = wrapSourceLineRangeWithCommentrayMarkers({
+    sourceText: args.sourceText,
+    range: { startLine, endLine },
+    languageId: args.languageId,
+    markerId: args.block.id,
+  });
+
+  return {
+    sourceText: wrapped.sourceText,
+    healed: true,
+    range: wrapped.innerRange,
+  };
 }
