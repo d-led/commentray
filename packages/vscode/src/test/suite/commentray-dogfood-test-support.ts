@@ -48,6 +48,8 @@ async function restoreDogfoodMutableFixtures(workspaceRoot: vscode.Uri): Promise
     DOGFOOD_INTEGRATION_MARKDOWN_SOURCE_BYTES,
   );
   const generatedFixtureUris = [
+    vscode.Uri.joinPath(workspaceRoot, "src", "boundary-recovery.ts"),
+    vscode.Uri.joinPath(workspaceRoot, "src", "existing-region.ts"),
     vscode.Uri.joinPath(workspaceRoot, "src", "manual-preserve.ts"),
     vscode.Uri.joinPath(workspaceRoot, "src", "unsorted-order.ts"),
   ];

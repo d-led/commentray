@@ -83,12 +83,6 @@ async function replaceDocumentText(uri: vscode.Uri, text: string): Promise<void>
   await doc.save();
 }
 
-async function writeTextFileDirect(uri: vscode.Uri, text: string): Promise<void> {
-  const parent = path.dirname(uri.fsPath);
-  await vscode.workspace.fs.createDirectory(vscode.Uri.file(parent));
-  await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
-}
-
 function integrationMarkdownSourceUri(dogfoodWorkspace: DogfoodWorkspaceAccessor): vscode.Uri {
   return vscode.Uri.joinPath(dogfoodWorkspace.root(), "docs", "integration-markdown-source.md");
 }
@@ -100,6 +94,19 @@ function integrationMarkdownPairedUri(dogfoodWorkspace: DogfoodWorkspaceAccessor
     "source",
     "docs",
     "integration-markdown-source.md",
+    "main.md",
+  );
+}
+
+function commentrayPairedUriForSource(
+  dogfoodWorkspace: DogfoodWorkspaceAccessor,
+  ...sourceSegments: string[]
+): vscode.Uri {
+  return vscode.Uri.joinPath(
+    dogfoodWorkspace.root(),
+    ".commentray",
+    "source",
+    ...sourceSegments,
     "main.md",
   );
 }
@@ -392,11 +399,15 @@ async function assertSelectionInsideExistingRegionRevealsExistingBlock(
   dogfoodWorkspace: DogfoodWorkspaceAccessor,
 ): Promise<void> {
   await vscode.commands.executeCommand("commentray.init");
-  const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts");
+  const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "existing-region.ts");
   const withRegion = sampleSourceWithGreetRegion(true);
   await replaceDocumentText(sourceUri, withRegion);
+  const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+  await vscode.window.showTextDocument(sourceDoc, { preview: false });
 
-  const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+
+  const pairedUri = commentrayPairedUriForSource(dogfoodWorkspace, "src", "existing-region.ts");
   const pairedBefore = [
     "<!-- commentray:block id=greet -->",
     "## greet",
@@ -404,10 +415,15 @@ async function assertSelectionInsideExistingRegionRevealsExistingBlock(
     "already documented",
     "",
   ].join("\n");
-  await writeTextFileDirect(pairedUri, pairedBefore);
+  await replaceDocumentText(pairedUri, pairedBefore);
 
-  const doc = await vscode.workspace.openTextDocument(sourceUri);
-  const ed = await vscode.window.showTextDocument(doc, { preview: false });
+  await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+  const ed = await vscode.window.showTextDocument(
+    await vscode.workspace.openTextDocument(sourceUri),
+    {
+      preview: false,
+    },
+  );
   ed.selection = new vscode.Selection(new vscode.Position(2, 2), new vscode.Position(2, 20));
 
   await vscode.commands.executeCommand("commentray.startBlockFromSelection");
@@ -437,17 +453,25 @@ async function assertSelectionTouchingBoundaryRecoversMissingBlock(
   dogfoodWorkspace: DogfoodWorkspaceAccessor,
 ): Promise<void> {
   await vscode.commands.executeCommand("commentray.init");
-  const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts");
+  const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "boundary-recovery.ts");
   const withRegion = sampleSourceWithGreetRegion(false);
   await replaceDocumentText(sourceUri, withRegion);
+  const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+  await vscode.window.showTextDocument(sourceDoc, { preview: false });
 
-  const pairedUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), ...pairedMarkdownPath.split("/"));
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+
+  const pairedUri = commentrayPairedUriForSource(dogfoodWorkspace, "src", "boundary-recovery.ts");
   const pairedBefore = ["# custom", ""].join("\n");
-  await writeTextFileDirect(pairedUri, pairedBefore);
+  await replaceDocumentText(pairedUri, pairedBefore);
   await vscode.commands.executeCommand("workbench.action.closeAllEditors");
 
-  const doc = await vscode.workspace.openTextDocument(sourceUri);
-  const ed = await vscode.window.showTextDocument(doc, { preview: false });
+  const ed = await vscode.window.showTextDocument(
+    await vscode.workspace.openTextDocument(sourceUri),
+    {
+      preview: false,
+    },
+  );
   ed.selection = new vscode.Selection(new vscode.Position(1, 2), new vscode.Position(1, 20));
 
   await vscode.commands.executeCommand("commentray.startBlockFromSelection");
@@ -566,7 +590,7 @@ async function assertUnsortedInsertionsReorderedBySourceFlow(
 ): Promise<void> {
   await vscode.commands.executeCommand("commentray.init");
 
-  const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "sample.ts");
+  const sourceUri = vscode.Uri.joinPath(dogfoodWorkspace.root(), "src", "unsorted-order.ts");
   const sourceContent = [
     "export function greet(name: string): string {",
     "  return `Hello, ${name}!`;",
@@ -580,15 +604,14 @@ async function assertUnsortedInsertionsReorderedBySourceFlow(
     "",
   ].join("\n");
   await replaceDocumentText(sourceUri, sourceContent);
+  const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+  await vscode.window.showTextDocument(sourceDoc, {
+    preview: false,
+  });
 
-  const pairedUri = vscode.Uri.joinPath(
-    dogfoodWorkspace.root(),
-    ".commentray",
-    "source",
-    "src",
-    "sample.ts",
-    "main.md",
-  );
+  await vscode.commands.executeCommand("commentray.openSideBySide");
+
+  const pairedUri = commentrayPairedUriForSource(dogfoodWorkspace, "src", "unsorted-order.ts");
   const pairedSeed = [
     "# custom",
     "",
@@ -598,7 +621,7 @@ async function assertUnsortedInsertionsReorderedBySourceFlow(
     "bottom block",
     "",
   ].join("\n");
-  await writeTextFileDirect(pairedUri, pairedSeed);
+  await replaceDocumentText(pairedUri, pairedSeed);
 
   await vscode.commands.executeCommand("workbench.action.closeAllEditors");
   const editor = await vscode.window.showTextDocument(
@@ -607,9 +630,6 @@ async function assertUnsortedInsertionsReorderedBySourceFlow(
       preview: false,
     },
   );
-
-  await vscode.commands.executeCommand("commentray.openSideBySide");
-  await vscode.window.showTextDocument(editor.document, { preview: false });
 
   const markdownOrder = async (): Promise<string[]> => {
     const text = new TextDecoder("utf-8").decode(await vscode.workspace.fs.readFile(pairedUri));
