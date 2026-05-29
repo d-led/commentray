@@ -1,4 +1,58 @@
 describe("Semantic link checking and permalink verification", () => {
+  function currentPageSupportsScrollAnchors(): Cypress.Chainable<boolean> {
+    return cy.document().then((doc) => {
+      return doc.querySelectorAll(".commentray-block-anchor, [id^='commentray-md-line-']").length > 0;
+    });
+  }
+
+  function gatherScrollAnchorCandidateHrefs(): Cypress.Chainable<string[]> {
+    return cy.document().then((doc) => {
+      const hrefs = new Set<string>();
+      const shell = doc.querySelector(".shell");
+      const pairBrowseHref = shell?.getAttribute("data-commentray-pair-browse-href")?.trim() ?? "";
+      if (pairBrowseHref.length > 0 && pairBrowseHref.startsWith("/")) {
+        hrefs.add(pairBrowseHref);
+      }
+
+      for (const link of Array.from(doc.querySelectorAll<HTMLAnchorElement>("a[href]"))) {
+        const href = link.getAttribute("href")?.trim() ?? "";
+        if (!href) continue;
+        if (href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("data:") || href.startsWith("javascript:")) {
+          continue;
+        }
+        if (href.startsWith("/") && !href.startsWith("//")) {
+          hrefs.add(href);
+        }
+      }
+
+      const candidates = Array.from(hrefs).filter((href) => href.includes("/browse/") || href.includes("/__e2e__/") || href.includes("/README.md/"));
+      if (candidates.length > 0) {
+        return candidates;
+      }
+      return ["/__e2e__/dual-scroll-sync/index.html"];
+    });
+  }
+
+  function visitFirstAnchorCapablePage(candidates: string[], index = 0): Cypress.Chainable<void> {
+    if (index >= candidates.length) {
+      throw new Error("Could not find an anchor-capable page to verify permalink scroll preservation");
+    }
+
+    const candidate = candidates[index];
+    return cy.visit(candidate, {
+      onBeforeLoad(win) {
+        win.localStorage.setItem("commentray.codeCommentrayStatic.wideModeIntro.v1", "1");
+      },
+    })
+    .then(() => currentPageSupportsScrollAnchors())
+    .then((hasAnchors) => {
+      if (hasAnchors) {
+        return;
+      }
+      return visitFirstAnchorCapablePage(candidates, index + 1);
+    });
+  }
+
   beforeEach(() => {
     cy.GoToStaticSiteHome();
   });
@@ -105,7 +159,13 @@ describe("Semantic link checking and permalink verification", () => {
 
   it("verifies that the copied permalink preserves vertical scroll position hash", () => {
     cy.ApplyDualPaneScrollTestViewport();
-    cy.GoToStaticSiteHomeForDualPaneScrollTests();
+    cy.CurrentPageShouldDisplayCodeBrowserShell();
+
+    currentPageSupportsScrollAnchors().then((hasAnchors) => {
+      if (!hasAnchors) {
+        return gatherScrollAnchorCandidateHrefs().then((candidates) => visitFirstAnchorCapablePage(candidates));
+      }
+    });
 
     cy.CurrentPageShouldDisplayCodeBrowserShell();
     cy.ScrollDocPaneBodyToMaximum();
